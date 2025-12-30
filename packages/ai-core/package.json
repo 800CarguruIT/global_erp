@@ -1,0 +1,30 @@
+{
+  "name": "@repo/ai-core",
+  "version": "0.0.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./server": "./src/index.ts",
+    "./client": "./src/client.ts",
+    "./reference-data": "./src/reference-data/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint . --max-warnings 0",
+    "check-types": "tsc --noEmit",
+    "build": "tsc -p tsconfig.json",
+    "migrate": "ts-node --transpile-only --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" scripts/migrate.ts"
+  },
+  "dependencies": {
+    "openai": "^6.9.1",
+    "postgres": "^3.4.4"
+  },
+  "devDependencies": {
+    "@repo/eslint-config": "workspace:*",
+    "@repo/typescript-config": "workspace:*",
+    "@types/node": "^22.15.3",
+    "eslint": "^9.39.1",
+    "typescript": "5.9.2"
+  }
+}
