@@ -374,6 +374,30 @@ export const CHANNEL_PROVIDER_TEMPLATES: ChannelProviderTemplate[] = [
     ],
   },
   {
+    key: "infobip-sms",
+    label: "Infobip SMS",
+    category: "Messaging",
+    channelType: "sms",
+    defaultAuthType: "apiKey",
+    fields: [
+      { id: "apiKey", label: "API Key", type: "password", required: true, section: "credentials" },
+      { id: "defaultFrom", label: "Default From (Sender)", type: "string", required: true, section: "metadata" },
+      { id: "apiBaseUrl", label: "API Base URL", type: "url", section: "metadata", placeholder: "https://api.infobip.com" },
+    ],
+  },
+  {
+    key: "messagebird-sms",
+    label: "MessageBird SMS",
+    category: "Messaging",
+    channelType: "sms",
+    defaultAuthType: "apiKey",
+    fields: [
+      { id: "accessKey", label: "Access Key", type: "password", required: true, section: "credentials" },
+      { id: "defaultFrom", label: "Default From (Originator)", type: "string", required: true, section: "metadata" },
+      { id: "apiBaseUrl", label: "API Base URL", type: "url", section: "metadata", placeholder: "https://rest.messagebird.com" },
+    ],
+  },
+  {
     key: "whatsapp-cloud",
     label: "WhatsApp Cloud API",
     category: "Messaging",
@@ -410,6 +434,24 @@ export const CHANNEL_PROVIDER_TEMPLATES: ChannelProviderTemplate[] = [
         helpText: "GupShup / MessageBird / Kaleyra",
       },
       { id: "defaultFromNumber", label: "Default From Number", type: "string", section: "metadata" },
+    ],
+  },
+  {
+    key: "firebase-push",
+    label: "Firebase Cloud Messaging",
+    category: "Messaging",
+    channelType: "messaging",
+    defaultAuthType: "service_account",
+    fields: [
+      {
+        id: "serviceAccountKeyJson",
+        label: "Service Account Key JSON",
+        type: "password",
+        required: true,
+        section: "credentials",
+        helpText: "Full Firebase service account JSON",
+      },
+      { id: "projectId", label: "Project ID", type: "string", section: "metadata" },
     ],
   },
   {

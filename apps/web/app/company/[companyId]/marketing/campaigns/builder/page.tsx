@@ -12,6 +12,7 @@ export default function CompanyCampaignBuilderPage() {
         typeLabelKey: "marketing.campaigns.type",
         typePluralKey: "marketing.campaigns.typePlural",
         mode: "builder",
+        itemsApi: "campaigns",
         builder: {
           titleKey: "marketing.campaigns.builder.title",
           descriptionKey: "marketing.campaigns.builder.desc",
@@ -81,6 +82,11 @@ export default function CompanyCampaignBuilderPage() {
             key: "name",
             labelKey: "marketing.campaigns.field.name.label",
             placeholderKey: "marketing.campaigns.field.name.placeholder",
+          },
+          {
+            key: "startsAt",
+            labelKey: "marketing.campaigns.builder.settings.wait.datetime.label",
+            type: "datetime",
           },
           {
             key: "objective",

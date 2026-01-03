@@ -18,8 +18,11 @@ import "./providers/whatsapp-generic";
 import "./providers/meta-generic";
 import "./providers/sendgrid";
 import "./providers/twilio-sms";
+import "./providers/infobip-sms";
+import "./providers/messagebird-sms";
 import "./providers/whatsapp-cloud";
 import "./providers/ga4";
+import "./providers/firebase-push";
 import type { IntegrationHealth, IntegrationHealthStatus } from "./types";
 import { getIntegrationHealthForIds, upsertIntegrationHealth } from "../shared/healthRepository";
 import {

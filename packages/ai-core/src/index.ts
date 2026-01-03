@@ -97,7 +97,13 @@ export * as TranslationsRepo from "./translations/translationsRepo";
 export * as TranslationsService from "./translations/translationsService";
 export * as MarketingTemplates from "./marketing/templates/repository";
 export * as CampaignBuilder from "./marketing/campaigns/builderRepository";
+export * as CampaignSchedules from "./marketing/campaigns/scheduleRepository";
+export * as CampaignScheduler from "./marketing/campaigns/scheduler";
+export * as CampaignPerformance from "./marketing/campaigns/performanceRepository";
+export * as MarketingSettings from "./marketing/settings/repository";
 export * as MarketingSegments from "./marketing/segments/repository";
+export * as Push from "./push/service";
+export * as PushTypes from "./push/types";
 
 export { getOpenAIClient } from "./ai/client";
 export { canUseAi } from "./ai/policy";

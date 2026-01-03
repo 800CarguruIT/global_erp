@@ -29,6 +29,13 @@ export default function CompanySettingsHome({ params }: Params) {
               href={`/company/${companyId}/settings/integrations`}
             />
           )}
+          {companyId && (
+            <SettingsCard
+              title="Marketing Scheduling"
+              description="Configure EasyCron settings for campaign launch and delays."
+              href={`/company/${companyId}/settings/marketing`}
+            />
+          )}
           <SettingsCard
             title="Profile"
             description="View and update your profile."

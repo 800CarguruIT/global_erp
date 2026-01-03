@@ -12,6 +12,8 @@ export default function CompanyCampaignsPage() {
         typeLabelKey: "marketing.campaigns.type",
         typePluralKey: "marketing.campaigns.typePlural",
         mode: "manager",
+        itemsApi: "campaigns",
+        hideForm: true,
         builder: {
           titleKey: "marketing.campaigns.builder.title",
           descriptionKey: "marketing.campaigns.builder.desc",
@@ -114,35 +116,18 @@ export default function CompanyCampaignsPage() {
         },
         fields: [
           {
+            key: "companyId",
+            labelKey: "marketing.campaigns.field.company.label",
+          },
+          {
             key: "name",
             labelKey: "marketing.campaigns.field.name.label",
             placeholderKey: "marketing.campaigns.field.name.placeholder",
           },
           {
-            key: "objective",
-            labelKey: "marketing.campaigns.field.objective.label",
-            placeholderKey: "marketing.campaigns.field.objective.placeholder",
-          },
-          {
-            key: "channel",
-            labelKey: "marketing.campaigns.field.channel.label",
-            type: "select",
-            options: [
-              { value: "sms", labelKey: "marketing.campaigns.field.channel.options.sms" },
-              { value: "email", labelKey: "marketing.campaigns.field.channel.options.email" },
-              { value: "whatsapp", labelKey: "marketing.campaigns.field.channel.options.whatsapp" },
-              { value: "ads", labelKey: "marketing.campaigns.field.channel.options.ads" },
-            ],
-          },
-          {
-            key: "budget",
-            labelKey: "marketing.campaigns.field.budget.label",
-            placeholderKey: "marketing.campaigns.field.budget.placeholder",
-          },
-          {
-            key: "audience",
-            labelKey: "marketing.campaigns.field.audience.label",
-            placeholderKey: "marketing.campaigns.field.audience.placeholder",
+            key: "startsAt",
+            labelKey: "marketing.campaigns.builder.settings.wait.datetime.label",
+            type: "datetime",
           },
         ],
         statusKeys: [
