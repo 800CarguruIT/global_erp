@@ -160,6 +160,22 @@ export const SIDEBAR_TREE: Partial<Record<NavScope, SidebarItem[]>> = {
         { label: "Branch", href: "/company/[companyId]/quotes/branch" },
       ],
     },
+    {
+      label: "Estimates",
+      href: "/company/[companyId]/estimates",
+      children: [
+        { label: "Create", href: "/company/[companyId]/estimates/new" },
+        { label: "List", href: "/company/[companyId]/estimates", exactMatch: true },
+      ],
+    },
+    {
+      label: "Inspections",
+      href: "/company/[companyId]/inspections",
+      children: [
+        { label: "Create", href: "/company/[companyId]/inspections/new" },
+        { label: "List", href: "/company/[companyId]/inspections", exactMatch: true },
+      ],
+    },
     { label: "Jobs", href: "/company/[companyId]/jobs" },
     { label: "Cars", href: "/company/[companyId]/cars" },
     {

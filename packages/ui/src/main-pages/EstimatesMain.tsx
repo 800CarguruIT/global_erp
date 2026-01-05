@@ -21,6 +21,14 @@ export function EstimatesMain({ companyId, companyName }: EstimatesMainProps) {
     error: null,
   });
   const [statusFilter, setStatusFilter] = useState<EstimateStatus | "all">("all");
+  const statusTabs: Array<{ id: EstimateStatus | "all"; label: string }> = [
+    { id: "all", label: "All" },
+    { id: "draft", label: "Draft" },
+    { id: "pending_approval", label: "Pending approval" },
+    { id: "approved", label: "Approved" },
+    { id: "rejected", label: "Rejected" },
+    { id: "cancelled", label: "Cancelled" },
+  ];
 
   useEffect(() => {
     let cancelled = false;
@@ -63,23 +71,22 @@ export function EstimatesMain({ companyId, companyName }: EstimatesMainProps) {
         </a>
       }
     >
-      <div className="flex items-center gap-3 py-2">
-        <label className="text-xs text-muted-foreground">Status</label>
-        <select
-          className="rounded-md border px-2 py-1 text-sm"
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as EstimateStatus | "all")}
-        >
-          <option value="all">All</option>
-          <option value="draft">Draft</option>
-          <option value="pending_approval">Pending approval</option>
-          <option value="approved">Approved</option>
-          <option value="rejected">Rejected</option>
-          <option value="cancelled">Cancelled</option>
-        </select>
+      <div className="flex flex-wrap items-center gap-2 py-2">
+        {statusTabs.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setStatusFilter(tab.id)}
+            className={`rounded-full border px-3 py-1 text-xs ${
+              statusFilter === tab.id ? "border-primary text-primary" : "hover:border-primary"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
-      {isLoading && <p className="text-sm text-muted-foreground">Loading estimates…</p>}
+      {isLoading && <p className="text-sm text-muted-foreground">Loading estimates...</p>}
       {loadError && <p className="text-sm text-destructive">{loadError}</p>}
       {!isLoading && !loadError && (
         <>
@@ -107,10 +114,10 @@ export function EstimatesMain({ companyId, companyName }: EstimatesMainProps) {
                       <tr key={est.id} className="border-b last:border-0">
                         <td className="py-2 pl-3 pr-4">
                           <a href={href} className="font-medium text-primary hover:underline">
-                            {est.id.slice(0, 8)}…
+                            {est.id.slice(0, 8)}...
                           </a>
                         </td>
-                        <td className="py-2 px-4 text-xs">{est.inspectionId.slice(0, 8)}…</td>
+                        <td className="py-2 px-4 text-xs">{est.inspectionId.slice(0, 8)}...</td>
                         <td className="py-2 px-4 text-xs capitalize">{est.status.replace("_", " ")}</td>
                         <td className="py-2 px-4 text-xs">{est.totalSale.toFixed(2)}</td>
                         <td className="py-2 px-4 text-xs">{est.finalPrice.toFixed(2)}</td>

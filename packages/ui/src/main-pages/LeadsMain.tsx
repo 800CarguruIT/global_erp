@@ -165,8 +165,10 @@ export function LeadsMain({ companyId, companyName }: LeadsMainProps) {
       const data = await res.json();
       const list = data.data ?? data.branches ?? [];
       const filtered = list.filter((b: any) => {
-        const types = (b.branch_types ?? []).map((t: string) => t.toLowerCase());
-        const services = (b.service_types ?? []).map((s: string) => s.toLowerCase());
+        const rawTypes = b.branch_types ?? b.branchTypes ?? [];
+        const rawServices = b.service_types ?? b.serviceTypes ?? [];
+        const types = (Array.isArray(rawTypes) ? rawTypes : []).map((t: string) => t.toLowerCase());
+        const services = (Array.isArray(rawServices) ? rawServices : []).map((s: string) => s.toLowerCase());
         if (lt === "recovery") {
           const base =
             types.includes("recovery") ||
@@ -194,7 +196,7 @@ export function LeadsMain({ companyId, companyName }: LeadsMainProps) {
           return typesOk || servicesOk || services.length === 0;
         }
         // default RSA
-        if (!(types.includes("rsa") || services.length > 0)) return false;
+        if (!(types.includes("rsa") || services.length > 0 || (types.length === 0 && services.length === 0))) return false;
         if (assignServiceType) {
           return services.length === 0 || services.includes(assignServiceType.toLowerCase());
         }
