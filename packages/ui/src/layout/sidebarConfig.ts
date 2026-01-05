@@ -15,6 +15,9 @@ export interface SidebarItem {
   labelKey?: string;
   href: string;
   moduleKey?: string;
+  disabled?: boolean;
+  exactMatch?: boolean;
+  children?: SidebarItem[];
 }
 
 export const SIDEBAR_CONFIG: Record<NavScope, Partial<Record<NavCategory, SidebarItem[]>>> = {
@@ -96,4 +99,113 @@ export const SIDEBAR_CONFIG: Record<NavScope, Partial<Record<NavCategory, Sideba
       { label: "Accounts", href: "/company/[companyId]/vendors/[vendorId]/accounts" },
     ],
   },
+};
+
+export const SIDEBAR_TREE: Partial<Record<NavScope, SidebarItem[]>> = {
+  company: [
+    { label: "Dashboard", href: "/company/[companyId]" },
+    {
+      label: "Branches",
+      href: "/company/[companyId]/branches",
+      children: [
+        { label: "Create", href: "/company/[companyId]/branches/new" },
+        { label: "List", href: "/company/[companyId]/branches", exactMatch: true },
+      ],
+    },
+    {
+      label: "Vendors",
+      href: "/company/[companyId]/vendors",
+      children: [
+        { label: "Create", href: "/company/[companyId]/vendors/new" },
+        { label: "List", href: "/company/[companyId]/vendors", exactMatch: true },
+      ],
+    },
+    {
+      label: "Call Center",
+      href: "/company/[companyId]/call-center",
+      children: [
+        { label: "Overview", href: "/company/[companyId]/call-center", exactMatch: true },
+        { label: "History", href: "/company/[companyId]/call-center/history" },
+      ],
+    },
+    {
+      label: "Leads",
+      href: "/company/[companyId]/leads",
+      children: [
+        { label: "Create", href: "/company/[companyId]/leads/new" },
+        { label: "List", href: "/company/[companyId]/leads", exactMatch: true },
+      ],
+    },
+    {
+      label: "Inventory",
+      href: "/company/[companyId]/inventory",
+      children: [
+        { label: "Create", href: "/company/[companyId]/inventory/new", disabled: true },
+        { label: "List", href: "/company/[companyId]/inventory", exactMatch: true },
+      ],
+    },
+    {
+      label: "Procurement",
+      href: "/company/[companyId]/procurement",
+      children: [
+        { label: "Create", href: "/company/[companyId]/procurement/new", disabled: true },
+        { label: "List", href: "/company/[companyId]/procurement", exactMatch: true },
+      ],
+    },
+    {
+      label: "Quotes",
+      href: "/company/[companyId]/quotes",
+      children: [
+        { label: "Vendor", href: "/company/[companyId]/quotes/vendor" },
+        { label: "Branch", href: "/company/[companyId]/quotes/branch" },
+      ],
+    },
+    { label: "Jobs", href: "/company/[companyId]/jobs" },
+    { label: "Cars", href: "/company/[companyId]/cars" },
+    {
+      label: "Marketing",
+      href: "/company/[companyId]/marketing",
+      children: [
+        { label: "Campaigns", href: "/company/[companyId]/marketing/campaigns" },
+        { label: "Ads", href: "/company/[companyId]/marketing/ads" },
+        { label: "SMS", href: "/company/[companyId]/marketing/sms" },
+        { label: "Email", href: "/company/[companyId]/marketing/email" },
+        { label: "Templates", href: "/company/[companyId]/marketing/templates" },
+        { label: "Social", href: "/company/[companyId]/marketing/posts" },
+        { label: "Dialer", href: "/company/[companyId]/settings/integrations/dialer" },
+      ],
+    },
+    { label: "Finance", href: "/company/[companyId]/accounting" },
+    {
+      label: "Customers",
+      href: "/company/[companyId]/customers",
+      children: [
+        { label: "Create", href: "/company/[companyId]/customers/new" },
+        { label: "List", href: "/company/[companyId]/customers", exactMatch: true },
+      ],
+    },
+    {
+      label: "HR",
+      href: "/company/[companyId]/hr",
+      children: [
+        { label: "Employees", href: "/company/[companyId]/hr/employees" },
+        { label: "Company Users", href: "/company/[companyId]/settings/security/users" },
+        { label: "Branch Users", href: "/company/[companyId]/hr/branch-users" },
+        { label: "Vendor Users", href: "/company/[companyId]/hr/vendor-users" },
+      ],
+    },
+    {
+      label: "Accounts",
+      href: "/company/[companyId]/accounting",
+      children: [
+        { label: "Accounts", href: "/company/[companyId]/accounting/accounts" },
+        { label: "Journals", href: "/company/[companyId]/accounting/journals" },
+        { label: "Trial Balance", href: "/company/[companyId]/accounting/trial-balance" },
+        { label: "Profit & Loss", href: "/company/[companyId]/accounting/reports/pnl" },
+        { label: "Cash Flow", href: "/company/[companyId]/accounting/reports/cashflow" },
+        { label: "Balance Sheet", href: "/company/[companyId]/accounting/reports/balance-sheet" },
+      ],
+    },
+    { label: "Reports", href: "/company/[companyId]/reports/overview" },
+  ],
 };

@@ -65,12 +65,17 @@ export function CategoryNav({
 }
 
 CategoryNav.getActiveCategory = function getActiveCategory(pathname: string): Category {
-  // Keep company call-center and leads under Main to show full navigation instead of reduced categories
-  if (pathname.startsWith("/company/") && pathname.includes("/call-center")) return "Main";
-  if (pathname.startsWith("/company/") && pathname.includes("/leads")) return "Main";
-  if (pathname.startsWith("/company/") && pathname.includes("/hr")) return "Main";
-  if (pathname.startsWith("/company/") && pathname.includes("/accounting")) return "Main";
-  if (pathname.startsWith("/global")) return "Main";
+  if (pathname.startsWith("/global")) {
+    if (pathname.includes("/call-center")) return "Call Center";
+    if (pathname.includes("/leads")) return "Leads";
+    if (pathname.includes("/sales")) return "Sales";
+    if (pathname.includes("/jobs")) return "Jobs";
+    if (pathname.includes("/accounting")) return "Accounting";
+    if (pathname.includes("/reports")) return "Reports";
+    if (pathname.includes("/hr")) return "HR";
+    if (pathname.includes("/analytics")) return "Analytics";
+    return "Main";
+  }
   if (pathname.includes("/call-center")) return "Call Center";
   if (pathname.includes("/leads") || pathname.includes("/crm")) return "Leads";
   if (pathname.includes("/sales")) return "Sales";
