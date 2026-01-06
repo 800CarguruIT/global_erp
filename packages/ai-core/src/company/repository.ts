@@ -49,6 +49,7 @@ function mapInsertFields(input: any) {
     timezone: input.timezone ?? null,
     currency: input.currency ?? null,
     google_location: input.googleLocation ?? null,
+    google_maps_api_key: input.googleMapsApiKey ?? null,
   };
 }
 
@@ -113,6 +114,7 @@ export async function updateCompany(
       timezone = COALESCE(${patch.timezone ?? null}, timezone),
       currency = COALESCE(${patch.currency ?? null}, currency),
       google_location = COALESCE(${patch.google_location ?? null}, google_location),
+      google_maps_api_key = COALESCE(${patch.google_maps_api_key ?? null}, google_maps_api_key),
       updated_at = NOW()
     WHERE id = ${id}
     RETURNING *
@@ -167,7 +169,8 @@ export async function createCompany(input: any): Promise<CompanyRow> {
       postal_code,
       country,
       timezone,
-      currency
+      currency,
+      google_maps_api_key
     ) VALUES (
       ${fields.logo_file_id},
       ${fields.display_name},
@@ -200,7 +203,8 @@ export async function createCompany(input: any): Promise<CompanyRow> {
       ${fields.postal_code},
       ${fields.country},
       ${fields.timezone},
-      ${fields.currency}
+      ${fields.currency},
+      ${fields.google_maps_api_key}
     )
     RETURNING *
   `;

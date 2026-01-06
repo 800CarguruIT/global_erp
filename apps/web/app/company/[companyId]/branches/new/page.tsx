@@ -25,13 +25,13 @@ export default async function BranchCreatePage({ params }: BranchCreatePageProps
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Create Branch</h1>
         <Link
-          className="rounded-md border px-3 py-2 text-sm hover:bg-muted"
+          className="inline-flex items-center rounded-md border border-slate-200 bg-white px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600 shadow-md transition hover:bg-slate-50 hover:shadow-lg"
           href={`/company/${companyId}/branches`}
         >
           Back to Branches
         </Link>
       </div>
-      <div className="mt-4 rounded-xl border border-border/60 bg-card p-4">
+      <div className="mt-4 rounded-xl bg-card p-4">
         <BranchCreateClient companyId={companyId} />
       </div>
     </AppLayout>

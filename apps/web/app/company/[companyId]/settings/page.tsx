@@ -36,11 +36,13 @@ export default function CompanySettingsHome({ params }: Params) {
               href={`/company/${companyId}/settings/marketing`}
             />
           )}
-          <SettingsCard
-            title="Profile"
-            description="View and update your profile."
-            href="/profile"
-          />
+          {companyId && (
+            <SettingsCard
+              title="Profile"
+              description="Manage company profile details."
+              href={`/company/${companyId}/settings/profile`}
+            />
+          )}
         </div>
       </div>
     </AppLayout>

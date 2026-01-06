@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import {
@@ -11,6 +11,25 @@ import {
 export function BranchCreateClient({ companyId }: { companyId: string }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const [googleMapsApiKey, setGoogleMapsApiKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const res = await fetch(`/api/company/${companyId}/profile`, { cache: "no-store" });
+        if (!res.ok) return;
+        const data = await res.json().catch(() => ({}));
+        const company = data?.data?.company ?? data?.data ?? data;
+        if (active) setGoogleMapsApiKey(company?.googleMapsApiKey ?? null);
+      } catch {
+        if (active) setGoogleMapsApiKey(null);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [companyId]);
 
   const handleSubmit = async (values: BranchFormValues) => {
     setError(null);
@@ -74,6 +93,7 @@ export function BranchCreateClient({ companyId }: { companyId: string }) {
       <BranchForm
         companyId={companyId}
         onSubmit={handleSubmit}
+        googleMapsApiKey={googleMapsApiKey}
       />
     </div>
   );

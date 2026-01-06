@@ -56,6 +56,7 @@ export type CompanyFormValues = {
   companyEmail?: string | null;
   companyPhone?: string | null;
   googleLocation?: string | null;
+  googleMapsApiKey?: string | null;
 
   address: {
     line1?: string | null;
@@ -105,6 +106,7 @@ export function CompanyForm({ mode, initialValues, onSubmit }: CompanyFormProps)
           contacts: [],
           address: {},
           googleLocation: "",
+          googleMapsApiKey: "",
         };
 
   const [values, setValues] = useState<CompanyFormValues>(normalizedInitial);
@@ -270,6 +272,13 @@ export function CompanyForm({ mode, initialValues, onSubmit }: CompanyFormProps)
             placeholder="https://maps.google.com/..."
             value={values.googleLocation ?? ""}
             onChange={(e) => update("googleLocation", e.target.value)}
+          />
+          <Input
+            label="Google Maps API key"
+            type="password"
+            placeholder="AIza..."
+            value={values.googleMapsApiKey ?? ""}
+            onChange={(e) => update("googleMapsApiKey", e.target.value)}
           />
           <p className="text-xs text-muted-foreground">
             {t("companyForm.address.hint")}

@@ -35,6 +35,7 @@ export interface CompanyRow {
   timezone: string | null;
   currency: string | null;
   google_location?: string | null;
+  google_maps_api_key?: string | null;
   is_active?: boolean | null;
   created_at?: string;
   updated_at?: string;

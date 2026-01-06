@@ -52,10 +52,6 @@ export function SidebarNav({
     setOpenSections((prev) => (prev[activeCategory] ? prev : { ...prev, [activeCategory]: true }));
   }, [activeCategory]);
 
-  if (!sections.length && !SIDEBAR_TREE[scope]?.length) {
-    return <div className="mx-auto max-w-6xl">{children}</div>;
-  }
-
   const pathParts = currentPathname.split("/").filter(Boolean);
   const companyId = pathParts[0] === "company" ? pathParts[1] : undefined;
   const branchId = pathParts[2] === "branches" ? pathParts[3] : undefined;
@@ -192,6 +188,10 @@ export function SidebarNav({
       return next;
     });
   }, [treeItems, currentPathname, companyId, branchId, vendorId]);
+
+  if (!sections.length && !SIDEBAR_TREE[scope]?.length) {
+    return <div className="mx-auto max-w-6xl">{children}</div>;
+  }
 
   return (
     <div className="mx-auto flex gap-6">

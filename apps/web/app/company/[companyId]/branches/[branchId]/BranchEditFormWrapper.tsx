@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   BranchForm,
@@ -16,6 +17,7 @@ export function BranchEditFormWrapper({
   initialValues: BranchFormValues;
 }) {
   const router = useRouter();
+  const [googleMapsApiKey, setGoogleMapsApiKey] = useState<string | null>(null);
   const clean = (val?: string | null) => {
     const t = val?.toString().trim();
     return t && t.length ? t : undefined;
@@ -96,12 +98,31 @@ export function BranchEditFormWrapper({
     router.push(`/company/${companyId}/branches`);
   };
 
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const res = await fetch(`/api/company/${companyId}/profile`, { cache: "no-store" });
+        if (!res.ok) return;
+        const data = await res.json().catch(() => ({}));
+        const company = data?.data?.company ?? data?.data ?? data;
+        if (active) setGoogleMapsApiKey(company?.googleMapsApiKey ?? null);
+      } catch {
+        if (active) setGoogleMapsApiKey(null);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [companyId]);
+
   return (
     <BranchForm
       companyId={companyId}
       initialValues={initialValues}
       onSubmit={handleSubmit}
       onDelete={handleDelete}
+      googleMapsApiKey={googleMapsApiKey}
     />
   );
 }

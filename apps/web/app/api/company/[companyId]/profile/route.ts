@@ -49,6 +49,7 @@ function mapToForm(company: any, contacts: any[]) {
     companyEmail: company.company_email ?? null,
     companyPhone: company.company_phone ?? null,
     googleLocation: company.google_location ?? null,
+    googleMapsApiKey: company.google_maps_api_key ?? null,
     address: {
       line1: company.address_line1 ?? null,
       line2: company.address_line2 ?? null,
@@ -101,6 +102,7 @@ function mapToUpdatePayload(body: any) {
     timezone: body.timezone ?? null,
     currency: body.currency ?? null,
     google_location: body.googleLocation ?? null,
+    google_maps_api_key: body.googleMapsApiKey ?? null,
     vat_rate: body.vat_rate ?? body.vatRate ?? null,
   };
 }
