@@ -23,6 +23,8 @@ export default function BranchUsersPage({ params }: Props) {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [statusUpdating, setStatusUpdating] = useState<Record<string, boolean>>({});
+  const [statusError, setStatusError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
 
   useEffect(() => {
@@ -53,6 +55,28 @@ export default function BranchUsersPage({ params }: Props) {
     }
     load();
   }, [companyId, branchId, query]);
+
+  async function toggleStatus(userId: string, next: boolean) {
+    if (!companyId || !branchId) return;
+    setStatusError(null);
+    setStatusUpdating((prev) => ({ ...prev, [userId]: true }));
+    try {
+      const res = await fetch(
+        `/api/company/${companyId}/admin/users/${userId}?branchId=${branchId}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ isActive: next }),
+        }
+      );
+      if (!res.ok) throw new Error("Failed to update status");
+      setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, is_active: next } : u)));
+    } catch (err: any) {
+      setStatusError(err?.message ?? "Failed to update status");
+    } finally {
+      setStatusUpdating((prev) => ({ ...prev, [userId]: false }));
+    }
+  }
 
   const displayUsers = useMemo(
     () =>
@@ -104,6 +128,9 @@ export default function BranchUsersPage({ params }: Props) {
               users={displayUsers}
               loading={loading}
               emptyText="No users found for this branch."
+              onToggleStatus={toggleStatus}
+              statusUpdating={statusUpdating}
+              statusError={statusError}
               onCreate={() => {
                 if (companyId && branchId) {
                   window.location.href = `/company/${companyId}/branches/${branchId}/settings/security/users/new`;

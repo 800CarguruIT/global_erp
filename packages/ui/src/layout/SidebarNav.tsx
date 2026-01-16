@@ -1,11 +1,29 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { CategoryNav, Category } from "./CategoryNav";
 import { SIDEBAR_CONFIG, SIDEBAR_TREE, NavScope, SidebarItem } from "./sidebarConfig";
 import { isModuleVisibleForScope, CURRENT_MODULE_PHASE } from "@repo/ai-core/shared/scopes-and-modules";
 import { useI18n } from "../i18n";
+
+function getCookieValue(name: string): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+function getCompanyIdFromBranchCookie(): string | null {
+  const lastBranchPath = getCookieValue("last_branch_path");
+  const match = lastBranchPath?.match(/^\/company\/([^/]+)\/branches\/([^/]+)/);
+  return match?.[1] ?? null;
+}
+
+function getBranchIdFromBranchCookie(): string | null {
+  const lastBranchPath = getCookieValue("last_branch_path");
+  const match = lastBranchPath?.match(/^\/company\/([^/]+)\/branches\/([^/]+)/);
+  return match?.[2] ?? null;
+}
 
 export function SidebarNav({
   scope,
@@ -23,7 +41,15 @@ export function SidebarNav({
   const resolveItems = (category: Category) =>
     (SIDEBAR_CONFIG[scope]?.[category] || []).filter((item) => {
       if (scope === "global" && item.href === "/global") return false;
-      return item.moduleKey ? isModuleVisibleForScope(scope as any, item.moduleKey as any, CURRENT_MODULE_PHASE) : true;
+      if (item.moduleKey && !isModuleVisibleForScope(scope as any, item.moduleKey as any, CURRENT_MODULE_PHASE)) {
+        return false;
+      }
+      if (item.permissionKeys?.length) {
+        if (!permissionsLoaded) return false;
+        const strict = scope === "branch";
+        return strict ? hasAnyExactPermission(item.permissionKeys) : hasAnyPermission(item.permissionKeys);
+      }
+      return true;
     });
 
   const sectionOrder: Category[] = [
@@ -53,9 +79,88 @@ export function SidebarNav({
   }, [activeCategory]);
 
   const pathParts = currentPathname.split("/").filter(Boolean);
-  const companyId = pathParts[0] === "company" ? pathParts[1] : undefined;
-  const branchId = pathParts[2] === "branches" ? pathParts[3] : undefined;
+  const isBranchRoot = pathParts[0] === "branches";
+  const companyId =
+    pathParts[0] === "company"
+      ? pathParts[1]
+      : isBranchRoot
+      ? getCompanyIdFromBranchCookie() ?? undefined
+      : undefined;
+  const branchId =
+    pathParts[0] === "company" && pathParts[2] === "branches"
+      ? pathParts[3]
+      : isBranchRoot
+      ? pathParts[1] === "leads"
+        ? getBranchIdFromBranchCookie() ?? undefined
+        : pathParts[1]
+      : undefined;
   const vendorId = pathParts[2] === "vendors" ? pathParts[3] : undefined;
+
+  const [permissions, setPermissions] = useState<string[] | null>(null);
+  const [permissionsLoaded, setPermissionsLoaded] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadPermissions() {
+      if (scope === "global") {
+        setPermissions(null);
+        setPermissionsLoaded(false);
+        return;
+      }
+      if (!companyId) {
+        setPermissions(null);
+        setPermissionsLoaded(false);
+        return;
+      }
+      setPermissionsLoaded(false);
+      try {
+        const params = new URLSearchParams();
+        params.set("scope", scope);
+        params.set("companyId", companyId);
+        if (branchId) params.set("branchId", branchId);
+        if (vendorId) params.set("vendorId", vendorId);
+        const res = await fetch(`/api/auth/permissions/me?${params.toString()}`);
+        if (!res.ok) {
+          if (!cancelled) {
+            setPermissions([]);
+            setPermissionsLoaded(true);
+          }
+          return;
+        }
+        const data = await res.json();
+        if (!cancelled) {
+          setPermissions(Array.isArray(data?.permissions) ? data.permissions : []);
+          setPermissionsLoaded(true);
+        }
+      } catch {
+        if (!cancelled) {
+          setPermissions([]);
+          setPermissionsLoaded(true);
+        }
+      }
+    }
+    loadPermissions();
+    return () => {
+      cancelled = true;
+    };
+  }, [scope, companyId, branchId, vendorId]);
+
+  const hasAnyPermission = useMemo(() => {
+    const permSet = new Set(permissions ?? []);
+    return (keys: string[]) =>
+      keys.some(
+        (key) =>
+          permSet.has(key) ||
+          permSet.has("global.admin") ||
+          permSet.has("company.admin") ||
+          permSet.has("branch.admin")
+      );
+  }, [permissions]);
+
+  const hasAnyExactPermission = useMemo(() => {
+    const permSet = new Set(permissions ?? []);
+    return (keys: string[]) => keys.some((key) => permSet.has(key));
+  }, [permissions]);
 
   const resolveHref = (href: string): string | null => {
     let next = href;
@@ -70,6 +175,12 @@ export function SidebarNav({
     if (next.includes("[vendorId]")) {
       if (!vendorId) return null;
       next = next.replace("[vendorId]", vendorId);
+    }
+    if (isBranchRoot && companyId && branchId) {
+      const branchPrefix = `/company/${companyId}/branches/${branchId}`;
+      if (next.startsWith(branchPrefix)) {
+        next = `/branches/${branchId}${next.slice(branchPrefix.length)}`;
+      }
     }
     return next;
   };
@@ -144,6 +255,25 @@ export function SidebarNav({
   }, [mainGroups, currentPathname]);
 
   const treeItems = SIDEBAR_TREE[scope];
+  const filteredTreeItems = useMemo(() => {
+    if (!treeItems?.length) return treeItems;
+    if (!permissionsLoaded) return treeItems;
+    const filterTree = (items: SidebarItem[]): SidebarItem[] =>
+      items.flatMap((item) => {
+        const childItems = item.children ? filterTree(item.children) : undefined;
+        const strict = scope === "branch";
+        const allowed = !item.permissionKeys?.length
+          ? true
+          : permissionsLoaded
+          ? strict
+            ? hasAnyExactPermission(item.permissionKeys)
+            : hasAnyPermission(item.permissionKeys)
+          : false;
+        if (!allowed && (!childItems || childItems.length === 0)) return [];
+        return [{ ...item, children: childItems }];
+      });
+    return filterTree(treeItems);
+  }, [treeItems, permissionsLoaded, permissions, scope, hasAnyPermission, hasAnyExactPermission]);
   const [openTree, setOpenTree] = useState<Record<string, boolean>>({});
 
   const getItemKey = (item: SidebarItem, parentKey: string) =>
@@ -169,7 +299,7 @@ export function SidebarNav({
   };
 
   useEffect(() => {
-    if (!treeItems?.length) return;
+    if (!filteredTreeItems?.length) return;
     const activeKeys = new Set<string>();
     const walk = (items: SidebarItem[], parentKey: string) => {
       items.forEach((item) => {
@@ -179,7 +309,7 @@ export function SidebarNav({
         if (item.children?.length) walk(item.children, key);
       });
     };
-    walk(treeItems, "tree");
+    walk(filteredTreeItems, "tree");
     setOpenTree((prev) => {
       const next = { ...prev };
       activeKeys.forEach((key) => {
@@ -189,7 +319,7 @@ export function SidebarNav({
     });
   }, [treeItems, currentPathname, companyId, branchId, vendorId]);
 
-  if (!sections.length && !SIDEBAR_TREE[scope]?.length) {
+  if (!sections.length && !filteredTreeItems?.length) {
     return <div className="mx-auto max-w-6xl">{children}</div>;
   }
 
@@ -208,9 +338,9 @@ export function SidebarNav({
               {activeCategory}
             </div>
           </div>
-          {treeItems?.length ? (
+          {filteredTreeItems?.length ? (
             <div className="relative flex flex-col gap-2">
-              {treeItems.map((item) => {
+              {filteredTreeItems.map((item) => {
                 const key = getItemKey(item, "tree");
                 const isOpen = openTree[key];
                 const resolvedHref = resolveItemHref(item);

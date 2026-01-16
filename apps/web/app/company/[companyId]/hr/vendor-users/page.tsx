@@ -16,6 +16,8 @@ export default function VendorUsersHub({ params }: Params) {
   const [users, setUsers] = useState<any[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [query, setQuery] = useState("");
+  const [statusUpdating, setStatusUpdating] = useState<Record<string, boolean>>({});
+  const [statusError, setStatusError] = useState<string | null>(null);
   const [editingUser, setEditingUser] = useState<any | null>(null);
   const [saving, setSaving] = useState(false);
   const router = useRouter();
@@ -70,6 +72,25 @@ export default function VendorUsersHub({ params }: Params) {
     }
     loadUsers();
   }, [companyId, selectedVendorId, query]);
+
+  async function toggleStatus(userId: string, next: boolean) {
+    if (!companyId) return;
+    setStatusError(null);
+    setStatusUpdating((prev) => ({ ...prev, [userId]: true }));
+    try {
+      const res = await fetch(`/api/company/${companyId}/admin/users/${userId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isActive: next }),
+      });
+      if (!res.ok) throw new Error("Failed to update status");
+      setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, is_active: next } : u)));
+    } catch (err: any) {
+      setStatusError(err?.message ?? "Failed to update status");
+    } finally {
+      setStatusUpdating((prev) => ({ ...prev, [userId]: false }));
+    }
+  }
 
   const displayUsers = users.map((u: any) => ({
     id: u.id,
@@ -144,6 +165,9 @@ export default function VendorUsersHub({ params }: Params) {
             }}
             loading={usersLoading}
             emptyText="No users found."
+            onToggleStatus={toggleStatus}
+            statusUpdating={statusUpdating}
+            statusError={statusError}
           />
         ) : null}
 

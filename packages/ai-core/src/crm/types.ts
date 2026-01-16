@@ -19,6 +19,9 @@ export interface CustomerRow {
   phone_alt: string | null;
   whatsapp_phone: string | null;
   address: string | null;
+  country?: string | null;
+  city?: string | null;
+  wallet_amount: number;
   google_location?: string | null;
   notes: string | null;
   is_active: boolean;
@@ -42,6 +45,7 @@ export interface CarRow {
   model_year: number | null;
   color: string | null;
   body_type: string | null;
+  is_insurance: boolean;
   mileage: number | null;
   tyre_size_front: string | null;
   tyre_size_back: string | null;
@@ -89,6 +93,8 @@ export type CreateCustomerInput = {
   phoneAlt?: string | null;
   whatsappPhone?: string | null;
   address?: string | null;
+  country?: string | null;
+  city?: string | null;
   googleLocation?: string | null;
   notes?: string | null;
 };
@@ -112,6 +118,7 @@ export type CreateCarInput = {
   modelYear?: number | null;
   color?: string | null;
   bodyType?: string | null;
+  isInsurance?: boolean | null;
   mileage?: number | null;
   tyreSizeFront?: string | null;
   tyreSizeBack?: string | null;
@@ -145,4 +152,36 @@ export type CarWithCustomers = CarRow & {
     customer: CustomerRow;
     link: CustomerCarLinkRow;
   }>;
+};
+
+export interface CustomerWalletTransactionRow {
+  id: string;
+  company_id: string;
+  customer_id: string;
+  amount: number;
+  payment_method: string | null;
+  payment_date: string | null;
+  payment_proof_file_id: string | null;
+  approved_at: string | null;
+  approved_by: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CustomerWalletTransactionWithCustomer extends CustomerWalletTransactionRow {
+  customer_name?: string | null;
+  customer_phone?: string | null;
+  customer_email?: string | null;
+  approved_by_name?: string | null;
+}
+
+export type CreateCustomerWalletTransactionInput = {
+  companyId: string;
+  customerId: string;
+  amount: number;
+  paymentMethod?: string | null;
+  paymentDate?: string | null;
+  paymentProofFileId?: string | null;
+  notes?: string | null;
 };

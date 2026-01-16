@@ -1,11 +1,8 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { AppLayout, Card } from "@repo/ui";
-import { CarMakeModelSelect } from "@repo/ui/components/common/CarMakeModelSelect";
-import { PlateInput, PlateValue } from "@repo/ui/components/common/PlateInput";
-import { FileUploader } from "@repo/ui";
+import { AppLayout, Card, FileUploader, useTheme } from "@repo/ui";
 
 type Params = {
   params:
@@ -18,52 +15,70 @@ type CustomerCarLink = {
   link: any;
 };
 
-type HistoryItem = { id: string; carId?: string | null; customerId?: string | null; [key: string]: any };
+type TabId =
+  | "leads"
+  | "inspections"
+  | "estimates"
+  | "invoices"
+  | "contracts"
+  | "followups"
+  | "calls";
 
-const EMPTY_CAR_FORM = {
-  carMake: "",
-  carModel: "",
-  carYear: "",
-  plateCountry: "AE",
-  plateLocationMode: undefined as PlateValue["locationMode"],
-  plateState: "",
-  plateCity: "",
-  plateCode: "",
-  plateNumber: "",
-  vinNumber: "",
-  vinPhotoFileId: "",
-  tyreSizeFront: "",
-  tyreSizeBack: "",
-  registrationExpiry: "",
-  registrationCardFileId: "",
-  mileage: "",
-  relationType: "owner" as "owner" | "driver" | "other",
+type WalletTransactionRow = {
+  id: string;
+  amount: number;
+  payment_method?: string | null;
+  payment_date?: string | null;
+  payment_proof_file_id?: string | null;
+  approved_at?: string | null;
+  approved_by?: string | null;
+  created_at?: string | null;
 };
 
 export default function CustomerDetailPage({ params }: Params) {
+  const { theme } = useTheme();
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [customerId, setCustomerId] = useState<string | null>(null);
   const [customer, setCustomer] = useState<any>(null);
   const [linkedCars, setLinkedCars] = useState<CustomerCarLink[]>([]);
-  const [historicalCars, setHistoricalCars] = useState<CustomerCarLink[]>([]);
-  const [selectedCarId, setSelectedCarId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [history, setHistory] = useState({
-    leads: [] as HistoryItem[],
-    inspections: [] as HistoryItem[],
-    estimates: [] as HistoryItem[],
-    invoices: [] as HistoryItem[],
+  const [activeTab, setActiveTab] = useState<TabId>("invoices");
+  const [walletTransactions, setWalletTransactions] = useState<WalletTransactionRow[]>([]);
+  const [walletLoading, setWalletLoading] = useState(false);
+  const [walletError, setWalletError] = useState<string | null>(null);
+  const [topupOpen, setTopupOpen] = useState(false);
+  const [topupForm, setTopupForm] = useState({
+    amount: "",
+    method: "cash",
+    paymentDate: "",
+    proofFileId: "",
   });
-  const [historyLoading, setHistoryLoading] = useState(false);
+  const [topupSaving, setTopupSaving] = useState(false);
+  const [topupError, setTopupError] = useState<string | null>(null);
+  const [walletBalance, setWalletBalance] = useState(0);
   const [addCarOpen, setAddCarOpen] = useState(false);
-  const [newCar, setNewCar] = useState(EMPTY_CAR_FORM);
-  const [savingCar, setSavingCar] = useState(false);
-  const [existingCars, setExistingCars] = useState<any[]>([]);
-  const [existingCarSearch, setExistingCarSearch] = useState("");
-  const [existingCarId, setExistingCarId] = useState<string>("");
-  const [existingCarLoading, setExistingCarLoading] = useState(false);
-  const [historyTab, setHistoryTab] = useState<"leads" | "inspections" | "estimates" | "invoices">("leads");
+  const [addCarForm, setAddCarForm] = useState({
+    plateNumber: "",
+    make: "",
+    model: "",
+    modelYear: "",
+    bodyType: "Regular",
+    isInsurance: false,
+  });
+  const [addCarSaving, setAddCarSaving] = useState(false);
+  const [addCarError, setAddCarError] = useState<string | null>(null);
+  const [viewCar, setViewCar] = useState<any | null>(null);
+  const [selectedCarId, setSelectedCarId] = useState<string | null>(null);
+  const [selectActionOpen, setSelectActionOpen] = useState(false);
+  const [selectActionCar, setSelectActionCar] = useState<any | null>(null);
+  const [selectActionMode, setSelectActionMode] = useState<"menu" | "appointment">("menu");
+  const [selectActionSaving, setSelectActionSaving] = useState(false);
+  const [selectActionError, setSelectActionError] = useState<string | null>(null);
+  const [appointmentForm, setAppointmentForm] = useState({
+    appointmentAt: "",
+    type: "walkin",
+  });
 
   useEffect(() => {
     Promise.resolve(params).then((p) => {
@@ -78,45 +93,10 @@ export default function CustomerDetailPage({ params }: Params) {
   }, [companyId, customerId]);
 
   useEffect(() => {
-    if (!companyId) return;
-    loadHistory(companyId);
-  }, [companyId]);
+    if (!companyId || !customerId) return;
+    loadWalletTransactions(companyId, customerId);
+  }, [companyId, customerId]);
 
-  useEffect(() => {
-    if (!addCarOpen || !companyId) return;
-    const controller = new AbortController();
-    const load = async () => {
-      setExistingCarLoading(true);
-      try {
-        const term = existingCarSearch.trim();
-        const searchParam = term ? `&search=${encodeURIComponent(term)}` : "";
-        const res = await fetch(`/api/cars?companyId=${companyId}&scope=company&activeOnly=true${searchParam}`, {
-          signal: controller.signal,
-        });
-        if (!res.ok) throw new Error("failed");
-        const data = await res.json().catch(() => ({}));
-        const list: any[] = data?.data ?? data ?? [];
-        setExistingCars(list);
-        if (!existingCarId && list.length === 1) {
-          setExistingCarId(list[0].id);
-        }
-      } catch {
-        setExistingCars([]);
-      } finally {
-        setExistingCarLoading(false);
-      }
-    };
-    load();
-    return () => controller.abort();
-  }, [addCarOpen, companyId, existingCarSearch]);
-
-  useEffect(() => {
-    if (existingCars.length && !existingCarId) {
-      setExistingCarId(existingCars[0].id);
-    } else if (existingCarId && !existingCars.find((c) => c.id === existingCarId) && existingCars.length) {
-      setExistingCarId(existingCars[0].id);
-    }
-  }, [existingCars, existingCarId]);
 
   async function loadCustomer(cId: string, custId: string) {
     setLoading(true);
@@ -126,12 +106,11 @@ export default function CustomerDetailPage({ params }: Params) {
       if (!res.ok) throw new Error("Failed to load customer");
       const data = await res.json();
       setCustomer(data);
+      setWalletBalance(Number(data?.wallet_amount ?? 0));
       const cars: CustomerCarLink[] = data?.cars ?? [];
-      const active = cars.filter((c) => c?.link?.is_active !== false && c?.car?.is_active !== false);
-      const inactive = cars.filter((c) => c?.link?.is_active === false || c?.car?.is_active === false);
-      setLinkedCars(active);
-      setHistoricalCars(inactive);
-      setSelectedCarId((active[0]?.car?.id as string | undefined) ?? null);
+      setLinkedCars(cars);
+      const primaryLink = cars.find((item) => item?.link?.is_primary);
+      setSelectedCarId(primaryLink?.car?.id ?? null);
     } catch (err: any) {
       setError(err?.message ?? "Failed to load customer");
     } finally {
@@ -139,130 +118,101 @@ export default function CustomerDetailPage({ params }: Params) {
     }
   }
 
-  async function loadHistory(cId: string) {
-    setHistoryLoading(true);
+  async function loadWalletTransactions(cId: string, custId: string) {
+    setWalletLoading(true);
+    setWalletError(null);
     try {
-      const [leadsRes, inspectionsRes, estimatesRes, invoicesRes] = await Promise.all([
-        fetch(`/api/company/${cId}/sales/leads`),
-        fetch(`/api/company/${cId}/workshop/inspections`),
-        fetch(`/api/company/${cId}/workshop/estimates`),
-        fetch(`/api/company/${cId}/workshop/invoices`),
-      ]);
-      const [leads, inspections, estimates, invoices] = await Promise.all([
-        leadsRes.ok ? leadsRes.json().then((d) => d.data ?? d ?? []) : [],
-        inspectionsRes.ok ? inspectionsRes.json().then((d) => d.data ?? d ?? []) : [],
-        estimatesRes.ok ? estimatesRes.json().then((d) => d.data ?? d ?? []) : [],
-        invoicesRes.ok ? invoicesRes.json().then((d) => d.data ?? d ?? []) : [],
-      ]);
-      setHistory({
-        leads: Array.isArray(leads) ? leads : [],
-        inspections: Array.isArray(inspections) ? inspections : [],
-        estimates: Array.isArray(estimates) ? estimates : [],
-        invoices: Array.isArray(invoices) ? invoices : [],
-      });
-    } catch {
-      // ignore best-effort
-    } finally {
-      setHistoryLoading(false);
-    }
-  }
-
-  const filteredHistory = useMemo(() => {
-    const filterBy = selectedCarId;
-    const custId = customerId;
-    function filterList(list: HistoryItem[]) {
-      return list.filter((item) => {
-        const matchesCustomer = custId ? item.customerId === custId || item.customer_id === custId : true;
-        const matchesCar = filterBy ? item.carId === filterBy || item.car_id === filterBy : true;
-        return matchesCustomer && matchesCar;
-      });
-    }
-    return {
-      leads: filterList(history.leads),
-      inspections: filterList(history.inspections),
-      estimates: filterList(history.estimates),
-      invoices: filterList(history.invoices),
-    };
-  }, [history, selectedCarId, customerId]);
-
-  async function handleUnlink(linkId: string, carEntry: CustomerCarLink) {
-    if (!companyId || !customerId) return;
-    const confirmMsg = "Remove this car from the customer?";
-    if (!window.confirm(confirmMsg)) return;
-    try {
-      await fetch(`/api/customers/${customerId}/cars?companyId=${companyId}&linkId=${linkId}`, {
-        method: "DELETE",
-      });
-      setLinkedCars((prev) => prev.filter((c) => c.link?.id !== linkId));
-      setHistoricalCars((prev) => [...prev, carEntry]);
-      if (selectedCarId === carEntry.car?.id) {
-        setSelectedCarId(null);
-      }
+      const res = await fetch(
+        `/api/customers/${custId}/wallet/transactions?companyId=${cId}&approvedOnly=false`
+      );
+      if (!res.ok) throw new Error("Failed to load wallet transactions");
+      const data = await res.json().catch(() => ({}));
+      setWalletTransactions(Array.isArray(data?.data) ? data.data : []);
     } catch (err: any) {
-      alert(err?.message ?? "Failed to unlink car");
+      setWalletError(err?.message ?? "Failed to load wallet transactions");
+    } finally {
+      setWalletLoading(false);
     }
   }
 
-  async function handleAddCar(e: React.FormEvent) {
-    e.preventDefault();
+
+  const cards = [
+    { label: "Total Invoices", value: "AED 8,240" },
+    { label: "Open Leads", value: "12" },
+    { label: "Active Contracts", value: "2" },
+  ];
+  const actions = [
+    { label: "Service Request", key: "service_request" },
+    { label: "Follow-Up" },
+    { label: "Create Contract" },
+    { label: "Create Appointment" },
+    { label: "Create Complaint" },
+  ];
+  const tabLabels = [
+    { id: "leads", label: "Leads" },
+    { id: "inspections", label: "Inspections" },
+    { id: "estimates", label: "Estimates" },
+    { id: "invoices", label: "Invoices & Transactions" },
+    { id: "contracts", label: "Contracts" },
+    { id: "followups", label: "Follow Ups" },
+    { id: "calls", label: "Call Recordings" },
+  ] as const;
+
+  const formatDateTime = (value?: string | null) => {
+    if (!value) return "-";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "-";
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(
+      date.getHours()
+    )}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+  };
+
+
+  const openProforma = (txn: WalletTransactionRow) => {
     if (!companyId || !customerId) return;
-    setSavingCar(true);
+    const url = `/api/customers/${customerId}/wallet/transactions/${txn.id}/proforma?companyId=${companyId}`;
+    window.open(url, "_blank", "width=900,height=1000");
+  };
+
+  const runCarAction = async (action: "car_in" | "appointment") => {
+    if (!companyId || !customerId || !selectActionCar) return;
+    setSelectActionSaving(true);
+    setSelectActionError(null);
     try {
-      const plate = `${newCar.plateCode ?? ""} ${newCar.plateNumber ?? ""}`.trim() || null;
-      const payload = {
-        relationType: newCar.relationType,
-        priority: linkedCars.length + 1,
-        isPrimary: linkedCars.length === 0,
-        newCar: {
-          plateCode: newCar.plateCode || null,
-          plateCountry: newCar.plateCountry || null,
-          plateState: newCar.plateState || null,
-          plateCity: newCar.plateCity || null,
-          plateLocationMode: newCar.plateLocationMode || null,
-          plateNumber: plate,
-          vin: newCar.vinNumber || null,
-          make: newCar.carMake || null,
-          model: newCar.carModel || null,
-          modelYear: newCar.carYear ? Number(newCar.carYear) : null,
-          mileage: newCar.mileage ? Number(newCar.mileage) : null,
-          tyreSizeFront: newCar.tyreSizeFront || null,
-          tyreSizeBack: newCar.tyreSizeBack || null,
-          registrationExpiry: newCar.registrationExpiry || null,
-          registrationCardFileId: newCar.registrationCardFileId || null,
-          notes: null,
-        },
-      };
-      const res = await fetch(`/api/customers/${customerId}/cars?companyId=${companyId}`, {
+      const res = await fetch(`/api/customers/${customerId}/cars/select?companyId=${companyId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          carId: selectActionCar.id,
+          action,
+          appointmentAt: action === "appointment" ? appointmentForm.appointmentAt || null : null,
+          appointmentType: action === "appointment" ? appointmentForm.type : null,
+        }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data?.error ?? "Failed to add car");
+        throw new Error(data?.error ?? "Failed to create lead");
       }
-      setNewCar(EMPTY_CAR_FORM);
-      setAddCarOpen(false);
-      await loadCustomer(companyId, customerId);
+      setSelectActionOpen(false);
+      setSelectActionMode("menu");
+      setAppointmentForm({ appointmentAt: "", type: "walkin" });
     } catch (err: any) {
-      alert(err?.message ?? "Failed to add car");
+      setSelectActionError(err?.message ?? "Failed to create lead");
     } finally {
-      setSavingCar(false);
+      setSelectActionSaving(false);
     }
-  }
-
-  const selectedCarLabel =
-    linkedCars.find((c) => c.car?.id === selectedCarId)?.car?.plate_number ??
-    linkedCars.find((c) => c.car?.id === selectedCarId)?.car?.plateNumber ??
-    "All cars";
+  };
 
   return (
     <AppLayout>
-      <div className="space-y-4 py-4">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold">Customer Details</h1>
-            <p className="text-sm text-muted-foreground">Manage customer, linked cars, and history.</p>
+      <div className="space-y-5 py-5">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="space-y-1">
+            <h1 className="text-2xl font-semibold">Customer Dashboard</h1>
+            <p className={`text-sm ${theme.mutedText}`}>
+              Track leads, inspections, invoices, and service history in one place.
+            </p>
           </div>
           <Link
             href={companyId ? `/company/${companyId}/customers` : "#"}
@@ -274,479 +224,846 @@ export default function CustomerDetailPage({ params }: Params) {
 
         {error && <div className="text-sm text-destructive">{error}</div>}
 
-        <div className="grid gap-4 lg:grid-cols-3">
-          <div className="space-y-4 lg:col-span-2">
-            <Card className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="text-lg font-semibold">Customer</div>
-                {loading && <div className="text-xs text-muted-foreground">Loading...</div>}
-                {!loading && companyId && customerId && (
-                  <>
-                    {customer?.is_active !== false ? (
-                      <button
-                        type="button"
-                        className="text-xs text-destructive underline"
-                        onClick={async () => {
-                          const confirmMsg = "Archive this customer? They can be re-activated later.";
-                          if (!window.confirm(confirmMsg)) return;
-                          await fetch(`/api/customers/${customerId}?companyId=${companyId}`, { method: "DELETE" });
-                          window.location.href = `/company/${companyId}/customers`;
-                        }}
-                      >
-                        Archive
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        className="text-xs text-primary underline"
-                        onClick={async () => {
-                          await fetch(`/api/customers/${customerId}?companyId=${companyId}`, {
-                            method: "PUT",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ scope: "company", companyId, is_active: true }),
-                          });
-                          await loadCustomer(companyId, customerId);
-                        }}
-                      >
-                        Unarchive
-                      </button>
-                    )}
-                  </>
-                )}
-              </div>
-              <div className="grid gap-3 md:grid-cols-2">
-                <Field label="Name" value={customer?.name ?? "—"} />
-                <Field label="Email" value={customer?.email ?? "—"} />
-                <Field label="Phone" value={customer?.phone ?? "—"} />
-                <Field label="WhatsApp" value={customer?.whatsapp_phone ?? customer?.phone ?? "—"} />
-                <Field label="Code" value={customer?.code ?? "—"} />
-                <Field label="Type" value={customer?.customer_type ?? "—"} />
-                <Field label="Address" value={customer?.address ?? "—"} className="md:col-span-2" />
-              </div>
-            </Card>
+        <div className="flex flex-wrap items-center gap-2">
+          {actions.map((action) => {
+            const isServiceRequest = action.key === "service_request";
+            const isDisabled = isServiceRequest && !selectedCarId;
+            return (
+            <button
+              key={action.label}
+              type="button"
+              className={`inline-flex items-center gap-2 rounded-md px-4 py-2 text-xs font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${
+                isDisabled ? "opacity-50 cursor-not-allowed" : `${theme.mutedText} hover:bg-white/10`
+              }`}
+              disabled={isDisabled}
+              onClick={() => {
+                if (!isServiceRequest) return;
+                if (!selectedCarId) return;
+                const car = linkedCars.find((item) => item?.car?.id === selectedCarId)?.car ?? null;
+                if (!car) return;
+                setSelectActionCar(car);
+                setSelectActionMode("menu");
+                setSelectActionError(null);
+                setSelectActionOpen(true);
+              }}
+            >
+              {action.label}
+              <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-white/10 text-[10px]">
+                v
+              </span>
+            </button>
+          );
+          })}
+        </div>
 
-            <Card className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="text-lg font-semibold">History</div>
-                <div className="flex items-center gap-2 text-xs">
-                  <span className="text-muted-foreground">Filter</span>
-                  <div className="flex flex-wrap gap-2">
+        <div className="grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
+          <div className="space-y-4">
+            <Card className={`relative overflow-hidden ${theme.cardBg} ${theme.cardBorder}`}>
+              <div className="absolute right-0 top-0 h-16 w-16 translate-x-6 -translate-y-6 rounded-full bg-emerald-500/30" />
+              <div className="absolute -left-8 top-20 h-20 w-20 rounded-full bg-amber-500/30" />
+              <div className="space-y-4 p-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-14 w-14 rounded-full bg-white/10 text-2xl flex items-center justify-center">
+                    C
+                  </div>
+                  <div>
+                    <div className={`text-sm ${theme.mutedText}`}>Customer</div>
+                    <div className="text-lg font-semibold">{customer?.name ?? "Mohammed Mahdy"}</div>
+                    <div className="text-xs text-rose-400">Not App User</div>
+                  </div>
+                </div>
+                <div className={`space-y-2 text-sm ${theme.mutedText}`}>
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-400">Phone</span>
+                    <span>{customer?.phone ?? "+971 54 228 7649"}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-400">Email</span>
+                    <span>{customer?.email ?? "mohdmahdy94@gmail.com"}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-400">Location</span>
+                    <span>{customer?.city ?? "Abu Hail"}, {customer?.country ?? "Dubai"}</span>
+                  </div>
+                </div>
+                <div className={`rounded-lg ${theme.cardBorder} ${theme.surfaceSubtle} p-3`}>
+                  <div className={`text-xs uppercase tracking-wide ${theme.mutedText}`}>Wallet</div>
+                  <div className="mt-2 flex items-center justify-between">
+                    <div className="text-xl font-semibold">AED {walletBalance.toFixed(2)}</div>
                     <button
                       type="button"
-                      className={`rounded-md border px-2 py-1 ${selectedCarId ? "hover:border-primary" : "border-primary text-primary"}`}
-                      onClick={() => setSelectedCarId(null)}
+                      className="rounded-md bg-amber-400 px-3 py-1 text-xs font-semibold text-black"
+                      onClick={() => {
+                        setTopupError(null);
+                        setTopupOpen(true);
+                      }}
                     >
-                      All cars
+                      Topup
                     </button>
-                    {linkedCars.map((c) => (
-                      <button
-                        key={c.car?.id}
-                        type="button"
-                        className={`rounded-md border px-2 py-1 text-xs ${
-                          selectedCarId === c.car?.id ? "border-primary text-primary" : "hover:border-primary"
-                        }`}
-                        onClick={() => setSelectedCarId(c.car?.id ?? null)}
-                      >
-                        {c.car?.plate_number || c.car?.plateNumber || c.car?.vin || "Car"}
-                      </button>
-                    ))}
-                    {historicalCars.map((c) => (
-                      <button
-                        key={c.car?.id ?? c.link?.id}
-                        type="button"
-                        className={`rounded-md border px-2 py-1 text-xs ${
-                          selectedCarId === c.car?.id ? "border-primary text-primary" : "hover:border-primary"
-                        }`}
-                        onClick={() => setSelectedCarId(c.car?.id ?? null)}
-                      >
-                        {(c.car?.plate_number || c.car?.vin || "Historical car") + " (historic)"}
-                      </button>
-                    ))}
                   </div>
                 </div>
               </div>
-              {historyLoading && <div className="text-sm text-muted-foreground">Loading history...</div>}
-              <div className="flex flex-wrap gap-2 text-xs">
-                {(["leads", "inspections", "estimates", "invoices"] as const).map((tab) => (
-                  <button
-                    key={tab}
-                    type="button"
-                    className={`rounded-md border px-3 py-1 ${historyTab === tab ? "border-primary text-primary" : "hover:border-primary"}`}
-                    onClick={() => setHistoryTab(tab)}
-                  >
-                    {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                  </button>
+            </Card>
+
+            <Card className={`space-y-3 ${theme.cardBg} ${theme.cardBorder}`}>
+              <div className="flex items-center justify-between px-4 pt-4">
+                <div className="text-sm font-semibold">Customer Cars</div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAddCarError(null);
+                    setAddCarOpen(true);
+                  }}
+                  className={`rounded-md px-3 py-1 text-xs font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+                >
+                  Add New Car
+                </button>
+              </div>
+              <div className="space-y-2 px-4 pb-4">
+                {linkedCars.length === 0 ? (
+                  <div className={`rounded-md ${theme.cardBorder} ${theme.surfaceSubtle} px-3 py-2 text-sm ${theme.mutedText}`}>
+                    No cars linked yet.
+                  </div>
+                ) : (
+                  linkedCars.map((c) => {
+                    const car = c.car ?? {};
+                    const plate = car.plate_number || car.plateNumber || "N/A";
+                    const label = [car.make, car.model, car.model_year].filter(Boolean).join(" ") || "Car";
+                    const type = car.body_type || "Regular";
+                    const carId = car.id ?? c.link?.id ?? "";
+                    const isSelected = carId && selectedCarId === carId;
+                    return (
+                      <div
+                        key={carId || `${plate}-${label}`}
+                        className={`rounded-md px-3 py-2 text-sm ${theme.cardBorder} ${theme.surfaceSubtle} ${
+                          isSelected ? "ring-1 ring-blue-500/70" : ""
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="font-semibold">{plate}</div>
+                          <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-white/70">
+                            {type}
+                          </span>
+                        </div>
+                        <div className={`text-xs ${theme.mutedText}`}>{label}</div>
+                        <div className="mt-2 flex items-center gap-2">
+                          <button
+                            type="button"
+                            className="rounded-md bg-amber-400 px-2 py-1 text-[10px] font-semibold text-black"
+                            onClick={() => setViewCar(car)}
+                          >
+                            View
+                          </button>
+                          <button
+                            type="button"
+                            className={`rounded-md px-2 py-1 text-[10px] font-semibold ${
+                              isSelected ? "bg-blue-600 text-white" : "bg-slate-700/80 text-white"
+                            }`}
+                            onClick={async () => {
+                              if (!carId || !companyId || !customerId) return;
+                              if (isSelected) {
+                                setSelectActionCar(car);
+                                setSelectActionMode("menu");
+                                setSelectActionError(null);
+                                setSelectActionOpen(true);
+                                return;
+                              }
+                              const linkId = c.link?.id;
+                              if (!linkId) return;
+                              setSelectedCarId(carId);
+                              try {
+                                const res = await fetch(
+                                  `/api/customers/${customerId}/cars?companyId=${companyId}&linkId=${linkId}`,
+                                  {
+                                    method: "PATCH",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ isPrimary: true }),
+                                  }
+                                );
+                                if (!res.ok) {
+                                  throw new Error("Failed to update car selection");
+                                }
+                                await loadCustomer(companyId, customerId);
+                                setSelectActionCar(car);
+                                setSelectActionMode("menu");
+                                setSelectActionError(null);
+                                setSelectActionOpen(true);
+                              } catch (err) {
+                                setSelectedCarId(null);
+                              }
+                            }}
+                          >
+                            {isSelected ? "Selected" : "Select"}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </Card>
+
+            <Card className={`space-y-3 ${theme.cardBg} ${theme.cardBorder}`}>
+              <div className="px-4 pt-4 text-sm font-semibold">Customer Spending</div>
+              <div className="space-y-2 px-4 pb-4">
+                {cards.map((card) => (
+                  <div key={card.label} className={`rounded-md ${theme.cardBorder} ${theme.surfaceSubtle} px-3 py-2 text-sm`}>
+                    <div className={`text-xs ${theme.mutedText}`}>{card.label}</div>
+                    <div className="text-lg font-semibold">{card.value}</div>
+                  </div>
                 ))}
               </div>
-              {historyTab === "leads" && (
-                <HistorySection
-                  title="Leads"
-                  items={filteredHistory.leads}
-                  emptyLabel="No leads"
-                  renderItem={(item) => {
-                    const href = companyId ? `/company/${companyId}/leads/${item.id}` : null;
-                    const customer = item.customerName ?? item.customer_name ?? "Customer";
-                    const phone = item.customerPhone ?? item.customer_phone ?? "";
-                    const division = item.leadType ?? item.lead_type ?? "";
-                    const meta = [customer, phone, division && `Type: ${division}`].filter(Boolean).join(" • ");
-                    return (
-                      <HistoryRow
-                        key={item.id}
-                        href={href}
-                        title={item.leadStage || item.status || "Lead"}
-                        subtitle={meta}
-                      />
-                    );
-                  }}
-                />
-              )}
-              {historyTab === "inspections" && (
-                <HistorySection
-                  title="Inspections"
-                  items={filteredHistory.inspections}
-                  emptyLabel="No inspections"
-                  renderItem={(item) => (
-                    <HistoryRow
-                      key={item.id}
-                      title={item.status || "Inspection"}
-                      subtitle={`Car: ${item.carPlateNumber ?? item.car_id ?? item.carId ?? "-"}`}
-                    />
-                  )}
-                />
-              )}
-              {historyTab === "estimates" && (
-                <HistorySection
-                  title="Estimates"
-                  items={filteredHistory.estimates}
-                  emptyLabel="No estimates"
-                  renderItem={(item) => (
-                    <HistoryRow
-                      key={item.id}
-                      title={item.status || "Estimate"}
-                      subtitle={`Car: ${item.carPlateNumber ?? item.car_id ?? item.carId ?? "-"}`}
-                    />
-                  )}
-                />
-              )}
-              {historyTab === "invoices" && (
-                <HistorySection
-                  title="Invoices"
-                  items={filteredHistory.invoices}
-                  emptyLabel="No invoices"
-                  renderItem={(item) => (
-                    <HistoryRow
-                      key={item.id}
-                      title={item.status || "Invoice"}
-                      subtitle={`Car: ${item.carPlateNumber ?? item.car_id ?? item.carId ?? "-"}`}
-                    />
-                  )}
-                />
-              )}
             </Card>
           </div>
 
           <div className="space-y-4">
-            <Card className="space-y-3">
-              <div className="text-lg font-semibold">Linked Cars</div>
-              {linkedCars.length === 0 && <div className="text-sm text-muted-foreground">No cars linked yet.</div>}
-              <div className="space-y-2">
-                {linkedCars.map((c) => (
-                  <div
-                    key={c.link?.id ?? c.car?.id}
-                    className={`flex items-center justify-between rounded-md border px-3 py-2 text-sm ${
-                      selectedCarId === c.car?.id ? "border-primary text-primary" : ""
+            <Card className={`p-4 ${theme.cardBg} ${theme.cardBorder}`}>
+              <div className="flex flex-wrap gap-2 border-b border-white/10 pb-3">
+                {tabLabels.map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`rounded-md px-3 py-2 text-xs font-semibold uppercase tracking-wide ${
+                      activeTab === tab.id
+                        ? "bg-blue-600 text-white"
+                        : "text-white/60 hover:bg-white/10"
                     }`}
                   >
-                    <div className="flex flex-col">
-                      <span className="font-medium">{c.car?.plate_number || c.car?.plateNumber || "Car"}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {[c.car?.make, c.car?.model, c.car?.model_year].filter(Boolean).join(" ")}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        className="text-xs text-primary hover:underline"
-                        onClick={() => setSelectedCarId(c.car?.id ?? null)}
-                      >
-                        Select
-                      </button>
-                      <button
-                        type="button"
-                        className="text-xs text-destructive hover:underline"
-                        onClick={() => c.link?.id && handleUnlink(c.link.id, c)}
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  </div>
+                    {tab.label}
+                  </button>
                 ))}
               </div>
-            </Card>
 
-            {historicalCars.length > 0 && (
-              <Card className="space-y-3">
-                <div className="text-lg font-semibold">Historical Cars</div>
-                <div className="space-y-2">
-                  {historicalCars.map((c) => (
-                    <button
-                      key={c.link?.id ?? c.car?.id ?? Math.random()}
-                      type="button"
-                      className="w-full rounded-md border px-3 py-2 text-left text-sm hover:border-primary"
-                      onClick={() => setSelectedCarId(c.car?.id ?? null)}
-                    >
-                      <div className="font-medium truncate">{c.car?.plate_number || c.car?.vin || "Car"}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {[c.car?.make, c.car?.model, c.car?.model_year].filter(Boolean).join(" ")}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </Card>
-            )}
-
-            <Card className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="text-lg font-semibold">Add / Link Car</div>
-                <button
-                  type="button"
-                  className="text-xs text-primary hover:underline"
-                  onClick={() => setAddCarOpen((v) => !v)}
-                >
-                  {addCarOpen ? "Hide" : "Add / Link"}
-                </button>
-              </div>
-              {addCarOpen && (
-                <form className="space-y-3" onSubmit={handleAddCar}>
-                  <div className="space-y-2">
-                    <label className="text-xs font-semibold text-muted-foreground">Link existing car</label>
-                    <input
-                      className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                      placeholder="Search plate, VIN, make or model"
-                      value={existingCarSearch}
-                      onChange={(e) => {
-                        setExistingCarSearch(e.target.value);
-                        setExistingCarId("");
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                        }
-                      }}
+              {activeTab === "invoices" && (
+                <div className="space-y-4 pt-4">
+                  <SectionCard title="Customer Invoices">
+                    <DataTable
+                      headers={[
+                        "Invoice ID",
+                        "Invoice Date",
+                        "Plate#",
+                        "Sales Agent",
+                        "Technician",
+                        "Total Amount",
+                        "Status",
+                        "Mode",
+                        "Print",
+                        "Payment Date",
+                      ]}
+                      rows={dummyInvoices}
                     />
-                    <select
-                      className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                      size={4}
-                      value={existingCarId}
-                      onChange={(e) => setExistingCarId(e.target.value)}
-                    >
-                      {existingCars
-                        .slice(0, 30)
-                        .map((c) => {
-                          // allow numeric search to match plates without prefix (e.g., 42001 vs "I 42001")
-                          const displayPlate = (c.plate_number ?? "").trim();
-                          const display =
-                            displayPlate ||
-                            (c.vin ?? "").trim() ||
-                            `${c.make ?? ""} ${c.model ?? ""}`.trim() ||
-                            c.id;
-                          return (
-                            <option key={c.id} value={c.id}>
-                              {display}
-                            </option>
-                          );
-                        })}
-                    </select>
-                    {existingCarLoading && <div className="text-xs text-muted-foreground">Searching...</div>}
-                    <button
-                      type="button"
-                      className="w-full rounded-md border px-3 py-2 text-sm hover:border-primary disabled:opacity-60"
-                      disabled={!existingCarId || !companyId || existingCarLoading}
-                      onClick={async () => {
-                        if (!existingCarId || !companyId || !customerId) return;
-                        try {
-                          const payload = {
-                            relationType: "owner",
-                            priority: linkedCars.length + 1,
-                            isPrimary: linkedCars.length === 0,
-                            existingCarId,
-                          };
-                          const resp = await fetch(`/api/customers/${customerId}/cars?companyId=${companyId}`, {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify(payload),
-                          });
-                          if (!resp.ok) throw new Error("Failed to link car");
-                          setExistingCarId("");
-                          setExistingCarSearch("");
-                          await loadCustomer(companyId, customerId);
-                        } catch (err: any) {
-                          alert(err?.message ?? "Failed to link car");
-                        }
-                      }}
-                    >
-                      Link selected car
-                    </button>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-semibold text-muted-foreground">Relation</label>
-                    <select
-                      className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                      value={newCar.relationType}
-                      onChange={(e) =>
-                        setNewCar((prev) => ({ ...prev, relationType: e.target.value as "owner" | "driver" | "other" }))
+                  </SectionCard>
+                  <SectionCard title="Sale Returns">
+                    <DataTable
+                      headers={[
+                        "Txn ID",
+                        "Against Invoice#",
+                        "Payment Amount",
+                        "Added By",
+                        "Remarks",
+                        "Date",
+                      ]}
+                      rows={dummyReturns}
+                    />
+                  </SectionCard>
+                  <SectionCard title="Customer Transactions">
+                    <DataTable
+                      headers={[
+                        "Txn ID",
+                        "Payment Mode",
+                        "Payment Proof",
+                        "Payment Amount",
+                        "Collect By",
+                        "Proforma",
+                        "Status",
+                        "Payment Date",
+                      ]}
+                      rows={
+                        walletLoading
+                          ? [[
+                              "Loading...",
+                              "-",
+                              "-",
+                              "-",
+                              "-",
+                              "-",
+                              "-",
+                              "-",
+                            ]]
+                          : walletTransactions.length === 0
+                          ? [[
+                              walletError ?? "No transactions found.",
+                              "-",
+                              "-",
+                              "-",
+                              "-",
+                              "-",
+                              "-",
+                              "-",
+                            ]]
+                          : walletTransactions.map((txn) => [
+                              txn.id,
+                              txn.payment_method ?? "-",
+                              txn.payment_proof_file_id ? (
+                                <a
+                                  key={`${txn.id}-proof`}
+                                  href={`/api/files/${txn.payment_proof_file_id}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="rounded-md border border-white/20 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white/70 hover:bg-white/10"
+                                >
+                                  View
+                                </a>
+                              ) : (
+                                "-"
+                              ),
+                              `AED ${Number(txn.amount ?? 0).toFixed(2)}`,
+                              txn.approved_by ?? "-",
+                              <button
+                                key={`${txn.id}-proforma`}
+                                type="button"
+                                className="rounded-md border border-white/20 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white/70 hover:bg-white/10"
+                                onClick={() => openProforma(txn)}
+                              >
+                                Proforma
+                              </button>,
+                              txn.approved_at ? "Approved" : "Unapproved",
+                              formatDateTime(txn.payment_date),
+                            ])
                       }
-                    >
-                      <option value="owner">Owner</option>
-                      <option value="driver">Driver</option>
-                      <option value="other">Other</option>
-                    </select>
-                  </div>
-                  <CarMakeModelSelect
-                    value={{
-                      make: newCar.carMake,
-                      model: newCar.carModel,
-                      year: newCar.carYear ? Number(newCar.carYear) : undefined,
-                    }}
-                    onChange={(v) =>
-                      setNewCar((prev) => ({
-                        ...prev,
-                        carMake: v.make,
-                        carModel: v.model ?? "",
-                        carYear: v.year ? String(v.year) : "",
-                      }))
-                    }
-                    minYear={1900}
-                  />
-                  <PlateInput
-                    value={{
-                      country: newCar.plateCountry,
-                      locationMode: newCar.plateLocationMode,
-                      state: newCar.plateState,
-                      city: newCar.plateCity,
-                      series: newCar.plateCode,
-                      number: newCar.plateNumber,
-                    }}
-                    onChange={(v) =>
-                      setNewCar((prev) => ({
-                        ...prev,
-                        plateCountry: v.country,
-                        plateLocationMode: v.locationMode,
-                        plateState: v.state ?? "",
-                        plateCity: v.city ?? "",
-                        plateCode: v.series ?? "",
-                        plateNumber: v.number ?? "",
-                      }))
-                    }
-                  />
-                  <div className="space-y-2">
-                    <label className="text-xs font-semibold text-muted-foreground">VIN</label>
-                    <input
-                      className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                      value={newCar.vinNumber}
-                      onChange={(e) => setNewCar((prev) => ({ ...prev, vinNumber: e.target.value }))}
                     />
+                  </SectionCard>
+                </div>
+              )}
+
+              {activeTab !== "invoices" && (
+                <div className={`pt-6 text-sm ${theme.mutedText}`}>
+                  <div className="rounded-md border border-dashed border-white/15 p-6 text-center">
+                    Dummy data for {tabLabels.find((tab) => tab.id === activeTab)?.label}.
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-semibold text-muted-foreground">Tire Size (Front)</label>
-                    <input
-                      className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                      value={newCar.tyreSizeFront}
-                      onChange={(e) => setNewCar((prev) => ({ ...prev, tyreSizeFront: e.target.value }))}
-                      placeholder="e.g. 235/55R18"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-semibold text-muted-foreground">Tire Size (Rear)</label>
-                    <input
-                      className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                      value={newCar.tyreSizeBack}
-                      onChange={(e) => setNewCar((prev) => ({ ...prev, tyreSizeBack: e.target.value }))}
-                      placeholder="e.g. 255/50R18"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-semibold text-muted-foreground">Registration Expiry</label>
-                    <input
-                      className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                      type="date"
-                      value={newCar.registrationExpiry}
-                      onChange={(e) => setNewCar((prev) => ({ ...prev, registrationExpiry: e.target.value }))}
-                    />
-                  </div>
-                  <FileUploader
-                    label="Registration Card Attachment"
-                    value={newCar.registrationCardFileId}
-                    onChange={(id) => setNewCar((prev) => ({ ...prev, registrationCardFileId: id ?? "" }))}
-                  />
-                  <div className="flex gap-2">
-                    <button
-                      type="submit"
-                      className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-60"
-                      disabled={savingCar}
-                    >
-                      {savingCar ? "Saving..." : "Save Car"}
-                    </button>
-                    <button
-                      type="button"
-                      className="rounded-md border px-4 py-2 text-sm"
-                      onClick={() => setAddCarOpen(false)}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </form>
+                </div>
               )}
             </Card>
           </div>
         </div>
       </div>
+      {topupOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <Card className={`w-full max-w-lg rounded-xl shadow-xl ${theme.cardBg} ${theme.cardBorder}`}>
+            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+              <div className="text-sm font-semibold">Topup Wallet</div>
+              <button
+                type="button"
+                onClick={() => setTopupOpen(false)}
+                className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+              >
+                Close
+              </button>
+            </div>
+            <div className="space-y-4 p-4">
+              {topupError && <div className="text-sm text-red-400">{topupError}</div>}
+              <div className="space-y-2">
+                <label className={`text-xs font-semibold ${theme.mutedText}`}>Amount</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  className={theme.input}
+                  value={topupForm.amount}
+                  onChange={(e) => setTopupForm((prev) => ({ ...prev, amount: e.target.value }))}
+                  placeholder="Enter amount"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className={`text-xs font-semibold ${theme.mutedText}`}>Payment Method</label>
+                <select
+                  className={theme.input}
+                  value={topupForm.method}
+                  onChange={(e) => setTopupForm((prev) => ({ ...prev, method: e.target.value }))}
+                >
+                  <option value="cash">Cash</option>
+                  <option value="card">Card</option>
+                  <option value="bank_transfer">Bank Transfer</option>
+                  <option value="online">Online</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className={`text-xs font-semibold ${theme.mutedText}`}>Payment Date</label>
+                <input
+                  type="date"
+                  className={theme.input}
+                  value={topupForm.paymentDate}
+                  onChange={(e) => setTopupForm((prev) => ({ ...prev, paymentDate: e.target.value }))}
+                />
+              </div>
+              <FileUploader
+                label="Payment Proof"
+                value={topupForm.proofFileId}
+                onChange={(id) => setTopupForm((prev) => ({ ...prev, proofFileId: id ?? "" }))}
+              />
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  className={`rounded-md px-4 py-2 text-xs font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+                  onClick={() => setTopupOpen(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="rounded-md bg-primary px-4 py-2 text-xs font-semibold uppercase tracking-wide text-primary-foreground"
+                  disabled={topupSaving}
+                  onClick={async () => {
+                    if (!companyId || !customerId) return;
+                    const amount = Number(topupForm.amount);
+                    if (!amount || amount <= 0) {
+                      setTopupError("Enter a valid amount.");
+                      return;
+                    }
+                    setTopupSaving(true);
+                    setTopupError(null);
+                    try {
+                      const res = await fetch(`/api/customers/${customerId}/wallet/transactions`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          companyId,
+                          amount,
+                          paymentMethod: topupForm.method,
+                          paymentDate: topupForm.paymentDate || null,
+                          paymentProofFileId: topupForm.proofFileId || null,
+                        }),
+                      });
+                      if (!res.ok) {
+                        const data = await res.json().catch(() => ({}));
+                        throw new Error(data?.error ?? "Failed to create topup");
+                      }
+                      const summaryRes = await fetch(
+                        `/api/customers/${customerId}/wallet/summary?companyId=${companyId}`
+                      );
+                      if (summaryRes.ok) {
+                        const summary = await summaryRes.json().catch(() => ({}));
+                        setWalletBalance(Number(summary?.balance ?? 0));
+                      } else {
+                        setWalletBalance((prev) => prev + amount);
+                      }
+                      setTopupForm({
+                        amount: "",
+                        method: "cash",
+                        paymentDate: "",
+                        proofFileId: "",
+                      });
+                      setTopupOpen(false);
+                    } catch (err: any) {
+                      setTopupError(err?.message ?? "Failed to create topup");
+                    } finally {
+                      setTopupSaving(false);
+                    }
+                  }}
+                >
+                  {topupSaving ? "Saving..." : "Save"}
+                </button>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {addCarOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <Card className={`w-full max-w-2xl rounded-xl shadow-xl ${theme.cardBg} ${theme.cardBorder}`}>
+            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+              <div className="text-sm font-semibold">Add New Car</div>
+              <button
+                type="button"
+                onClick={() => setAddCarOpen(false)}
+                className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+              >
+                Close
+              </button>
+            </div>
+            <div className="space-y-4 p-4">
+              {addCarError && <div className="text-sm text-red-400">{addCarError}</div>}
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <label className={`text-xs font-semibold ${theme.mutedText}`}>Plate Number</label>
+                  <input
+                    type="text"
+                    className={theme.input}
+                    value={addCarForm.plateNumber}
+                    onChange={(e) => setAddCarForm((prev) => ({ ...prev, plateNumber: e.target.value }))}
+                    placeholder="DXB-A-1234"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className={`text-xs font-semibold ${theme.mutedText}`}>Car Type</label>
+                  <select
+                    className={theme.input}
+                    value={addCarForm.bodyType}
+                    onChange={(e) => setAddCarForm((prev) => ({ ...prev, bodyType: e.target.value }))}
+                  >
+                    <option value="Regular">Regular</option>
+                    <option value="Sedan">Sedan</option>
+                    <option value="SUV">SUV</option>
+                    <option value="Truck">Truck</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className={`text-xs font-semibold ${theme.mutedText}`}>Make</label>
+                  <select
+                    className={theme.input}
+                    value={addCarForm.make}
+                    onChange={(e) =>
+                      setAddCarForm((prev) => ({
+                        ...prev,
+                        make: e.target.value,
+                        model: carModelsByMake[e.target.value]?.includes(prev.model)
+                          ? prev.model
+                          : "",
+                      }))
+                    }
+                  >
+                    <option value="">Select Make</option>
+                    {carMakes.map((make) => (
+                      <option key={make} value={make}>
+                        {make}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className={`text-xs font-semibold ${theme.mutedText}`}>Model</label>
+                  <select
+                    className={theme.input}
+                    value={addCarForm.model}
+                    onChange={(e) => setAddCarForm((prev) => ({ ...prev, model: e.target.value }))}
+                    disabled={!addCarForm.make}
+                  >
+                    <option value="">Select Model</option>
+                    {(carModelsByMake[addCarForm.make] ?? []).map((model) => (
+                      <option key={model} value={model}>
+                        {model}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className={`text-xs font-semibold ${theme.mutedText}`}>Model Year</label>
+                  <select
+                    className={theme.input}
+                    value={addCarForm.modelYear}
+                    onChange={(e) => setAddCarForm((prev) => ({ ...prev, modelYear: e.target.value }))}
+                  >
+                    <option value="">Select Year</option>
+                    {carYears.map((year) => (
+                      <option key={year} value={String(year)}>
+                        {year}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <label className="flex items-center gap-2 text-xs font-semibold text-white/70">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4"
+                  checked={addCarForm.isInsurance}
+                  onChange={(e) => setAddCarForm((prev) => ({ ...prev, isInsurance: e.target.checked }))}
+                />
+                Insurance Car
+              </label>
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  className={`rounded-md px-4 py-2 text-xs font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+                  onClick={() => setAddCarOpen(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="rounded-md bg-primary px-4 py-2 text-xs font-semibold uppercase tracking-wide text-primary-foreground"
+                  disabled={addCarSaving}
+                  onClick={async () => {
+                    if (!companyId || !customerId) return;
+                    const yearValue = addCarForm.modelYear ? Number(addCarForm.modelYear) : null;
+                    if (addCarForm.modelYear && (Number.isNaN(yearValue) || yearValue <= 0)) {
+                      setAddCarError("Enter a valid model year.");
+                      return;
+                    }
+                    setAddCarSaving(true);
+                    setAddCarError(null);
+                    try {
+                      const res = await fetch(`/api/customers/${customerId}/cars?companyId=${companyId}`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          relationType: "owner",
+                          newCar: {
+                            plateNumber: addCarForm.plateNumber || null,
+                            make: addCarForm.make || null,
+                            model: addCarForm.model || null,
+                            modelYear: yearValue || null,
+                            bodyType: addCarForm.bodyType || null,
+                            isInsurance: addCarForm.isInsurance,
+                          },
+                        }),
+                      });
+                      if (!res.ok) {
+                        const data = await res.json().catch(() => ({}));
+                        throw new Error(data?.error ?? "Failed to add car");
+                      }
+                      await loadCustomer(companyId, customerId);
+                      setAddCarForm({
+                        plateNumber: "",
+                        make: "",
+                        model: "",
+                        modelYear: "",
+                        bodyType: "Regular",
+                        isInsurance: false,
+                      });
+                      setAddCarOpen(false);
+                    } catch (err: any) {
+                      setAddCarError(err?.message ?? "Failed to add car");
+                    } finally {
+                      setAddCarSaving(false);
+                    }
+                  }}
+                >
+                  {addCarSaving ? "Saving..." : "Save"}
+                </button>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {viewCar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <Card className={`w-full max-w-lg rounded-xl shadow-xl ${theme.cardBg} ${theme.cardBorder}`}>
+            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+              <div className="text-sm font-semibold">Car Details</div>
+              <button
+                type="button"
+                onClick={() => setViewCar(null)}
+                className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+              >
+                Close
+              </button>
+            </div>
+            <div className="space-y-3 p-4 text-sm">
+              <div className="grid gap-3">
+                <div className="flex items-center justify-between">
+                  <span className={theme.mutedText}>Plate</span>
+                  <span className="font-semibold">
+                    {viewCar.plate_number || viewCar.plateNumber || "N/A"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className={theme.mutedText}>Make</span>
+                  <span className="font-semibold">{viewCar.make || "N/A"}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className={theme.mutedText}>Model</span>
+                  <span className="font-semibold">{viewCar.model || "N/A"}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className={theme.mutedText}>Year</span>
+                  <span className="font-semibold">{viewCar.model_year || viewCar.modelYear || "N/A"}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className={theme.mutedText}>Type</span>
+                  <span className="font-semibold">{viewCar.body_type || viewCar.bodyType || "N/A"}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className={theme.mutedText}>Insurance</span>
+                  <span className="font-semibold">
+                    {viewCar.is_insurance || viewCar.isInsurance ? "Yes" : "No"}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {selectActionOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <Card className={`w-full max-w-lg rounded-xl shadow-xl ${theme.cardBg} ${theme.cardBorder}`}>
+            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+              <div className="text-sm font-semibold">Customer Car Action</div>
+              <button
+                type="button"
+                onClick={() => setSelectActionOpen(false)}
+                className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+              >
+                Close
+              </button>
+            </div>
+            <div className="space-y-4 p-4">
+              {selectActionError && <div className="text-sm text-red-400">{selectActionError}</div>}
+              <div className={`rounded-md ${theme.cardBorder} ${theme.surfaceSubtle} px-3 py-2 text-sm`}>
+                <div className="font-semibold">
+                  {selectActionCar?.plate_number || selectActionCar?.plateNumber || "N/A"}
+                </div>
+                <div className={`text-xs ${theme.mutedText}`}>
+                  {[selectActionCar?.make, selectActionCar?.model, selectActionCar?.model_year]
+                    .filter(Boolean)
+                    .join(" ") || "Car"}
+                </div>
+              </div>
+
+              {selectActionMode === "menu" && (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    className="rounded-md bg-primary px-3 py-2 text-xs font-semibold uppercase tracking-wide text-primary-foreground"
+                    disabled={selectActionSaving}
+                    onClick={() => runCarAction("car_in")}
+                  >
+                    {selectActionSaving ? "Working..." : "Car In (Walkin)"}
+                  </button>
+                  <button
+                    type="button"
+                    className={`rounded-md px-3 py-2 text-xs font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+                    onClick={() => setSelectActionMode("appointment")}
+                  >
+                    Create Appointment
+                  </button>
+                </div>
+              )}
+
+              {selectActionMode === "appointment" && (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className={`text-xs font-semibold ${theme.mutedText}`}>Appointment Date</label>
+                    <input
+                      type="datetime-local"
+                      className={theme.input}
+                      value={appointmentForm.appointmentAt}
+                      onChange={(e) =>
+                        setAppointmentForm((prev) => ({ ...prev, appointmentAt: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className={`text-xs font-semibold ${theme.mutedText}`}>Appointment Type</label>
+                    <select
+                      className={theme.input}
+                      value={appointmentForm.type}
+                      onChange={(e) =>
+                        setAppointmentForm((prev) => ({ ...prev, type: e.target.value }))
+                      }
+                    >
+                      <option value="walkin">Walkin</option>
+                      <option value="recovery">Recovery</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center justify-end gap-2">
+                    <button
+                      type="button"
+                      className={`rounded-md px-4 py-2 text-xs font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+                      onClick={() => setSelectActionMode("menu")}
+                    >
+                      Back
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded-md bg-primary px-4 py-2 text-xs font-semibold uppercase tracking-wide text-primary-foreground"
+                      disabled={selectActionSaving || !appointmentForm.appointmentAt}
+                      onClick={() => runCarAction("appointment")}
+                    >
+                      {selectActionSaving ? "Working..." : "Create Appointment"}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </Card>
+        </div>
+      )}
     </AppLayout>
   );
 }
 
-function Field({ label, value, className }: { label: string; value: React.ReactNode; className?: string }) {
+const dummyInvoices = [
+  ["CG-INV-000158680", "2026-01-10 06:01:47", "DXB-A-1234", "master_admin", "SC_Department", "AED 367.50", "Paid", "Loyalty Points", "Print", "2026-01-10 06:01:47"],
+  ["CG-INV-000158681", "2026-01-10 06:01:01", "DXB-D-1000", "master_admin", "SC_Department", "AED 105.00", "Paid", "Loyalty Points", "Print", "2026-01-10 06:01:01"],
+];
+
+const carMakes = ["Audi", "BMW", "Ford", "Honda", "Hyundai", "Kia", "Mazda", "Nissan", "Toyota"];
+
+const carModelsByMake: Record<string, string[]> = {
+  Audi: ["A3", "A4", "Q5"],
+  BMW: ["3 Series", "5 Series", "X5"],
+  Ford: ["Escape", "Explorer", "Focus"],
+  Honda: ["Accord", "Civic", "CR-V"],
+  Hyundai: ["Accent", "Elantra", "Sonata"],
+  Kia: ["Cerato", "Optima", "Sportage"],
+  Mazda: ["3", "6", "CX-5"],
+  Nissan: ["Altima", "Patrol", "Sunny"],
+  Toyota: ["Camry", "Corolla", "Land Cruiser"],
+};
+
+const carYears = Array.from({ length: 30 }, (_, index) => new Date().getFullYear() - index);
+
+const dummyReturns = [
+  ["CG-RTN-000201", "CG-INV-000158680", "AED 50.00", "master_admin", "Refund issued", "2026-01-11 10:02:12"],
+];
+
+const dummyTransactions = [
+  ["CG-TXN-000208521", "Paid Cash", "View", "AED 1000.00", "master_admin", "Print", "Pending Verification", "2025-12-06 20:30:47"],
+  ["CG-TXN-000208522", "Paid Cash", "View", "AED 1000.00", "master_admin", "Print", "Pending Verification", "2025-12-06 20:35:58"],
+  ["CG-TXN-000208523", "Paid Cash", "View", "AED 500.00", "master_admin", "Print", "Pending Verification", "2025-12-06 20:38:15"],
+];
+
+function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
+  const { theme } = useTheme();
   return (
-    <div className={className}>
-      <div className="text-xs font-semibold text-muted-foreground">{label}</div>
-      <div className="text-sm">{value}</div>
+    <div className="overflow-hidden rounded-md border border-white/15">
+      <div className={`flex items-center justify-between px-4 py-2 text-sm font-semibold ${theme.surfaceSubtle} ${theme.cardBorder}`}>
+        <span>{title}</span>
+        <span className="text-lg leading-none">-</span>
+      </div>
+      <div className="p-3">{children}</div>
     </div>
   );
 }
 
-function HistorySection({
-  title,
-  items,
-  emptyLabel,
-  renderItem,
+function DataTable({
+  headers,
+  rows,
 }: {
-  title: string;
-  items: HistoryItem[];
-  emptyLabel: string;
-  renderItem: (item: HistoryItem) => React.ReactNode;
+  headers: string[];
+  rows: Array<Array<React.ReactNode>>;
 }) {
+  const { theme } = useTheme();
   return (
-    <div className="space-y-2">
-      <div className="text-sm font-semibold">{title}</div>
-      {items.length === 0 && <div className="text-xs text-muted-foreground">{emptyLabel}</div>}
-      {items.length > 0 && <div className="space-y-2">{items.map(renderItem)}</div>}
+    <div className={`overflow-x-auto rounded-md ${theme.cardBorder} ${theme.surfaceSubtle}`}>
+      <table className="min-w-full text-xs">
+        <thead className="bg-white/5 text-white/70">
+          <tr>
+            {headers.map((header) => (
+              <th key={header} className="whitespace-nowrap px-3 py-2 text-left font-semibold">
+                {header}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, idx) => (
+            <tr key={`${row[0]}-${idx}`} className="border-t border-white/10 text-white/80">
+              {row.map((cell, cellIdx) => (
+                <td key={`${row[0]}-${cellIdx}`} className="whitespace-nowrap px-3 py-2">
+                  {cell}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
-}
-
-function HistoryRow({ title, subtitle, href }: { title: string; subtitle?: string; href?: string | null }) {
-  const content = (
-    <div className="rounded-md border px-3 py-2 text-sm hover:border-primary">
-      <div className="font-medium truncate">{title}</div>
-      {subtitle && <div className="text-xs text-muted-foreground truncate">{subtitle}</div>}
-    </div>
-  );
-  if (href) {
-    return (
-      <a href={href} className="block">
-        {content}
-      </a>
-    );
-  }
-  return content;
 }

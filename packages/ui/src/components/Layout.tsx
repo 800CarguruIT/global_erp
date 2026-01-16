@@ -79,6 +79,24 @@ type LayoutProps = {
   forceScope?: ScopeInfo;
 };
 
+function getCookieValue(name: string): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+function getCompanyIdFromBranchCookie(): string | null {
+  const lastBranchPath = getCookieValue("last_branch_path");
+  const match = lastBranchPath?.match(/^\/company\/([^/]+)\/branches\/([^/]+)/);
+  return match?.[1] ?? null;
+}
+
+function getBranchIdFromBranchCookie(): string | null {
+  const lastBranchPath = getCookieValue("last_branch_path");
+  const match = lastBranchPath?.match(/^\/company\/([^/]+)\/branches\/([^/]+)/);
+  return match?.[2] ?? null;
+}
+
 function detectScope(pathname: string): ScopeInfo {
   if (pathname.startsWith("/company/")) {
     const parts = pathname.split("/").filter(Boolean);
@@ -91,6 +109,16 @@ function detectScope(pathname: string): ScopeInfo {
     }
     return { scope: "company", companyId };
   }
+  if (pathname.startsWith("/branches/")) {
+    const parts = pathname.split("/").filter(Boolean);
+    const maybeRoute = parts[1];
+    const branchId =
+      maybeRoute === "leads"
+        ? getBranchIdFromBranchCookie() ?? undefined
+        : maybeRoute;
+    const companyId = getCompanyIdFromBranchCookie() ?? undefined;
+    return { scope: "branch", companyId, branchId };
+  }
   if (pathname.startsWith("/vendor/")) {
     const parts = pathname.split("/").filter(Boolean);
     return { scope: "vendor", vendorId: parts[1] };
@@ -102,15 +130,19 @@ function LayoutInner({ children, forceScope }: LayoutProps) {
   const pathname = usePathname() || "/";
   const scopeInfo = forceScope ?? detectScope(pathname);
   const hideSidebar = scopeInfo.scope === "global" && pathname === "/global";
+  const useBranchRoot = scopeInfo.scope === "branch" && pathname.startsWith("/branches/");
   const [companyName, setCompanyName] = useState<string | null>(null);
   const [branchName, setBranchName] = useState<string | null>(null);
+  const branchBase = useBranchRoot
+    ? `/branches/${scopeInfo.branchId ?? ""}`
+    : `/company/${scopeInfo.companyId ?? ""}/branches/${scopeInfo.branchId ?? ""}`;
   const settingsHref =
     scopeInfo.scope === "global"
       ? "/global/settings"
       : scopeInfo.scope === "company"
       ? `/company/${scopeInfo.companyId}/settings`
       : scopeInfo.scope === "branch"
-      ? `/company/${scopeInfo.companyId}/branches/${scopeInfo.branchId}/settings`
+      ? `${branchBase}/settings`
       : `/company/${scopeInfo.companyId ?? ""}/vendors/${scopeInfo.vendorId ?? ""}/settings`;
   const brandHref =
     scopeInfo.scope === "global"
@@ -118,7 +150,7 @@ function LayoutInner({ children, forceScope }: LayoutProps) {
       : scopeInfo.scope === "company"
       ? `/company/${scopeInfo.companyId}`
       : scopeInfo.scope === "branch"
-      ? `/company/${scopeInfo.companyId}/branches/${scopeInfo.branchId}`
+      ? branchBase
       : `/company/${scopeInfo.companyId ?? ""}/vendors/${scopeInfo.vendorId ?? ""}`;
   const brandLabel =
     scopeInfo.scope === "global"

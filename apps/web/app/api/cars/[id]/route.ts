@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { Crm } from "@repo/ai-core";
-import { buildScopeContextFromRoute, requirePermission } from "../../../lib/auth/permissions";
+import { buildScopeContextFromRoute, requirePermission } from "@/lib/auth/permissions";
 
 const updateSchema = z.object({
   scope: z.enum(["global", "company"]).default("company"),
@@ -19,6 +19,7 @@ const updateSchema = z.object({
   modelYear: z.number().optional().nullable(),
   color: z.string().optional().nullable(),
   bodyType: z.string().optional().nullable(),
+  isInsurance: z.boolean().optional().nullable(),
   mileage: z.number().optional().nullable(),
   tyreSizeFront: z.string().optional().nullable(),
   tyreSizeBack: z.string().optional().nullable(),

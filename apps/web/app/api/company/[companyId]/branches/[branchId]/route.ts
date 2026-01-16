@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { buildScopeContextFromRoute, requirePermission } from "../../../../../../lib/auth/permissions";
+import { getCurrentUserIdFromRequest } from "../../../../../../lib/auth/current-user";
 
 type ParamsContext = { params: { companyId: string; branchId: string } | Promise<{ companyId: string; branchId: string }> };
 
@@ -30,6 +32,10 @@ export async function GET(_req: NextRequest, ctx: ParamsContext) {
   if (!companyId || !branchId) {
     return NextResponse.json({ error: "companyId and branchId are required" }, { status: 400 });
   }
+  const userId = await getCurrentUserIdFromRequest(_req);
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
     const { Branches } = await import("@repo/ai-core");
     const branch = await Branches.getBranchWithDetails(companyId, branchId);
@@ -48,6 +54,12 @@ export async function PUT(req: NextRequest, ctx: ParamsContext) {
   if (!companyId || !branchId) {
     return NextResponse.json({ error: "companyId and branchId are required", received: { companyId, branchId, url: req.url } }, { status: 400 });
   }
+  const authError = await requirePermission(
+    req,
+    "branches.edit",
+    buildScopeContextFromRoute({ companyId, branchId }, "branch")
+  );
+  if (authError) return authError;
   try {
     const body = await req.json();
     const { Branches } = await import("@repo/ai-core");
@@ -94,6 +106,12 @@ export async function DELETE(_req: NextRequest, ctx: ParamsContext) {
   if (!companyId || !branchId) {
     return NextResponse.json({ error: "companyId and branchId are required", received: { companyId, branchId, url: _req.url } }, { status: 400 });
   }
+  const authError = await requirePermission(
+    _req,
+    "branches.delete",
+    buildScopeContextFromRoute({ companyId, branchId }, "branch")
+  );
+  if (authError) return authError;
   try {
     const { Branches } = await import("@repo/ai-core");
     await Branches.softDeleteBranch(companyId, branchId);

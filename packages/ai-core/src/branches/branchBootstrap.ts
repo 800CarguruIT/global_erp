@@ -40,7 +40,10 @@ export async function ensureBranchAdminForBranch(branch: Branch) {
       ${branch.company_id}
     )
     ON CONFLICT (email)
-    DO UPDATE SET is_active = true, company_id = COALESCE(users.company_id, EXCLUDED.company_id)
+    DO UPDATE SET
+      is_active = true,
+      company_id = COALESCE(users.company_id, EXCLUDED.company_id),
+      branch_id = ${branch.id}
     RETURNING id
   `;
   const userId = (userRes as any).rows ? (userRes as any).rows[0]?.id : userRes[0]?.id;
@@ -52,9 +55,24 @@ export async function ensureBranchAdminForBranch(branch: Branch) {
     ON CONFLICT (user_id, role_id) DO NOTHING
   `;
 
+  const branchPermissionKeys = [
+    "branches.view",
+    "branches.create",
+    "branches.edit",
+    "branches.delete",
+    "branch.admin",
+  ];
+
+  await sql`
+    DELETE FROM role_permissions
+    WHERE role_id = ${roleId}
+  `;
+
   await sql`
     INSERT INTO role_permissions (role_id, permission_id)
-    SELECT ${roleId}, p.id FROM permissions p
+    SELECT ${roleId}, p.id
+    FROM permissions p
+    WHERE p.key = ANY(${branchPermissionKeys})
     ON CONFLICT DO NOTHING
   `;
 }

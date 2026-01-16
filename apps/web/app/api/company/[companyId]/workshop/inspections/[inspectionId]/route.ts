@@ -25,6 +25,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
   const patch = {
     status: body.status,
+    startAt: body.startAt ?? body.start_at,
+    completeAt: body.completeAt ?? body.complete_at,
     healthEngine: body.healthEngine,
     healthTransmission: body.healthTransmission,
     healthBrakes: body.healthBrakes,

@@ -8,10 +8,18 @@ export default function CompanyRoleNewPage({ params }: { params: { companyId: st
   const [perms, setPerms] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [forbidden, setForbidden] = useState(false);
 
   useEffect(() => {
     async function load() {
       try {
+        setForbidden(false);
+        const authRes = await fetch(`/api/auth/roles?scope=company&companyId=${companyId}`);
+        if (authRes.status === 401 || authRes.status === 403) {
+          setForbidden(true);
+          setLoading(false);
+          return;
+        }
         const res = await fetch("/api/auth/permissions");
         if (!res.ok) throw new Error("Failed to load permissions");
         const data = await res.json();
@@ -23,7 +31,7 @@ export default function CompanyRoleNewPage({ params }: { params: { companyId: st
       }
     }
     load();
-  }, []);
+  }, [companyId]);
 
   return (
     <AppLayout>
@@ -37,7 +45,9 @@ export default function CompanyRoleNewPage({ params }: { params: { companyId: st
             Back to Roles
           </button>
         </div>
-        {loading ? (
+        {forbidden ? (
+          <div className="text-sm text-destructive">Only company admins can manage roles and permissions.</div>
+        ) : loading ? (
           <div className="text-sm text-muted-foreground">Loading...</div>
         ) : (
           <RoleForm

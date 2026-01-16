@@ -213,13 +213,18 @@ export async function updateEstimateHeader(
   }>
 ): Promise<void> {
   const sql = getSql();
-  const updated = {
-    status: patch.status,
-    vat_rate: patch.vatRate,
-    total_discount: patch.totalDiscount,
-    currency: patch.currency,
-    meta: patch.meta,
-  };
+  const updated = Object.fromEntries(
+    Object.entries({
+      status: patch.status,
+      vat_rate: patch.vatRate,
+      total_discount: patch.totalDiscount,
+      currency: patch.currency,
+      meta: patch.meta,
+    }).filter(([, value]) => value !== undefined)
+  );
+  if (Object.keys(updated).length === 0) {
+    return;
+  }
   await sql`
     UPDATE estimates
     SET ${sql(updated)}

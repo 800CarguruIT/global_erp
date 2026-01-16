@@ -44,7 +44,8 @@ async function ensureLeadAssignmentColumns(): Promise<boolean> {
           'pickup_from',
           'dropoff_to',
           'pickup_google_location',
-          'dropoff_google_location'
+          'dropoff_google_location',
+          'checkin_at'
         )
     `;
     const names = (res as any)?.map((r: any) => r.column_name) ?? [];
@@ -61,6 +62,7 @@ async function ensureLeadAssignmentColumns(): Promise<boolean> {
       "dropoff_to",
       "pickup_google_location",
       "dropoff_google_location",
+      "checkin_at",
     ].filter((c) => !names.includes(c));
     if (missing.length) {
       // add columns if they don't exist; keep null defaults to avoid migrations blocking
@@ -77,7 +79,8 @@ async function ensureLeadAssignmentColumns(): Promise<boolean> {
         ADD COLUMN IF NOT EXISTS pickup_from text NULL,
         ADD COLUMN IF NOT EXISTS dropoff_to text NULL,
         ADD COLUMN IF NOT EXISTS pickup_google_location text NULL,
-        ADD COLUMN IF NOT EXISTS dropoff_google_location text NULL
+        ADD COLUMN IF NOT EXISTS dropoff_google_location text NULL,
+        ADD COLUMN IF NOT EXISTS checkin_at timestamptz NULL
       `;
     }
     leadAssignmentColumnsSupported = true;
@@ -99,6 +102,7 @@ export async function listLeadsForCompany(companyId: string): Promise<Lead[]> {
         c.email AS customer_email,
         car.plate_number AS car_plate_number,
         car.model AS car_model,
+        COALESCE(b.display_name, b.name, b.code) AS branch_name,
         e.full_name AS agent_name,
         l.customer_details_requested,
         l.customer_details_approved,
@@ -109,6 +113,7 @@ export async function listLeadsForCompany(companyId: string): Promise<Lead[]> {
       FROM leads l
       LEFT JOIN customers c ON c.id = l.customer_id
       LEFT JOIN cars car ON car.id = l.car_id
+      LEFT JOIN branches b ON b.id = l.branch_id
       LEFT JOIN employees e ON e.id = l.agent_employee_id
       WHERE l.company_id = ${companyId}
       ORDER BY l.created_at DESC
@@ -127,6 +132,7 @@ export async function getLeadById(companyId: string, leadId: string): Promise<Le
         c.email AS customer_email,
         car.plate_number AS car_plate_number,
         car.model AS car_model,
+        COALESCE(b.display_name, b.name, b.code) AS branch_name,
         e.full_name AS agent_name,
         l.customer_details_requested,
         l.customer_details_approved,
@@ -137,6 +143,7 @@ export async function getLeadById(companyId: string, leadId: string): Promise<Le
       FROM leads l
       LEFT JOIN customers c ON c.id = l.customer_id
       LEFT JOIN cars car ON car.id = l.car_id
+      LEFT JOIN branches b ON b.id = l.branch_id
       LEFT JOIN employees e ON e.id = l.agent_employee_id
       WHERE l.company_id = ${companyId} AND l.id = ${leadId}
       LIMIT 1
@@ -267,12 +274,15 @@ function mapLeadRow(row: any): Lead {
     firstResponseAt: row.first_response_at,
   lastActivityAt: row.last_activity_at,
   closedAt: row.closed_at,
+  checkinAt: row.checkin_at,
   isLocked: row.is_locked,
   healthScore: row.health_score,
   sentimentScore: row.sentiment_score,
   customerFeedback: row.customer_feedback,
   agentRemark: row.agent_remark,
   customerRemark: row.customer_remark,
+  carInVideo: row.carin_video ?? null,
+  carOutVideo: row.carout_video ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     customerName: row.customer_name,
@@ -280,9 +290,10 @@ function mapLeadRow(row: any): Lead {
     customerEmail: row.customer_email,
     carPlateNumber: row.car_plate_number,
     carModel: row.car_model,
+    branchName: row.branch_name ?? null,
     agentName: row.agent_name,
     customerDetailsRequested: row.customer_details_requested ?? false,
-    customerDetailsApproved: row.customer_details_approved ?? false,
+  customerDetailsApproved: row.customer_details_approved ?? false,
   };
 }
 
@@ -406,6 +417,9 @@ export async function updateLeadPartial(
     customerRemark?: string | null;
     customerFeedback?: string | null;
     sentimentScore?: number | null;
+    checkinAt?: string | null;
+    carInVideo?: string | null;
+    carOutVideo?: string | null;
   }
 ): Promise<void> {
   const supportsAssignments = await ensureLeadAssignmentColumns();
@@ -486,6 +500,9 @@ export async function updateLeadPartial(
       : supportsAssignments
         ? current.customerDetailsApproved ?? false
         : false;
+  const newCheckinAt = patch.checkinAt !== undefined ? patch.checkinAt : current.checkinAt ?? null;
+  const newCarInVideo = patch.carInVideo !== undefined ? patch.carInVideo : (current as any).carInVideo ?? null;
+  const newCarOutVideo = patch.carOutVideo !== undefined ? patch.carOutVideo : (current as any).carOutVideo ?? null;
 
   const newClosedAt =
     newStatus === "closed_won" || newStatus === "lost"
@@ -522,6 +539,9 @@ export async function updateLeadPartial(
         customer_remark = ${newCustomerRemark},
         customer_feedback = ${newCustomerFeedback},
         sentiment_score = ${newSentimentScore},
+        checkin_at = ${newCheckinAt},
+        carin_video = ${newCarInVideo},
+        carout_video = ${newCarOutVideo},
         closed_at = ${newClosedAt},
         health_score = ${healthScore},
         updated_at = now()
@@ -537,6 +557,9 @@ export async function updateLeadPartial(
         customer_remark = ${newCustomerRemark},
         customer_feedback = ${newCustomerFeedback},
         sentiment_score = ${newSentimentScore},
+        checkin_at = ${newCheckinAt},
+        carin_video = ${newCarInVideo},
+        carout_video = ${newCarOutVideo},
         closed_at = ${newClosedAt},
         health_score = ${healthScore},
         updated_at = now()

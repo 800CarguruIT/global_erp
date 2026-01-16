@@ -66,8 +66,8 @@ export function SmartSelect({
   const displayValue = input || selectedOption?.label || "";
 
   return (
-    <div className="relative">
-      {label && <div className="mb-1 text-xs font-semibold uppercase opacity-80">{label}</div>}
+    <div className="relative space-y-1">
+      {label && <div className="text-xs font-semibold text-muted-foreground">{label}</div>}
       <div className="relative">
         <input
           className={`${theme.input} pr-10`}

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Leads } from "@repo/ai-core";
+import { Leads, WorkshopInspections } from "@repo/ai-core";
 import { getCurrentUserIdFromRequest } from "../../../../../../../lib/auth/current-user";
 
 type Params = { params: Promise<{ companyId: string; leadId: string }> };
@@ -32,21 +32,38 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
+    const checkinAt = body.checkinAt ?? (body.leadStatus === "car_in" ? new Date().toISOString() : undefined);
+
     await Leads.updateLeadPartial(companyId, leadId, {
       leadStatus: body.leadStatus,
       leadStage: body.leadStage,
+      branchId: body.branchId,
       agentRemark: body.agentRemark,
       customerRemark: body.customerRemark,
       customerFeedback: body.customerFeedback,
       sentimentScore: body.sentimentScore,
+      checkinAt,
+      carInVideo: body.carInVideo,
+      carOutVideo: body.carOutVideo,
     });
 
     const userId = await getCurrentUserIdFromRequest(req);
     const changes: Array<{ field: string; from: any; to: any }> = [];
-    const fields: Array<keyof typeof before> = ["leadStatus", "leadStage", "agentRemark", "customerRemark", "customerFeedback", "sentimentScore"];
+    const fields: Array<keyof typeof before> = [
+      "leadStatus",
+      "leadStage",
+      "branchId",
+      "agentRemark",
+      "customerRemark",
+      "customerFeedback",
+      "sentimentScore",
+      "checkinAt",
+      "carInVideo",
+      "carOutVideo",
+    ];
     for (const field of fields) {
       const prev = (before as any)[field];
-      const next = (body as any)[field];
+      const next = field === "checkinAt" ? checkinAt : (body as any)[field];
       if (next !== undefined && next !== prev) {
         changes.push({ field: String(field), from: prev ?? null, to: next ?? null });
       }
@@ -59,6 +76,40 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         eventType: "updated",
         eventPayload: { changes },
       });
+    }
+    if (body.leadStatus === "accepted" && before.leadStatus !== "accepted") {
+      await Leads.appendLeadEvent({
+        companyId,
+        leadId,
+        actorUserId: userId,
+        eventType: "accepted",
+        eventPayload: { acceptedAt: new Date().toISOString() },
+      });
+    }
+    if (body.leadStatus === "car_in" && before.leadStatus !== "car_in") {
+      await Leads.appendLeadEvent({
+        companyId,
+        leadId,
+        actorUserId: userId,
+        eventType: "car_in",
+        eventPayload: { checkinAt: checkinAt ?? new Date().toISOString() },
+      });
+      const carId = before.carId;
+      const customerId = before.customerId;
+      const branchId = body.branchId ?? before.branchId ?? null;
+      if (carId) {
+        const existing = await WorkshopInspections.getLatestInspectionForLead(companyId, leadId);
+        if (!existing) {
+          await WorkshopInspections.createInspection({
+            companyId,
+            leadId,
+            carId,
+            customerId: customerId ?? null,
+            branchId,
+            status: "pending",
+          });
+        }
+      }
     }
 
     const remarkEvents: Array<Promise<void>> = [];

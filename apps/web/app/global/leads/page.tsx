@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { AppLayout, Card, useI18n, useTheme } from "@repo/ui";
+import { AppLayout, Card, useI18n } from "@repo/ui";
 
 type LeadStatus = "open" | "assigned" | "onboarding" | "inprocess" | "completed" | "closed" | "lost";
 type LeadType = "sales" | "support" | "complaint";
@@ -32,22 +32,32 @@ const TABS: { id: LeadStatus | "all"; labelKey: string }[] = [
   { id: "lost", labelKey: "leads.tab.lost" },
 ];
 
+const STATUS_STYLES: Record<LeadStatus, string> = {
+  open: "bg-sky-500/15 text-sky-600",
+  assigned: "bg-indigo-500/15 text-indigo-600",
+  onboarding: "bg-amber-500/15 text-amber-600",
+  inprocess: "bg-orange-500/15 text-orange-600",
+  completed: "bg-emerald-500/15 text-emerald-600",
+  closed: "bg-emerald-500/15 text-emerald-600",
+  lost: "bg-rose-500/15 text-rose-600",
+};
+
 function StatusBadge({ status }: { status: LeadStatus }) {
-  const color =
-    status === "completed" || status === "closed"
-      ? "bg-emerald-500/20 text-emerald-300"
-      : status === "inprocess"
-      ? "bg-amber-500/20 text-amber-200"
-      : status === "onboarding"
-      ? "bg-sky-500/20 text-sky-200"
-      : status === "lost"
-      ? "bg-red-500/20 text-red-200"
-      : "bg-purple-500/20 text-purple-200";
-  return <span className={`rounded-full px-2 py-0.5 text-xs capitalize ${color}`}>{status}</span>;
+  return (
+    <span className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold capitalize ${
+      STATUS_STYLES[status]
+    }`}>
+      {status}
+    </span>
+  );
 }
 
 function TypeBadge({ type }: { type: string }) {
-  return <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs capitalize">{type}</span>;
+  return (
+    <span className="inline-flex items-center rounded-full bg-muted/40 px-3 py-1 text-[11px] font-semibold text-muted-foreground capitalize">
+      {type}
+    </span>
+  );
 }
 
 const dateFormatter = new Intl.DateTimeFormat("en-US", {
@@ -62,6 +72,14 @@ const dateFormatter = new Intl.DateTimeFormat("en-US", {
 
 function formatDate(date: string) {
   return dateFormatter.format(new Date(date));
+}
+
+function normalize(value: string | null | undefined) {
+  return (value ?? "").toString().trim().toLowerCase();
+}
+
+function safeText(value: string | null | undefined) {
+  return value && value !== "null" ? value : "-";
 }
 
 export default function GlobalLeadsPage() {
@@ -79,8 +97,8 @@ function LeadsContent() {
   const [error, setError] = useState<string | null>(null);
   const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
   const [aiAppreciation, setAiAppreciation] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
   const { t } = useI18n();
-  const { theme } = useTheme();
 
   useEffect(() => {
     let active = true;
@@ -102,12 +120,19 @@ function LeadsContent() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [t]);
 
   const filtered = useMemo(() => {
-    if (tab === "all") return leads;
-    return leads.filter((l) => l.status === tab);
-  }, [tab, leads]);
+    const term = normalize(query);
+    const rows = tab === "all" ? leads : leads.filter((l) => l.status === tab);
+    if (!term) return rows;
+    return rows.filter((l) => {
+      const haystack = [l.title, l.customerName, l.customerPhone, l.type, l.status]
+        .map(normalize)
+        .join(" ");
+      return haystack.includes(term);
+    });
+  }, [tab, leads, query]);
 
   const counts = useMemo(() => {
     const map: Record<LeadStatus, number> = {
@@ -142,30 +167,55 @@ function LeadsContent() {
     }
   }, [counts, t]);
 
+  function resetFilters() {
+    setTab("all");
+    setQuery("");
+  }
+
   return (
-    <div className="space-y-6 py-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">{t("leads.title")}</h1>
+    <div className="w-full -mx-4 px-4 lg:-mx-8 lg:px-8 py-6 space-y-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="space-y-1">
+          <h1 className="text-xl sm:text-2xl font-semibold">{t("leads.title")}</h1>
           <p className="text-sm text-muted-foreground">{t("leads.subtitle")}</p>
         </div>
-        <div className="flex gap-2 text-sm">
-          {TABS.map((tabDef) => (
-            <button
-              key={tabDef.id}
-              className={`rounded-full border px-3 py-1 ${
-                tab === tabDef.id ? "bg-primary text-primary-foreground border-primary" : "border-border/60"
-              }`}
-              onClick={() => setTab(tabDef.id)}
-            >
-              {t(tabDef.labelKey)}
-            </button>
-          ))}
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={resetFilters}
+            className="inline-flex items-center rounded-md border border-slate-200 bg-white px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600 shadow-md transition hover:bg-slate-50 hover:shadow-lg"
+          >
+            <svg viewBox="0 0 24 24" className="-ml-1 mr-2 h-4 w-4" aria-hidden="true">
+              <path
+                d="M4 6h16M7 12h10M10 18h4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+              />
+            </svg>
+            View All
+          </button>
+          <Link
+            href="/global/leads/new"
+            className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-primary-foreground shadow-md transition hover:opacity-90 hover:shadow-lg"
+          >
+            <svg viewBox="0 0 24 24" className="-ml-1 mr-2 h-4 w-4" aria-hidden="true">
+              <path
+                d="M12 5v14M5 12h14"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
+            </svg>
+            Add Lead
+          </Link>
         </div>
       </div>
 
       <div className="grid gap-3 lg:grid-cols-2">
-        <Card>
+        <Card className="rounded-2xl border border-border/30 bg-card shadow-sm">
           <div className="space-y-2">
             <div className="text-sm font-semibold">{t("leads.ai.title")}</div>
             {loading ? (
@@ -181,7 +231,7 @@ function LeadsContent() {
             )}
           </div>
         </Card>
-        <Card>
+        <Card className="rounded-2xl border border-border/30 bg-card shadow-sm">
           <div className="space-y-2">
             <div className="text-sm font-semibold">{t("leads.ai.appreciation.title")}</div>
             <div className="text-sm text-muted-foreground">
@@ -191,60 +241,142 @@ function LeadsContent() {
         </Card>
       </div>
 
-      {error && <div className="text-sm text-destructive">{error}</div>}
-      {loading ? (
-        <p className="text-sm text-muted-foreground">{t("leads.loading")}</p>
-      ) : (
-        <Card>
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="text-left border-b border-border/60 text-xs text-muted-foreground">
-                  <th className="px-3 py-2">{t("leads.table.lead")}</th>
-                  <th className="px-3 py-2">{t("leads.table.customer")}</th>
-                  <th className="px-3 py-2">Contact</th>
-                  <th className="px-3 py-2">{t("leads.table.type")}</th>
-                  <th className="px-3 py-2">{t("leads.table.status")}</th>
-                  <th className="px-3 py-2">{t("leads.table.updated")}</th>
-                  <th className="px-3 py-2">{t("leads.table.actions")}</th>
+      <Card className="rounded-2xl border-x border-border/30 bg-card shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/30 px-4 py-3">
+          <div className="inline-flex rounded-lg bg-muted/40 p-1 text-xs">
+            {TABS.map((tabDef) => (
+              <button
+                key={tabDef.id}
+                type="button"
+                onClick={() => setTab(tabDef.id)}
+                className={`rounded-md px-3 py-1.5 font-medium transition ${
+                  tab === tabDef.id
+                    ? "bg-background text-foreground shadow-sm border border-border/40"
+                    : "border border-transparent text-muted-foreground hover:bg-muted/50"
+                }`}
+              >
+                {t(tabDef.labelKey)}
+              </button>
+            ))}
+          </div>
+          <div className="relative w-full max-w-xs">
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search"
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 pr-9 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
+              <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
+                <path
+                  d="M15.5 15.5L21 21M10.5 18a7.5 7.5 0 1 1 0-15a7.5 7.5 0 0 1 0 15Z"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </span>
+          </div>
+        </div>
+        {error && <div className="px-4 pt-3 text-xs text-red-500">{error}</div>}
+
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm border-separate border-spacing-0">
+            <thead>
+              <tr className="text-left bg-muted/20">
+                <th className="px-4 py-3 sticky top-0 bg-muted/20 backdrop-blur border-b border-border/30 text-xs font-semibold text-muted-foreground">
+                  {t("leads.table.lead")}
+                </th>
+                <th className="px-4 py-3 sticky top-0 bg-muted/20 backdrop-blur border-b border-border/30 text-xs font-semibold text-muted-foreground">
+                  {t("leads.table.customer")}
+                </th>
+                <th className="px-4 py-3 sticky top-0 bg-muted/20 backdrop-blur border-b border-border/30 text-xs font-semibold text-muted-foreground">
+                  Contact
+                </th>
+                <th className="px-4 py-3 sticky top-0 bg-muted/20 backdrop-blur border-b border-border/30 text-xs font-semibold text-muted-foreground">
+                  {t("leads.table.type")}
+                </th>
+                <th className="px-4 py-3 sticky top-0 bg-muted/20 backdrop-blur border-b border-border/30 text-xs font-semibold text-muted-foreground">
+                  {t("leads.table.status")}
+                </th>
+                <th className="px-4 py-3 sticky top-0 bg-muted/20 backdrop-blur border-b border-border/30 text-xs font-semibold text-muted-foreground">
+                  {t("leads.table.updated")}
+                </th>
+                <th className="px-4 py-3 text-right sticky top-0 bg-muted/20 backdrop-blur border-b border-border/30 text-xs font-semibold text-muted-foreground">
+                  {t("leads.table.actions")}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading && (
+                <tr>
+                  <td className="px-3 py-6 text-muted-foreground text-center" colSpan={7}>
+                    {t("leads.loading")}
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {filtered.map((lead) => (
-                  <tr key={lead.id} className="border-b border-border/60">
-                    <td className="px-3 py-2">
-                      <div className="font-semibold">{lead.title || t("leads.table.untitled")}</div>
+              )}
+              {!loading && error && (
+                <tr>
+                  <td className="px-3 py-6 text-red-500 text-center" colSpan={7}>
+                    {error}
+                  </td>
+                </tr>
+              )}
+              {!loading && !error && filtered.length === 0 && (
+                <tr>
+                  <td className="px-3 py-6 text-muted-foreground text-center" colSpan={7}>
+                    {t("leads.empty")}
+                  </td>
+                </tr>
+              )}
+              {!loading &&
+                !error &&
+                filtered.map((lead) => (
+                  <tr key={lead.id} className="hover:bg-muted/20">
+                    <td className="px-4 py-3 border-b border-border/30">
+                      <div className="font-medium text-foreground">{lead.title || t("leads.table.untitled")}</div>
                     </td>
-                    <td className="px-3 py-2">
-                      <div>{lead.customerName || t("leads.table.noCustomer")}</div>
+                    <td className="px-4 py-3 border-b border-border/30">
+                      {lead.customerName || t("leads.table.noCustomer")}
                     </td>
-                    <td className="px-3 py-2 text-xs text-muted-foreground">{lead.customerPhone || "-"}</td>
-                    <td className="px-3 py-2">
+                    <td className="px-4 py-3 border-b border-border/30 text-xs text-muted-foreground">
+                      {safeText(lead.customerPhone)}
+                    </td>
+                    <td className="px-4 py-3 border-b border-border/30">
                       <TypeBadge type={lead.type} />
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-4 py-3 border-b border-border/30">
                       <StatusBadge status={lead.status} />
                     </td>
-                    <td className="px-3 py-2 text-xs text-muted-foreground">{formatDate(lead.lastUpdated)}</td>
-                    <td className="px-3 py-2 text-xs">
-                      <Link href={`/global/leads/${lead.id}`} className="text-primary hover:underline">
+                    <td className="px-4 py-3 border-b border-border/30 text-xs text-muted-foreground">
+                      {formatDate(lead.lastUpdated)}
+                    </td>
+                    <td className="px-4 py-3 text-right border-b border-border/30">
+                      <Link
+                        href={`/global/leads/${lead.id}`}
+                        className="inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary-foreground shadow-sm transition hover:opacity-90 hover:shadow-md"
+                      >
+                        <svg viewBox="0 0 24 24" className="-ml-1 mr-2 h-4 w-4" aria-hidden="true">
+                          <path
+                            d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6Z"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                          <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" strokeWidth="1.5" />
+                        </svg>
                         {t("leads.table.view")}
                       </Link>
                     </td>
                   </tr>
                 ))}
-                {filtered.length === 0 && (
-                  <tr>
-                    <td className="px-3 py-3 text-sm text-muted-foreground" colSpan={6}>
-                      {t("leads.empty")}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
     </div>
   );
 }

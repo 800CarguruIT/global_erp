@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { appendLeadEvent, deleteLead, getLeadById, updateLeadPartial } from "@repo/ai-core/crm/leads/repository";
 import { getSql } from "@repo/ai-core/db";
+import { createInspection, getLatestInspectionForLead } from "@repo/ai-core/workshop/inspections/repository";
 
 type Params = { params: Promise<{ companyId: string; id: string }> };
 
@@ -32,16 +33,18 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
   const branchIdFromBody = branchId === null ? null : branchId ?? lead.branchId ?? null;
   const branchChanged = branchIdFromBody !== lead.branchId;
+  const nextAssignedUserId = assignedUserId ?? lead.assignedUserId ?? null;
+  const nextLeadStatus = status ?? lead.leadStatus;
 
   await updateLeadPartial(companyId, id, {
     leadStatus: status ?? lead.leadStatus,
     leadStage: leadStage ?? lead.leadStage,
     branchId: branchIdFromBody,
-    assignedUserId: assignedUserId ?? lead.assignedUserId ?? null,
+    assignedUserId: nextAssignedUserId,
     serviceType: serviceType ?? lead.serviceType ?? null,
     recoveryDirection: recoveryDirection ?? lead.recoveryDirection ?? null,
     recoveryFlow: recoveryFlow ?? lead.recoveryFlow ?? null,
-    assignedAt: assignedUserId ? new Date().toISOString() : null,
+    assignedAt: nextAssignedUserId ? new Date().toISOString() : null,
     agentRemark: agentRemark ?? lead.agentRemark,
     customerRemark: customerRemark ?? lead.customerRemark,
     customerFeedback: lead.customerFeedback,
@@ -63,6 +66,29 @@ export async function PUT(req: NextRequest, { params }: Params) {
       eventType: "branch_updated",
       eventPayload: { from: lead.branchId ?? null, to: updated.branchId ?? null },
     });
+  }
+
+  if (
+    lead.leadType === "workshop" &&
+    nextLeadStatus === "car_in" &&
+    (branchIdFromBody || nextAssignedUserId) &&
+    (branchChanged || nextAssignedUserId !== lead.assignedUserId)
+  ) {
+    try {
+      const existing = await getLatestInspectionForLead(companyId, id);
+      if (!existing) {
+        await createInspection({
+          companyId,
+          leadId: id,
+          carId: lead.carId ?? null,
+          customerId: lead.customerId ?? null,
+          branchId: branchIdFromBody ?? null,
+          status: "pending",
+        });
+      }
+    } catch (err) {
+      console.error("Failed to create inspection after assignment", err);
+    }
   }
 
   // If workshop lead gets a branch and has a pickup, update linked recovery pickup lead drop-off to that branch

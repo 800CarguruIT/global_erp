@@ -1,4 +1,4 @@
-export type EstimateStatus = "draft" | "pending_approval" | "approved" | "rejected" | "cancelled";
+export type EstimateStatus = "draft" | "pending_approval" | "approved" | "rejected" | "cancelled" | "invoiced";
 export type EstimateItemStatus = "pending" | "approved" | "rejected";
 
 export type Estimate = {

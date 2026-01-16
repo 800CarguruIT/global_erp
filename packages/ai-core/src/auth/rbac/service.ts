@@ -5,6 +5,7 @@ import {
   getRoleById,
   getRolePermissions,
   getRolesByScope,
+  getUserPermissionsForExactScope,
   getUserEffectivePermissions,
   getUserRoles,
   insertRole,
@@ -111,13 +112,38 @@ export async function getUserPermissions(
   return perms.map((p) => p.key);
 }
 
+export async function getUserPermissionsForScope(
+  userId: string,
+  scopeContext: ScopeContext
+): Promise<string[]> {
+  const perms = await getUserPermissionsForExactScope(userId, scopeContext);
+  return perms.map((p) => p.key);
+}
+
 export async function checkPermission(
   userId: string,
   permissionKey: string,
   scopeContext: ScopeContext
 ): Promise<boolean> {
   const perms = await getUserPermissions(userId, scopeContext);
-  return perms.includes(permissionKey) || perms.includes("global.admin") || perms.includes("company.admin");
+  if (perms.includes(permissionKey) || perms.includes("global.admin")) return true;
+
+  if (scopeContext.scope !== "global") {
+    if (perms.includes("company.admin")) return true;
+    const roles = await getUserRoles(userId);
+    const companyId = scopeContext.companyId ?? null;
+    const isCompanyAdmin = roles.some(
+      (r) =>
+        r.scope === "company" &&
+        (r.key === "company_admin" || r.key.startsWith("company_admin_")) &&
+        (!companyId || r.company_id === null || r.company_id === companyId)
+    );
+    if (isCompanyAdmin) return true;
+  }
+
+  if (scopeContext.scope === "branch" && perms.includes("branch.admin")) return true;
+
+  return false;
 }
 
 export async function userHasAnyPermission(

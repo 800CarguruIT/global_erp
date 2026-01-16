@@ -1,6 +1,7 @@
 import { getSql } from "../../db";
 import { getQualityCheckWithItems } from "../qualityCheck/repository";
 import { getEstimateWithItems } from "../estimates/repository";
+import { createWorkOrderFromEstimate } from "../workorders/repository";
 import type { Invoice, InvoiceItem, InvoiceStatus } from "./types";
 
 function mapInvoiceRow(row: any): Invoice {
@@ -160,6 +161,119 @@ export async function createInvoiceFromQualityCheck(companyId: string, qcId: str
   }
 
   await recalculateInvoiceTotals(invoice.id);
+  const refreshed = await getInvoiceWithItems(companyId, invoice.id);
+  return {
+    invoice: refreshed?.invoice ?? invoice,
+    items: refreshed?.items ?? [],
+  };
+}
+
+export async function createInvoiceFromEstimate(
+  companyId: string,
+  estimateId: string
+): Promise<{ invoice: Invoice; items: InvoiceItem[] }> {
+  const sql = getSql();
+  const estimateData = await getEstimateWithItems(companyId, estimateId);
+  if (!estimateData) throw new Error("Estimate not found");
+  const { estimate, items: lines } = estimateData;
+
+  let workOrderId: string | null = null;
+  const woRows = await sql`
+    SELECT id
+    FROM work_orders
+    WHERE company_id = ${companyId} AND estimate_id = ${estimateId}
+    ORDER BY created_at DESC
+    LIMIT 1
+  `;
+  if (woRows.length) {
+    workOrderId = woRows[0].id;
+  } else {
+    const created = await createWorkOrderFromEstimate(companyId, estimateId);
+    workOrderId = created.workOrder.id;
+  }
+
+  const invoiceNumber = await nextInvoiceNumber(companyId);
+  const vatRate = estimate.vatRate ?? 5.0;
+
+  const invRows = await sql`
+    INSERT INTO invoices (
+      company_id,
+      work_order_id,
+      estimate_id,
+      quality_check_id,
+      inspection_id,
+      lead_id,
+      car_id,
+      customer_id,
+      invoice_number,
+      invoice_date,
+      status,
+      vat_rate,
+      terms,
+      notes
+    ) VALUES (
+      ${companyId},
+      ${workOrderId},
+      ${estimateId},
+      ${null},
+      ${estimate.inspectionId ?? null},
+      ${estimate.leadId ?? null},
+      ${estimate.carId ?? null},
+      ${estimate.customerId ?? null},
+      ${invoiceNumber},
+      ${new Date().toISOString().slice(0, 10)},
+      ${"draft" as InvoiceStatus},
+      ${vatRate},
+      ${null},
+      ${null}
+    )
+    RETURNING *
+  `;
+  const invoice = mapInvoiceRow(invRows[0]);
+
+  for (const [idx, line] of lines.entries()) {
+    const qty = line.quantity ?? 1;
+    const rate = line.sale ?? 0;
+    const lineSale = qty * rate;
+    const lineDiscount = 0;
+    const lineFinal = lineSale - lineDiscount;
+    await sql`
+      INSERT INTO invoice_items (
+        invoice_id,
+        work_order_item_id,
+        estimate_item_id,
+        line_no,
+        name,
+        description,
+        quantity,
+        rate,
+        line_sale,
+        line_discount,
+        line_final
+      ) VALUES (
+        ${invoice.id},
+        ${null},
+        ${line.id},
+        ${line.lineNo ?? idx + 1},
+        ${line.partName},
+        ${line.description ?? null},
+        ${qty},
+        ${rate},
+        ${lineSale},
+        ${lineDiscount},
+        ${lineFinal}
+      )
+    `;
+  }
+
+  await recalculateInvoiceTotals(invoice.id);
+  await sql`
+    UPDATE estimates
+    SET status = 'invoiced',
+        invoice_status = 'Invoiced',
+        invoice_date = ${new Date().toISOString().slice(0, 10)}
+    WHERE id = ${estimateId} AND company_id = ${companyId}
+  `;
   const refreshed = await getInvoiceWithItems(companyId, invoice.id);
   return {
     invoice: refreshed?.invoice ?? invoice,

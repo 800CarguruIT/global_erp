@@ -24,6 +24,8 @@ export default function BranchUsersHub({ params }: Params) {
   const [loadingBranches, setLoadingBranches] = useState(false);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [statusUpdating, setStatusUpdating] = useState<Record<string, boolean>>({});
+  const [statusError, setStatusError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
 
   useEffect(() => {
@@ -72,6 +74,28 @@ export default function BranchUsersHub({ params }: Params) {
     }
     loadUsers();
   }, [companyId, selectedBranchId, query]);
+
+  async function toggleStatus(userId: string, next: boolean) {
+    if (!companyId || !selectedBranchId) return;
+    setStatusError(null);
+    setStatusUpdating((prev) => ({ ...prev, [userId]: true }));
+    try {
+      const res = await fetch(
+        `/api/company/${companyId}/admin/users/${userId}?branchId=${selectedBranchId}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ isActive: next }),
+        }
+      );
+      if (!res.ok) throw new Error("Failed to update status");
+      setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, is_active: next } : u)));
+    } catch (err: any) {
+      setStatusError(err?.message ?? "Failed to update status");
+    } finally {
+      setStatusUpdating((prev) => ({ ...prev, [userId]: false }));
+    }
+  }
 
   const displayUsers = useMemo(
     () =>
@@ -133,6 +157,9 @@ export default function BranchUsersHub({ params }: Params) {
             users={displayUsers}
             loading={loadingUsers}
             emptyText={selectedBranchId ? "No users found for this branch." : "Select a branch to view users."}
+            onToggleStatus={toggleStatus}
+            statusUpdating={statusUpdating}
+            statusError={statusError}
             onCreate={() => {
               if (companyId && selectedBranchId) {
                 window.location.href = `/company/${companyId}/branches/${selectedBranchId}/settings/security/users/new`;

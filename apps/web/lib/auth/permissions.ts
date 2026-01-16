@@ -3,25 +3,36 @@ import type { ScopeContext } from "@repo/ai-core";
 import { Rbac } from "@repo/ai-core";
 import { getCurrentUserIdFromRequest } from "./current-user";
 
+function normalizeScopeId(value?: string) {
+  if (!value) return undefined;
+  if (value === "undefined" || value === "null") return undefined;
+  return value;
+}
+
 export function buildScopeContextFromRoute(
   params: { companyId?: string; branchId?: string; vendorId?: string },
   levelOverride?: "global" | "company" | "branch" | "vendor"
 ): ScopeContext {
+  const normalized = {
+    companyId: normalizeScopeId(params.companyId),
+    branchId: normalizeScopeId(params.branchId),
+    vendorId: normalizeScopeId(params.vendorId),
+  };
   if (levelOverride) {
     if (levelOverride === "global") return { scope: "global" };
-    if (levelOverride === "company") return { scope: "company", companyId: params.companyId };
+    if (levelOverride === "company") return { scope: "company", companyId: normalized.companyId };
     if (levelOverride === "branch")
-      return { scope: "branch", companyId: params.companyId, branchId: params.branchId };
-    return { scope: "vendor", companyId: params.companyId, vendorId: params.vendorId };
+      return { scope: "branch", companyId: normalized.companyId, branchId: normalized.branchId };
+    return { scope: "vendor", companyId: normalized.companyId, vendorId: normalized.vendorId };
   }
-  if (params.branchId) {
-    return { scope: "branch", companyId: params.companyId, branchId: params.branchId };
+  if (normalized.branchId) {
+    return { scope: "branch", companyId: normalized.companyId, branchId: normalized.branchId };
   }
-  if (params.vendorId) {
-    return { scope: "vendor", companyId: params.companyId, vendorId: params.vendorId };
+  if (normalized.vendorId) {
+    return { scope: "vendor", companyId: normalized.companyId, vendorId: normalized.vendorId };
   }
-  if (params.companyId) {
-    return { scope: "company", companyId: params.companyId };
+  if (normalized.companyId) {
+    return { scope: "company", companyId: normalized.companyId };
   }
   return { scope: "global" };
 }

@@ -18,6 +18,7 @@ const createSchema = z.object({
   modelYear: z.number().optional().nullable(),
   color: z.string().optional().nullable(),
   bodyType: z.string().optional().nullable(),
+  isInsurance: z.boolean().optional().nullable(),
   mileage: z.number().optional().nullable(),
   tyreSizeFront: z.string().optional().nullable(),
   tyreSizeBack: z.string().optional().nullable(),

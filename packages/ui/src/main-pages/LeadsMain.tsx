@@ -3,7 +3,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { LeadsTable } from "../components/leads/LeadsTable";
 import { MainPageShell } from "./MainPageShell";
-import { useTheme } from "../theme";
 import { useI18n } from "../i18n";
 import { Card } from "../components/Card";
 
@@ -12,13 +11,34 @@ export type LeadsMainProps = {
   companyName?: string;
 };
 
+type SortKey =
+  | "lead"
+  | "customer"
+  | "car"
+  | "status"
+  | "source"
+  | "branch"
+  | "agent"
+  | "service"
+  | "health"
+  | "created";
+
+const collator = new Intl.Collator("en", { numeric: true, sensitivity: "base" });
+
+function normalize(value: string | number | null | undefined) {
+  return (value ?? "").toString().trim().toLowerCase();
+}
+
 export function LeadsMain({ companyId, companyName }: LeadsMainProps) {
-  const { card, cardBorder } = useTheme();
   const { t } = useI18n();
   const [leads, setLeads] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<"all" | "rsa" | "recovery" | "workshop">("all");
+  const [query, setQuery] = useState("");
+  const [sortKey, setSortKey] = useState<SortKey>("created");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkMessage, setBulkMessage] = useState<string | null>(null);
   const [bulkWorking, setBulkWorking] = useState(false);
@@ -58,7 +78,76 @@ export function LeadsMain({ companyId, companyName }: LeadsMainProps) {
     refreshLeads();
   }, [refreshLeads]);
 
-  const filteredLeads = tab === "all" ? leads : leads.filter((l) => l.leadType === tab);
+  const filteredLeads = useMemo(() => {
+    const term = normalize(query);
+    let rows = tab === "all" ? leads : leads.filter((l) => l.leadType === tab);
+
+    if (!term) return rows;
+
+    return rows.filter((lead) => {
+      const haystack = [
+        lead.id,
+        lead.customerName,
+        lead.customerPhone,
+        lead.customerEmail,
+        lead.carPlateNumber,
+        lead.carModel,
+        lead.leadType,
+        lead.leadStage,
+        lead.leadStatus,
+        lead.source,
+        lead.branchId,
+        lead.agentName,
+        lead.serviceType,
+        lead.healthScore,
+      ]
+        .map(normalize)
+        .join(" ");
+      return haystack.includes(term);
+    });
+  }, [leads, query, tab]);
+
+  const sortedLeads = useMemo(() => {
+    const rows = [...filteredLeads];
+    rows.sort((a, b) => {
+      const dir = sortDir === "asc" ? 1 : -1;
+      switch (sortKey) {
+        case "lead":
+          return dir * collator.compare(normalize(a.id), normalize(b.id));
+        case "customer":
+          return dir * collator.compare(normalize(a.customerName), normalize(b.customerName));
+        case "car":
+          return dir * collator.compare(normalize(a.carPlateNumber), normalize(b.carPlateNumber));
+        case "status":
+          return dir * collator.compare(normalize(a.leadStatus), normalize(b.leadStatus));
+        case "source":
+          return dir * collator.compare(normalize(a.source), normalize(b.source));
+        case "branch":
+          return dir * collator.compare(normalize(a.branchId), normalize(b.branchId));
+        case "agent":
+          return dir * collator.compare(normalize(a.agentName), normalize(b.agentName));
+        case "service":
+          return dir * collator.compare(normalize(a.serviceType), normalize(b.serviceType));
+        case "health": {
+          const diff = Number(a.healthScore ?? 0) - Number(b.healthScore ?? 0);
+          return dir * diff;
+        }
+        case "created": {
+          const left = new Date(a.createdAt ?? 0).getTime();
+          const right = new Date(b.createdAt ?? 0).getTime();
+          return dir * (left - right);
+        }
+        default:
+          return 0;
+      }
+    });
+    return rows;
+  }, [filteredLeads, sortDir, sortKey]);
+
+  const pageSize = 10;
+  const totalPages = Math.max(1, Math.ceil(sortedLeads.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const pagedLeads = sortedLeads.slice((safePage - 1) * pageSize, safePage * pageSize);
   const tabs = useMemo(
     () =>
       [
@@ -141,10 +230,25 @@ export function LeadsMain({ companyId, companyName }: LeadsMainProps) {
     }
   }, [counts, t]);
 
+  function toggleSort(nextKey: SortKey) {
+    if (nextKey === sortKey) {
+      setSortDir((dir) => (dir === "asc" ? "desc" : "asc"));
+      return;
+    }
+    setSortKey(nextKey);
+    setSortDir("asc");
+  }
+
+  const sortLabel = sortDir === "asc" ? "ASC" : "DESC";
+
   async function openAssign(leadId: string, lead?: any) {
     setAssignLeadId(leadId);
     const lt = (lead?.leadType as "rsa" | "recovery" | "workshop" | undefined) ?? null;
-    if (lt === "workshop" && lead?.leadStage !== "inspection_queue") {
+    if (
+      lt === "workshop" &&
+      lead?.leadStage !== "inspection_queue" &&
+      lead?.leadStage !== "checkin"
+    ) {
       setAssignError(t("leads.assign.onlyInspection") ?? "Only inspection leads can be assigned to branches.");
       setAssignLeadId(null);
       return;
@@ -272,170 +376,264 @@ export function LeadsMain({ companyId, companyName }: LeadsMainProps) {
     setAssignRecoveryFlow("");
   }
 
+  useEffect(() => {
+    setPage(1);
+  }, [query, tab, sortKey, sortDir]);
+
   return (
     <MainPageShell
       title={companyName ? t("leads.company.title") ?? t("leads.title") : t("leads.title")}
       subtitle={companyName ? t("leads.company.subtitle") ?? t("leads.subtitle") : t("leads.subtitle")}
       scopeLabel={companyName ? `${t("leads.scopePrefix") ?? "Company"}: ${companyName}` : t("scope.company") ?? "Company workspace"}
-      primaryAction={
-        <a
-          href={`/company/${companyId}/leads/new`}
-          className="rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-sm hover:opacity-90"
-        >
-          {t("leads.create") ?? "Create Lead"}
-        </a>
-      }
+      contentClassName="p-0 bg-transparent"
     >
       {error && <p className="text-sm text-destructive">{t("leads.loadError") ?? "Failed to load leads. Please try again."}</p>}
       {assignError && <p className="text-sm text-destructive">{assignError}</p>}
       {assignSuccess && <p className="text-sm text-emerald-500">{assignSuccess}</p>}
 
-      <div className="grid gap-3 lg:grid-cols-2">
-        <Card>
-          <div className="space-y-2">
-            <div className="text-sm font-semibold">{t("leads.ai.title")}</div>
-            {loading ? (
-              <div className="text-sm text-muted-foreground">{t("leads.ai.loading")}</div>
-            ) : aiSuggestions.length === 0 ? (
-              <div className="text-sm text-muted-foreground">{t("leads.ai.actions.empty")}</div>
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-3">
+            {selected.size > 0 ? (
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-muted-foreground">{selected.size} selected</span>
+                <button
+                  className="inline-flex items-center rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition hover:bg-slate-50 hover:shadow-md disabled:opacity-50"
+                  onClick={() => bulkAction("archive")}
+                  disabled={bulkWorking}
+                >
+                  {bulkWorking ? t("leads.working") ?? "Working..." : t("leads.bulk.archive") ?? "Archive selected"}
+                </button>
+                <button
+                  className="inline-flex items-center rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-destructive shadow-sm transition hover:bg-slate-50 hover:shadow-md disabled:opacity-50"
+                  onClick={() => bulkAction("delete")}
+                  disabled={bulkWorking}
+                >
+                  {bulkWorking ? t("leads.working") ?? "Working..." : t("leads.bulk.delete") ?? "Delete selected"}
+                </button>
+                {bulkMessage && <span className="text-xs text-muted-foreground">{bulkMessage}</span>}
+              </div>
             ) : (
-              <ul className="list-disc pl-5 text-sm text-muted-foreground space-y-1">
-                {aiSuggestions.map((a, idx) => (
-                  <li key={idx}>{a}</li>
-                ))}
-              </ul>
+              <span className="text-xs text-muted-foreground">&nbsp;</span>
             )}
+            <a
+              href={`/company/${companyId}/leads/new`}
+              className="inline-flex items-center rounded-md border border-white/30 bg-primary px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-primary-foreground shadow-md transition hover:opacity-90 hover:shadow-lg"
+            >
+              <svg viewBox="0 0 24 24" className="-ml-1 mr-2 h-4 w-4" aria-hidden="true">
+                <path
+                  d="M12 5v14M5 12h14"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                />
+              </svg>
+              {t("leads.create") ?? "Create Lead"}
+            </a>
           </div>
-        </Card>
-        <Card>
-          <div className="space-y-2">
-            <div className="text-sm font-semibold">{t("leads.ai.appreciation.title")}</div>
-            <div className="text-sm text-muted-foreground">{loading ? t("leads.ai.loading") : aiAppreciation}</div>
-          </div>
-        </Card>
-      </div>
-
-      <div className="flex flex-wrap gap-2 pb-3">
-        {tabs.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            onClick={() => setTab(t.key)}
-            className={`rounded-full border px-3 py-1 text-xs ${
-              tab === t.key ? "border-primary text-primary" : "hover:border-primary"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-      {loading && !error ? (
-        <p className="text-sm text-muted-foreground">{t("leads.loading") ?? "Loading leads..."}</p>
-      ) : (
-        <>
-          {selected.size > 0 && (
-            <div className="flex items-center gap-2 pb-3 text-sm">
-              <span className="text-muted-foreground">{selected.size} selected</span>
-              <button
-                className={`rounded-md border px-2 py-1 disabled:opacity-50 ${cardBorder}`}
-                onClick={() => bulkAction("archive")}
-                disabled={bulkWorking}
-              >
-                {bulkWorking ? t("leads.working") ?? "Working..." : t("leads.bulk.archive") ?? "Archive selected"}
-              </button>
-              <button
-                className="rounded-md border border-destructive px-2 py-1 text-destructive hover:bg-destructive/10 disabled:opacity-50"
-                onClick={() => bulkAction("delete")}
-                disabled={bulkWorking}
-              >
-                {bulkWorking ? t("leads.working") ?? "Working..." : t("leads.bulk.delete") ?? "Delete selected"}
-              </button>
-              {bulkMessage && <span className="text-xs text-muted-foreground">{bulkMessage}</span>}
-            </div>
-          )}
-          <div className={`${card} ${cardBorder} rounded-2xl p-2`}>
-            <LeadsTable
-              companyId={companyId}
-              leads={filteredLeads}
-              selectable
-              selectedIds={selected}
-              onSelectChange={toggleSelect}
-              onAssign={(id, lead) => openAssign(id, lead)}
-              onRefresh={refreshLeads}
-            />
-          </div>
-          {assignLeadId && (
-            <Card className="mt-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-sm font-semibold">
-                    {assignLeadType === "recovery"
-                      ? t("leads.assign.recovery")
-                      : assignLeadType === "workshop"
-                      ? t("leads.assign.workshop")
-                      : t("leads.assign.rsa")}
+          {loading && !error ? (
+            <p className="text-sm text-muted-foreground">{t("leads.loading") ?? "Loading leads..."}</p>
+          ) : (
+            <>
+              <Card className="border-0 p-0 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/30 px-4 py-3">
+                  <div className="inline-flex rounded-lg bg-muted/40 p-1 text-xs">
+                    {tabs.map((t) => (
+                      <button
+                        key={t.key}
+                        type="button"
+                        onClick={() => setTab(t.key)}
+                        className={`rounded-md px-3 py-1.5 font-medium transition ${
+                          tab === t.key
+                            ? "bg-background text-foreground shadow-sm border border-border/40"
+                            : "border border-transparent text-muted-foreground hover:bg-muted/50"
+                        }`}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
                   </div>
-                  <div className="text-xs text-muted-foreground">
-                    {assignLeadType === "workshop"
-                      ? t("leads.assign.workshop.helper")
-                      : t("leads.assign.helper")}
+                  <div className="relative w-full max-w-xs">
+                    <input
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      placeholder="Search"
+                      className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 pr-9 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    />
+                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
+                      <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
+                        <path
+                          d="M15.5 15.5L21 21M10.5 18a7.5 7.5 0 1 1 0-15a7.5 7.5 0 0 1 0 15Z"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.6"
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                    </span>
                   </div>
                 </div>
-                <button className="text-xs text-muted-foreground hover:text-foreground" onClick={() => resetAssign()}>
-                  {t("leads.assign.close")}
-                </button>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <select
-                  className="rounded border px-3 py-2 text-sm"
-                  value={assignBranchId ?? ""}
-                  onChange={(e) => {
-                    const val = e.target.value || null;
-                    setAssignBranchId(val);
-                    setAssignUserId(null);
-                    if (val) loadAssignUsers(val);
-                    else setAssignUsers([]);
-                  }}
-                >
-                  <option value="">{t("leads.assign.selectBranch")}</option>
-                  {assignBranches.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.display_name || b.name || b.code || b.id.slice(0, 8)}
-                    </option>
-                  ))}
-                </select>
-                {assignLeadType !== "workshop" && (
-                  <select
-                    className="rounded border px-3 py-2 text-sm"
-                    value={assignUserId ?? ""}
-                    onChange={(e) => setAssignUserId(e.target.value || null)}
-                    disabled={!assignUsers.length}
+                <LeadsTable
+                  companyId={companyId}
+                  leads={pagedLeads}
+                  selectable
+                  selectedIds={selected}
+                  onSelectChange={toggleSelect}
+                  onAssign={(id, lead) => openAssign(id, lead)}
+                  onRefresh={refreshLeads}
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                  sortLabel={sortLabel}
+                />
+              </Card>
+              <div className="flex items-center justify-between px-4 py-3 text-xs text-muted-foreground">
+                <span>
+                  Page {safePage} of {totalPages}
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className="rounded-md border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
+                    disabled={safePage <= 1}
+                    onClick={() => setPage((prev) => Math.max(1, prev - 1))}
                   >
-                    <option value="">{t("leads.assign.selectUser")}</option>
-                    {assignUsers.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.full_name || u.email} {u.last_login_at ? t("leads.assign.online") : ""}
-                      </option>
-                    ))}
-                  </select>
-                )}
-                <button
-                  className="rounded bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-60"
-                  onClick={() => assignLead()}
-                  disabled={
-                    !assignBranchId ||
-                    assignLoading ||
-                    (assignLeadType !== "workshop" && assignLeadType !== "recovery" && !assignUserId) ||
-                    (assignLeadType === "recovery" && (!assignRecoveryDirection || !assignRecoveryFlow))
-                  }
-                >
-                  {assignLoading ? t("leads.assign.working") : t("leads.assign.submit")}
-                </button>
+                    <svg viewBox="0 0 24 24" className="-ml-1 mr-2 h-4 w-4" aria-hidden="true">
+                      <path
+                        d="M15 6l-6 6 6 6"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                    Previous
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-md border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
+                    disabled={safePage >= totalPages}
+                    onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+                  >
+                    <svg viewBox="0 0 24 24" className="-ml-1 mr-2 h-4 w-4" aria-hidden="true">
+                      <path
+                        d="M9 6l6 6-6 6"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                    Next
+                  </button>
+                </div>
               </div>
-            </Card>
+              {assignLeadId && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+                  <Card className="w-full max-w-2xl space-y-4 rounded-2xl border border-white/10 bg-slate-950 text-white shadow-xl">
+                    <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                      <div>
+                        <div className="text-sm font-semibold text-white">
+                          {assignLeadType === "recovery"
+                            ? t("leads.assign.recovery")
+                            : assignLeadType === "workshop"
+                            ? t("leads.assign.workshop")
+                            : t("leads.assign.rsa")}
+                        </div>
+                        <div className="text-xs text-white/70">
+                          {assignLeadType === "workshop"
+                            ? t("leads.assign.workshop.helper")
+                            : t("leads.assign.helper")}
+                        </div>
+                      </div>
+                      <button
+                        className="inline-flex items-center rounded-md border border-white/20 bg-white/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-white shadow-sm transition hover:bg-white/20 hover:shadow-md"
+                        onClick={() => resetAssign()}
+                      >
+                        {t("leads.assign.close")}
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 text-white">
+                      <select
+                        className="rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60"
+                        value={assignBranchId ?? ""}
+                        onChange={(e) => {
+                          const val = e.target.value || null;
+                          setAssignBranchId(val);
+                          setAssignUserId(null);
+                          if (val) loadAssignUsers(val);
+                          else setAssignUsers([]);
+                        }}
+                      >
+                        <option value="">{t("leads.assign.selectBranch")}</option>
+                        {assignBranches.map((b) => (
+                          <option key={b.id} value={b.id}>
+                            {b.display_name || b.name || b.code || b.id.slice(0, 8)}
+                          </option>
+                        ))}
+                      </select>
+                      {assignLeadType !== "workshop" && (
+                        <select
+                          className="rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60"
+                          value={assignUserId ?? ""}
+                          onChange={(e) => setAssignUserId(e.target.value || null)}
+                          disabled={!assignUsers.length}
+                        >
+                          <option value="">{t("leads.assign.selectUser")}</option>
+                          {assignUsers.map((u) => (
+                            <option key={u.id} value={u.id}>
+                              {u.full_name || u.email} {u.last_login_at ? t("leads.assign.online") : ""}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                      <button
+                        className="rounded bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-60"
+                        onClick={() => assignLead()}
+                        disabled={
+                          !assignBranchId ||
+                          assignLoading ||
+                          (assignLeadType !== "workshop" && assignLeadType !== "recovery" && !assignUserId) ||
+                          (assignLeadType === "recovery" && (!assignRecoveryDirection || !assignRecoveryFlow))
+                        }
+                      >
+                        {assignLoading ? t("leads.assign.working") : t("leads.assign.submit")}
+                      </button>
+                    </div>
+                  </Card>
+                </div>
+              )}
+            </>
           )}
-        </>
-      )}
+        </div>
+        <aside className="space-y-3">
+          <Card>
+            <div className="space-y-2">
+              <div className="text-sm font-semibold">{t("leads.ai.title")}</div>
+              {loading ? (
+                <div className="text-sm text-muted-foreground">{t("leads.ai.loading")}</div>
+              ) : aiSuggestions.length === 0 ? (
+                <div className="text-sm text-muted-foreground">{t("leads.ai.actions.empty")}</div>
+              ) : (
+                <ul className="list-disc pl-5 text-sm text-muted-foreground space-y-1">
+                  {aiSuggestions.map((a, idx) => (
+                    <li key={idx}>{a}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </Card>
+          <Card>
+            <div className="space-y-2">
+              <div className="text-sm font-semibold">{t("leads.ai.appreciation.title")}</div>
+              <div className="text-sm text-muted-foreground">{loading ? t("leads.ai.loading") : aiAppreciation}</div>
+            </div>
+          </Card>
+        </aside>
+      </div>
     </MainPageShell>
   );
 }

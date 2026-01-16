@@ -3,10 +3,13 @@ import type {
   CarWithCustomers,
   CreateCarInput,
   CreateCustomerInput,
+  CreateCustomerWalletTransactionInput,
   CustomerCarLinkRow,
   CustomerCarRelationType,
   CustomerRow,
+  CustomerWalletTransactionWithCustomer,
   CustomerWithCars,
+  CustomerWalletTransactionRow,
   LinkCustomerToCarInput,
   UpdateCarInput,
   UpdateCustomerInput,
@@ -20,15 +23,22 @@ import {
   getCarById,
   getCustomerByCode,
   getCustomerById,
+  getCustomerWalletTransactionById,
   getMaxPriorityForRelation,
   insertCar,
   insertCustomer,
+  insertCustomerWalletTransaction,
   insertLink,
   getLinkByCustomerCarRelation,
+  getCustomerWalletBalance,
+  listCustomerWalletTransactions,
+  listCompanyWalletTransactions as repoListCompanyWalletTransactions,
   listCars as repoListCars,
   listLinksForCar,
   listLinksForCustomer,
   listCustomers as repoListCustomers,
+  approveCustomerWalletTransaction as repoApproveCustomerWalletTransaction,
+  updateCustomerWalletAmount,
   updateCar,
   updateCustomer,
   updateLink,
@@ -132,6 +142,8 @@ function mapCustomerInputToRow(companyId: string, input: UpdateCustomerInput): P
     phone_alt: input.phoneAlt ?? undefined,
     whatsapp_phone: input.whatsappPhone ?? undefined,
     address: input.address ?? undefined,
+    country: input.country ?? undefined,
+    city: input.city ?? undefined,
     notes: input.notes ?? undefined,
     is_active: input.isActive ?? (input as any).is_active ?? undefined,
   } as any;
@@ -216,6 +228,7 @@ function mapCarInputToRow(companyId: string, input: UpdateCarInput): Partial<Car
     model_year: input.modelYear ?? undefined,
     color: input.color ?? undefined,
     body_type: input.bodyType ?? undefined,
+    is_insurance: input.isInsurance ?? undefined,
     mileage: input.mileage ?? undefined,
     tyre_size_front: input.tyreSizeFront ?? undefined,
     tyre_size_back: input.tyreSizeBack ?? undefined,
@@ -350,6 +363,46 @@ export async function deactivateCustomer(id: string): Promise<void> {
 
 export async function deactivateCar(id: string): Promise<void> {
   await repoDeactivateCar(id);
+}
+
+// Wallet
+export async function createCustomerWalletTopup(
+  input: CreateCustomerWalletTransactionInput
+): Promise<CustomerWalletTransactionRow> {
+  return insertCustomerWalletTransaction(input);
+}
+
+export async function approveCustomerWalletTopup(
+  id: string,
+  approvedBy: string | null
+): Promise<CustomerWalletTransactionRow> {
+  const existing = await getCustomerWalletTransactionById(id);
+  if (!existing) throw new Error("Wallet transaction not found");
+  if (existing.approved_at) return existing;
+  const approved = await repoApproveCustomerWalletTransaction(id, approvedBy);
+  await updateCustomerWalletAmount(approved.company_id, approved.customer_id, Number(approved.amount));
+  return approved;
+}
+
+export async function listCustomerWalletTopups(companyId: string, customerId: string, approvedOnly = false) {
+  return listCustomerWalletTransactions(companyId, customerId, { approvedOnly });
+}
+
+export async function listCompanyWalletTopups(
+  companyId: string,
+  approvedOnly = false
+): Promise<CustomerWalletTransactionWithCustomer[]> {
+  return repoListCompanyWalletTransactions(companyId, { approvedOnly });
+}
+
+export async function getCustomerWalletSummary(companyId: string, customerId: string) {
+  const customer = await getCustomerById(customerId);
+  if (!customer || customer.company_id !== companyId) return { balance: 0 };
+  return { balance: Number((customer as any).wallet_amount ?? 0) };
+}
+
+export async function getCustomerWalletTransaction(id: string) {
+  return getCustomerWalletTransactionById(id);
 }
 
 // Helpers

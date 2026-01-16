@@ -7,9 +7,10 @@ export const runtime = "nodejs";
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { fileId: string } }
+  { params }: { params: { fileId: string } } | { params: Promise<{ fileId: string }> }
 ) {
-  const record = await Files.getFileById(params.fileId);
+  const { fileId } = await params;
+  const record = await Files.getFileById(fileId);
   if (!record) {
     return new NextResponse("Not found", { status: 404 });
   }

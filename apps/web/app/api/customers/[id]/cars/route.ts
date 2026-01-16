@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { Crm } from "@repo/ai-core";
-import { buildScopeContextFromRoute, requirePermission } from "../../../../lib/auth/permissions";
+import { buildScopeContextFromRoute, requirePermission } from "@/lib/auth/permissions";
 
 const linkSchema = z.object({
   relationType: z.enum(["owner", "driver", "other"]),
@@ -13,12 +13,18 @@ const linkSchema = z.object({
     .object({
       code: z.string().optional(),
       plateNumber: z.string().optional().nullable(),
+      plateCode: z.string().optional().nullable(),
+      plateCountry: z.string().optional().nullable(),
+      plateState: z.string().optional().nullable(),
+      plateCity: z.string().optional().nullable(),
+      plateLocationMode: z.enum(["state", "city", "both"]).optional().nullable(),
       vin: z.string().optional().nullable(),
       make: z.string().optional().nullable(),
       model: z.string().optional().nullable(),
       modelYear: z.number().optional().nullable(),
       color: z.string().optional().nullable(),
       bodyType: z.string().optional().nullable(),
+      isInsurance: z.boolean().optional().nullable(),
       mileage: z.number().optional().nullable(),
       tyreSizeFront: z.string().optional().nullable(),
       tyreSizeBack: z.string().optional().nullable(),

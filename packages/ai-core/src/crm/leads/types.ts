@@ -1,5 +1,12 @@
 export type LeadType = "rsa" | "recovery" | "workshop";
-export type LeadStatus = "open" | "closed" | "lost" | "processing" | "closed_won";
+export type LeadStatus =
+  | "open"
+  | "accepted"
+  | "car_in"
+  | "closed"
+  | "lost"
+  | "processing"
+  | "closed_won";
 
 export type LeadStage =
   | "new"
@@ -39,6 +46,7 @@ export interface Lead {
   firstResponseAt: string | null;
   lastActivityAt: string | null;
   closedAt: string | null;
+  checkinAt?: string | null;
   isLocked?: boolean;
   healthScore: number | null;
   sentimentScore: number | null;
@@ -47,6 +55,8 @@ export interface Lead {
   customerRemark?: string | null;
   customerDetailsRequested?: boolean;
   customerDetailsApproved?: boolean;
+  carInVideo?: string | null;
+  carOutVideo?: string | null;
   createdAt: string;
   updatedAt: string;
   customerName?: string | null;
@@ -54,6 +64,7 @@ export interface Lead {
   customerEmail?: string | null;
   carPlateNumber?: string | null;
   carModel?: string | null;
+  branchName?: string | null;
   agentName?: string | null;
 }
 

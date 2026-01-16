@@ -22,9 +22,15 @@ export async function GET(req: NextRequest) {
       | "company"
       | "branch"
       | "vendor";
-    const companyId = url.searchParams.get("companyId") ?? undefined;
-    const branchId = url.searchParams.get("branchId") ?? undefined;
-    const vendorId = url.searchParams.get("vendorId") ?? undefined;
+    const normalizeId = (value: string | null) =>
+      value && value !== "undefined" && value !== "null" ? value : undefined;
+    const companyId = normalizeId(url.searchParams.get("companyId"));
+    const branchId = normalizeId(url.searchParams.get("branchId"));
+    const vendorId = normalizeId(url.searchParams.get("vendorId"));
+
+    if (scope !== "global" && !companyId) {
+      return NextResponse.json({ data: [] });
+    }
 
     if (scope !== "global") {
       const requiredPerm =

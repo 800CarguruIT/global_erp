@@ -8,20 +8,30 @@ export type LeadsTableProps = {
   companyId: string;
   leads: Lead[];
   onAssign?: (id: string, lead: Lead) => void;
+  renderActions?: (lead: Lead) => React.ReactNode;
   selectable?: boolean;
   selectedIds?: Set<string>;
   onSelectChange?: (id: string, checked: boolean) => void;
   onRefresh?: () => Promise<void> | void;
+  sortKey?: string;
+  sortDir?: "asc" | "desc";
+  sortLabel?: string;
+  onSort?: (key: string) => void;
 };
 
 export function LeadsTable({
   companyId,
   leads,
   onAssign,
+  renderActions,
   selectable = false,
   selectedIds,
   onSelectChange,
   onRefresh,
+  sortKey,
+  sortDir,
+  sortLabel,
+  onSort,
 }: LeadsTableProps) {
   async function handleVisibilityToggle(leadId: string, approved: boolean) {
     await fetch(`/api/company/${companyId}/sales/leads/${leadId}/customer-visibility`, {
@@ -52,22 +62,111 @@ export function LeadsTable({
 
   return (
     <div className="overflow-x-auto">
-      <table className="min-w-full text-sm">
+      <table className="min-w-full text-sm border-separate border-spacing-0">
         <thead>
-          <tr className="border-b text-xs text-muted-foreground">
-            {selectable && <th className="w-10 py-2 pr-2 text-left" />}
-            <th className="py-2 pr-4 text-left">Lead</th>
-            <th className="py-2 px-4 text-left">Customer</th>
-            <th className="py-2 px-4 text-left">Car</th>
-            <th className="py-2 px-4 text-left">Type / Stage</th>
-            <th className="py-2 px-4 text-left">Status</th>
-            <th className="py-2 px-4 text-left">Source</th>
-            <th className="py-2 px-4 text-left">Branch</th>
-            <th className="py-2 px-4 text-left">Agent</th>
-            <th className="py-2 px-4 text-left">Service</th>
-            <th className="py-2 px-4 text-left">Customer Info</th>
-            <th className="py-2 px-4 text-left">Health</th>
-            <th className="py-2 px-4 text-left">Actions</th>
+          <tr className="text-left bg-muted/20">
+            {selectable && (
+              <th className="w-10 px-4 py-3 sticky top-0 bg-muted/20 backdrop-blur border-b border-border/30 text-xs font-semibold text-muted-foreground" />
+            )}
+            <th className="px-4 py-3 sticky top-0 bg-muted/20 backdrop-blur border-b border-border/30 text-xs font-semibold text-muted-foreground">
+              <button
+                type="button"
+                onClick={() => onSort?.("lead")}
+                className="inline-flex items-center gap-2 hover:text-foreground"
+              >
+                Lead
+                {sortKey === "lead" && <span className="text-[10px] text-muted-foreground">{sortLabel}</span>}
+              </button>
+            </th>
+            <th className="px-4 py-3 sticky top-0 bg-muted/20 backdrop-blur border-b border-border/30 text-xs font-semibold text-muted-foreground">
+              <button
+                type="button"
+                onClick={() => onSort?.("customer")}
+                className="inline-flex items-center gap-2 hover:text-foreground"
+              >
+                Customer
+                {sortKey === "customer" && <span className="text-[10px] text-muted-foreground">{sortLabel}</span>}
+              </button>
+            </th>
+            <th className="px-4 py-3 sticky top-0 bg-muted/20 backdrop-blur border-b border-border/30 text-xs font-semibold text-muted-foreground">
+              <button
+                type="button"
+                onClick={() => onSort?.("car")}
+                className="inline-flex items-center gap-2 hover:text-foreground"
+              >
+                Car
+                {sortKey === "car" && <span className="text-[10px] text-muted-foreground">{sortLabel}</span>}
+              </button>
+            </th>
+            <th className="px-4 py-3 sticky top-0 bg-muted/20 backdrop-blur border-b border-border/30 text-xs font-semibold text-muted-foreground">
+              Type / Stage
+            </th>
+            <th className="px-4 py-3 sticky top-0 bg-muted/20 backdrop-blur border-b border-border/30 text-xs font-semibold text-muted-foreground">
+              <button
+                type="button"
+                onClick={() => onSort?.("status")}
+                className="inline-flex items-center gap-2 hover:text-foreground"
+              >
+                Status
+                {sortKey === "status" && <span className="text-[10px] text-muted-foreground">{sortLabel}</span>}
+              </button>
+            </th>
+            <th className="px-4 py-3 sticky top-0 bg-muted/20 backdrop-blur border-b border-border/30 text-xs font-semibold text-muted-foreground">
+              <button
+                type="button"
+                onClick={() => onSort?.("source")}
+                className="inline-flex items-center gap-2 hover:text-foreground"
+              >
+                Source
+                {sortKey === "source" && <span className="text-[10px] text-muted-foreground">{sortLabel}</span>}
+              </button>
+            </th>
+            <th className="px-4 py-3 sticky top-0 bg-muted/20 backdrop-blur border-b border-border/30 text-xs font-semibold text-muted-foreground">
+              <button
+                type="button"
+                onClick={() => onSort?.("branch")}
+                className="inline-flex items-center gap-2 hover:text-foreground"
+              >
+                Branch
+                {sortKey === "branch" && <span className="text-[10px] text-muted-foreground">{sortLabel}</span>}
+              </button>
+            </th>
+            <th className="px-4 py-3 sticky top-0 bg-muted/20 backdrop-blur border-b border-border/30 text-xs font-semibold text-muted-foreground">
+              <button
+                type="button"
+                onClick={() => onSort?.("agent")}
+                className="inline-flex items-center gap-2 hover:text-foreground"
+              >
+                Agent
+                {sortKey === "agent" && <span className="text-[10px] text-muted-foreground">{sortLabel}</span>}
+              </button>
+            </th>
+            <th className="px-4 py-3 sticky top-0 bg-muted/20 backdrop-blur border-b border-border/30 text-xs font-semibold text-muted-foreground">
+              <button
+                type="button"
+                onClick={() => onSort?.("service")}
+                className="inline-flex items-center gap-2 hover:text-foreground"
+              >
+                Service
+                {sortKey === "service" && <span className="text-[10px] text-muted-foreground">{sortLabel}</span>}
+              </button>
+            </th>
+            <th className="px-4 py-3 sticky top-0 bg-muted/20 backdrop-blur border-b border-border/30 text-xs font-semibold text-muted-foreground">
+              Customer Info
+            </th>
+            <th className="px-4 py-3 sticky top-0 bg-muted/20 backdrop-blur border-b border-border/30 text-xs font-semibold text-muted-foreground">
+              <button
+                type="button"
+                onClick={() => onSort?.("health")}
+                className="inline-flex items-center gap-2 hover:text-foreground"
+              >
+                Health
+                {sortKey === "health" && <span className="text-[10px] text-muted-foreground">{sortLabel}</span>}
+              </button>
+            </th>
+            <th className="px-4 py-3 sticky top-0 bg-muted/20 backdrop-blur border-b border-border/30 text-xs font-semibold text-muted-foreground">
+              Actions
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -75,11 +174,14 @@ export function LeadsTable({
             const detailHref = `/company/${companyId}/leads/${lead.id}`;
             const customerHref = lead.customerId ? `/company/${companyId}/customers/${lead.customerId}` : null;
             const carHref = lead.carId ? `/company/${companyId}/cars/${lead.carId}` : null;
+            const leadType = `${lead.leadType ?? ""}`.toLowerCase();
+            const canAssign =
+              Boolean(onAssign) && (leadType === "rsa" || leadType === "recovery" || leadType === "workshop");
 
             return (
-              <tr key={lead.id} className="border-b last:border-0">
+              <tr key={lead.id} className="hover:bg-muted/20">
                 {selectable && (
-                  <td className="py-2 pr-2 align-top">
+                  <td className="px-4 py-3 border-b border-border/30 align-top">
                     <input
                       type="checkbox"
                       checked={selectedIds?.has(lead.id) ?? false}
@@ -87,13 +189,13 @@ export function LeadsTable({
                     />
                   </td>
                 )}
-                <td className="py-2 pr-4">
+                <td className="px-4 py-3 border-b border-border/30">
                   <a href={detailHref} className="font-medium text-primary hover:underline">
                     {lead.id.slice(0, 8)}
                   </a>
                   <div className="text-xs text-muted-foreground">{new Date(lead.createdAt).toLocaleString()}</div>
                 </td>
-                <td className="py-2 px-4">
+                <td className="px-4 py-3 border-b border-border/30">
                   {lead.customerName ? (
                     customerHref ? (
                       <a href={customerHref} className="text-sm hover:underline">
@@ -107,56 +209,63 @@ export function LeadsTable({
                   )}
                   {lead.customerPhone && <div className="text-xs text-muted-foreground">{lead.customerPhone}</div>}
                 </td>
-                <td className="py-2 px-4">
+                <td className="px-4 py-3 border-b border-border/30">
                   {lead.carPlateNumber ? (
                     carHref ? (
                       <a href={carHref} className="hover:underline">
-                        <div className="text-sm">{lead.carPlateNumber}</div>
-                        {lead.carModel && <div className="text-xs text-muted-foreground">{lead.carModel}</div>}
+                        <div className="text-sm">
+                          {lead.carPlateNumberFull || lead.carPlateNumber}
+                        </div>
+                        {(lead.carMake || lead.carModel) && (
+                          <div className="text-xs text-muted-foreground">
+                            {[lead.carMake, lead.carModel].filter(Boolean).join(" ")}
+                          </div>
+                        )}
                       </a>
                     ) : (
                       <>
-                        <div className="text-sm">{lead.carPlateNumber}</div>
-                        {lead.carModel && <div className="text-xs text-muted-foreground">{lead.carModel}</div>}
+                        <div className="text-sm">
+                          {lead.carPlateNumberFull || lead.carPlateNumber}
+                        </div>
+                        {(lead.carMake || lead.carModel) && (
+                          <div className="text-xs text-muted-foreground">
+                            {[lead.carMake, lead.carModel].filter(Boolean).join(" ")}
+                          </div>
+                        )}
                       </>
                     )
                   ) : (
                     <span className="text-xs text-muted-foreground">No car</span>
                   )}
                 </td>
-                <td className="py-2 px-4">
+                <td className="px-4 py-3 border-b border-border/30">
                   <div className="flex flex-col gap-1">
                     <LeadTypeBadge type={lead.leadType as any} />
                     <span className="text-xs text-muted-foreground capitalize">{lead.leadStage.replace(/_/g, " ")}</span>
                   </div>
                 </td>
-                <td className="py-2 px-4">
+                <td className="px-4 py-3 border-b border-border/30">
                   <LeadStatusBadge status={lead.leadStatus as any} />
                 </td>
-                <td className="py-2 px-4 text-xs capitalize">
+                <td className="px-4 py-3 border-b border-border/30 text-xs capitalize">
                   {lead.source || <span className="text-muted-foreground">Unknown</span>}
                 </td>
-                <td className="py-2 px-4 text-sm">
+                <td className="px-4 py-3 border-b border-border/30 text-sm">
                   {lead.branchId ? (
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs">{lead.branchId.slice(0, 8)}</span>
-                      <button
-                        className="rounded border px-2 py-1 text-[11px] hover:border-destructive hover:text-destructive"
-                        type="button"
-                        onClick={() => handleUnassignBranch(lead.id)}
-                        aria-label="Unassign branch"
-                      >
-                        Unassign
-                      </button>
-                    </div>
+                    <a
+                      href={`/company/${companyId}/branches/${lead.branchId}`}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      {lead.branchName || lead.branchId.slice(0, 8)}
+                    </a>
                   ) : (
                     <span className="text-xs text-muted-foreground">Unassigned</span>
                   )}
                 </td>
-                <td className="py-2 px-4 text-sm">
+                <td className="px-4 py-3 border-b border-border/30 text-sm">
                   {lead.agentName || <span className="text-xs text-muted-foreground">Unassigned</span>}
                 </td>
-                <td className="py-2 px-4 text-xs capitalize">
+                <td className="px-4 py-3 border-b border-border/30 text-xs capitalize">
                   {lead.serviceType ? (
                     <div className="flex flex-col gap-0.5">
                       <span>{lead.serviceType.replace("_", " ")}</span>
@@ -171,14 +280,14 @@ export function LeadsTable({
                     <span className="text-muted-foreground">-</span>
                   )}
                 </td>
-                <td className="py-2 px-4 text-xs">
+                <td className="px-4 py-3 border-b border-border/30 text-xs">
                   {lead.customerDetailsApproved ? (
                     <div className="flex items-center gap-2">
                       <span className="rounded-full border border-emerald-500/60 bg-emerald-500/10 px-2 py-1 text-emerald-500">
                         Visible
                       </span>
                       <button
-                        className="rounded border px-2 py-1 text-xs hover:border-destructive hover:text-destructive"
+                        className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-destructive hover:shadow-md"
                         type="button"
                         onClick={() => handleVisibilityToggle(lead.id, false)}
                       >
@@ -191,7 +300,7 @@ export function LeadsTable({
                         Requested
                       </span>
                       <button
-                        className="rounded border px-2 py-1 text-xs hover:border-primary hover:text-primary"
+                        className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-primary hover:shadow-md"
                         type="button"
                         onClick={() => handleVisibilityToggle(lead.id, true)}
                       >
@@ -202,15 +311,15 @@ export function LeadsTable({
                     <span className="text-muted-foreground">-</span>
                   )}
                 </td>
-                <td className="py-2 px-4">
+                <td className="px-4 py-3 border-b border-border/30">
                   <LeadHealthBadge score={lead.healthScore} />
                 </td>
-                <td className="py-2 px-4 text-sm">
-                  {onAssign &&
-                  ((lead.leadType === "rsa" || lead.leadType === "recovery") ||
-                    (lead.leadType === "workshop" && lead.leadStage === "inspection_queue")) ? (
+                <td className="px-4 py-3 border-b border-border/30 text-sm">
+                  {renderActions ? (
+                    renderActions(lead)
+                  ) : canAssign ? (
                     <button
-                      className="rounded border px-2 py-1 text-xs hover:border-primary hover:text-primary"
+                      className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-primary hover:shadow-md"
                       onClick={() => onAssign(lead.id, lead)}
                       type="button"
                     >

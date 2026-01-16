@@ -1,0 +1,83 @@
+{
+  "info": {
+    "name": "Global ERP Mobile API",
+    "_postman_id": "b7c3a1c4-3f24-4f6a-9a53-3f8d1c7c3d6a",
+    "description": "Mobile JWT auth endpoints for Global ERP",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth - Login (Mobile)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"admin@demo.test\",\n  \"password\": \"Admin@123\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/mobile/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "mobile", "auth", "login"]
+        }
+      }
+    },
+    {
+      "name": "Auth - Me (Mobile)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/mobile/auth/me",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "mobile", "auth", "me"]
+        }
+      }
+    },
+    {
+      "name": "Auth - Refresh (Mobile)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/mobile/auth/refresh",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "mobile", "auth", "refresh"]
+        }
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "refreshToken",
+      "value": ""
+    }
+  ]
+}

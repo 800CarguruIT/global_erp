@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { UserRepository } from "@repo/ai-core";
-import { requirePermission, buildScopeContextFromRoute } from "../../../../../../lib/auth/permissions";
+import { requirePermission, buildScopeContextFromRoute } from "@/lib/auth/permissions";
 
 type Params = { params: Promise<{ companyId: string }> };
 

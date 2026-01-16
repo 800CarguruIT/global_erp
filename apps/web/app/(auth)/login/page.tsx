@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useTheme, useI18n, I18nProvider } from "@repo/ui";
+import { toast } from "sonner";
 
 const REMEMBER_EMAIL_KEY = "global-erp-login-email";
 const REMEMBER_PASSWORD_KEY = "global-erp-login-password";
@@ -19,13 +19,11 @@ export default function LoginPage() {
 }
 
 function LoginContent() {
-  const router = useRouter();
   const { theme, themes, setThemeId } = useTheme();
   const { t, languages, lang, setLang, loadingLang } = useI18n();
   const [mounted, setMounted] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [rememberEmail, setRememberEmail] = useState(true);
   const [rememberPassword, setRememberPassword] = useState(false);
@@ -143,7 +141,6 @@ function LoginContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
     setLoading(true);
     try {
       const res = await fetch("/api/auth/login", {
@@ -160,7 +157,12 @@ function LoginContent() {
       // Use full navigation to ensure cookies and middleware pick up the new session.
       window.location.assign(target);
     } catch (err: any) {
-      setError(err?.message ?? "Login failed");
+      const message = err?.message ?? "Login failed";
+      if (message.toLowerCase().includes("invalid credentials")) {
+        toast.error("Invalid credentials");
+      } else {
+        toast.error(message);
+      }
     } finally {
       setLoading(false);
     }
@@ -269,7 +271,6 @@ function LoginContent() {
               </label>
             </div>
 
-            {error && <div className="text-sm text-red-500">{error}</div>}
             <button
               type="submit"
               disabled={loading}

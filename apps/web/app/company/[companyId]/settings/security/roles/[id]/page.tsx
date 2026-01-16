@@ -14,6 +14,7 @@ export default function CompanyRoleEditPage({ params }: Params) {
   const [perms, setPerms] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [forbidden, setForbidden] = useState(false);
 
   // Resolve params which may be a promise in App Router
   useEffect(() => {
@@ -44,11 +45,16 @@ export default function CompanyRoleEditPage({ params }: Params) {
     if (!companyId || !roleId) return;
     setError(null);
     setLoading(true);
+    setForbidden(false);
     try {
       const [permRes, roleRes] = await Promise.all([
         fetch("/api/auth/permissions"),
         fetch(`/api/auth/roles/${roleId}?scope=company&companyId=${companyId}`),
       ]);
+      if (roleRes.status === 401 || roleRes.status === 403) {
+        setForbidden(true);
+        return;
+      }
       if (!permRes.ok) throw new Error("Failed to load permissions");
       if (!roleRes.ok) throw new Error("Failed to load role");
       const permJson = await permRes.json();
@@ -79,7 +85,9 @@ export default function CompanyRoleEditPage({ params }: Params) {
           </button>
         </div>
         {error && <div className="text-sm text-destructive">{error}</div>}
-        {loading || !role ? (
+        {forbidden ? (
+          <div className="text-sm text-destructive">Only company admins can manage roles and permissions.</div>
+        ) : loading || !role ? (
           <div className="text-sm text-muted-foreground">Loading...</div>
         ) : (
           <RoleForm

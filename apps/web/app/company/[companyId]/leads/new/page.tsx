@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { AppLayout, Card, useTheme } from "@repo/ui";
 import Link from "next/link";
@@ -80,6 +80,9 @@ export default function CompanyLeadCreatePage({
   const [branchesError, setBranchesError] = useState<string | null>(null);
   const [lookupLoading, setLookupLoading] = useState(false);
   const [lookupError, setLookupError] = useState<string | null>(null);
+  const [googleMapsApiKey, setGoogleMapsApiKey] = useState<string | null>(null);
+  const [mapsReady, setMapsReady] = useState(false);
+  const initialLocationSetRef = useRef(false);
   const [linkedCars, setLinkedCars] = useState<LookupResult["cars"]>([]);
   const [selectedCarId, setSelectedCarId] = useState<string | null>(null);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(preset.customerId || null);
@@ -149,6 +152,82 @@ export default function CompanyLeadCreatePage({
   useEffect(() => {
     Promise.resolve(params).then((p) => setCompanyId(p?.companyId ?? null));
   }, [params]);
+
+  useEffect(() => {
+    if (!companyId) return;
+    let active = true;
+    (async () => {
+      try {
+        const res = await fetch(`/api/company/${companyId}/profile`, { cache: "no-store" });
+        if (!res.ok) return;
+        const data = await res.json().catch(() => ({}));
+        const company = data?.data?.company ?? data?.data ?? data;
+        if (active) setGoogleMapsApiKey(company?.googleMapsApiKey ?? null);
+      } catch {
+        if (active) setGoogleMapsApiKey(null);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [companyId]);
+
+  useEffect(() => {
+    if (!googleMapsApiKey || typeof window === "undefined") return;
+    const existing = document.querySelector("script[data-google-maps='places']");
+    if (existing) {
+      if ((window as any).google?.maps?.places) setMapsReady(true);
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(
+      googleMapsApiKey
+    )}&libraries=places`;
+    script.async = true;
+    script.defer = true;
+    script.setAttribute("data-google-maps", "places");
+    script.onload = () => setMapsReady(true);
+    script.onerror = () => setMapsReady(false);
+    document.head.appendChild(script);
+  }, [googleMapsApiKey]);
+
+  useEffect(() => {
+    if (!mapsReady || !googleMapsApiKey || initialLocationSetRef.current) return;
+    if (!navigator?.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const coords = `${pos.coords.latitude.toFixed(6)},${pos.coords.longitude.toFixed(6)}`;
+        const embedUrl = buildEmbedUrl(googleMapsApiKey, { center: coords });
+        const iframe = toIframeHtml(embedUrl);
+        if (!iframe) return;
+        initialLocationSetRef.current = true;
+        setForm((prev) => {
+          const next = { ...prev };
+          if (!prev.rsaGoogleLocation) {
+            next.rsaGoogleLocation = iframe;
+            next.rsaLocation = prev.rsaLocation || iframe;
+          }
+          if (!prev.pickupGoogleLocation) {
+            next.pickupGoogleLocation = iframe;
+            next.pickupFrom = prev.pickupFrom || iframe;
+          }
+          if (!prev.dropoffGoogleLocation) {
+            next.dropoffGoogleLocation = iframe;
+            next.dropoffTo = prev.dropoffTo || iframe;
+          }
+          if (!prev.pickupLocationGoogle) {
+            next.pickupLocationGoogle = iframe;
+            next.pickupLocation = prev.pickupLocation || iframe;
+          }
+          return next;
+        });
+      },
+      () => {
+        // ignore geolocation errors
+      },
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+  }, [mapsReady, googleMapsApiKey]);
 
   useEffect(() => {
     if (!companyId) return;
@@ -454,14 +533,14 @@ export default function CompanyLeadCreatePage({
                   <button
                     type="button"
                     onClick={handleLookup}
-                    className="rounded-md border px-3 py-1 text-sm"
+                    className="inline-flex items-center rounded-md border border-slate-200 bg-white px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600 shadow-md transition hover:bg-slate-50 hover:shadow-lg disabled:opacity-50"
                     disabled={lookupLoading}
                   >
                     {lookupLoading ? "Searching..." : "Lookup by phone/plate"}
                   </button>
                 </div>
                 {lookupError && <div className="text-sm text-destructive">{lookupError}</div>}
-                <div className="grid gap-3 md:grid-cols-2">
+                <div className="grid gap-3 md:grid-cols-2 md:items-end">
                   <div>
                     <div className={labelClass}>Customer Name</div>
                     <input
@@ -536,8 +615,8 @@ export default function CompanyLeadCreatePage({
                   }}
                   minYear={1900}
                 />
-                <div className="grid gap-3 md:grid-cols-2">
-                  <div>
+                <div className="grid gap-3 md:grid-cols-2 md:items-end">
+                  <div className="space-y-1">
                     <div className={labelClass}>VIN Number</div>
                     <input className={inputClass} value={form.vinNumber} onChange={(e) => update("vinNumber", e.target.value)} />
                   </div>
@@ -602,7 +681,7 @@ export default function CompanyLeadCreatePage({
                 </div>
 
                 <div className="grid gap-3 md:grid-cols-2">
-                  <div>
+                  <div className="space-y-2">
                     <div className={labelClass}>Registration Expiry</div>
                     <input
                       className={inputClass}
@@ -688,26 +767,23 @@ export default function CompanyLeadCreatePage({
                     </select>
                   </div>
                 </div>
-                <div>
-                  <div className={labelClass}>Google embedded location</div>
-                  <input
-                    className={inputClass}
-                    value={form.rsaGoogleLocation}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setForm((prev) => ({
-                        ...prev,
-                        rsaGoogleLocation: val,
-                        rsaLocation: val || prev.rsaLocation,
-                      }));
-                    }}
-                    placeholder="Paste Google Maps embed / link"
-                    required
-                  />
-                  <div className="text-xs text-muted-foreground">
-                    Used to dispatch the RSA technician to the right spot.
-                  </div>
-                </div>
+                <GoogleLocationField
+                  label="Google embedded location"
+                  info="Used to dispatch the RSA technician to the right spot."
+                  value={form.rsaGoogleLocation}
+                  onChange={(val) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      rsaGoogleLocation: val,
+                      rsaLocation: val || prev.rsaLocation,
+                    }))
+                  }
+                  placeholder="https://maps.google.com/..."
+                  required
+                  googleMapsApiKey={googleMapsApiKey}
+                  mapsReady={mapsReady}
+                  inputClass={inputClass}
+                />
               </div>
             )}
                                 {form.leadDivision === "recovery" && (
@@ -755,7 +831,11 @@ export default function CompanyLeadCreatePage({
                     {form.recoveryDirection === "pickup" ? (
                       <div className="space-y-3">
                         <div>
-                          <div className={labelClass}>Flow</div>
+                          <LabelHint
+                            text="Flow"
+                            info="Flow determines drop-off destination."
+                            className={labelClass}
+                          />
                           <select
                             className={inputClass}
                             value={form.recoveryFlow}
@@ -773,125 +853,125 @@ export default function CompanyLeadCreatePage({
                             <option value="customer_to_customer">Customer to Customer</option>
                             <option value="branch_to_branch">Branch to Branch</option>
                           </select>
-                          <div className="text-xs text-muted-foreground">Flow determines drop-off destination.</div>
                         </div>
 
                 <div className="space-y-3">
                   <div className="grid gap-3 md:grid-cols-2">
                     <div>
-                      <div className={labelClass}>
-                        {form.recoveryFlow === "branch_to_branch" ? "Pickup branch" : "Pickup location (Google embed / link)"}
-                      </div>
                       {form.recoveryFlow === "branch_to_branch" ? (
-                        <select
-                          className={inputClass}
-                          value={form.pickupFrom}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            const branch = branches.find((b: any) => b.id === val);
-                            const branchLocation =
-                              branch?.address_line1 ||
-                              branch?.addressLine1 ||
-                              branch?.display_name ||
-                              branch?.name ||
-                              branch?.code ||
-                              "";
-                            const branchGoogle = branch?.google_location ?? branch?.googleLocation ?? "";
-                            setForm((prev) => ({
-                              ...prev,
-                              pickupFrom: val,
-                              pickupGoogleLocation: branchGoogle || prev.pickupGoogleLocation,
-                            }));
-                          }}
-                          required
-                        >
-                          <option value="">Select branch</option>
-                          {branches.map((b: any) => (
-                            <option key={b.id} value={b.id}>
-                              {b.display_name ?? b.name ?? b.code ?? b.id?.slice(0, 8) ?? "Branch"}
-                            </option>
-                          ))}
-                        </select>
+                        <>
+                          <div className={labelClass}>Pickup branch</div>
+                          <select
+                            className={inputClass}
+                            value={form.pickupFrom}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              const branch = branches.find((b: any) => b.id === val);
+                              const branchLocation =
+                                branch?.address_line1 ||
+                                branch?.addressLine1 ||
+                                branch?.display_name ||
+                                branch?.name ||
+                                branch?.code ||
+                                "";
+                              const branchGoogle = branch?.google_location ?? branch?.googleLocation ?? "";
+                              setForm((prev) => ({
+                                ...prev,
+                                pickupFrom: val,
+                                pickupGoogleLocation: branchGoogle || prev.pickupGoogleLocation,
+                              }));
+                            }}
+                            required
+                          >
+                            <option value="">Select branch</option>
+                            {branches.map((b: any) => (
+                              <option key={b.id} value={b.id}>
+                                {b.display_name ?? b.name ?? b.code ?? b.id?.slice(0, 8) ?? "Branch"}
+                              </option>
+                            ))}
+                          </select>
+                        </>
                       ) : (
-                        <input
-                          className={inputClass}
+                        <GoogleLocationField
+                          label={form.recoveryFlow === "customer_to_customer" ? "Pickup location" : "Pickup location"}
                           value={form.pickupGoogleLocation}
-                          onChange={(e) => {
-                            const val = e.target.value;
+                          onChange={(val) =>
                             setForm((prev) => ({
                               ...prev,
                               pickupGoogleLocation: val,
                               pickupFrom: val || prev.pickupFrom,
-                            }));
-                          }}
-                          placeholder={
-                            form.recoveryFlow === "customer_to_customer"
-                              ? "Embed / Maps link for pickup"
-                              : "Embed / Maps link for pickup or customer location"
+                            }))
                           }
+                          placeholder="https://maps.google.com/..."
                           required
+                          googleMapsApiKey={googleMapsApiKey}
+                          mapsReady={mapsReady}
+                          inputClass={inputClass}
                         />
                       )}
                     </div>
                     <div>
-                      <div className={labelClass}>
-                        {form.recoveryFlow === "customer_to_customer" ? "Drop-off location (Google embed / link)" : "Drop-off branch"}
-                      </div>
                       {form.recoveryFlow === "customer_to_customer" ? (
-                        <input
-                          className={inputClass}
+                        <GoogleLocationField
+                          label="Drop-off location"
                           value={form.dropoffGoogleLocation}
-                          onChange={(e) => {
-                            const val = e.target.value;
+                          onChange={(val) =>
                             setForm((prev) => ({
                               ...prev,
                               dropoffGoogleLocation: val,
                               dropoffTo: val || prev.dropoffTo,
-                            }));
-                          }}
-                          placeholder="Embed / Maps link for drop-off"
+                            }))
+                          }
+                          placeholder="https://maps.google.com/..."
                           required
+                          googleMapsApiKey={googleMapsApiKey}
+                          mapsReady={mapsReady}
+                          inputClass={inputClass}
                         />
                       ) : (
-                        <select
-                          className={inputClass}
-                          value={form.recoveryBranchId}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            const branch = branches.find((b: any) => b.id === val);
-                            const branchLocation =
-                              branch?.address_line1 ||
-                              branch?.addressLine1 ||
-                              branch?.display_name ||
-                              branch?.name ||
-                              branch?.code ||
-                              "";
-                            const branchGoogle = branch?.google_location ?? branch?.googleLocation ?? "";
-                            setForm((prev) => ({
-                              ...prev,
-                              recoveryBranchId: val,
-                              dropoffTo:
-                                prev.recoveryFlow === "customer_to_branch" || prev.recoveryFlow === "branch_to_branch"
-                                  ? branchLocation || prev.dropoffTo
-                                  : prev.dropoffTo,
-                              dropoffGoogleLocation:
-                                prev.recoveryFlow === "customer_to_branch" || prev.recoveryFlow === "branch_to_branch"
-                                  ? branchGoogle || prev.dropoffGoogleLocation
-                                  : prev.dropoffGoogleLocation,
-                            }));
-                          }}
-                          required
-                        >
-                          <option value="">Select branch</option>
-                          {branches.map((b: any) => (
-                            <option key={b.id} value={b.id}>
-                              {b.display_name ?? b.name ?? b.code ?? b.id?.slice(0, 8) ?? "Branch"}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                      {form.recoveryFlow !== "customer_to_customer" && (
-                        <div className="text-xs text-muted-foreground">Auto-fills location from the selected branch.</div>
+                        <>
+                          <LabelHint
+                            text="Drop-off branch"
+                            info="Auto-fills location from the selected branch."
+                            className={labelClass}
+                          />
+                          <select
+                            className={inputClass}
+                            value={form.recoveryBranchId}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              const branch = branches.find((b: any) => b.id === val);
+                              const branchLocation =
+                                branch?.address_line1 ||
+                                branch?.addressLine1 ||
+                                branch?.display_name ||
+                                branch?.name ||
+                                branch?.code ||
+                                "";
+                              const branchGoogle = branch?.google_location ?? branch?.googleLocation ?? "";
+                              setForm((prev) => ({
+                                ...prev,
+                                recoveryBranchId: val,
+                                dropoffTo:
+                                  prev.recoveryFlow === "customer_to_branch" || prev.recoveryFlow === "branch_to_branch"
+                                    ? branchLocation || prev.dropoffTo
+                                    : prev.dropoffTo,
+                                dropoffGoogleLocation:
+                                  prev.recoveryFlow === "customer_to_branch" || prev.recoveryFlow === "branch_to_branch"
+                                    ? branchGoogle || prev.dropoffGoogleLocation
+                                    : prev.dropoffGoogleLocation,
+                              }));
+                            }}
+                            required
+                          >
+                            <option value="">Select branch</option>
+                            {branches.map((b: any) => (
+                              <option key={b.id} value={b.id}>
+                                {b.display_name ?? b.name ?? b.code ?? b.id?.slice(0, 8) ?? "Branch"}
+                              </option>
+                            ))}
+                          </select>
+                        </>
                       )}
                     </div>
                   </div>
@@ -900,7 +980,11 @@ export default function CompanyLeadCreatePage({
                     ) : (
                       <div className="grid gap-3 md:grid-cols-2">
                         <div>
-                          <div className={labelClass}>Flow</div>
+                          <LabelHint
+                            text="Flow"
+                            info="Pickup: choose the handover path. Dropoff is always Branch to Customer."
+                            className={labelClass}
+                          />
                           <select
                             className={inputClass}
                             value={form.recoveryFlow}
@@ -918,25 +1002,23 @@ export default function CompanyLeadCreatePage({
                             )}
                             {form.recoveryDirection === "dropoff" && <option value="branch_to_customer">Branch to Customer</option>}
                           </select>
-                          <div className="text-xs text-muted-foreground">
-                            Pickup: choose the handover path. Dropoff is always Branch to Customer.
-                          </div>
                         </div>
                         <div>
-                          <div className={labelClass}>Drop-off location (Google embed / link)</div>
-                          <input
-                            className={inputClass}
+                          <GoogleLocationField
+                            label="Drop-off location"
                             value={form.dropoffGoogleLocation}
-                            onChange={(e) => {
-                              const val = e.target.value;
+                            onChange={(val) =>
                               setForm((prev) => ({
                                 ...prev,
                                 dropoffGoogleLocation: val,
                                 dropoffTo: val || prev.dropoffTo,
-                              }));
-                            }}
-                            placeholder="Embed / Maps link for drop-off"
+                              }))
+                            }
+                            placeholder="https://maps.google.com/..."
                             required
+                            googleMapsApiKey={googleMapsApiKey}
+                            mapsReady={mapsReady}
+                            inputClass={inputClass}
                           />
                         </div>
                       </div>
@@ -1009,27 +1091,26 @@ export default function CompanyLeadCreatePage({
                               </select>
                             </div>
                             <div className="md:col-span-2">
-                              <div className={labelClass}>Pickup location (Google embed / link)</div>
-                              <input
-                                className={inputClass}
-                                value={form.pickupLocationGoogle}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  setForm((prev) => ({
-                                    ...prev,
-                                    pickupLocationGoogle: val,
-                                    pickupLocation: val || prev.pickupLocation,
-                                  }));
-                                }}
-                                placeholder="Embed / Maps link for pickup"
-                                required
-                              />
-                              <div className="text-xs text-muted-foreground">
-                                Include a Google Maps link to embed the location.
-                              </div>
-                            </div>
+                            <GoogleLocationField
+                              label="Pickup location"
+                              info="Include a Google Maps link to embed the location."
+                              value={form.pickupLocationGoogle}
+                              onChange={(val) =>
+                                setForm((prev) => ({
+                                  ...prev,
+                                  pickupLocationGoogle: val,
+                                  pickupLocation: val || prev.pickupLocation,
+                                }))
+                              }
+                              placeholder="https://maps.google.com/..."
+                              required
+                              googleMapsApiKey={googleMapsApiKey}
+                              mapsReady={mapsReady}
+                              inputClass={inputClass}
+                            />
                           </div>
-                        )}
+                        </div>
+                      )}
                       </>
                     )}
                     <div>
@@ -1069,13 +1150,13 @@ export default function CompanyLeadCreatePage({
                 <button
                   type="submit"
                   disabled={saving}
-                  className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+                  className="inline-flex items-center rounded-md border border-white/30 bg-primary px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-primary-foreground shadow-md transition hover:opacity-90 hover:shadow-lg disabled:opacity-50"
                 >
                   {saving ? "Saving..." : "Create Lead"}
                 </button>
                 <Link
                   href={companyId ? `/company/${companyId}/leads` : "#"}
-                  className="rounded-md border px-4 py-2 text-sm font-semibold"
+                  className="inline-flex items-center rounded-md border border-slate-200 bg-white px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600 shadow-md transition hover:bg-slate-50 hover:shadow-lg"
                 >
                   Cancel
                 </Link>
@@ -1089,7 +1170,7 @@ export default function CompanyLeadCreatePage({
                   <button
                     type="button"
                     onClick={handleLookup}
-                    className="rounded-md border px-3 py-1 text-xs"
+                    className="inline-flex items-center rounded-md border border-slate-200 bg-white px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600 shadow-md transition hover:bg-slate-50 hover:shadow-lg disabled:opacity-50"
                     disabled={lookupLoading}
                   >
                     {lookupLoading ? "Loading..." : "Refresh"}
@@ -1116,7 +1197,7 @@ export default function CompanyLeadCreatePage({
                             type="button"
                             key={car.id ?? car.plateNumber ?? Math.random()}
                             onClick={() => car.id && applyLinkedCar(car.id)}
-                            className={`w-full rounded-md border px-3 py-2 text-left text-sm transition ${
+                            className={`w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition hover:bg-slate-50 hover:shadow-md ${
                               selectedCarId === car.id ? "border-primary text-primary" : "hover:border-primary"
                             }`}
                           >
@@ -1150,7 +1231,7 @@ export default function CompanyLeadCreatePage({
                         registrationCardFileId: "",
                       }));
                         }}
-                        className="w-full rounded-md border px-3 py-2 text-sm hover:border-primary"
+                        className="w-full rounded-md border border-slate-200 bg-white px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600 shadow-md transition hover:bg-slate-50 hover:shadow-lg"
                       >
                         New car
                       </button>
@@ -1165,6 +1246,262 @@ export default function CompanyLeadCreatePage({
         </form>
       </div>
     </AppLayout>
+  );
+}
+
+function extractEmbedSrc(value?: string | null) {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (trimmed.includes("<iframe")) {
+    const match = trimmed.match(/src=["']([^"']+)["']/i);
+    return match?.[1] ?? null;
+  }
+  return trimmed;
+}
+
+function buildEmbedUrl(googleMapsApiKey: string, opts: { placeId?: string; center?: string }) {
+  if (opts.placeId) {
+    return `https://www.google.com/maps/embed/v1/place?key=${encodeURIComponent(
+      googleMapsApiKey
+    )}&q=place_id:${encodeURIComponent(opts.placeId)}`;
+  }
+  if (opts.center) {
+    return `https://www.google.com/maps/embed/v1/view?key=${encodeURIComponent(
+      googleMapsApiKey
+    )}&center=${encodeURIComponent(opts.center)}&zoom=16`;
+  }
+  return null;
+}
+
+function toIframeHtml(embedUrl?: string | null) {
+  if (!embedUrl) return null;
+  return `<iframe title="Lead location map" src="${embedUrl}" width="100%" height="280" style="border:0;" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>`;
+}
+
+function getPlaceId(value?: string | null) {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (trimmed.startsWith("place_id:")) {
+    const id = trimmed.replace("place_id:", "").trim();
+    return id || null;
+  }
+  const src = extractEmbedSrc(trimmed);
+  if (!src) return null;
+  try {
+    const url = new URL(src);
+    const q = url.searchParams.get("q");
+    if (q && q.startsWith("place_id:")) {
+      const id = q.replace("place_id:", "").trim();
+      return id || null;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function parseLatLng(value?: string | null) {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (trimmed.startsWith("latlng:")) {
+    const coords = trimmed.replace("latlng:", "").trim();
+    const [lat, lng] = coords.split(",").map((v) => Number(v));
+    if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng };
+  }
+  if (/^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/.test(trimmed)) {
+    const [lat, lng] = trimmed.split(",").map((v) => Number(v));
+    if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng };
+  }
+  const src = extractEmbedSrc(trimmed) ?? trimmed;
+  if (src.startsWith("http")) {
+    try {
+      const url = new URL(src);
+      const q = url.searchParams.get("q");
+      if (q && /^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/.test(q)) {
+        const [lat, lng] = q.split(",").map((v) => Number(v));
+        if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng };
+      }
+      const center = url.searchParams.get("center");
+      if (center && /^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/.test(center)) {
+        const [lat, lng] = center.split(",").map((v) => Number(v));
+        if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng };
+      }
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function InfoIcon({ title, label }: { title: string; label: string }) {
+  return (
+    <button
+      type="button"
+      className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-white/30 text-[10px] text-muted-foreground transition hover:bg-white/5 hover:text-foreground"
+      title={title}
+      aria-label={label}
+    >
+      <svg viewBox="0 0 24 24" className="h-3 w-3" aria-hidden="true">
+        <path
+          d="M12 8.5h.01M11 11h2v5h-2z"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="1.6" />
+      </svg>
+    </button>
+  );
+}
+
+function LabelHint({ text, info, className }: { text: string; info?: string; className?: string }) {
+  return (
+    <div className={`flex items-center gap-2 ${className ?? ""}`}>
+      <span>{text}</span>
+      {info && <InfoIcon title={info} label={`${text} info`} />}
+    </div>
+  );
+}
+
+type GoogleLocationFieldProps = {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  required?: boolean;
+  info?: string;
+  googleMapsApiKey: string | null;
+  mapsReady: boolean;
+  inputClass: string;
+};
+
+function GoogleLocationField({
+  label,
+  value,
+  onChange,
+  placeholder,
+  required,
+  info,
+  googleMapsApiKey,
+  mapsReady,
+  inputClass,
+}: GoogleLocationFieldProps) {
+  const searchRef = useRef<HTMLInputElement | null>(null);
+  const mapRef = useRef<HTMLDivElement | null>(null);
+  const mapInstanceRef = useRef<any>(null);
+  const mapMarkerRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (!mapsReady || !googleMapsApiKey || !searchRef.current) return;
+    const google = (window as any).google;
+    if (!google?.maps?.places) return;
+    const autocomplete = new google.maps.places.Autocomplete(searchRef.current, {
+      fields: ["place_id", "geometry"],
+    });
+    const listener = autocomplete.addListener("place_changed", () => {
+      const place = autocomplete.getPlace();
+      const placeId = place?.place_id;
+      const loc = place?.geometry?.location;
+      const embedUrl = placeId
+        ? buildEmbedUrl(googleMapsApiKey, { placeId })
+        : loc
+        ? buildEmbedUrl(googleMapsApiKey, { center: `${loc.lat()},${loc.lng()}` })
+        : null;
+      const iframe = toIframeHtml(embedUrl);
+      if (iframe) onChange(iframe);
+    });
+    return () => {
+      if (listener?.remove) listener.remove();
+    };
+  }, [mapsReady, googleMapsApiKey, onChange]);
+
+  useEffect(() => {
+    if (!mapsReady || !googleMapsApiKey || !mapRef.current) return;
+    const google = (window as any).google;
+    if (!google?.maps) return;
+    if (!mapInstanceRef.current) {
+      mapInstanceRef.current = new google.maps.Map(mapRef.current, {
+        center: { lat: 0, lng: 0 },
+        zoom: 2,
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: false,
+      });
+      mapInstanceRef.current.addListener("click", (e: any) => {
+        if (!e?.latLng) return;
+        const lat = e.latLng.lat();
+        const lng = e.latLng.lng();
+        const coords = `${lat.toFixed(6)},${lng.toFixed(6)}`;
+        const embedUrl = buildEmbedUrl(googleMapsApiKey, { center: coords });
+        const iframe = toIframeHtml(embedUrl);
+        if (iframe) onChange(iframe);
+      });
+    }
+  }, [mapsReady, googleMapsApiKey, onChange]);
+
+  useEffect(() => {
+    if (!mapsReady || !googleMapsApiKey || !mapInstanceRef.current) return;
+    const google = (window as any).google;
+    if (!google?.maps) return;
+    const placeId = getPlaceId(value);
+    const latLng = parseLatLng(value);
+
+    const setMarker = (position: { lat: number; lng: number }) => {
+      if (!mapMarkerRef.current) {
+        mapMarkerRef.current = new google.maps.Marker({
+          map: mapInstanceRef.current,
+          position,
+        });
+      } else {
+        mapMarkerRef.current.setPosition(position);
+      }
+      mapInstanceRef.current.setCenter(position);
+      mapInstanceRef.current.setZoom(14);
+    };
+
+    if (latLng) {
+      setMarker(latLng);
+      return;
+    }
+    if (placeId) {
+      const service = new google.maps.places.PlacesService(mapInstanceRef.current);
+      service.getDetails({ placeId, fields: ["geometry"] }, (place: any, status: any) => {
+        if (status !== google.maps.places.PlacesServiceStatus.OK) return;
+        const loc = place?.geometry?.location;
+        if (!loc) return;
+        setMarker({ lat: loc.lat(), lng: loc.lng() });
+      });
+    }
+  }, [mapsReady, googleMapsApiKey, value]);
+
+  return (
+    <div className="space-y-2">
+      <LabelHint text={label} info={info} className="text-xs font-semibold text-muted-foreground" />
+      <input
+        ref={searchRef}
+        placeholder={
+          googleMapsApiKey ? "Search location in Google Maps" : "Set Google Maps API key in Company Settings to search"
+        }
+        className={inputClass}
+        disabled={!googleMapsApiKey}
+      />
+      {googleMapsApiKey && (
+        <div className="overflow-hidden rounded-lg border border-border/40">
+          <div ref={mapRef} className="h-64 w-full" />
+        </div>
+      )}
+      <input
+        className={inputClass}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        required={required}
+      />
+    </div>
   );
 }
 
@@ -1187,5 +1524,3 @@ function parsePhoneValue(raw: string, fallback: PhoneValue): PhoneValue {
   }
   return fallback;
 }
-
-

@@ -21,6 +21,8 @@ const createSchema = z.object({
   phoneAlt: z.string().optional().nullable(),
   whatsappPhone: z.string().optional().nullable(),
   address: z.string().optional().nullable(),
+  country: z.string().optional().nullable(),
+  city: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
 });
 

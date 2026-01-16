@@ -19,14 +19,17 @@ export function LeadTypeBadge({ type }: { type: LeadType }) {
 export function LeadStatusBadge({ status }: { status: LeadStatus }) {
   const labelMap: Record<LeadStatus, string> = {
     open: "Open",
+    accepted: "Accepted",
+    car_in: "Car In",
     closed: "Closed",
     lost: "Lost",
     processing: "Processing",
     closed_won: "Closed / Won",
-    lost: "Lost",
   };
   const colorMap: Record<LeadStatus, string> = {
     open: "bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-200",
+    accepted: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200",
+    car_in: "bg-indigo-100 text-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200",
     closed: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200",
     lost: "bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-200",
     processing: "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200",

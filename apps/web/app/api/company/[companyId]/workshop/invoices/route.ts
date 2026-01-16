@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createInvoiceFromQualityCheck, listInvoicesForCompany } from "@repo/ai-core/workshop/invoices/repository";
+import { createInvoiceFromEstimate, createInvoiceFromQualityCheck, listInvoicesForCompany } from "@repo/ai-core/workshop/invoices/repository";
 import type { InvoiceStatus } from "@repo/ai-core/workshop/invoices/types";
 import type { GatepassHandoverType } from "@repo/ai-core/workshop/gatepass/types";
 import { createGatepassFromInvoice } from "@repo/ai-core/workshop/gatepass/repository";
@@ -17,10 +17,12 @@ export async function GET(req: NextRequest, { params }: Params) {
 export async function POST(req: NextRequest, { params }: Params) {
   const { companyId } = await params;
   const body = await req.json().catch(() => ({}));
-  if (!body.qcId) {
-    return new NextResponse("qcId required", { status: 400 });
+  if (!body.qcId && !body.estimateId) {
+    return new NextResponse("qcId or estimateId required", { status: 400 });
   }
-  const result = await createInvoiceFromQualityCheck(companyId, body.qcId);
+  const result = body.estimateId
+    ? await createInvoiceFromEstimate(companyId, body.estimateId)
+    : await createInvoiceFromQualityCheck(companyId, body.qcId);
   // Optionally auto-create gatepass when invoice created
   if (body.createGatepass) {
     const handoverType = (body.handoverType as GatepassHandoverType) ?? "branch";

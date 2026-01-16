@@ -10,6 +10,13 @@ export function resolveScopeFromPath(pathname: string): ScopeContext {
       branchId: branchMatch[2],
     };
   }
+  const shortBranchMatch = pathname.match(/^\/branches\/([^/]+)/);
+  if (shortBranchMatch) {
+    return {
+      scope: "branch",
+      branchId: shortBranchMatch[1],
+    };
+  }
 
   // Vendor under company
   const companyVendorMatch = pathname.match(/^\/company\/([^/]+)\/vendors\/([^/]+)/);

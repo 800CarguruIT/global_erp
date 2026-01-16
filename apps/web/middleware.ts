@@ -41,6 +41,24 @@ export async function middleware(req: NextRequest) {
     return redirectTo(req, "/auth/login");
   }
 
+  const branchPathMatch = pathname.match(/^\/branches\/([^/]+)(\/.*)?$/);
+  if (branchPathMatch) {
+    const branchId = branchPathMatch[1];
+    const suffix = branchPathMatch[2] ?? "";
+    if (suffix.startsWith("/branches")) {
+      return NextResponse.next();
+    }
+    const lastBranchPath = req.cookies.get("last_branch_path")?.value;
+    const lastMatch = lastBranchPath?.match(/^\/company\/([^/]+)\/branches\/([^/]+)/);
+    const companyId = lastMatch?.[1];
+    const cookieBranchId = lastMatch?.[2];
+    if (companyId && cookieBranchId && branchId === cookieBranchId) {
+      const url = req.nextUrl.clone();
+      url.pathname = `/company/${companyId}/branches/${branchId}${suffix}`;
+      return NextResponse.rewrite(url);
+    }
+  }
+
   // Lightweight redirect rules without hitting DB in middleware.
   if (pathname === "/") {
     return redirectTo(req, "/global");

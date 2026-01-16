@@ -3,12 +3,24 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { AppLayout, Card, useTheme } from "@repo/ui";
+import { CarMakeModelSelect } from "@repo/ui/components/common/CarMakeModelSelect";
 import { PhoneInput } from "@repo/ui/components/common/PhoneInput";
 import type { PhoneValue } from "@repo/ui/components/common/PhoneInput";
+import { PlateInput, PlateValue } from "@repo/ui/components/common/PlateInput";
 
 type Params = { params: { companyId: string } | Promise<{ companyId: string }> };
 
 const EMPTY_PHONE: PhoneValue = { dialCode: "+971", nationalNumber: "" };
+const EMPTY_PLATE: PlateValue = {
+  country: "AE",
+  locationMode: undefined,
+  state: "",
+  city: "",
+  series: "",
+  number: "",
+};
+
+const CAR_TYPE_OPTIONS = ["Regular", "SUV", "Pickup", "Van", "Truck", "Motorcycle", "Other"];
 
 export default function CustomerCreatePage({ params }: Params) {
   const { theme } = useTheme();
@@ -21,6 +33,12 @@ export default function CustomerCreatePage({ params }: Params) {
     phone: EMPTY_PHONE as PhoneValue,
     whatsappPhone: EMPTY_PHONE as PhoneValue,
     useDifferentWhatsapp: false,
+    plate: EMPTY_PLATE as PlateValue,
+    carMake: "",
+    carModel: "",
+    carYear: "",
+    carType: "Regular",
+    isInsurance: false,
   });
 
   useEffect(() => {
@@ -59,6 +77,32 @@ export default function CustomerCreatePage({ params }: Params) {
       const data = await res.json();
       const id = data?.id ?? data?.data?.id;
       if (id) {
+        const plateText = `${form.plate.series ?? ""} ${form.plate.number ?? ""}`.trim() || null;
+        const carRes = await fetch(`/api/customers/${id}/cars?companyId=${companyId}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            relationType: "owner",
+            isPrimary: true,
+            newCar: {
+              plateNumber: plateText,
+              plateCode: form.plate.series || null,
+              plateCountry: form.plate.country || null,
+              plateState: form.plate.state || null,
+              plateCity: form.plate.city || null,
+              plateLocationMode: form.plate.locationMode || null,
+              make: form.carMake || null,
+              model: form.carModel || null,
+              modelYear: form.carYear ? Number(form.carYear) : null,
+              bodyType: form.carType || null,
+              isInsurance: form.isInsurance,
+            },
+          }),
+        });
+        if (!carRes.ok) {
+          const carData = await carRes.json().catch(() => ({}));
+          throw new Error(carData?.error ?? "Failed to add car");
+        }
         window.location.href = `/company/${companyId}/customers/${id}`;
       } else {
         window.location.href = `/company/${companyId}/customers`;
@@ -122,17 +166,17 @@ export default function CustomerCreatePage({ params }: Params) {
                 />
               </div>
             </div>
-              <div className="space-y-2">
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    id="useDifferentWhatsapp"
-                    type="checkbox"
-                    className="h-4 w-4 accent-primary"
-                    checked={form.useDifferentWhatsapp}
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setForm((prev) => ({
-                        ...prev,
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  id="useDifferentWhatsapp"
+                  type="checkbox"
+                  className="h-4 w-4 accent-primary"
+                  checked={form.useDifferentWhatsapp}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setForm((prev) => ({
+                      ...prev,
                       useDifferentWhatsapp: checked,
                       whatsappPhone: checked ? prev.whatsappPhone : prev.phone,
                     }));
@@ -151,6 +195,56 @@ export default function CustomerCreatePage({ params }: Params) {
                   <div className="text-xs text-muted-foreground">Leave unchecked to reuse main phone</div>
                 </div>
               )}
+            </div>
+          </Card>
+          <Card className="space-y-3">
+            <div className="text-lg font-semibold">Car</div>
+            <div className="space-y-2">
+              <div className={labelClass}>Car Plate #</div>
+              <PlateInput
+                value={form.plate}
+                onChange={(val) => update("plate", val)}
+              />
+            </div>
+            <CarMakeModelSelect
+              value={{
+                make: form.carMake,
+                model: form.carModel,
+                year: form.carYear ? Number(form.carYear) : undefined,
+              }}
+              onChange={(val) => {
+                update("carMake", val.make);
+                update("carModel", val.model ?? "");
+                update("carYear", val.year ? String(val.year) : "");
+              }}
+              minYear={1980}
+            />
+            <div className="grid gap-3 md:grid-cols-2">
+              <div>
+                <div className={labelClass}>Car Type</div>
+                <select
+                  className={inputClass}
+                  value={form.carType}
+                  onChange={(e) => update("carType", e.target.value)}
+                >
+                  {CAR_TYPE_OPTIONS.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex items-center">
+                <label className="mt-5 inline-flex items-center gap-2 rounded-md border border-amber-200 bg-amber-100/70 px-3 py-2 text-sm font-semibold text-amber-900">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 accent-amber-500"
+                    checked={form.isInsurance}
+                    onChange={(e) => update("isInsurance", e.target.checked)}
+                  />
+                  Insurance Car
+                </label>
+              </div>
             </div>
           </Card>
 

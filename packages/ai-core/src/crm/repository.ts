@@ -3,9 +3,12 @@ import type {
   CarRow,
   CreateCarInput,
   CreateCustomerInput,
+  CreateCustomerWalletTransactionInput,
   CustomerCarLinkRow,
   CustomerCarRelationType,
   CustomerRow,
+  CustomerWalletTransactionRow,
+  CustomerWalletTransactionWithCustomer,
 } from "./types";
 
 function rowsFrom<T>(result: T[] | { rows: T[] }): T[] {
@@ -63,7 +66,7 @@ export async function insertCustomer(data: { code: string } & CreateCustomerInpu
   const res = await sql<CustomerRow[]>`
     INSERT INTO customers (
       company_id, customer_type, code, name, first_name, last_name, date_of_birth, national_id, passport_no,
-      legal_name, trade_license_no, tax_number, email, phone, phone_alt, whatsapp_phone, address, google_location, notes, is_active
+      legal_name, trade_license_no, tax_number, email, phone, phone_alt, whatsapp_phone, address, country, city, google_location, notes, is_active
     ) VALUES (
       ${data.companyId},
       ${data.customerType},
@@ -82,6 +85,8 @@ export async function insertCustomer(data: { code: string } & CreateCustomerInpu
       ${data.phoneAlt ?? null},
       ${data.whatsappPhone ?? null},
       ${data.address ?? null},
+      ${data.country ?? null},
+      ${data.city ?? null},
       ${data.googleLocation ?? null},
       ${data.notes ?? null},
       TRUE
@@ -115,6 +120,8 @@ export async function updateCustomer(
       phone_alt = COALESCE(${patch.phone_alt ?? null}, phone_alt),
       whatsapp_phone = COALESCE(${patch.whatsapp_phone ?? null}, whatsapp_phone),
       address = COALESCE(${patch.address ?? null}, address),
+      country = COALESCE(${(patch as any).country ?? null}, country),
+      city = COALESCE(${(patch as any).city ?? null}, city),
       google_location = COALESCE(${patch.google_location ?? null}, google_location),
       notes = COALESCE(${patch.notes ?? null}, notes),
       is_active = COALESCE(${patch.is_active ?? null}, is_active),
@@ -193,7 +200,7 @@ export async function insertCar(data: {
   const res = await sql<CarRow[]>`
     INSERT INTO cars (
       company_id, code, plate_code, plate_number, plate_country, plate_state, plate_city, plate_location_mode,
-      vin, make, model, model_year, color, body_type,
+      vin, make, model, model_year, color, body_type, is_insurance,
       mileage, tyre_size_front, tyre_size_back, registration_expiry, registration_card_file_id, vin_photo_file_id,
       is_unregistered, notes, is_active
     ) VALUES (
@@ -211,6 +218,7 @@ export async function insertCar(data: {
       ${data.modelYear ?? null},
       ${data.color ?? null},
       ${data.bodyType ?? null},
+      ${data.isInsurance ?? false},
       ${data.mileage ?? null},
       ${data.tyreSizeFront ?? null},
       ${data.tyreSizeBack ?? null},
@@ -244,6 +252,7 @@ export async function updateCar(id: string, patch: Partial<CarRow>): Promise<Car
       model_year = COALESCE(${patch.model_year ?? null}, model_year),
       color = COALESCE(${patch.color ?? null}, color),
       body_type = COALESCE(${patch.body_type ?? null}, body_type),
+      is_insurance = COALESCE(${(patch as any).is_insurance ?? null}, is_insurance),
       mileage = COALESCE(${patch.mileage ?? null}, mileage),
       tyre_size_front = COALESCE(${patch.tyre_size_front ?? null}, tyre_size_front),
       tyre_size_back = COALESCE(${patch.tyre_size_back ?? null}, tyre_size_back),
@@ -265,6 +274,147 @@ export async function updateCar(id: string, patch: Partial<CarRow>): Promise<Car
 export async function deactivateCar(id: string): Promise<void> {
   const sql = getSql();
   await sql`UPDATE cars SET is_active = FALSE, updated_at = NOW() WHERE id = ${id}`;
+}
+
+export async function updateCustomerWalletAmount(
+  companyId: string,
+  customerId: string,
+  delta: number
+): Promise<number> {
+  const sql = getSql();
+  const res = await sql<{ wallet_amount: number }[]>`
+    UPDATE customers
+    SET wallet_amount = COALESCE(wallet_amount, 0) + ${delta},
+        updated_at = NOW()
+    WHERE company_id = ${companyId}
+      AND id = ${customerId}
+    RETURNING wallet_amount
+  `;
+  const row = rowsFrom(res)[0];
+  return Number(row?.wallet_amount ?? 0);
+}
+
+// Wallet transactions
+export async function insertCustomerWalletTransaction(
+  data: CreateCustomerWalletTransactionInput
+): Promise<CustomerWalletTransactionRow> {
+  const sql = getSql();
+  const res = await sql<CustomerWalletTransactionRow[]>`
+    INSERT INTO customer_wallet_transactions (
+      company_id,
+      customer_id,
+      amount,
+      payment_method,
+      payment_date,
+      payment_proof_file_id,
+      approved_at,
+      approved_by,
+      notes
+    ) VALUES (
+      ${data.companyId},
+      ${data.customerId},
+      ${data.amount},
+      ${data.paymentMethod ?? null},
+      ${data.paymentDate ?? null},
+      ${data.paymentProofFileId ?? null},
+      NULL,
+      NULL,
+      ${data.notes ?? null}
+    )
+    RETURNING *
+  `;
+  return rowsFrom(res)[0] as CustomerWalletTransactionRow;
+}
+
+export async function listCustomerWalletTransactions(
+  companyId: string,
+  customerId: string,
+  opts?: { approvedOnly?: boolean }
+): Promise<CustomerWalletTransactionRow[]> {
+  const sql = getSql();
+  const approvedFilter = opts?.approvedOnly ? sql`AND approved_at IS NOT NULL` : sql``;
+  const res = await sql<CustomerWalletTransactionRow[]>`
+    SELECT *
+    FROM customer_wallet_transactions
+    WHERE company_id = ${companyId}
+      AND customer_id = ${customerId}
+      ${approvedFilter}
+    ORDER BY created_at DESC
+  `;
+  return rowsFrom(res);
+}
+
+export async function listCompanyWalletTransactions(
+  companyId: string,
+  opts?: { approvedOnly?: boolean }
+): Promise<CustomerWalletTransactionWithCustomer[]> {
+  const sql = getSql();
+  const approvedFilter = opts?.approvedOnly ? sql`AND t.approved_at IS NOT NULL` : sql``;
+  const res = await sql<CustomerWalletTransactionWithCustomer[]>`
+    SELECT
+      t.*,
+      c.name AS customer_name,
+      c.phone AS customer_phone,
+      c.email AS customer_email,
+      COALESCE(u.full_name, u.email) AS approved_by_name
+    FROM customer_wallet_transactions t
+    JOIN customers c ON c.id = t.customer_id
+    LEFT JOIN users u ON u.id = t.approved_by
+    WHERE t.company_id = ${companyId}
+      ${approvedFilter}
+    ORDER BY t.created_at DESC
+  `;
+  return rowsFrom(res);
+}
+
+export async function getCustomerWalletTransactionById(
+  id: string
+): Promise<CustomerWalletTransactionRow | null> {
+  const sql = getSql();
+  const res = await sql<CustomerWalletTransactionRow[]>`
+    SELECT *
+    FROM customer_wallet_transactions
+    WHERE id = ${id}
+    LIMIT 1
+  `;
+  const row = rowsFrom(res)[0] as CustomerWalletTransactionRow | undefined;
+  return row ?? null;
+}
+
+export async function approveCustomerWalletTransaction(
+  id: string,
+  approvedBy: string | null
+): Promise<CustomerWalletTransactionRow> {
+  const sql = getSql();
+  const res = await sql<CustomerWalletTransactionRow[]>`
+    UPDATE customer_wallet_transactions
+    SET
+      approved_at = NOW(),
+      approved_by = ${approvedBy ?? null},
+      updated_at = NOW()
+    WHERE id = ${id}
+      AND approved_at IS NULL
+    RETURNING *
+  `;
+  const row = rowsFrom(res)[0] as CustomerWalletTransactionRow | undefined;
+  if (!row) throw new Error(`Wallet transaction not found or already approved for id=${id}`);
+  return row;
+}
+
+export async function getCustomerWalletBalance(
+  companyId: string,
+  customerId: string
+): Promise<number> {
+  const sql = getSql();
+  const res = await sql<{ total: number | null }[]>`
+    SELECT COALESCE(SUM(amount), 0) AS total
+    FROM customer_wallet_transactions
+    WHERE company_id = ${companyId}
+      AND customer_id = ${customerId}
+      AND approved_at IS NOT NULL
+  `;
+  const row = rowsFrom(res)[0];
+  return Number(row?.total ?? 0);
 }
 
 // Links

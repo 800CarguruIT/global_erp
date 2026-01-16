@@ -8,6 +8,7 @@ export function MainPageShell({
   scopeLabel,
   primaryAction,
   secondaryActions,
+  contentClassName,
   children,
 }: {
   title: string;
@@ -15,8 +16,12 @@ export function MainPageShell({
   scopeLabel?: string;
   primaryAction?: React.ReactNode;
   secondaryActions?: React.ReactNode;
+  contentClassName?: string;
   children: React.ReactNode;
 }) {
+  const contentClass =
+    contentClassName ?? "rounded-2xl border border-border/60 bg-card/80 p-4";
+
   return (
     <div className="space-y-3 py-4">
       <div className="flex items-start justify-between gap-3">
@@ -30,7 +35,7 @@ export function MainPageShell({
           {secondaryActions && <div className="flex items-center gap-2">{secondaryActions}</div>}
         </div>
       </div>
-      <div className="rounded-2xl border border-border/60 bg-card/80 p-4">{children}</div>
+      <div className={contentClass}>{children}</div>
     </div>
   );
 }

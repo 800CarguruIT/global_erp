@@ -91,9 +91,10 @@ export function BranchJobsMain({
       return t;
     };
     const parsed = pathname?.match(/\/company\/([^/]+)\/branches\/([^/]+)/);
+    const shortParsed = pathname?.match(/\/branches\/([^/]+)/);
     return {
       effectiveCompanyId: normalize(companyId) ?? normalize(parsed?.[1]),
-      effectiveBranchId: normalize(branchId) ?? normalize(parsed?.[2]),
+      effectiveBranchId: normalize(branchId) ?? normalize(parsed?.[2] ?? shortParsed?.[1]),
     };
   }, [companyId, branchId, pathname]);
 

@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getCurrentUserIdFromRequest } from "../../../../../lib/auth/current-user";
+import { buildScopeContextFromRoute, requirePermission } from "../../../../../lib/auth/permissions";
 
 type ParamsContext = { params: { companyId: string } | Promise<{ companyId: string }> };
 
@@ -29,6 +31,31 @@ export async function GET(_req: NextRequest, ctx: ParamsContext) {
   if (!companyId) {
     return NextResponse.json({ error: "companyId is required" }, { status: 400 });
   }
+  const userId = await getCurrentUserIdFromRequest(_req);
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const scope = _req.nextUrl.searchParams.get("scope") ?? "company";
+  const branchId = _req.nextUrl.searchParams.get("branchId") ?? undefined;
+  const context = buildScopeContextFromRoute(
+    { companyId, branchId },
+    scope === "branch" ? "branch" : "company"
+  );
+  if (scope === "branch") {
+    const { Rbac } = await import("@repo/ai-core");
+    const perms = await Rbac.getUserPermissions(userId, context);
+    const allowed =
+      perms.includes("branches.view") ||
+      perms.includes("branches.create") ||
+      perms.includes("branches.edit") ||
+      perms.includes("branches.delete");
+    if (!allowed) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+  } else {
+    const authError = await requirePermission(_req, "branches.view", context);
+    if (authError) return authError;
+  }
 
   try {
     const { Branches } = await import("@repo/ai-core");
@@ -52,6 +79,12 @@ export async function POST(req: NextRequest, ctx: ParamsContext) {
     if (!companyId) {
       return NextResponse.json({ error: "companyId is required", received: { body, url: req.url } }, { status: 400 });
     }
+    const authError = await requirePermission(
+      req,
+      "branches.create",
+      buildScopeContextFromRoute({ companyId }, "company")
+    );
+    if (authError) return authError;
     const { Branches } = await import("@repo/ai-core");
     const created = await Branches.createBranch({
       companyId,

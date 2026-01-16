@@ -62,7 +62,21 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    if (companyId && branchId) {
+      try {
+        const { Branches } = await import("@repo/ai-core");
+        const branch = await Branches.getBranchById(companyId, branchId);
+        if (!branch || branch.is_active === false) {
+          return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+        }
+      } catch (err) {
+        console.error("Branch lookup failed during login", err);
+        return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+      }
+    }
+
     // Compute redirect based on scope
+    // TODO: add explicit "workshop" scope + workshopId routing when implemented.
     let redirect = "/global";
     if (ctx?.isGlobal || scope === "global") {
       redirect = "/global";
@@ -74,13 +88,13 @@ export async function POST(req: NextRequest) {
           ? `/company/${companyId ?? "unknown"}/vendors/${vendorId}`
           : "/global";
     } else if (scope === "branch") {
-      redirect = companyId && branchId ? `/company/${companyId}/branches/${branchId}` : "/company";
+      redirect = branchId ? `/branches/${branchId}` : "/company";
     } else if (scope === "company" && companyId) {
       redirect = `/company/${companyId}`;
     } else if (vendorId && companyId) {
       redirect = `/company/${companyId}/vendors/${vendorId}`;
     } else if (branchId && companyId) {
-      redirect = `/company/${companyId}/branches/${branchId}`;
+      redirect = `/branches/${branchId}`;
     } else if (!ctx?.isGlobal && companies.length === 1 && companies[0]?.companyId) {
       redirect = `/company/${companies[0].companyId}`;
     } else if (!ctx?.isGlobal && companies.length > 1) {
@@ -89,8 +103,9 @@ export async function POST(req: NextRequest) {
 
     const response = NextResponse.json({ success: true, redirect });
     setSessionCookie(response, token);
-    if (redirect.startsWith("/company/") && redirect.includes("/branches/")) {
-      response.cookies.set("last_branch_path", redirect, {
+    const branchPath = companyId && branchId ? `/company/${companyId}/branches/${branchId}` : null;
+    if (branchPath) {
+      response.cookies.set("last_branch_path", branchPath, {
         path: "/",
         sameSite: "lax",
         httpOnly: false,

@@ -13,6 +13,8 @@ export type UserListRow = {
   roles?: { id: string; name: string }[];
   last_login_at?: string | null;
   company_id?: string | null;
+  branch_id?: string | null;
+  branch_name?: string | null;
 };
 
 function rowsFrom<T>(result: T[] | { rows: T[] }): T[] {
@@ -38,9 +40,7 @@ export async function listUsers(params: {
         })`
       : sql``;
 
-  const companyFilter = companyId
-    ? sql`AND (u.company_id = ${companyId} OR e.company_id = ${companyId})`
-    : sql``;
+  const companyFilter = companyId ? sql`AND u.company_id = ${companyId}` : sql``;
   const globalFilter = globalOnly ? sql`AND u.company_id IS NULL` : sql``;
   const branchFilter = branchId
     ? sql`AND EXISTS (
@@ -62,9 +62,11 @@ export async function listUsers(params: {
 
   const rows = await sql<UserListRow[]>`
     SELECT u.id, u.email, u.full_name, u.is_active, u.employee_id, u.created_at, u.updated_at, u.company_id,
+           u.branch_id, b.name as branch_name,
            (SELECT MAX(last_seen_at) FROM user_sessions us WHERE us.user_id = u.id) as last_login_at
     FROM users u
     LEFT JOIN employees e ON e.id = u.employee_id
+    LEFT JOIN branches b ON b.id = u.branch_id
     WHERE 1=1
       ${search}
       ${companyFilter}

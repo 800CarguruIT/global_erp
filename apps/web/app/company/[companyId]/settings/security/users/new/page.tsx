@@ -91,8 +91,12 @@ export default function CompanyUserCreatePage({
         if (selectedScope.type === "branch") params.set("branchId", selectedScope.id);
         if (selectedScope.type === "vendor") params.set("vendorId", selectedScope.id);
 
+        const roleParams = new URLSearchParams();
+        roleParams.set("scope", "company");
+        roleParams.set("companyId", companyId);
+
         const [rolesRes, employeesRes] = await Promise.all([
-          fetch(`/api/auth/roles?${params.toString()}`),
+          fetch(`/api/auth/roles?${roleParams.toString()}`),
           fetch(`/api/hr/employees?${params.toString()}&activeOnly=true`),
         ]);
         if (!rolesRes.ok) throw new Error("Failed to load roles");

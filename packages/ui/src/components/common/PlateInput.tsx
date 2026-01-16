@@ -20,6 +20,8 @@ type PlateInputProps = {
 
 export function PlateInput({ value, onChange }: PlateInputProps) {
   const { theme } = useTheme();
+  const inputBorderClass = theme.inputBorder;
+  const inputBgClass = theme.inputBg;
   const countries = ReferenceData.ReferenceCountries.allCountries;
   const states = ReferenceData.ReferenceStates.allStates;
   const cities = ReferenceData.ReferenceCities?.allCities ?? [];
@@ -59,9 +61,13 @@ export function PlateInput({ value, onChange }: PlateInputProps) {
   }
 
   return (
-    <div className="grid grid-cols-2 gap-2 md:grid-cols-6">
+    <div className="grid grid-cols-2 gap-4 md:grid-cols-6">
       <div>
-        <div className="text-xs font-semibold text-muted-foreground">Country Code</div>
+        <div className="space-y-2 ">
+          <div className="text-xs font-semibold text-muted-foreground">
+            Country Code
+          </div>
+        </div>
         <select
           className={theme.input}
           value={value.country}
@@ -83,10 +89,34 @@ export function PlateInput({ value, onChange }: PlateInputProps) {
           ))}
         </select>
       </div>
-      <div className="flex flex-col justify-center gap-1">
-        <div className="text-xs font-semibold text-muted-foreground">State or City</div>
-        <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-          <label className="flex items-center gap-1">
+      <div className="flex flex-col justify-center gap-2 md:col-span-2 ">
+        <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground space-y-2">
+          <span>State or City</span>
+          {/* <button
+            type="button"
+            className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-white/30 text-[10px] text-muted-foreground transition hover:bg-white/5 hover:text-foreground"
+            title="Enable one or both to load options for the country"
+            aria-label="State or City info"
+          >
+            <svg viewBox="0 0 24 24" className="h-1 w-1" aria-hidden="true">
+              <path
+                d="M12 8.5h.01M11 11h2v5h-2z"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="1.6" />
+            </svg>
+          </button> */}
+        </div>
+        <div className="grid gap-4 text-xs sm:grid-cols-2">
+          <label
+            className={`flex cursor-pointer items-center gap-3 rounded-lg px-3 py-1 transition ${inputBorderClass} ${inputBgClass} ${
+              showState ? "ring-1 ring-primary/30" : "hover:bg-muted/30"
+            }`}
+          >
             <input
               type="checkbox"
               className="h-4 w-4"
@@ -103,9 +133,18 @@ export function PlateInput({ value, onChange }: PlateInputProps) {
               }}
               disabled={!hasCountry}
             />
-            <span>State</span>
+            <span className="font-semibold">State</span>
+            {showState && (
+              <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                Selected
+              </span>
+            )}
           </label>
-          <label className="flex items-center gap-1">
+          <label
+            className={`flex cursor-pointer items-center gap-3 rounded-lg px-3 py-1 transition ${inputBorderClass} ${inputBgClass} ${
+              showCity ? "ring-1 ring-primary/30" : "hover:bg-muted/30"
+            }`}
+          >
             <input
               type="checkbox"
               className="h-4 w-4"
@@ -122,10 +161,14 @@ export function PlateInput({ value, onChange }: PlateInputProps) {
               }}
               disabled={!hasCountry}
             />
-            <span>City</span>
+            <span className="font-semibold">City</span>
+            {showCity && (
+              <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                Selected
+              </span>
+            )}
           </label>
         </div>
-        <div className="text-[11px] text-muted-foreground">Enable one or both to load options for the country</div>
       </div>
       {showState && (
       <div>

@@ -29,16 +29,39 @@ export async function GET(req: NextRequest, { params }: Params) {
     const hay = `${l.customerName ?? ""} ${l.customerPhone ?? ""} ${l.customerEmail ?? ""} ${l.source ?? ""}`.toLowerCase();
     return hay.includes(q);
   });
-  return NextResponse.json({ data: filtered });
+  const sql = getSql();
+  const wallets = await sql`
+    SELECT id, wallet_amount
+    FROM customers
+    WHERE company_id = ${companyId}
+  `;
+  const walletMap = wallets.reduce((acc: Record<string, number>, row: any) => {
+    if (row?.id) acc[row.id] = Number(row.wallet_amount ?? 0);
+    return acc;
+  }, {});
+  const enriched = filtered.map((lead) => ({
+    ...lead,
+    customerWalletAmount: walletMap[lead.customerId] ?? 0,
+  }));
+  return NextResponse.json({ data: enriched });
 }
 
 export async function POST(req: NextRequest, { params }: Params) {
   const { companyId } = await params;
   const body = await req.json().catch(() => ({}));
+  const customerPayload = body?.customer ?? null;
+  const customerName = body?.name ?? customerPayload?.name ?? null;
+  const customerEmail = body?.email ?? customerPayload?.email ?? null;
+  const customerPhone =
+    body?.phone ??
+    (customerPayload?.phoneCode || customerPayload?.phoneNumber
+      ? `${customerPayload?.phoneCode ?? ""}${customerPayload?.phoneNumber ?? ""}`
+      : null);
+  const customerWhatsapp =
+    customerPayload?.whatsappPhoneCode || customerPayload?.whatsappPhoneNumber
+      ? `${customerPayload?.whatsappPhoneCode ?? ""}${customerPayload?.whatsappPhoneNumber ?? ""}`
+      : null;
   const {
-    name,
-    phone,
-    email,
     source,
     status,
     ownerId,
@@ -62,13 +85,14 @@ export async function POST(req: NextRequest, { params }: Params) {
   } = body ?? {};
 
   let customer_id = customerId ?? null;
-  if (!customer_id && name) {
+  if (!customer_id && customerName) {
     const customer = await createCustomer({
       companyId,
       customerType: "individual",
-      name,
-      phone: phone ?? null,
-      email: email ?? null,
+      name: customerName,
+      phone: customerPhone ?? null,
+      whatsappPhone: customerWhatsapp ?? null,
+      email: customerEmail ?? null,
     });
     customer_id = customer.id;
   }
@@ -196,7 +220,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       leadId: lead.id,
       carId: (lead as any).carId ?? null,
       customerId: (lead as any).customerId ?? null,
-      status: "draft",
+      status: "pending",
       meta: {
         flow: workshopFlow,
         inquiry: workshopInquiry ?? null,
@@ -221,7 +245,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       leadId: lead.id,
       carId: (lead as any).carId ?? null,
       customerId: (lead as any).customerId ?? null,
-      status: "draft",
+      status: "pending",
       agentRemark: workshopInquiry ?? null,
       draftPayload: workshopFlow === "inspection_oil_change" ? { oilChangeRequested: true } : null,
     });

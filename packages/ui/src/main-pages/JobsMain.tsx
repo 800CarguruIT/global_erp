@@ -435,6 +435,18 @@ export function JobActionsCell({ companyId, job }: JobActionsCellProps) {
     setIsLoading(true);
     setError(null);
     try {
+      if (action === "inspection_start" || action === "work_start") {
+        const leadRes = await fetch(`/api/company/${companyId}/sales/leads/${job.id}`);
+        if (!leadRes.ok) throw new Error(`HTTP ${leadRes.status}`);
+        const leadJson = await leadRes.json();
+        const leadData = leadJson.data?.lead ?? leadJson.data?.data ?? leadJson.data ?? {};
+        const carInVideo = leadData.carInVideo ?? leadData.carin_video ?? null;
+        if (!carInVideo) {
+          setError("Car in video is required before starting the job.");
+          setIsLoading(false);
+          return;
+        }
+      }
       const patchBody: any = { workshopAction: action };
 
       const patchRes = await fetch(`/api/company/${companyId}/sales/leads/${job.id}`, {
@@ -449,7 +461,7 @@ export function JobActionsCell({ companyId, job }: JobActionsCellProps) {
           leadId: job.id,
           carId: (job as any).carId ?? null,
           customerId: (job as any).customerId ?? null,
-          status: "in_progress",
+          status: "pending",
         };
 
         const inspRes = await fetch(`/api/company/${companyId}/workshop/inspections`, {

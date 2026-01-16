@@ -220,6 +220,38 @@ export async function getUserEffectivePermissions(
   return rowsFrom(base) as PermissionRow[];
 }
 
+export async function getUserPermissionsForExactScope(
+  userId: string,
+  context: ScopeContext
+): Promise<PermissionRow[]> {
+  const sql: any = getSql();
+  const res = await sql<PermissionRow[]>`
+    SELECT DISTINCT p.id, p.key, p.description
+    FROM permissions p
+    INNER JOIN role_permissions rp ON rp.permission_id = p.id
+    INNER JOIN roles r ON r.id = rp.role_id
+    INNER JOIN user_roles ur ON ur.role_id = r.id
+    WHERE ur.user_id = ${userId}
+      AND (
+        (${context.scope} = 'global' AND r.scope = 'global')
+        OR (${context.scope} = 'company' AND r.scope = 'company' AND r.company_id = ${context.companyId ?? null})
+        OR (
+          ${context.scope} = 'branch'
+          AND r.scope = 'branch'
+          AND r.company_id = ${context.companyId ?? null}
+          AND r.branch_id = ${context.branchId ?? null}
+        )
+        OR (
+          ${context.scope} = 'vendor'
+          AND r.scope = 'vendor'
+          AND r.company_id = ${context.companyId ?? null}
+          AND r.vendor_id = ${context.vendorId ?? null}
+        )
+      )
+  `;
+  return rowsFrom(res) as PermissionRow[];
+}
+
 export async function assignRolesToUser(userId: string, roleIds: string[]): Promise<void> {
   const sql = getSql();
   await sql`DELETE FROM user_roles WHERE user_id = ${userId}`;

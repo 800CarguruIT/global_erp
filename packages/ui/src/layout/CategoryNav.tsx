@@ -46,7 +46,7 @@ export function CategoryNav({
   return (
     <div className={`flex flex-wrap items-center justify-center gap-1 sm:gap-2 ${compact ? "text-xs" : "text-sm"}`}>
       {visibleCategories.map((cat) => {
-        const href = getHref(scopeInfo, cat);
+        const href = getHref(scopeInfo, cat, currentPath);
         const active = currentPath.startsWith(href);
         return (
           <Link
@@ -98,14 +98,17 @@ const CATEGORY_MODULE_MAP: Partial<Record<Category, ModuleKey>> = {
   Analytics: "analytics",
 };
 
-function getHref(scopeInfo: ScopeInfo, category: Category): string {
+function getHref(scopeInfo: ScopeInfo, category: Category, currentPath: string): string {
+  const useBranchRoot = scopeInfo.scope === "branch" && currentPath.startsWith("/branches/");
   const base =
     scopeInfo.scope === "global"
       ? "/global"
       : scopeInfo.scope === "company"
       ? `/company/${scopeInfo.companyId ?? ""}`
       : scopeInfo.scope === "branch"
-      ? `/company/${scopeInfo.companyId ?? ""}/branches/${scopeInfo.branchId ?? ""}`
+      ? useBranchRoot
+        ? `/branches/${scopeInfo.branchId ?? ""}`
+        : `/company/${scopeInfo.companyId ?? ""}/branches/${scopeInfo.branchId ?? ""}`
       : `/company/${scopeInfo.companyId ?? ""}/vendors/${scopeInfo.vendorId ?? ""}`;
 
   switch (category) {

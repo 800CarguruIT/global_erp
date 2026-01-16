@@ -317,7 +317,7 @@ export function InspectionDetailMain({ companyId, inspectionId }: InspectionDeta
     );
   }
 
-  const saveStatusText = saveError ? saveError : isSaving ? "Saving…" : lastSavedAt ? `Saved ${lastSavedAt.toLocaleTimeString()}` : "All changes saved";
+  const saveStatusText = saveError ? saveError : isSaving ? "Saving..." : lastSavedAt ? `Saved ${lastSavedAt.toLocaleTimeString()}` : "All changes saved";
 
   return (
     <MainPageShell

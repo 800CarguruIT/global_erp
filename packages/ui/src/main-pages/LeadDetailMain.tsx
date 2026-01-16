@@ -5,11 +5,21 @@ import { MainPageShell } from "./MainPageShell";
 import type { Lead, LeadEvent, LeadStatus } from "@repo/ai-core/crm/leads/types";
 import { LeadTypeBadge, LeadStatusBadge, LeadHealthBadge } from "../components/leads/LeadBadges";
 import { LeadTimeline } from "../components/leads/LeadTimeline";
+import { Card } from "../components/Card";
 
 type LeadDetailMainProps = {
   companyId: string;
   leadId: string;
   onDeleted?: () => void;
+  showDeleteActions?: boolean;
+  useSectionCards?: boolean;
+  showAcceptAction?: boolean;
+  showCheckinAction?: boolean;
+  showSaveAction?: boolean;
+  timelineMode?: "events" | "status";
+  currentBranchId?: string | null;
+  timelineCutoff?: "accepted" | null;
+  timelineVariant?: "default" | "centered";
 };
 
 type ParsedAutoNotes = {
@@ -77,7 +87,20 @@ function deriveRecoveryFlow(lead: any, autoNotes: ParsedAutoNotes | null): strin
   return "-";
 }
 
-export function LeadDetailMain({ companyId, leadId, onDeleted }: LeadDetailMainProps) {
+export function LeadDetailMain({
+  companyId,
+  leadId,
+  onDeleted,
+  showDeleteActions = true,
+  useSectionCards = false,
+  showAcceptAction = false,
+  showCheckinAction = false,
+  showSaveAction = true,
+  timelineMode = "events",
+  currentBranchId = null,
+  timelineCutoff = null,
+  timelineVariant = "default",
+}: LeadDetailMainProps) {
   const [lead, setLead] = useState<Lead | null>(null);
   const [events, setEvents] = useState<LeadEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -165,6 +188,123 @@ export function LeadDetailMain({ companyId, leadId, onDeleted }: LeadDetailMainP
     ];
   };
 
+  const buildStatusTimeline = (currentLead: Lead, leadEvents: LeadEvent[]) => {
+    const steps: LeadEvent[] = [];
+    const acceptedEvent = leadEvents.find((e) => e.eventType === "accepted");
+    const checkinEvent = leadEvents.find((e) => e.eventType === "car_in");
+    const branchAssignedEvent = leadEvents.find((e) => e.eventType === "branch_updated");
+
+    steps.push({
+      id: `${currentLead.id}-created`,
+      leadId: currentLead.id,
+      companyId: currentLead.companyId,
+      actorUserId: null,
+      actorEmployeeId: null,
+      eventType: "created",
+      eventPayload: { order: 1 },
+      createdAt: currentLead.createdAt,
+    });
+
+    const hasAssignment =
+      currentLead.leadStage === "assigned" ||
+      Boolean(currentLead.branchId) ||
+      Boolean(currentLead.assignedUserId) ||
+      Boolean(currentLead.assignedAt);
+    if (hasAssignment) {
+      steps.push({
+        id: `${currentLead.id}-assigned`,
+        leadId: currentLead.id,
+        companyId: currentLead.companyId,
+        actorUserId: null,
+        actorEmployeeId: null,
+        eventType: "status_step",
+        eventPayload: {
+          label: "Assigned",
+          actor: branchAssignedEvent?.actorName ?? branchAssignedEvent?.actorUserId ?? null,
+          order: 2,
+        },
+        createdAt: currentLead.assignedAt ?? currentLead.updatedAt ?? currentLead.createdAt,
+      });
+    }
+
+    const acceptedAt =
+      (acceptedEvent?.eventPayload?.acceptedAt as string | undefined) ??
+      acceptedEvent?.createdAt ??
+      (currentLead.leadStatus === "accepted" ? currentLead.updatedAt : undefined);
+    if (acceptedAt) {
+      steps.push({
+        id: `${currentLead.id}-accepted`,
+        leadId: currentLead.id,
+        companyId: currentLead.companyId,
+        actorUserId: null,
+        actorEmployeeId: null,
+        eventType: "accepted",
+        eventPayload: {
+          acceptedAt,
+          actor: acceptedEvent?.actorName ?? acceptedEvent?.actorUserId ?? null,
+          order: 3,
+        },
+        createdAt: acceptedAt,
+      });
+    }
+
+    const checkinAt =
+      (checkinEvent?.eventPayload?.checkinAt as string | undefined) ??
+      checkinEvent?.createdAt ??
+      currentLead.checkinAt ??
+      (currentLead.leadStatus === "car_in" ? currentLead.updatedAt : undefined);
+    if (checkinAt) {
+      steps.push({
+        id: `${currentLead.id}-car-in`,
+        leadId: currentLead.id,
+        companyId: currentLead.companyId,
+        actorUserId: null,
+        actorEmployeeId: null,
+        eventType: "status_step",
+        eventPayload: {
+          label: "Car check-in",
+          actor: checkinEvent?.actorName ?? checkinEvent?.actorUserId ?? null,
+          order: 4,
+        },
+        createdAt: checkinAt,
+      });
+    }
+
+    if (currentLead.leadStatus === "processing") {
+      steps.push({
+        id: `${currentLead.id}-processing`,
+        leadId: currentLead.id,
+        companyId: currentLead.companyId,
+        actorUserId: null,
+        actorEmployeeId: null,
+        eventType: "status_step",
+        eventPayload: { label: "Processing", order: 5 },
+        createdAt: currentLead.updatedAt ?? currentLead.createdAt,
+      });
+    }
+
+    if (["closed", "closed_won", "lost"].includes(currentLead.leadStatus)) {
+      const label =
+        currentLead.leadStatus === "closed_won"
+          ? "Closed / Won"
+          : currentLead.leadStatus === "lost"
+          ? "Lost"
+          : "Closed";
+      steps.push({
+        id: `${currentLead.id}-closed`,
+        leadId: currentLead.id,
+        companyId: currentLead.companyId,
+        actorUserId: null,
+        actorEmployeeId: null,
+        eventType: "status_step",
+        eventPayload: { label, order: 6 },
+        createdAt: currentLead.closedAt ?? currentLead.updatedAt ?? currentLead.createdAt,
+      });
+    }
+
+    return steps;
+  };
+
   useEffect(() => {
     let cancelled = false;
 
@@ -179,11 +319,17 @@ export function LeadDetailMain({ companyId, leadId, onDeleted }: LeadDetailMainP
           throw new Error("Lead not found");
         }
 
-        const loadedEvents = await fetchEventsByUrl(`${salesLeadUrl}/events`);
+        const loadedEvents = await fetchEventsByUrl(
+          `/api/company/${companyId}/crm/leads/${leadId}/events`
+        );
 
         if (!cancelled) {
           setLead(loadedLead);
-          setEvents(withFallbackEvents(loadedLead, loadedEvents));
+          setEvents(
+            timelineMode === "status"
+              ? buildStatusTimeline(loadedLead, loadedEvents)
+              : withFallbackEvents(loadedLead, loadedEvents)
+          );
           setStatus(loadedLead.leadStatus as LeadStatus);
           setStage(loadedLead.leadStage || "");
           const parsed = parseAutoAgentNotes(loadedLead.agentRemark);
@@ -235,10 +381,15 @@ export function LeadDetailMain({ companyId, leadId, onDeleted }: LeadDetailMainP
       // Reload lead and events to reflect latest activity/actor info
       setIsReloadingTimeline(true);
       const refreshedLead = await fetchLeadByUrl(`/api/company/${companyId}/sales/leads/${lead.id}`);
-      const refreshedEvents = await fetchEventsByUrl(`/api/company/${companyId}/sales/leads/${lead.id}/events`);
+      const refreshedEvents = await fetchEventsByUrl(
+        `/api/company/${companyId}/crm/leads/${lead.id}/events`
+      );
       setIsReloadingTimeline(false);
 
-      const timelineEvents = withFallbackEvents(refreshedLead ?? lead, refreshedEvents.length ? refreshedEvents : events);
+      const timelineEvents =
+        timelineMode === "status"
+          ? buildStatusTimeline(refreshedLead ?? lead, refreshedEvents.length ? refreshedEvents : events)
+          : withFallbackEvents(refreshedLead ?? lead, refreshedEvents.length ? refreshedEvents : events);
 
       if (refreshedLead) {
         setLead(refreshedLead);
@@ -269,6 +420,90 @@ export function LeadDetailMain({ companyId, leadId, onDeleted }: LeadDetailMainP
       setTimeout(() => setSaveSuccess(false), 2000);
     } catch (err) {
       setSaveError("Failed to save changes. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleAccept() {
+    if (!lead) return;
+    setIsSaving(true);
+    setSaveError(null);
+    setSaveSuccess(false);
+    try {
+      const res = await fetch(`/api/company/${companyId}/crm/leads/${lead.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          leadStatus: "accepted",
+        }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const refreshedLead = await fetchLeadByUrl(`/api/company/${companyId}/sales/leads/${lead.id}`);
+      const refreshedEvents = await fetchEventsByUrl(
+        `/api/company/${companyId}/crm/leads/${lead.id}/events`
+      );
+      if (refreshedLead) {
+        setLead(refreshedLead);
+        setStatus(refreshedLead.leadStatus as LeadStatus);
+        setStage(refreshedLead.leadStage || "");
+        const parsed = parseAutoAgentNotes(refreshedLead.agentRemark);
+        setAgentRemark(parsed.cleanedRemark);
+        setAutoNotes(parsed.notes);
+        setCustomerRemark(refreshedLead.customerRemark ?? refreshedLead.customerFeedback ?? "");
+      }
+      setEvents(
+        timelineMode === "status"
+          ? buildStatusTimeline(refreshedLead ?? lead, refreshedEvents.length ? refreshedEvents : events)
+          : withFallbackEvents(refreshedLead ?? lead, refreshedEvents.length ? refreshedEvents : events)
+      );
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 2000);
+    } catch (err) {
+      setSaveError("Failed to accept lead. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleCheckin() {
+    if (!lead) return;
+    setIsSaving(true);
+    setSaveError(null);
+    setSaveSuccess(false);
+    try {
+      const res = await fetch(`/api/company/${companyId}/crm/leads/${lead.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          leadStatus: "car_in",
+          checkinAt: new Date().toISOString(),
+          branchId: currentBranchId ?? undefined,
+        }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const refreshedLead = await fetchLeadByUrl(`/api/company/${companyId}/sales/leads/${lead.id}`);
+      const refreshedEvents = await fetchEventsByUrl(
+        `/api/company/${companyId}/crm/leads/${lead.id}/events`
+      );
+      if (refreshedLead) {
+        setLead(refreshedLead);
+        setStatus(refreshedLead.leadStatus as LeadStatus);
+        setStage(refreshedLead.leadStage || "");
+        const parsed = parseAutoAgentNotes(refreshedLead.agentRemark);
+        setAgentRemark(parsed.cleanedRemark);
+        setAutoNotes(parsed.notes);
+        setCustomerRemark(refreshedLead.customerRemark ?? refreshedLead.customerFeedback ?? "");
+      }
+      setEvents(
+        timelineMode === "status"
+          ? buildStatusTimeline(refreshedLead ?? lead, refreshedEvents.length ? refreshedEvents : events)
+          : withFallbackEvents(refreshedLead ?? lead, refreshedEvents.length ? refreshedEvents : events)
+      );
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 2000);
+    } catch (err) {
+      setSaveError("Failed to check in car. Please try again.");
     } finally {
       setIsSaving(false);
     }
@@ -322,218 +557,446 @@ export function LeadDetailMain({ companyId, leadId, onDeleted }: LeadDetailMainP
       title="Lead Details"
       subtitle="Manage status, remarks and track the full timeline."
       scopeLabel="Company workspace"
+      contentClassName="border-0 p-0 bg-transparent"
       primaryAction={
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={isSaving}
-          className="rounded-md border px-3 py-1 text-sm font-medium"
-        >
-          {isSaving ? "Saving..." : "Save changes"}
-        </button>
+        showSaveAction ? (
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={isSaving}
+            className="rounded-md border px-3 py-1 text-sm font-medium"
+          >
+            {isSaving ? "Saving..." : "Save changes"}
+          </button>
+        ) : undefined
       }
       secondaryActions={
         <>
           {saveSuccess && <span className="text-xs text-emerald-600">Saved.</span>}
           {saveError && <span className="text-xs text-destructive">{saveError}</span>}
           {deleteError && <span className="text-xs text-destructive">{deleteError}</span>}
-          <div className="flex items-center gap-2">
+          {showAcceptAction && lead?.leadStatus !== "accepted" && lead?.leadStatus !== "car_in" && (
             <button
               type="button"
-              onClick={() => handleDelete(true)}
-              disabled={deleting}
-              className="rounded-md border px-2 py-1 text-xs hover:bg-white/10 disabled:opacity-50"
+              onClick={handleAccept}
+              disabled={isSaving}
+              className="rounded-md border px-2 py-1 text-xs font-semibold uppercase tracking-wide hover:bg-white/10 disabled:opacity-50"
             >
-              {deleting ? "Archiving..." : "Archive"}
+              Accept lead
             </button>
+          )}
+          {showCheckinAction && lead?.leadStatus === "accepted" && (
             <button
               type="button"
-              onClick={() => handleDelete(false)}
-              disabled={deleting}
-              className="rounded-md border border-destructive px-2 py-1 text-xs text-destructive hover:bg-destructive/10 disabled:opacity-50"
+              onClick={handleCheckin}
+              disabled={isSaving}
+              className="rounded-md border px-2 py-1 text-xs font-semibold uppercase tracking-wide hover:bg-white/10 disabled:opacity-50"
             >
-              {deleting ? "Deleting..." : "Delete"}
+              Car check-in
             </button>
-          </div>
+          )}
+          {showDeleteActions && (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => handleDelete(true)}
+                disabled={deleting}
+                className="rounded-md border px-2 py-1 text-xs hover:bg-white/10 disabled:opacity-50"
+              >
+                {deleting ? "Archiving..." : "Archive"}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDelete(false)}
+                disabled={deleting}
+                className="rounded-md border border-destructive px-2 py-1 text-xs text-destructive hover:bg-destructive/10 disabled:opacity-50"
+              >
+                {deleting ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          )}
         </>
       }
     >
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <h2 className="text-sm font-semibold">Customer</h2>
-              {lead.customerName ? (
-                <>
-                  <div className="text-sm">{lead.customerName}</div>
-                  {lead.customerPhone && <div className="text-xs text-muted-foreground">{lead.customerPhone}</div>}
-                  {lead.customerEmail && <div className="text-xs text-muted-foreground">{lead.customerEmail}</div>}
-                </>
-              ) : (
-                <p className="text-xs text-muted-foreground">No customer linked.</p>
-              )}
-            </div>
-            <div className="space-y-2">
-              <h2 className="text-sm font-semibold">Car</h2>
-              {lead.carPlateNumber ? (
-                <>
-                  <div className="text-sm">{lead.carPlateNumber}</div>
-                  {lead.carModel && <div className="text-xs text-muted-foreground">{lead.carModel}</div>}
-                </>
-              ) : (
-                <p className="text-xs text-muted-foreground">No car linked.</p>
-              )}
-            </div>
+            {useSectionCards ? (
+              <>
+                <Card className="p-4">
+                  <div className="space-y-2">
+                    <h2 className="text-sm font-semibold">Customer</h2>
+                    {lead.customerName ? (
+                      <>
+                        <div className="text-sm">{lead.customerName}</div>
+                        {lead.customerPhone && <div className="text-xs text-muted-foreground">{lead.customerPhone}</div>}
+                        {lead.customerEmail && <div className="text-xs text-muted-foreground">{lead.customerEmail}</div>}
+                      </>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">No customer linked.</p>
+                    )}
+                  </div>
+                </Card>
+                <Card className="p-4">
+                  <div className="space-y-2">
+                    <h2 className="text-sm font-semibold">Car</h2>
+                    {lead.carPlateNumber ? (
+                      <>
+                        <div className="text-sm">{lead.carPlateNumber}</div>
+                        {lead.carModel && <div className="text-xs text-muted-foreground">{lead.carModel}</div>}
+                      </>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">No car linked.</p>
+                    )}
+                  </div>
+                </Card>
+              </>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <h2 className="text-sm font-semibold">Customer</h2>
+                  {lead.customerName ? (
+                    <>
+                      <div className="text-sm">{lead.customerName}</div>
+                      {lead.customerPhone && <div className="text-xs text-muted-foreground">{lead.customerPhone}</div>}
+                      {lead.customerEmail && <div className="text-xs text-muted-foreground">{lead.customerEmail}</div>}
+                    </>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">No customer linked.</p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <h2 className="text-sm font-semibold">Car</h2>
+                  {lead.carPlateNumber ? (
+                    <>
+                      <div className="text-sm">{lead.carPlateNumber}</div>
+                      {lead.carModel && <div className="text-xs text-muted-foreground">{lead.carModel}</div>}
+                    </>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">No car linked.</p>
+                  )}
+                </div>
+              </>
+            )}
           </div>
 
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="space-y-1 text-sm">
-              <div className="text-xs text-muted-foreground">Type & Stage</div>
-              <LeadTypeBadge type={lead.leadType as any} />
-              <div className="mt-1">
-                <select
-                  className="w-full rounded-md border bg-background p-1 text-xs"
-                  value={stage}
-                  onChange={(e) => setStage(e.target.value)}
-                >
-                  <option value="">Use current: {lead.leadStage}</option>
-                  <option value="new">New</option>
-                  <option value="enroute">Enroute</option>
-                  <option value="processing">Processing</option>
-                  <option value="completed">Completed</option>
-                  <option value="closed">Closed</option>
-                </select>
-              </div>
-            </div>
-            <div className="space-y-1 text-sm">
-              <div className="text-xs text-muted-foreground">Status</div>
-              <LeadStatusBadge status={lead.leadStatus as any} />
-              <div className="mt-1">
+          {useSectionCards ? (
+            <Card className="p-4">
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="space-y-1 text-sm">
+                  <div className="text-xs text-muted-foreground">Type & Stage</div>
+                  <LeadTypeBadge type={lead.leadType as any} />
+                  <div className="mt-1">
+                    <select
+                      className="w-full rounded-md border bg-background p-1 text-xs"
+                      value={stage}
+                      onChange={(e) => setStage(e.target.value)}
+                    >
+                      <option value="">Use current: {lead.leadStage}</option>
+                      <option value="new">New</option>
+                      <option value="enroute">Enroute</option>
+                      <option value="processing">Processing</option>
+                      <option value="completed">Completed</option>
+                      <option value="closed">Closed</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="space-y-1 text-sm">
+                  <div className="text-xs text-muted-foreground">Status</div>
+                  <LeadStatusBadge status={lead.leadStatus as any} />
+                <div className="mt-1">
                 <select
                   className="w-full rounded-md border bg-background p-1 text-xs"
                   value={status}
                   onChange={(e) => setStatus(e.target.value as LeadStatus | "")}
                 >
                   <option value="open">Open</option>
+                  <option value="accepted">Accepted</option>
+                  <option value="car_in">Car In</option>
                   <option value="processing">Processing</option>
                   <option value="closed_won">Closed / Won</option>
                   <option value="lost">Lost</option>
                 </select>
-              </div>
-              <div className="text-xs text-muted-foreground capitalize">Source: {lead.source || "Unknown"}</div>
-            </div>
-            <div className="space-y-1 text-sm">
-              <div className="text-xs text-muted-foreground">Health</div>
-              <LeadHealthBadge score={lead.healthScore ?? null} />
-              {lead.sentimentScore != null && (
-                <div className="text-xs text-muted-foreground">Sentiment: {lead.sentimentScore}</div>
-              )}
-            </div>
-          </div>
-
-          <div className="space-y-2 rounded-md border p-3">
-            <h2 className="text-sm font-semibold">Lead fields</h2>
-            <div className="grid gap-3 md:grid-cols-2">
-              {[
-                { label: "Lead ID", value: lead.id },
-                { label: "Service type", value: lead.serviceType || "-" },
-                { label: "Branch", value: branchInfo?.name || lead.branchId || "-" },
-                { label: "Recovery direction", value: displayRecoveryDirection },
-                { label: "Recovery flow", value: displayRecoveryFlow },
-                { label: "Pickup from", value: lead.pickupFrom || autoNotes?.pickupFrom || "-" },
-                {
-                  label: "Drop-off to",
-                  value:
-                    lead.dropoffGoogleLocation ||
-                    branchInfo?.google ||
-                    lead.dropoffTo ||
-                    branchInfo?.address ||
-                    branchInfo?.name ||
-                    "-",
-                },
-                { label: "Assigned user", value: lead.assignedUserId || "-" },
-                { label: "Agent employee", value: lead.agentEmployeeId || "-" },
-                {
-                  label: "Created at",
-                  value: lead.createdAt ? new Date(lead.createdAt).toLocaleString() : "-",
-                },
-                {
-                  label: "Updated at",
-                  value: lead.updatedAt ? new Date(lead.updatedAt).toLocaleString() : "-",
-                },
-              ].map((item) => (
-                <div key={item.label} className="text-sm">
-                  <div className="text-xs text-muted-foreground">{item.label}</div>
-                  <div className="truncate">{item.value}</div>
+                  </div>
+                  <div className="text-xs text-muted-foreground capitalize">Source: {lead.source || "Unknown"}</div>
                 </div>
-              ))}
-              {autoNotes &&
-                (autoNotes.flow ||
-                  autoNotes.appointment ||
-                  autoNotes.visit ||
-                  autoNotes.pickupFrom ||
-                  autoNotes.inquiry ||
-                  autoNotes.recoveryLead ||
-                  autoNotes.location) && (
-                  <div className="md:col-span-2">
-                    <div className="mt-3 border-t pt-3">
-                      <div className="text-xs font-semibold uppercase text-muted-foreground">Workshop details</div>
-                      <div className="mt-2 grid gap-3 md:grid-cols-2">
-                        {[
-                          { label: "Flow", value: autoNotes.flow },
-                          { label: "Appointment", value: autoNotes.appointment },
-                          { label: "Visit type", value: autoNotes.visit },
-                          { label: "Pickup location", value: autoNotes.pickupFrom },
-                          { label: "Inquiry", value: autoNotes.inquiry },
-                          { label: "Recovery lead", value: autoNotes.recoveryLead },
-                          { label: "Location link", value: autoNotes.location },
-                        ]
-                          .filter((item) => item.value)
-                          .map((item) => (
-                            <div key={item.label} className="text-sm">
-                              <div className="text-xs text-muted-foreground">{item.label}</div>
-                              <div className="truncate">{item.value}</div>
-                            </div>
-                          ))}
+                <div className="space-y-1 text-sm">
+                  <div className="text-xs text-muted-foreground">Health</div>
+                  <LeadHealthBadge score={lead.healthScore ?? null} />
+                  {lead.sentimentScore != null && (
+                    <div className="text-xs text-muted-foreground">Sentiment: {lead.sentimentScore}</div>
+                  )}
+                </div>
+              </div>
+            </Card>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="space-y-1 text-sm">
+                <div className="text-xs text-muted-foreground">Type & Stage</div>
+                <LeadTypeBadge type={lead.leadType as any} />
+                <div className="mt-1">
+                  <select
+                    className="w-full rounded-md border bg-background p-1 text-xs"
+                    value={stage}
+                    onChange={(e) => setStage(e.target.value)}
+                  >
+                    <option value="">Use current: {lead.leadStage}</option>
+                    <option value="new">New</option>
+                    <option value="enroute">Enroute</option>
+                    <option value="processing">Processing</option>
+                    <option value="completed">Completed</option>
+                    <option value="closed">Closed</option>
+                  </select>
+                </div>
+              </div>
+              <div className="space-y-1 text-sm">
+                <div className="text-xs text-muted-foreground">Status</div>
+                <LeadStatusBadge status={lead.leadStatus as any} />
+                <div className="mt-1">
+                  <select
+                    className="w-full rounded-md border bg-background p-1 text-xs"
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value as LeadStatus | "")}
+                  >
+                    <option value="open">Open</option>
+                    <option value="car_in">Car In</option>
+                    <option value="processing">Processing</option>
+                    <option value="closed_won">Closed / Won</option>
+                    <option value="lost">Lost</option>
+                  </select>
+                </div>
+                <div className="text-xs text-muted-foreground capitalize">Source: {lead.source || "Unknown"}</div>
+              </div>
+              <div className="space-y-1 text-sm">
+                <div className="text-xs text-muted-foreground">Health</div>
+                <LeadHealthBadge score={lead.healthScore ?? null} />
+                {lead.sentimentScore != null && (
+                  <div className="text-xs text-muted-foreground">Sentiment: {lead.sentimentScore}</div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {useSectionCards ? (
+            <Card className="p-4">
+              <div className="space-y-2">
+                <h2 className="text-sm font-semibold">Lead fields</h2>
+                <div className="grid gap-3 md:grid-cols-2">
+                  {[
+                    { label: "Lead ID", value: lead.id },
+                    { label: "Service type", value: lead.serviceType || "-" },
+                    { label: "Branch", value: branchInfo?.name || lead.branchId || "-" },
+                    { label: "Recovery direction", value: displayRecoveryDirection },
+                    { label: "Recovery flow", value: displayRecoveryFlow },
+                    { label: "Pickup from", value: lead.pickupFrom || autoNotes?.pickupFrom || "-" },
+                    {
+                      label: "Drop-off to",
+                      value:
+                        lead.dropoffGoogleLocation ||
+                        branchInfo?.google ||
+                        lead.dropoffTo ||
+                        branchInfo?.address ||
+                        branchInfo?.name ||
+                        "-",
+                    },
+                    { label: "Assigned user", value: lead.assignedUserId || "-" },
+                    { label: "Agent employee", value: lead.agentEmployeeId || "-" },
+                    {
+                      label: "Created at",
+                      value: lead.createdAt ? new Date(lead.createdAt).toLocaleString() : "-",
+                    },
+                    {
+                      label: "Updated at",
+                      value: lead.updatedAt ? new Date(lead.updatedAt).toLocaleString() : "-",
+                    },
+                  ].map((item) => (
+                    <div key={item.label} className="text-sm">
+                      <div className="text-xs text-muted-foreground">{item.label}</div>
+                      <div className="truncate">{item.value}</div>
+                    </div>
+                  ))}
+                  {autoNotes &&
+                    (autoNotes.flow ||
+                      autoNotes.appointment ||
+                      autoNotes.visit ||
+                      autoNotes.pickupFrom ||
+                      autoNotes.inquiry ||
+                      autoNotes.recoveryLead ||
+                      autoNotes.location) && (
+                      <div className="md:col-span-2">
+                        <div className="mt-3 pt-3">
+                          <div className="text-xs font-semibold uppercase text-muted-foreground">Workshop details</div>
+                          <div className="mt-2 grid gap-3 md:grid-cols-2">
+                            {[
+                              { label: "Flow", value: autoNotes.flow },
+                              { label: "Appointment", value: autoNotes.appointment },
+                              { label: "Visit type", value: autoNotes.visit },
+                              { label: "Pickup location", value: autoNotes.pickupFrom },
+                              { label: "Inquiry", value: autoNotes.inquiry },
+                              { label: "Recovery lead", value: autoNotes.recoveryLead },
+                              { label: "Location link", value: autoNotes.location },
+                            ]
+                              .filter((item) => item.value)
+                              .map((item) => (
+                                <div key={item.label} className="text-sm">
+                                  <div className="text-xs text-muted-foreground">{item.label}</div>
+                                  <div className="truncate">{item.value}</div>
+                                </div>
+                              ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                </div>
+              </div>
+            </Card>
+          ) : (
+            <div className="space-y-2 rounded-md p-3">
+              <h2 className="text-sm font-semibold">Lead fields</h2>
+              <div className="grid gap-3 md:grid-cols-2">
+                {[
+                  { label: "Lead ID", value: lead.id },
+                  { label: "Service type", value: lead.serviceType || "-" },
+                  { label: "Branch", value: branchInfo?.name || lead.branchId || "-" },
+                  { label: "Recovery direction", value: displayRecoveryDirection },
+                  { label: "Recovery flow", value: displayRecoveryFlow },
+                  { label: "Pickup from", value: lead.pickupFrom || autoNotes?.pickupFrom || "-" },
+                  {
+                    label: "Drop-off to",
+                    value:
+                      lead.dropoffGoogleLocation ||
+                      branchInfo?.google ||
+                      lead.dropoffTo ||
+                      branchInfo?.address ||
+                      branchInfo?.name ||
+                      "-",
+                  },
+                  { label: "Assigned user", value: lead.assignedUserId || "-" },
+                  { label: "Agent employee", value: lead.agentEmployeeId || "-" },
+                  {
+                    label: "Created at",
+                    value: lead.createdAt ? new Date(lead.createdAt).toLocaleString() : "-",
+                  },
+                  {
+                    label: "Updated at",
+                    value: lead.updatedAt ? new Date(lead.updatedAt).toLocaleString() : "-",
+                  },
+                ].map((item) => (
+                  <div key={item.label} className="text-sm">
+                    <div className="text-xs text-muted-foreground">{item.label}</div>
+                    <div className="truncate">{item.value}</div>
+                  </div>
+                ))}
+                {autoNotes &&
+                  (autoNotes.flow ||
+                    autoNotes.appointment ||
+                    autoNotes.visit ||
+                    autoNotes.pickupFrom ||
+                    autoNotes.inquiry ||
+                    autoNotes.recoveryLead ||
+                    autoNotes.location) && (
+                    <div className="md:col-span-2">
+                      <div className="mt-3 pt-3">
+                        <div className="text-xs font-semibold uppercase text-muted-foreground">Workshop details</div>
+                        <div className="mt-2 grid gap-3 md:grid-cols-2">
+                          {[
+                            { label: "Flow", value: autoNotes.flow },
+                            { label: "Appointment", value: autoNotes.appointment },
+                            { label: "Visit type", value: autoNotes.visit },
+                            { label: "Pickup location", value: autoNotes.pickupFrom },
+                            { label: "Inquiry", value: autoNotes.inquiry },
+                            { label: "Recovery lead", value: autoNotes.recoveryLead },
+                            { label: "Location link", value: autoNotes.location },
+                          ]
+                            .filter((item) => item.value)
+                            .map((item) => (
+                              <div key={item.label} className="text-sm">
+                                <div className="text-xs text-muted-foreground">{item.label}</div>
+                                <div className="truncate">{item.value}</div>
+                              </div>
+                            ))}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
+                  )}
+              </div>
             </div>
-          </div>
+          )}
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <h2 className="text-sm font-semibold">Agent remarks</h2>
-              <textarea
-                className="h-24 w-full rounded-md border bg-background p-2 text-sm"
-                placeholder="Add or update agent remarks"
-                value={agentRemark}
-                onChange={(e) => setAgentRemark(e.target.value)}
-              />
+          {useSectionCards ? (
+            <div className="grid gap-4 md:grid-cols-2">
+              <Card className="p-4">
+                <div className="space-y-2">
+                  <h2 className="text-sm font-semibold">Agent remarks</h2>
+                  <textarea
+                    className="h-24 w-full rounded-md bg-background p-2 text-sm"
+                    placeholder="Add or update agent remarks"
+                    value={agentRemark}
+                    onChange={(e) => setAgentRemark(e.target.value)}
+                  />
+                </div>
+              </Card>
+              <Card className="p-4">
+                <div className="space-y-2">
+                  <h2 className="text-sm font-semibold">Customer remarks / feedback</h2>
+                  <textarea
+                    className="h-24 w-full rounded-md bg-background p-2 text-sm"
+                    placeholder="Customer sentiment / feedback"
+                    value={customerRemark}
+                    onChange={(e) => setCustomerRemark(e.target.value)}
+                  />
+                </div>
+              </Card>
             </div>
-            <div className="space-y-2">
-              <h2 className="text-sm font-semibold">Customer remarks / feedback</h2>
-              <textarea
-                className="h-24 w-full rounded-md border bg-background p-2 text-sm"
-                placeholder="Customer sentiment / feedback"
-                value={customerRemark}
-                onChange={(e) => setCustomerRemark(e.target.value)}
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-3">
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="text-sm font-semibold">Timeline</h2>
-          </div>
-          {isReloadingTimeline ? (
-            <p className="text-xs text-muted-foreground">Refreshing timeline...</p>
           ) : (
-            <LeadTimeline events={events} />
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <h2 className="text-sm font-semibold">Agent remarks</h2>
+                <textarea
+                  className="h-24 w-full rounded-md bg-background p-2 text-sm"
+                  placeholder="Add or update agent remarks"
+                  value={agentRemark}
+                  onChange={(e) => setAgentRemark(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <h2 className="text-sm font-semibold">Customer remarks / feedback</h2>
+                <textarea
+                  className="h-24 w-full rounded-md bg-background p-2 text-sm"
+                  placeholder="Customer sentiment / feedback"
+                  value={customerRemark}
+                  onChange={(e) => setCustomerRemark(e.target.value)}
+                />
+              </div>
+            </div>
           )}
         </div>
+
+        {useSectionCards ? (
+          <Card className="p-4">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="text-sm font-semibold">Timeline</h2>
+              </div>
+              {isReloadingTimeline ? (
+                <p className="text-xs text-muted-foreground">Refreshing timeline...</p>
+              ) : (
+                <LeadTimeline events={events} variant={timelineVariant} />
+              )}
+            </div>
+          </Card>
+        ) : (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold">Timeline</h2>
+            </div>
+            {isReloadingTimeline ? (
+              <p className="text-xs text-muted-foreground">Refreshing timeline...</p>
+            ) : (
+              <LeadTimeline events={events} variant={timelineVariant} />
+            )}
+          </div>
+        )}
       </div>
     </MainPageShell>
   );

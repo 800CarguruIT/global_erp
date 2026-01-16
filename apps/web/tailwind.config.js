@@ -1,15 +1,15 @@
-/* eslint-env node */
-/* globals module */
 /** @type {import('tailwindcss').Config} */
-module.exports = {
+const config = {
   content: [
     "./app/**/*.{ts,tsx}",
     "./components/**/*.{ts,tsx}",
     "./pages/**/*.{ts,tsx}",
-    "../../packages/ui/src/**/*.{ts,tsx}"
+    "../../packages/ui/src/**/*.{ts,tsx}",
   ],
   theme: {
-    extend: {}
+    extend: {},
   },
-  plugins: []
+  plugins: [],
 };
+
+export default config;

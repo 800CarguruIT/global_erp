@@ -14,6 +14,7 @@ export default function CompanyRolesPage({ params }: Params) {
   const [roles, setRoles] = useState<RoleRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [forbidden, setForbidden] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -41,8 +42,15 @@ export default function CompanyRolesPage({ params }: Params) {
     if (!companyId) return;
     setLoading(true);
     setError(null);
+    setForbidden(false);
     try {
       const res = await fetch(`/api/auth/roles?scope=company&companyId=${companyId}`);
+      if (res.status === 401 || res.status === 403) {
+        setForbidden(true);
+        setRoles([]);
+        setError("Only company admins can manage roles and permissions.");
+        return;
+      }
       if (!res.ok) throw new Error("Failed to load roles");
       const data = await res.json();
       setRoles((data?.data ?? []) as any);
@@ -65,12 +73,14 @@ export default function CompanyRolesPage({ params }: Params) {
             <h1 className="text-xl sm:text-2xl font-semibold">Company Roles</h1>
             <p className="text-sm text-muted-foreground">Manage roles and permissions for this company.</p>
           </div>
-          <button
-            className="rounded-md border px-3 py-1 text-sm font-medium"
-            onClick={() => (window.location.href = `/company/${companyId}/settings/security/roles/new`)}
-          >
-            New Role
-          </button>
+          {!forbidden ? (
+            <button
+              className="rounded-md border px-3 py-1 text-sm font-medium"
+              onClick={() => (window.location.href = `/company/${companyId}/settings/security/roles/new`)}
+            >
+              New Role
+            </button>
+          ) : null}
         </div>
         {error && <div className="text-sm text-destructive">{error}</div>}
         {loading ? (
@@ -78,12 +88,24 @@ export default function CompanyRolesPage({ params }: Params) {
         ) : (
           <RoleListTable
             roles={roles as any}
-            onCreate={() => (window.location.href = `/company/${companyId}/settings/security/roles/new`)}
-            onEdit={(id) => (window.location.href = `/company/${companyId}/settings/security/roles/${id}`)}
-            onDelete={async (id) => {
-              await fetch(`/api/auth/roles/${id}?scope=company&companyId=${companyId}`, { method: "DELETE" });
-              load();
-            }}
+            onCreate={
+              forbidden
+                ? undefined
+                : () => (window.location.href = `/company/${companyId}/settings/security/roles/new`)
+            }
+            onEdit={
+              forbidden
+                ? undefined
+                : (id) => (window.location.href = `/company/${companyId}/settings/security/roles/${id}`)
+            }
+            onDelete={
+              forbidden
+                ? undefined
+                : async (id) => {
+                    await fetch(`/api/auth/roles/${id}?scope=company&companyId=${companyId}`, { method: "DELETE" });
+                    load();
+                  }
+            }
           />
         )}
       </div>

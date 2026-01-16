@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useScope } from "../../../context/scope/ScopeProvider";
 import {
   MODULES,
@@ -35,6 +36,7 @@ const MODULE_TRANSLATIONS: Partial<
 export function ModuleHub() {
   const { t } = useI18n();
   const scope = useScope();
+  const pathname = usePathname();
   const modules = Object.values(MODULES).filter((m) =>
     isModuleVisibleForScope(scope.scope, m.key, CURRENT_MODULE_PHASE)
   );
@@ -43,7 +45,10 @@ export function ModuleHub() {
   if (scope.scope === "company") {
     basePath = `/company/${scope.companyId}`;
   } else if (scope.scope === "branch") {
-    basePath = `/company/${scope.companyId}/branches/${scope.branchId}`;
+    basePath =
+      pathname?.startsWith("/branches/") && scope.branchId
+        ? `/branches/${scope.branchId}`
+        : `/company/${scope.companyId}/branches/${scope.branchId}`;
   } else if (scope.scope === "vendor") {
     basePath = scope.companyId ? `/company/${scope.companyId}/vendors/${scope.vendorId}` : `/vendor/${scope.vendorId}`;
   }

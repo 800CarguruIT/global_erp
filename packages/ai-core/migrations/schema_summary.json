@@ -1,0 +1,4903 @@
+[
+  {
+    "file": "packages\\ai-core\\migrations\\000_core_schema.sql",
+    "table": "users",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "email",
+        "definition": "text UNIQUE"
+      },
+      {
+        "name": "password_hash",
+        "definition": "text"
+      },
+      {
+        "name": "full_name",
+        "definition": "text"
+      },
+      {
+        "name": "is_active",
+        "definition": "boolean NOT NULL DEFAULT true"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\000_core_schema.sql",
+    "table": "companies",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "name",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "code",
+        "definition": "text UNIQUE"
+      },
+      {
+        "name": "is_active",
+        "definition": "boolean NOT NULL DEFAULT true"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\002_integration_events.sql",
+    "table": "integration_events",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "integration_type",
+        "definition": "text NOT NULL, -- 'dialer' | 'channel'"
+      },
+      {
+        "name": "integration_id",
+        "definition": "uuid NOT NULL"
+      },
+      {
+        "name": "provider_key",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "direction",
+        "definition": "text NOT NULL, -- 'outbound' | 'inbound'"
+      },
+      {
+        "name": "event_type",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "payload",
+        "definition": "jsonb NOT NULL"
+      },
+      {
+        "name": "status",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "error",
+        "definition": "text NULL"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\003_employees.sql",
+    "table": "employees",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "auto_code",
+        "definition": "text NOT NULL UNIQUE"
+      },
+      {
+        "name": "scope",
+        "definition": "text NOT NULL, -- 'global' | 'company' | 'branch' | 'vendor'"
+      },
+      {
+        "name": "company_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "branch_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "vendor_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "first_name",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "last_name",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "full_name",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "temp_address",
+        "definition": "text NULL"
+      },
+      {
+        "name": "perm_address",
+        "definition": "text NULL"
+      },
+      {
+        "name": "phone_personal",
+        "definition": "text NULL"
+      },
+      {
+        "name": "phone_company",
+        "definition": "text NULL"
+      },
+      {
+        "name": "email_personal",
+        "definition": "text NULL"
+      },
+      {
+        "name": "email_company",
+        "definition": "text NULL"
+      },
+      {
+        "name": "doc_id_number",
+        "definition": "text NULL"
+      },
+      {
+        "name": "doc_id_issue",
+        "definition": "date NULL"
+      },
+      {
+        "name": "doc_id_expiry",
+        "definition": "date NULL"
+      },
+      {
+        "name": "doc_passport_number",
+        "definition": "text NULL"
+      },
+      {
+        "name": "doc_passport_issue",
+        "definition": "date NULL"
+      },
+      {
+        "name": "doc_passport_expiry",
+        "definition": "date NULL"
+      },
+      {
+        "name": "doc_id_file_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "doc_passport_file_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "nationality",
+        "definition": "text NULL"
+      },
+      {
+        "name": "title",
+        "definition": "text NULL"
+      },
+      {
+        "name": "division",
+        "definition": "text NULL"
+      },
+      {
+        "name": "department",
+        "definition": "text NULL"
+      },
+      {
+        "name": "start_date",
+        "definition": "date NULL"
+      },
+      {
+        "name": "date_of_birth",
+        "definition": "date NULL"
+      },
+      {
+        "name": "basic_salary",
+        "definition": "numeric(14,2) NOT NULL DEFAULT 0"
+      },
+      {
+        "name": "pension_amount",
+        "definition": "numeric(14,2) NOT NULL DEFAULT 0"
+      },
+      {
+        "name": "gratuity_amount",
+        "definition": "numeric(14,2) NOT NULL DEFAULT 0"
+      },
+      {
+        "name": "allowance_total",
+        "definition": "numeric(14,2) NOT NULL DEFAULT 0"
+      },
+      {
+        "name": "gov_fee_total",
+        "definition": "numeric(14,2) NOT NULL DEFAULT 0"
+      },
+      {
+        "name": "salary_grand_total",
+        "definition": "numeric(14,2) NOT NULL DEFAULT 0"
+      },
+      {
+        "name": "visa_required",
+        "definition": "boolean NOT NULL DEFAULT false"
+      },
+      {
+        "name": "visa_fee",
+        "definition": "numeric(14,2) NOT NULL DEFAULT 0"
+      },
+      {
+        "name": "immigration_fee",
+        "definition": "numeric(14,2) NOT NULL DEFAULT 0"
+      },
+      {
+        "name": "work_permit_fee",
+        "definition": "numeric(14,2) NOT NULL DEFAULT 0"
+      },
+      {
+        "name": "admin_fee",
+        "definition": "numeric(14,2) NOT NULL DEFAULT 0"
+      },
+      {
+        "name": "insurance_fee",
+        "definition": "numeric(14,2) NOT NULL DEFAULT 0"
+      },
+      {
+        "name": "employee_type",
+        "definition": "text NOT NULL DEFAULT 'full_time'"
+      },
+      {
+        "name": "accommodation_type",
+        "definition": "text NOT NULL DEFAULT 'self'"
+      },
+      {
+        "name": "transport_type",
+        "definition": "text NOT NULL DEFAULT 'self'"
+      },
+      {
+        "name": "working_days_per_week",
+        "definition": "integer NULL"
+      },
+      {
+        "name": "working_hours_per_day",
+        "definition": "numeric(5,2) NULL"
+      },
+      {
+        "name": "official_day_off",
+        "definition": "text NULL"
+      },
+      {
+        "name": "emergency_name",
+        "definition": "text NULL"
+      },
+      {
+        "name": "emergency_phone",
+        "definition": "text NULL"
+      },
+      {
+        "name": "emergency_email",
+        "definition": "text NULL"
+      },
+      {
+        "name": "emergency_relation",
+        "definition": "text NULL"
+      },
+      {
+        "name": "emergency_address",
+        "definition": "text NULL"
+      },
+      {
+        "name": "image_file_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\003_employees.sql",
+    "table": "employee_allowances",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "employee_id",
+        "definition": "uuid NOT NULL REFERENCES employees(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "kind",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "label",
+        "definition": "text NULL"
+      },
+      {
+        "name": "amount",
+        "definition": "numeric(14,2) NOT NULL"
+      },
+      {
+        "name": "sort_order",
+        "definition": "integer NOT NULL DEFAULT 0"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\004_rbac.sql",
+    "table": "roles",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "name",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "scope",
+        "definition": "text NOT NULL, -- 'global' | 'company' | 'branch' | 'vendor'"
+      },
+      {
+        "name": "company_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "branch_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "vendor_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "description",
+        "definition": "text NULL"
+      },
+      {
+        "name": "is_system",
+        "definition": "boolean NOT NULL DEFAULT false"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": [
+      "key text NOT NULL UNIQUE"
+    ]
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\004_rbac.sql",
+    "table": "permissions",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "description",
+        "definition": "text NOT NULL"
+      }
+    ],
+    "constraints": [
+      "key text NOT NULL UNIQUE"
+    ]
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\004_rbac.sql",
+    "table": "role_permissions",
+    "columns": [
+      {
+        "name": "role_id",
+        "definition": "uuid NOT NULL REFERENCES roles(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "permission_id",
+        "definition": "uuid NOT NULL REFERENCES permissions(id) ON DELETE CASCADE"
+      }
+    ],
+    "constraints": [
+      "PRIMARY KEY (role_id, permission_id)"
+    ]
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\004_rbac.sql",
+    "table": "user_roles",
+    "columns": [
+      {
+        "name": "user_id",
+        "definition": "uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "role_id",
+        "definition": "uuid NOT NULL REFERENCES roles(id) ON DELETE CASCADE"
+      }
+    ],
+    "constraints": [
+      "PRIMARY KEY (user_id, role_id)"
+    ]
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\005_accounting.sql",
+    "table": "accounting_standard_accounts",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "code",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "name",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "type",
+        "definition": "text NOT NULL, -- asset | liability | equity | income | expense"
+      },
+      {
+        "name": "sub_type",
+        "definition": "text NULL"
+      },
+      {
+        "name": "normal_balance",
+        "definition": "text NOT NULL, -- debit | credit"
+      },
+      {
+        "name": "is_leaf",
+        "definition": "boolean NOT NULL DEFAULT true"
+      },
+      {
+        "name": "parent_id",
+        "definition": "uuid NULL REFERENCES accounting_standard_accounts(id)"
+      },
+      {
+        "name": "notes",
+        "definition": "text NULL"
+      },
+      {
+        "name": "is_active",
+        "definition": "boolean NOT NULL DEFAULT true"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": [
+      "UNIQUE (code)"
+    ]
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\005_accounting.sql",
+    "table": "accounting_entities",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "scope",
+        "definition": "text NOT NULL, -- global | company"
+      },
+      {
+        "name": "company_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "name",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "base_currency",
+        "definition": "text NOT NULL DEFAULT 'USD'"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\005_accounting.sql",
+    "table": "accounting_accounts",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "entity_id",
+        "definition": "uuid NOT NULL REFERENCES accounting_entities(id)"
+      },
+      {
+        "name": "standard_id",
+        "definition": "uuid NULL REFERENCES accounting_standard_accounts(id)"
+      },
+      {
+        "name": "code",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "name",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "type",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "sub_type",
+        "definition": "text NULL"
+      },
+      {
+        "name": "normal_balance",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "parent_id",
+        "definition": "uuid NULL REFERENCES accounting_accounts(id)"
+      },
+      {
+        "name": "is_leaf",
+        "definition": "boolean NOT NULL DEFAULT true"
+      },
+      {
+        "name": "is_active",
+        "definition": "boolean NOT NULL DEFAULT true"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": [
+      "UNIQUE (entity_id, code)"
+    ]
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\005_accounting.sql",
+    "table": "accounting_journals",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "entity_id",
+        "definition": "uuid NOT NULL REFERENCES accounting_entities(id)"
+      },
+      {
+        "name": "journal_no",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "journal_type",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "date",
+        "definition": "date NOT NULL"
+      },
+      {
+        "name": "description",
+        "definition": "text NULL"
+      },
+      {
+        "name": "reference",
+        "definition": "text NULL"
+      },
+      {
+        "name": "currency",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "created_by_user_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "is_posted",
+        "definition": "boolean NOT NULL DEFAULT true"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": [
+      "UNIQUE (entity_id, journal_no)"
+    ]
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\005_accounting.sql",
+    "table": "accounting_journal_lines",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "journal_id",
+        "definition": "uuid NOT NULL REFERENCES accounting_journals(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "entity_id",
+        "definition": "uuid NOT NULL"
+      },
+      {
+        "name": "line_no",
+        "definition": "integer NOT NULL"
+      },
+      {
+        "name": "account_id",
+        "definition": "uuid NOT NULL REFERENCES accounting_accounts(id)"
+      },
+      {
+        "name": "description",
+        "definition": "text NULL"
+      },
+      {
+        "name": "debit",
+        "definition": "numeric(18,4) NOT NULL DEFAULT 0"
+      },
+      {
+        "name": "credit",
+        "definition": "numeric(18,4) NOT NULL DEFAULT 0"
+      },
+      {
+        "name": "company_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "branch_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "vendor_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "employee_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "project_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "cost_center",
+        "definition": "text NULL"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\006_user_monitoring.sql",
+    "table": "user_sessions",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "user_id",
+        "definition": "uuid NOT NULL REFERENCES users(id)"
+      },
+      {
+        "name": "scope",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "company_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "branch_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "vendor_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "started_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "last_seen_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "ip_address",
+        "definition": "text NULL"
+      },
+      {
+        "name": "user_agent",
+        "definition": "text NULL"
+      },
+      {
+        "name": "device_fingerprint",
+        "definition": "text NULL"
+      },
+      {
+        "name": "geo_country",
+        "definition": "text NULL"
+      },
+      {
+        "name": "geo_city",
+        "definition": "text NULL"
+      },
+      {
+        "name": "is_active",
+        "definition": "boolean NOT NULL DEFAULT true"
+      },
+      {
+        "name": "last_action",
+        "definition": "text NULL"
+      },
+      {
+        "name": "last_action_at",
+        "definition": "timestamptz NULL"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\006_user_monitoring.sql",
+    "table": "user_activity_logs",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "user_id",
+        "definition": "uuid NOT NULL REFERENCES users(id)"
+      },
+      {
+        "name": "session_id",
+        "definition": "uuid NULL REFERENCES user_sessions(id)"
+      },
+      {
+        "name": "scope",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "company_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "branch_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "vendor_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "timestamp",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "ip_address",
+        "definition": "text NULL"
+      },
+      {
+        "name": "action_key",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "entity_type",
+        "definition": "text NULL"
+      },
+      {
+        "name": "entity_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "summary",
+        "definition": "text NULL"
+      },
+      {
+        "name": "metadata",
+        "definition": "jsonb NOT NULL DEFAULT '{}'::jsonb"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\006_user_monitoring.sql",
+    "table": "user_change_history",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "user_id",
+        "definition": "uuid NULL REFERENCES users(id)"
+      },
+      {
+        "name": "session_id",
+        "definition": "uuid NULL REFERENCES user_sessions(id)"
+      },
+      {
+        "name": "scope",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "company_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "branch_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "vendor_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "entity_type",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "entity_id",
+        "definition": "uuid NOT NULL"
+      },
+      {
+        "name": "change_timestamp",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "change_type",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "change_summary",
+        "definition": "text NULL"
+      },
+      {
+        "name": "before_data",
+        "definition": "jsonb NULL"
+      },
+      {
+        "name": "after_data",
+        "definition": "jsonb NULL"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\006_user_monitoring.sql",
+    "table": "user_risk_profiles",
+    "columns": [
+      {
+        "name": "user_id",
+        "definition": "uuid PRIMARY KEY REFERENCES users(id)"
+      },
+      {
+        "name": "overall_risk_score",
+        "definition": "numeric(5,2) NOT NULL DEFAULT 0"
+      },
+      {
+        "name": "risk_level",
+        "definition": "text NOT NULL DEFAULT 'low'"
+      },
+      {
+        "name": "last_evaluated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "has_global_admin_role",
+        "definition": "boolean NOT NULL DEFAULT false"
+      },
+      {
+        "name": "high_privilege_role_count",
+        "definition": "integer NOT NULL DEFAULT 0"
+      },
+      {
+        "name": "total_active_sessions",
+        "definition": "integer NOT NULL DEFAULT 0"
+      },
+      {
+        "name": "last_login_at",
+        "definition": "timestamptz NULL"
+      },
+      {
+        "name": "last_login_ip",
+        "definition": "text NULL"
+      },
+      {
+        "name": "last_login_country",
+        "definition": "text NULL"
+      },
+      {
+        "name": "last_failed_login_at",
+        "definition": "timestamptz NULL"
+      },
+      {
+        "name": "unusual_location",
+        "definition": "boolean NOT NULL DEFAULT false"
+      },
+      {
+        "name": "notes",
+        "definition": "text NULL"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\007_customers_cars_and_company_master.sql",
+    "table": "company_contacts",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "company_id",
+        "definition": "uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "title",
+        "definition": "text NULL"
+      },
+      {
+        "name": "name",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "phone",
+        "definition": "text NULL"
+      },
+      {
+        "name": "email",
+        "definition": "text NULL"
+      },
+      {
+        "name": "address",
+        "definition": "text NULL"
+      },
+      {
+        "name": "sort_order",
+        "definition": "integer NOT NULL DEFAULT 0"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\007_customers_cars_and_company_master.sql",
+    "table": "customers",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "company_id",
+        "definition": "uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "customer_type",
+        "definition": "text NOT NULL DEFAULT 'individual'"
+      },
+      {
+        "name": "code",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "name",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "first_name",
+        "definition": "text NULL"
+      },
+      {
+        "name": "last_name",
+        "definition": "text NULL"
+      },
+      {
+        "name": "date_of_birth",
+        "definition": "date NULL"
+      },
+      {
+        "name": "national_id",
+        "definition": "text NULL"
+      },
+      {
+        "name": "passport_no",
+        "definition": "text NULL"
+      },
+      {
+        "name": "legal_name",
+        "definition": "text NULL"
+      },
+      {
+        "name": "trade_license_no",
+        "definition": "text NULL"
+      },
+      {
+        "name": "tax_number",
+        "definition": "text NULL"
+      },
+      {
+        "name": "email",
+        "definition": "text NULL"
+      },
+      {
+        "name": "phone",
+        "definition": "text NULL"
+      },
+      {
+        "name": "phone_alt",
+        "definition": "text NULL"
+      },
+      {
+        "name": "whatsapp_phone",
+        "definition": "text NULL"
+      },
+      {
+        "name": "address",
+        "definition": "text NULL"
+      },
+      {
+        "name": "notes",
+        "definition": "text NULL"
+      },
+      {
+        "name": "is_active",
+        "definition": "boolean NOT NULL DEFAULT true"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\007_customers_cars_and_company_master.sql",
+    "table": "cars",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "company_id",
+        "definition": "uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "code",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "plate_number",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "vin",
+        "definition": "text NULL"
+      },
+      {
+        "name": "make",
+        "definition": "text NULL"
+      },
+      {
+        "name": "model",
+        "definition": "text NULL"
+      },
+      {
+        "name": "model_year",
+        "definition": "integer NULL"
+      },
+      {
+        "name": "color",
+        "definition": "text NULL"
+      },
+      {
+        "name": "body_type",
+        "definition": "text NULL"
+      },
+      {
+        "name": "mileage",
+        "definition": "numeric(12,2) NULL"
+      },
+      {
+        "name": "tyre_size_front",
+        "definition": "text NULL"
+      },
+      {
+        "name": "tyre_size_back",
+        "definition": "text NULL"
+      },
+      {
+        "name": "registration_expiry",
+        "definition": "date NULL"
+      },
+      {
+        "name": "registration_card_file_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "is_unregistered",
+        "definition": "boolean NOT NULL DEFAULT false"
+      },
+      {
+        "name": "is_active",
+        "definition": "boolean NOT NULL DEFAULT true"
+      },
+      {
+        "name": "notes",
+        "definition": "text NULL"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\007_customers_cars_and_company_master.sql",
+    "table": "customer_car_links",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "company_id",
+        "definition": "uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "customer_id",
+        "definition": "uuid NOT NULL REFERENCES customers(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "car_id",
+        "definition": "uuid NOT NULL REFERENCES cars(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "relation_type",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "priority",
+        "definition": "integer NOT NULL DEFAULT 1"
+      },
+      {
+        "name": "is_primary",
+        "definition": "boolean NOT NULL DEFAULT false"
+      },
+      {
+        "name": "notes",
+        "definition": "text NULL"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\008_call_center.sql",
+    "table": "call_sessions",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "scope",
+        "definition": "text NOT NULL, -- 'global' | 'company'"
+      },
+      {
+        "name": "company_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "branch_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "created_by_user_id",
+        "definition": "uuid NOT NULL"
+      },
+      {
+        "name": "direction",
+        "definition": "text NOT NULL, -- 'outbound' | 'inbound'"
+      },
+      {
+        "name": "from_number",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "to_number",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "to_entity_type",
+        "definition": "text NULL, -- 'customer' | 'employee' | 'vendor' | 'other'"
+      },
+      {
+        "name": "to_entity_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "provider_key",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "provider_call_id",
+        "definition": "text NULL"
+      },
+      {
+        "name": "status",
+        "definition": "text NOT NULL, -- 'initiated' | 'ringing' | 'in_progress' | 'completed' | 'failed' | 'cancelled'"
+      },
+      {
+        "name": "started_at",
+        "definition": "timestamptz NULL"
+      },
+      {
+        "name": "ended_at",
+        "definition": "timestamptz NULL"
+      },
+      {
+        "name": "duration_seconds",
+        "definition": "integer NULL"
+      },
+      {
+        "name": "metadata",
+        "definition": "jsonb NOT NULL DEFAULT '{}'::jsonb"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\008_call_center.sql",
+    "table": "call_recordings",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "call_session_id",
+        "definition": "uuid NOT NULL REFERENCES call_sessions(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "provider_recording_id",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "url",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "duration_seconds",
+        "definition": "integer NULL"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\009_vendors.sql",
+    "table": "vendors",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "company_id",
+        "definition": "uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "code",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "name",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "legal_name",
+        "definition": "text NULL"
+      },
+      {
+        "name": "phone",
+        "definition": "text NULL"
+      },
+      {
+        "name": "email",
+        "definition": "text NULL"
+      },
+      {
+        "name": "address_line1",
+        "definition": "text NULL"
+      },
+      {
+        "name": "address_line2",
+        "definition": "text NULL"
+      },
+      {
+        "name": "city",
+        "definition": "text NULL"
+      },
+      {
+        "name": "state_region",
+        "definition": "text NULL"
+      },
+      {
+        "name": "postal_code",
+        "definition": "text NULL"
+      },
+      {
+        "name": "country",
+        "definition": "text NULL"
+      },
+      {
+        "name": "trade_license_number",
+        "definition": "text NULL"
+      },
+      {
+        "name": "trade_license_issue",
+        "definition": "date NULL"
+      },
+      {
+        "name": "trade_license_expiry",
+        "definition": "date NULL"
+      },
+      {
+        "name": "trade_license_file_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "tax_number",
+        "definition": "text NULL"
+      },
+      {
+        "name": "tax_certificate_file_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "is_active",
+        "definition": "boolean NOT NULL DEFAULT TRUE"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\009_vendors.sql",
+    "table": "vendor_contacts",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "vendor_id",
+        "definition": "uuid NOT NULL REFERENCES vendors(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "name",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "phone",
+        "definition": "text NULL"
+      },
+      {
+        "name": "email",
+        "definition": "text NULL"
+      },
+      {
+        "name": "address",
+        "definition": "text NULL"
+      },
+      {
+        "name": "sort_order",
+        "definition": "integer NOT NULL DEFAULT 0"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\009_vendors.sql",
+    "table": "vendor_bank_accounts",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "vendor_id",
+        "definition": "uuid NOT NULL REFERENCES vendors(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "bank_name",
+        "definition": "text NULL"
+      },
+      {
+        "name": "branch_name",
+        "definition": "text NULL"
+      },
+      {
+        "name": "account_name",
+        "definition": "text NULL"
+      },
+      {
+        "name": "account_number",
+        "definition": "text NULL"
+      },
+      {
+        "name": "iban",
+        "definition": "text NULL"
+      },
+      {
+        "name": "swift",
+        "definition": "text NULL"
+      },
+      {
+        "name": "currency",
+        "definition": "text NULL"
+      },
+      {
+        "name": "is_default",
+        "definition": "boolean NOT NULL DEFAULT FALSE"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\011_leads.sql",
+    "table": "leads",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "company_id",
+        "definition": "uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "customer_id",
+        "definition": "uuid REFERENCES customers(id) ON DELETE SET NULL"
+      },
+      {
+        "name": "car_id",
+        "definition": "uuid REFERENCES cars(id) ON DELETE SET NULL"
+      },
+      {
+        "name": "agent_employee_id",
+        "definition": "uuid REFERENCES employees(id) ON DELETE SET NULL"
+      },
+      {
+        "name": "lead_type",
+        "definition": "text NOT NULL CHECK (lead_type IN ('rsa', 'recovery', 'workshop'))"
+      },
+      {
+        "name": "lead_status",
+        "definition": "text NOT NULL CHECK (lead_status IN ('open', 'processing', 'closed_won', 'lost'))"
+      },
+      {
+        "name": "lead_stage",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "source",
+        "definition": "text"
+      },
+      {
+        "name": "sla_minutes",
+        "definition": "integer"
+      },
+      {
+        "name": "first_response_at",
+        "definition": "timestamptz"
+      },
+      {
+        "name": "last_activity_at",
+        "definition": "timestamptz"
+      },
+      {
+        "name": "closed_at",
+        "definition": "timestamptz"
+      },
+      {
+        "name": "health_score",
+        "definition": "integer"
+      },
+      {
+        "name": "sentiment_score",
+        "definition": "integer"
+      },
+      {
+        "name": "customer_feedback",
+        "definition": "text"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\011_leads.sql",
+    "table": "lead_events",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "lead_id",
+        "definition": "uuid NOT NULL REFERENCES leads(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "company_id",
+        "definition": "uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "actor_user_id",
+        "definition": "uuid REFERENCES users(id) ON DELETE SET NULL"
+      },
+      {
+        "name": "actor_employee_id",
+        "definition": "uuid REFERENCES employees(id) ON DELETE SET NULL"
+      },
+      {
+        "name": "event_type",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "event_payload",
+        "definition": "jsonb"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\013_inspections.sql",
+    "table": "inspections",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "company_id",
+        "definition": "uuid NOT NULL"
+      },
+      {
+        "name": "lead_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "car_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "customer_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "inspector_employee_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "advisor_employee_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "status",
+        "definition": "text NOT NULL DEFAULT 'draft', -- draft | in_progress | completed | approved | cancelled"
+      },
+      {
+        "name": "health_engine",
+        "definition": "integer NULL"
+      },
+      {
+        "name": "health_transmission",
+        "definition": "integer NULL"
+      },
+      {
+        "name": "health_brakes",
+        "definition": "integer NULL"
+      },
+      {
+        "name": "health_suspension",
+        "definition": "integer NULL"
+      },
+      {
+        "name": "health_electrical",
+        "definition": "integer NULL"
+      },
+      {
+        "name": "overall_health",
+        "definition": "integer NULL"
+      },
+      {
+        "name": "customer_remark",
+        "definition": "text NULL"
+      },
+      {
+        "name": "agent_remark",
+        "definition": "text NULL"
+      },
+      {
+        "name": "inspector_remark",
+        "definition": "text NULL"
+      },
+      {
+        "name": "inspector_remark_layman",
+        "definition": "text NULL"
+      },
+      {
+        "name": "ai_summary_markdown",
+        "definition": "text NULL"
+      },
+      {
+        "name": "ai_summary_plain",
+        "definition": "text NULL"
+      },
+      {
+        "name": "draft_payload",
+        "definition": "jsonb NULL"
+      },
+      {
+        "name": "media_summary",
+        "definition": "jsonb NULL"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\013_inspections.sql",
+    "table": "inspection_items",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "inspection_id",
+        "definition": "uuid NOT NULL REFERENCES inspections(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "line_no",
+        "definition": "integer NOT NULL"
+      },
+      {
+        "name": "category",
+        "definition": "text NULL,      -- e.g. \"brakes\", \"suspension\""
+      },
+      {
+        "name": "part_name",
+        "definition": "text NOT NULL, -- e.g. \"front brake pads\""
+      },
+      {
+        "name": "severity",
+        "definition": "text NULL,      -- e.g. minor | moderate | critical"
+      },
+      {
+        "name": "required_action",
+        "definition": "text NULL, -- e.g. replace / adjust / monitor"
+      },
+      {
+        "name": "tech_reason",
+        "definition": "text NULL,     -- why inspector added it (technical)"
+      },
+      {
+        "name": "layman_reason",
+        "definition": "text NULL,   -- AI translated explanation"
+      },
+      {
+        "name": "photo_refs",
+        "definition": "jsonb NULL,     -- array of file ids/urls"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\013_inspections.sql",
+    "table": "inspection_media",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "inspection_id",
+        "definition": "uuid NOT NULL REFERENCES inspections(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "media_type",
+        "definition": "text NOT NULL,  -- photo | video | audio"
+      },
+      {
+        "name": "angle",
+        "definition": "text NULL,           -- front | rear | left | right | 360 | damage"
+      },
+      {
+        "name": "label",
+        "definition": "text NULL,           -- free-text"
+      },
+      {
+        "name": "file_ref",
+        "definition": "text NOT NULL,    -- file id / url (we'll map to storage later)"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\013_inspections.sql",
+    "table": "inspection_versions",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "inspection_id",
+        "definition": "uuid NOT NULL REFERENCES inspections(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "version_no",
+        "definition": "integer NOT NULL"
+      },
+      {
+        "name": "pdf_file_ref",
+        "definition": "text NOT NULL,        -- file id / url of PDF"
+      },
+      {
+        "name": "created_by_user_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\014_estimates.sql",
+    "table": "estimates",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "company_id",
+        "definition": "uuid NOT NULL"
+      },
+      {
+        "name": "inspection_id",
+        "definition": "uuid NOT NULL"
+      },
+      {
+        "name": "lead_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "car_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "customer_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "status",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "currency",
+        "definition": "text NULL"
+      },
+      {
+        "name": "vat_rate",
+        "definition": "numeric(5,2) NOT NULL DEFAULT 5.00"
+      },
+      {
+        "name": "total_cost",
+        "definition": "numeric(14,2) NOT NULL DEFAULT 0"
+      },
+      {
+        "name": "total_sale",
+        "definition": "numeric(14,2) NOT NULL DEFAULT 0"
+      },
+      {
+        "name": "total_discount",
+        "definition": "numeric(14,2) NOT NULL DEFAULT 0"
+      },
+      {
+        "name": "final_price",
+        "definition": "numeric(14,2) NOT NULL DEFAULT 0"
+      },
+      {
+        "name": "vat_amount",
+        "definition": "numeric(14,2) NOT NULL DEFAULT 0"
+      },
+      {
+        "name": "grand_total",
+        "definition": "numeric(14,2) NOT NULL DEFAULT 0"
+      },
+      {
+        "name": "meta",
+        "definition": "jsonb NULL"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\014_estimates.sql",
+    "table": "estimate_items",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "estimate_id",
+        "definition": "uuid NOT NULL REFERENCES estimates(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "inspection_item_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "line_no",
+        "definition": "integer NOT NULL"
+      },
+      {
+        "name": "part_name",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "description",
+        "definition": "text NULL"
+      },
+      {
+        "name": "type",
+        "definition": "text NOT NULL DEFAULT 'genuine'"
+      },
+      {
+        "name": "quantity",
+        "definition": "numeric(10,2) NOT NULL DEFAULT 1"
+      },
+      {
+        "name": "cost",
+        "definition": "numeric(14,2) NOT NULL DEFAULT 0"
+      },
+      {
+        "name": "sale",
+        "definition": "numeric(14,2) NOT NULL DEFAULT 0"
+      },
+      {
+        "name": "gp_percent",
+        "definition": "numeric(6,2) NULL"
+      },
+      {
+        "name": "status",
+        "definition": "text NOT NULL DEFAULT 'pending'"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\015_parts_inventory.sql",
+    "table": "parts_catalog",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "company_id",
+        "definition": "uuid NOT NULL"
+      },
+      {
+        "name": "part_number",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "brand",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "sku",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "description",
+        "definition": "text NULL"
+      },
+      {
+        "name": "qr_code",
+        "definition": "text NULL"
+      },
+      {
+        "name": "is_active",
+        "definition": "boolean NOT NULL DEFAULT true"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": [
+      "UNIQUE (company_id, part_number, brand)"
+    ]
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\015_parts_inventory.sql",
+    "table": "inventory_stock",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "company_id",
+        "definition": "uuid NOT NULL"
+      },
+      {
+        "name": "part_id",
+        "definition": "uuid NOT NULL REFERENCES parts_catalog(id) ON DELETE RESTRICT"
+      },
+      {
+        "name": "location_code",
+        "definition": "text NOT NULL DEFAULT 'MAIN'"
+      },
+      {
+        "name": "on_hand",
+        "definition": "numeric(14,2) NOT NULL DEFAULT 0"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": [
+      "UNIQUE (company_id, part_id, location_code)"
+    ]
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\015_parts_inventory.sql",
+    "table": "inventory_movements",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "company_id",
+        "definition": "uuid NOT NULL"
+      },
+      {
+        "name": "part_id",
+        "definition": "uuid NOT NULL REFERENCES parts_catalog(id)"
+      },
+      {
+        "name": "location_code",
+        "definition": "text NOT NULL DEFAULT 'MAIN'"
+      },
+      {
+        "name": "direction",
+        "definition": "text NOT NULL, -- 'in' | 'out'"
+      },
+      {
+        "name": "quantity",
+        "definition": "numeric(14,2) NOT NULL"
+      },
+      {
+        "name": "source_type",
+        "definition": "text NOT NULL, -- po | adjustment | issue | receipt etc."
+      },
+      {
+        "name": "source_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "grn_number",
+        "definition": "text NULL"
+      },
+      {
+        "name": "note",
+        "definition": "text NULL"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\016_work_orders.sql",
+    "table": "work_orders",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "company_id",
+        "definition": "uuid NOT NULL"
+      },
+      {
+        "name": "estimate_id",
+        "definition": "uuid NOT NULL"
+      },
+      {
+        "name": "inspection_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "lead_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "car_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "customer_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "branch_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "status",
+        "definition": "text NOT NULL DEFAULT 'draft'"
+      },
+      {
+        "name": "queue_reason",
+        "definition": "text NULL"
+      },
+      {
+        "name": "work_started_at",
+        "definition": "timestamptz NULL"
+      },
+      {
+        "name": "work_completed_at",
+        "definition": "timestamptz NULL"
+      },
+      {
+        "name": "meta",
+        "definition": "jsonb NULL"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\016_work_orders.sql",
+    "table": "work_order_items",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "work_order_id",
+        "definition": "uuid NOT NULL REFERENCES work_orders(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "estimate_item_id",
+        "definition": "uuid NOT NULL REFERENCES estimate_items(id) ON DELETE RESTRICT"
+      },
+      {
+        "name": "line_no",
+        "definition": "integer NOT NULL"
+      },
+      {
+        "name": "part_name",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "description",
+        "definition": "text NULL"
+      },
+      {
+        "name": "is_part",
+        "definition": "boolean NOT NULL DEFAULT true"
+      },
+      {
+        "name": "is_labor",
+        "definition": "boolean NOT NULL DEFAULT false"
+      },
+      {
+        "name": "required_qty",
+        "definition": "numeric(10,2) NOT NULL DEFAULT 1"
+      },
+      {
+        "name": "issued_qty",
+        "definition": "numeric(10,2) NOT NULL DEFAULT 0"
+      },
+      {
+        "name": "work_status",
+        "definition": "text NOT NULL DEFAULT 'pending'"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\016_work_orders.sql",
+    "table": "work_order_media",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "work_order_id",
+        "definition": "uuid NOT NULL REFERENCES work_orders(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "work_order_item_id",
+        "definition": "uuid NULL REFERENCES work_order_items(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "kind",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "file_ref",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "note",
+        "definition": "text NULL"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\017_quality_checks.sql",
+    "table": "quality_checks",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "company_id",
+        "definition": "uuid NOT NULL"
+      },
+      {
+        "name": "work_order_id",
+        "definition": "uuid NOT NULL REFERENCES work_orders(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "estimate_id",
+        "definition": "uuid NULL REFERENCES estimates(id)"
+      },
+      {
+        "name": "inspection_id",
+        "definition": "uuid NULL REFERENCES inspections(id)"
+      },
+      {
+        "name": "lead_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "car_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "customer_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "status",
+        "definition": "text NOT NULL DEFAULT 'queue'"
+      },
+      {
+        "name": "test_drive_done",
+        "definition": "boolean NOT NULL DEFAULT false"
+      },
+      {
+        "name": "wash_done",
+        "definition": "boolean NOT NULL DEFAULT false"
+      },
+      {
+        "name": "qc_remarks",
+        "definition": "text NULL"
+      },
+      {
+        "name": "qc_video_ref",
+        "definition": "text NULL"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\017_quality_checks.sql",
+    "table": "quality_check_items",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "quality_check_id",
+        "definition": "uuid NOT NULL REFERENCES quality_checks(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "work_order_item_id",
+        "definition": "uuid NOT NULL REFERENCES work_order_items(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "line_no",
+        "definition": "integer NOT NULL"
+      },
+      {
+        "name": "qc_status",
+        "definition": "text NOT NULL DEFAULT 'pending'"
+      },
+      {
+        "name": "qc_note",
+        "definition": "text NULL"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\018_invoices.sql",
+    "table": "invoices",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "company_id",
+        "definition": "uuid NOT NULL"
+      },
+      {
+        "name": "work_order_id",
+        "definition": "uuid NOT NULL REFERENCES work_orders(id)"
+      },
+      {
+        "name": "estimate_id",
+        "definition": "uuid NULL REFERENCES estimates(id)"
+      },
+      {
+        "name": "quality_check_id",
+        "definition": "uuid NULL REFERENCES quality_checks(id)"
+      },
+      {
+        "name": "inspection_id",
+        "definition": "uuid NULL REFERENCES inspections(id)"
+      },
+      {
+        "name": "lead_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "car_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "customer_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "invoice_number",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "invoice_date",
+        "definition": "date NOT NULL DEFAULT current_date"
+      },
+      {
+        "name": "status",
+        "definition": "text NOT NULL DEFAULT 'draft'"
+      },
+      {
+        "name": "payment_method",
+        "definition": "text NULL"
+      },
+      {
+        "name": "due_date",
+        "definition": "date NULL"
+      },
+      {
+        "name": "paid_at",
+        "definition": "timestamptz NULL"
+      },
+      {
+        "name": "total_sale",
+        "definition": "numeric(14,2) NOT NULL DEFAULT 0"
+      },
+      {
+        "name": "total_discount",
+        "definition": "numeric(14,2) NOT NULL DEFAULT 0"
+      },
+      {
+        "name": "final_amount",
+        "definition": "numeric(14,2) NOT NULL DEFAULT 0"
+      },
+      {
+        "name": "vat_rate",
+        "definition": "numeric(5,2) NOT NULL DEFAULT 5.00"
+      },
+      {
+        "name": "vat_amount",
+        "definition": "numeric(14,2) NOT NULL DEFAULT 0"
+      },
+      {
+        "name": "grand_total",
+        "definition": "numeric(14,2) NOT NULL DEFAULT 0"
+      },
+      {
+        "name": "terms",
+        "definition": "text NULL"
+      },
+      {
+        "name": "notes",
+        "definition": "text NULL"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\018_invoices.sql",
+    "table": "invoice_items",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "invoice_id",
+        "definition": "uuid NOT NULL REFERENCES invoices(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "work_order_item_id",
+        "definition": "uuid NULL REFERENCES work_order_items(id) ON DELETE SET NULL"
+      },
+      {
+        "name": "estimate_item_id",
+        "definition": "uuid NULL REFERENCES estimate_items(id) ON DELETE SET NULL"
+      },
+      {
+        "name": "line_no",
+        "definition": "integer NOT NULL"
+      },
+      {
+        "name": "name",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "description",
+        "definition": "text NULL"
+      },
+      {
+        "name": "quantity",
+        "definition": "numeric(10,2) NOT NULL DEFAULT 1"
+      },
+      {
+        "name": "rate",
+        "definition": "numeric(14,2) NOT NULL DEFAULT 0"
+      },
+      {
+        "name": "line_sale",
+        "definition": "numeric(14,2) NOT NULL DEFAULT 0"
+      },
+      {
+        "name": "line_discount",
+        "definition": "numeric(14,2) NOT NULL DEFAULT 0"
+      },
+      {
+        "name": "line_final",
+        "definition": "numeric(14,2) NOT NULL DEFAULT 0"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\019_gatepasses.sql",
+    "table": "gatepasses",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "company_id",
+        "definition": "uuid NOT NULL"
+      },
+      {
+        "name": "lead_id",
+        "definition": "uuid NOT NULL"
+      },
+      {
+        "name": "work_order_id",
+        "definition": "uuid NOT NULL REFERENCES work_orders(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "invoice_id",
+        "definition": "uuid NOT NULL REFERENCES invoices(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "quality_check_id",
+        "definition": "uuid NULL REFERENCES quality_checks(id)"
+      },
+      {
+        "name": "car_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "customer_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "handover_type",
+        "definition": "text NOT NULL DEFAULT 'branch', -- branch | dropoff_recovery"
+      },
+      {
+        "name": "status",
+        "definition": "text NOT NULL DEFAULT 'pending', -- pending | ready | released | cancelled"
+      },
+      {
+        "name": "invoice_status_snapshot",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "amount_due",
+        "definition": "numeric(14,2) NOT NULL DEFAULT 0"
+      },
+      {
+        "name": "payment_ok",
+        "definition": "boolean NOT NULL DEFAULT false"
+      },
+      {
+        "name": "supervisor_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "supervisor_approved_at",
+        "definition": "timestamptz NULL"
+      },
+      {
+        "name": "customer_signed",
+        "definition": "boolean NOT NULL DEFAULT false"
+      },
+      {
+        "name": "customer_name",
+        "definition": "text NULL"
+      },
+      {
+        "name": "customer_id_number",
+        "definition": "text NULL"
+      },
+      {
+        "name": "handover_form_ref",
+        "definition": "text NULL"
+      },
+      {
+        "name": "customer_signature_ref",
+        "definition": "text NULL"
+      },
+      {
+        "name": "final_video_ref",
+        "definition": "text NULL"
+      },
+      {
+        "name": "final_note",
+        "definition": "text NULL"
+      },
+      {
+        "name": "recovery_lead_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\020_quotes.sql",
+    "table": "quotes",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "company_id",
+        "definition": "uuid NOT NULL"
+      },
+      {
+        "name": "quote_type",
+        "definition": "text NOT NULL, -- vendor_part | branch_labor"
+      },
+      {
+        "name": "status",
+        "definition": "text NOT NULL DEFAULT 'draft', -- draft | submitted | approved | rejected | cancelled"
+      },
+      {
+        "name": "estimate_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "work_order_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "vendor_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "branch_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "currency",
+        "definition": "text NULL"
+      },
+      {
+        "name": "total_amount",
+        "definition": "numeric(14,2) NOT NULL DEFAULT 0"
+      },
+      {
+        "name": "valid_until",
+        "definition": "date NULL"
+      },
+      {
+        "name": "created_by",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "approved_by",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "approved_at",
+        "definition": "timestamptz NULL"
+      },
+      {
+        "name": "meta",
+        "definition": "jsonb NULL"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\020_quotes.sql",
+    "table": "quote_items",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "quote_id",
+        "definition": "uuid NOT NULL REFERENCES quotes(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "line_no",
+        "definition": "integer NOT NULL"
+      },
+      {
+        "name": "estimate_item_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "work_order_item_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "name",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "description",
+        "definition": "text NULL"
+      },
+      {
+        "name": "quantity",
+        "definition": "numeric(10,2) NOT NULL DEFAULT 1"
+      },
+      {
+        "name": "unit_price",
+        "definition": "numeric(14,2) NOT NULL DEFAULT 0"
+      },
+      {
+        "name": "total_price",
+        "definition": "numeric(14,2) NOT NULL DEFAULT 0"
+      },
+      {
+        "name": "part_number",
+        "definition": "text NULL"
+      },
+      {
+        "name": "brand",
+        "definition": "text NULL"
+      },
+      {
+        "name": "part_type",
+        "definition": "text NULL"
+      },
+      {
+        "name": "eta_days",
+        "definition": "integer NULL"
+      },
+      {
+        "name": "labor_hours",
+        "definition": "numeric(10,2) NULL"
+      },
+      {
+        "name": "labor_rate",
+        "definition": "numeric(14,2) NULL"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\021_procurement.sql",
+    "table": "purchase_orders",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "company_id",
+        "definition": "uuid NOT NULL"
+      },
+      {
+        "name": "vendor_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "vendor_name",
+        "definition": "text NULL"
+      },
+      {
+        "name": "vendor_contact",
+        "definition": "text NULL"
+      },
+      {
+        "name": "po_number",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "po_type",
+        "definition": "text NOT NULL DEFAULT 'po', -- po | lpo"
+      },
+      {
+        "name": "source_type",
+        "definition": "text NOT NULL DEFAULT 'manual', -- quote | manual"
+      },
+      {
+        "name": "quote_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "status",
+        "definition": "text NOT NULL DEFAULT 'draft', -- draft | issued | partially_received | received | cancelled"
+      },
+      {
+        "name": "currency",
+        "definition": "text NULL"
+      },
+      {
+        "name": "expected_date",
+        "definition": "date NULL"
+      },
+      {
+        "name": "notes",
+        "definition": "text NULL"
+      },
+      {
+        "name": "total_cost",
+        "definition": "numeric(14,2) NOT NULL DEFAULT 0"
+      },
+      {
+        "name": "created_by",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "approved_by",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "approved_at",
+        "definition": "timestamptz NULL"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\021_procurement.sql",
+    "table": "purchase_order_items",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "purchase_order_id",
+        "definition": "uuid NOT NULL REFERENCES purchase_orders(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "line_no",
+        "definition": "integer NOT NULL"
+      },
+      {
+        "name": "estimate_item_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "parts_catalog_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "name",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "description",
+        "definition": "text NULL"
+      },
+      {
+        "name": "quantity",
+        "definition": "numeric(10,2) NOT NULL DEFAULT 1"
+      },
+      {
+        "name": "unit_cost",
+        "definition": "numeric(14,2) NOT NULL DEFAULT 0"
+      },
+      {
+        "name": "total_cost",
+        "definition": "numeric(14,2) NOT NULL DEFAULT 0"
+      },
+      {
+        "name": "received_qty",
+        "definition": "numeric(10,2) NOT NULL DEFAULT 0"
+      },
+      {
+        "name": "status",
+        "definition": "text NOT NULL DEFAULT 'pending', -- pending | partial | received | cancelled"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\022_inventory_locations.sql",
+    "table": "inventory_locations",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "UUID PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "company_id",
+        "definition": "UUID NOT NULL"
+      },
+      {
+        "name": "code",
+        "definition": "TEXT NOT NULL"
+      },
+      {
+        "name": "name",
+        "definition": "TEXT NOT NULL"
+      },
+      {
+        "name": "location_type",
+        "definition": "TEXT NOT NULL"
+      },
+      {
+        "name": "branch_id",
+        "definition": "UUID NULL"
+      },
+      {
+        "name": "fleet_vehicle_id",
+        "definition": "UUID NULL"
+      },
+      {
+        "name": "is_active",
+        "definition": "BOOLEAN NOT NULL DEFAULT TRUE"
+      },
+      {
+        "name": "created_at",
+        "definition": "TIMESTAMPTZ NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "TIMESTAMPTZ NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\023_fleet_and_bays.sql",
+    "table": "fleet_vehicles",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "company_id",
+        "definition": "uuid NOT NULL"
+      },
+      {
+        "name": "branch_id",
+        "definition": "uuid NOT NULL"
+      },
+      {
+        "name": "code",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "name",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "vehicle_type",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "plate_number",
+        "definition": "text NULL"
+      },
+      {
+        "name": "make",
+        "definition": "text NULL"
+      },
+      {
+        "name": "model",
+        "definition": "text NULL"
+      },
+      {
+        "name": "model_year",
+        "definition": "integer NULL"
+      },
+      {
+        "name": "capacity_jobs",
+        "definition": "integer NOT NULL DEFAULT 1"
+      },
+      {
+        "name": "status",
+        "definition": "text NOT NULL DEFAULT 'available'"
+      },
+      {
+        "name": "is_active",
+        "definition": "boolean NOT NULL DEFAULT true"
+      },
+      {
+        "name": "inventory_location_id",
+        "definition": "uuid NULL REFERENCES inventory_locations(id)"
+      },
+      {
+        "name": "notes",
+        "definition": "text NULL"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\023_fleet_and_bays.sql",
+    "table": "workshop_bays",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "company_id",
+        "definition": "uuid NOT NULL"
+      },
+      {
+        "name": "branch_id",
+        "definition": "uuid NOT NULL"
+      },
+      {
+        "name": "code",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "name",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "bay_type",
+        "definition": "text NOT NULL DEFAULT 'mechanical'"
+      },
+      {
+        "name": "capacity_cars",
+        "definition": "integer NOT NULL DEFAULT 1"
+      },
+      {
+        "name": "status",
+        "definition": "text NOT NULL DEFAULT 'available'"
+      },
+      {
+        "name": "is_active",
+        "definition": "boolean NOT NULL DEFAULT true"
+      },
+      {
+        "name": "notes",
+        "definition": "text NULL"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\024_accounting_config.sql",
+    "table": "accounting_company_settings",
+    "columns": [
+      {
+        "name": "company_id",
+        "definition": "uuid PRIMARY KEY"
+      },
+      {
+        "name": "ar_control_account_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "ap_control_account_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "sales_revenue_account_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "workshop_revenue_account_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "rsa_revenue_account_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "recovery_revenue_account_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "cogs_account_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "labor_cost_account_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "inventory_account_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "wip_account_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "vat_output_account_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "vat_input_account_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "discount_given_account_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "discount_received_account_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "rounding_diff_account_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "cash_account_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "bank_clearing_account_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\024_branch_accounting_entries.sql",
+    "table": "branch_accounting_entries",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "UUID PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "company_id",
+        "definition": "UUID NOT NULL"
+      },
+      {
+        "name": "branch_id",
+        "definition": "UUID NOT NULL"
+      },
+      {
+        "name": "category",
+        "definition": "TEXT NOT NULL CHECK (category IN ('receivable','payable'))"
+      },
+      {
+        "name": "entry_type",
+        "definition": "TEXT NOT NULL, -- inspection, job, stock, fine, other"
+      },
+      {
+        "name": "description",
+        "definition": "TEXT NOT NULL"
+      },
+      {
+        "name": "amount",
+        "definition": "NUMERIC(18,2) NOT NULL DEFAULT 0"
+      },
+      {
+        "name": "status",
+        "definition": "TEXT NOT NULL DEFAULT 'open', -- open, partial, paid, disputed"
+      },
+      {
+        "name": "due_date",
+        "definition": "DATE"
+      },
+      {
+        "name": "created_at",
+        "definition": "TIMESTAMPTZ NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\025_branches.sql",
+    "table": "branches",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "company_id",
+        "definition": "uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "code",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "name",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "address_line1",
+        "definition": "text NULL"
+      },
+      {
+        "name": "address_line2",
+        "definition": "text NULL"
+      },
+      {
+        "name": "city",
+        "definition": "text NULL"
+      },
+      {
+        "name": "state_region",
+        "definition": "text NULL"
+      },
+      {
+        "name": "postal_code",
+        "definition": "text NULL"
+      },
+      {
+        "name": "country",
+        "definition": "text NULL"
+      },
+      {
+        "name": "phone",
+        "definition": "text NULL"
+      },
+      {
+        "name": "email",
+        "definition": "text NULL"
+      },
+      {
+        "name": "is_active",
+        "definition": "boolean NOT NULL DEFAULT true"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\026_files.sql",
+    "table": "files",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "scope",
+        "definition": "text NOT NULL DEFAULT 'global'"
+      },
+      {
+        "name": "company_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "uploaded_by",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "kind",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "mime_type",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "original_name",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "storage_path",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "size_bytes",
+        "definition": "bigint NOT NULL"
+      },
+      {
+        "name": "width",
+        "definition": "int NULL"
+      },
+      {
+        "name": "height",
+        "definition": "int NULL"
+      },
+      {
+        "name": "duration_seconds",
+        "definition": "numeric NULL"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\027_translations.sql",
+    "table": "ui_translations",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "source_text",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "target_lang",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "translated_text",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "checksum",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": [
+      "UNIQUE (source_text, target_lang)"
+    ]
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\030_branch_extensions.sql",
+    "table": "branch_contacts",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "branch_id",
+        "definition": "uuid NOT NULL REFERENCES branches(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "name",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "phone_code",
+        "definition": "text NULL"
+      },
+      {
+        "name": "phone_number",
+        "definition": "text NULL"
+      },
+      {
+        "name": "email",
+        "definition": "text NULL"
+      },
+      {
+        "name": "sort_order",
+        "definition": "integer NOT NULL DEFAULT 0"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\030_branch_extensions.sql",
+    "table": "branch_bank_accounts",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "branch_id",
+        "definition": "uuid NOT NULL REFERENCES branches(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "bank_name",
+        "definition": "text NULL"
+      },
+      {
+        "name": "branch_name",
+        "definition": "text NULL"
+      },
+      {
+        "name": "account_name",
+        "definition": "text NULL"
+      },
+      {
+        "name": "account_number",
+        "definition": "text NULL"
+      },
+      {
+        "name": "iban",
+        "definition": "text NULL"
+      },
+      {
+        "name": "swift",
+        "definition": "text NULL"
+      },
+      {
+        "name": "currency",
+        "definition": "text NULL"
+      },
+      {
+        "name": "is_default",
+        "definition": "boolean NOT NULL DEFAULT false"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\031_channel_and_dialer_integrations.sql",
+    "table": "integration_channels",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "scope",
+        "definition": "text NOT NULL CHECK (scope IN ('global', 'company'))"
+      },
+      {
+        "name": "company_id",
+        "definition": "uuid NULL REFERENCES companies(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "name",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "channel_type",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "provider_key",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "auth_type",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "credentials",
+        "definition": "jsonb NOT NULL DEFAULT '{}'::jsonb"
+      },
+      {
+        "name": "metadata",
+        "definition": "jsonb NOT NULL DEFAULT '{}'::jsonb"
+      },
+      {
+        "name": "webhooks",
+        "definition": "jsonb NOT NULL DEFAULT '{}'::jsonb"
+      },
+      {
+        "name": "is_active",
+        "definition": "boolean NOT NULL DEFAULT TRUE"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\031_channel_and_dialer_integrations.sql",
+    "table": "integration_dialers",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "provider",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "label",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "auth_type",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "credentials",
+        "definition": "jsonb NOT NULL DEFAULT '{}'::jsonb"
+      },
+      {
+        "name": "metadata",
+        "definition": "jsonb NOT NULL DEFAULT '{}'::jsonb"
+      },
+      {
+        "name": "webhooks",
+        "definition": "jsonb NOT NULL DEFAULT '{}'::jsonb"
+      },
+      {
+        "name": "is_global",
+        "definition": "boolean NOT NULL DEFAULT FALSE"
+      },
+      {
+        "name": "company_id",
+        "definition": "uuid NULL REFERENCES companies(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "is_active",
+        "definition": "boolean NOT NULL DEFAULT TRUE"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\031_channel_and_dialer_integrations.sql",
+    "table": "integration_dialer_metadata",
+    "columns": [
+      {
+        "name": "dialer_id",
+        "definition": "uuid NOT NULL REFERENCES integration_dialers(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "value",
+        "definition": "text NOT NULL"
+      }
+    ],
+    "constraints": [
+      "key text NOT NULL",
+      "PRIMARY KEY (dialer_id, key)"
+    ]
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\031_channel_and_dialer_integrations.sql",
+    "table": "integration_dialer_webhooks",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "dialer_id",
+        "definition": "uuid NOT NULL REFERENCES integration_dialers(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "event",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "url",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "secret",
+        "definition": "text NULL"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\032_ai_config.sql",
+    "table": "ai_global_config",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "serial PRIMARY KEY"
+      },
+      {
+        "name": "master_enabled",
+        "definition": "boolean NOT NULL DEFAULT true"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\032_ai_config.sql",
+    "table": "ai_modules",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "serial PRIMARY KEY"
+      },
+      {
+        "name": "label",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "category",
+        "definition": "text NOT NULL DEFAULT 'general'"
+      },
+      {
+        "name": "description",
+        "definition": "text NULL"
+      },
+      {
+        "name": "global_enabled",
+        "definition": "boolean NOT NULL DEFAULT true"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": [
+      "key text NOT NULL UNIQUE"
+    ]
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\033_global_extensions.sql",
+    "table": "agents",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "user_id",
+        "definition": "uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "employee_id",
+        "definition": "uuid REFERENCES employees(id) ON DELETE SET NULL"
+      },
+      {
+        "name": "role",
+        "definition": "text NOT NULL DEFAULT 'agent'"
+      },
+      {
+        "name": "is_active",
+        "definition": "boolean NOT NULL DEFAULT true"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\033_global_extensions.sql",
+    "table": "global_subscriptions",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "company_id",
+        "definition": "uuid REFERENCES companies(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "category",
+        "definition": "text NOT NULL CHECK (category IN ('trial', 'active', 'expiring', 'expired', 'offboarded'))"
+      },
+      {
+        "name": "status",
+        "definition": "text NOT NULL DEFAULT 'active'"
+      },
+      {
+        "name": "amount",
+        "definition": "numeric(14,2)"
+      },
+      {
+        "name": "currency",
+        "definition": "text NOT NULL DEFAULT 'USD'"
+      },
+      {
+        "name": "started_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "ends_at",
+        "definition": "timestamptz"
+      },
+      {
+        "name": "managed_by_agent_id",
+        "definition": "uuid REFERENCES agents(id) ON DELETE SET NULL"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\038_calls.sql",
+    "table": "calls",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "UUID PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "scope",
+        "definition": "TEXT NOT NULL DEFAULT 'global', -- global | company | branch | vendor"
+      },
+      {
+        "name": "company_id",
+        "definition": "UUID NULL"
+      },
+      {
+        "name": "branch_id",
+        "definition": "UUID NULL"
+      },
+      {
+        "name": "direction",
+        "definition": "TEXT NULL, -- inbound | outbound"
+      },
+      {
+        "name": "status",
+        "definition": "TEXT NULL, -- completed | failed | missed | in-progress"
+      },
+      {
+        "name": "started_at",
+        "definition": "TIMESTAMPTZ NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "ended_at",
+        "definition": "TIMESTAMPTZ NULL"
+      },
+      {
+        "name": "metadata",
+        "definition": "JSONB DEFAULT '{}'::jsonb"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\039_campaigns.sql",
+    "table": "campaigns",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "UUID PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "name",
+        "definition": "TEXT NOT NULL"
+      },
+      {
+        "name": "status",
+        "definition": "TEXT NOT NULL DEFAULT 'draft', -- draft | scheduled | live | paused | completed | cancelled"
+      },
+      {
+        "name": "scope",
+        "definition": "TEXT NOT NULL DEFAULT 'global', -- global | company | branch | vendor"
+      },
+      {
+        "name": "company_id",
+        "definition": "UUID NULL"
+      },
+      {
+        "name": "branch_id",
+        "definition": "UUID NULL"
+      },
+      {
+        "name": "starts_at",
+        "definition": "TIMESTAMPTZ NULL"
+      },
+      {
+        "name": "ends_at",
+        "definition": "TIMESTAMPTZ NULL"
+      },
+      {
+        "name": "created_at",
+        "definition": "TIMESTAMPTZ NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "TIMESTAMPTZ NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\040_ai_feature_toggles.sql",
+    "table": "ai_feature_toggles",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "UUID PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "feature_key",
+        "definition": "TEXT NOT NULL"
+      },
+      {
+        "name": "scope_type",
+        "definition": "TEXT NOT NULL DEFAULT 'global', -- global | company | branch | vendor"
+      },
+      {
+        "name": "scope_id",
+        "definition": "UUID NULL"
+      },
+      {
+        "name": "enabled",
+        "definition": "BOOLEAN NOT NULL DEFAULT true"
+      },
+      {
+        "name": "created_at",
+        "definition": "TIMESTAMPTZ NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "TIMESTAMPTZ NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\041_billing_invoices.sql",
+    "table": "billing_invoices",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "company_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "subscription_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "status",
+        "definition": "text NOT NULL DEFAULT 'pending', -- pending | paid | canceled"
+      },
+      {
+        "name": "currency",
+        "definition": "text NOT NULL DEFAULT 'USD'"
+      },
+      {
+        "name": "total_amount",
+        "definition": "numeric(18,4) NOT NULL DEFAULT 0"
+      },
+      {
+        "name": "due_date",
+        "definition": "date NULL"
+      },
+      {
+        "name": "paid_at",
+        "definition": "timestamptz NULL"
+      },
+      {
+        "name": "payment_ref",
+        "definition": "text NULL"
+      },
+      {
+        "name": "reference",
+        "definition": "text NULL"
+      },
+      {
+        "name": "description",
+        "definition": "text NULL"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\041_billing_invoices.sql",
+    "table": "billing_invoice_lines",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "invoice_id",
+        "definition": "uuid NOT NULL REFERENCES billing_invoices(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "line_no",
+        "definition": "integer NOT NULL"
+      },
+      {
+        "name": "name",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "description",
+        "definition": "text NULL"
+      },
+      {
+        "name": "amount",
+        "definition": "numeric(18,4) NOT NULL DEFAULT 0"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\042_invoice_org_profile.sql",
+    "table": "billing_org_profile",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "name",
+        "definition": "text NOT NULL DEFAULT 'Global ERP'"
+      },
+      {
+        "name": "address",
+        "definition": "text NULL"
+      },
+      {
+        "name": "email",
+        "definition": "text NULL"
+      },
+      {
+        "name": "phone",
+        "definition": "text NULL"
+      },
+      {
+        "name": "tax_id",
+        "definition": "text NULL"
+      },
+      {
+        "name": "website",
+        "definition": "text NULL"
+      },
+      {
+        "name": "currency",
+        "definition": "text NOT NULL DEFAULT 'USD'"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\043_marketing_templates.sql",
+    "table": "marketing_templates",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "company_id",
+        "definition": "uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "type",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "provider_key",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "name",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "status",
+        "definition": "text NOT NULL DEFAULT 'draft'"
+      },
+      {
+        "name": "content",
+        "definition": "jsonb NOT NULL DEFAULT '{}'::jsonb"
+      },
+      {
+        "name": "provider_status",
+        "definition": "text NULL"
+      },
+      {
+        "name": "provider_template_id",
+        "definition": "text NULL"
+      },
+      {
+        "name": "published_at",
+        "definition": "timestamptz NULL"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\044_campaign_builder_graphs.sql",
+    "table": "campaign_builder_graphs",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "UUID PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "scope",
+        "definition": "TEXT NOT NULL"
+      },
+      {
+        "name": "company_id",
+        "definition": "UUID NULL"
+      },
+      {
+        "name": "graph",
+        "definition": "JSONB NOT NULL DEFAULT '{}'::jsonb"
+      },
+      {
+        "name": "created_at",
+        "definition": "TIMESTAMPTZ NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "TIMESTAMPTZ NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\045_marketing_segments.sql",
+    "table": "marketing_segments",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "UUID PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "company_id",
+        "definition": "UUID NOT NULL"
+      },
+      {
+        "name": "name",
+        "definition": "TEXT NOT NULL"
+      },
+      {
+        "name": "created_at",
+        "definition": "TIMESTAMPTZ NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "TIMESTAMPTZ NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\046_marketing_company_settings.sql",
+    "table": "marketing_company_settings",
+    "columns": [
+      {
+        "name": "company_id",
+        "definition": "UUID PRIMARY KEY"
+      },
+      {
+        "name": "easycron_api_key",
+        "definition": "TEXT NULL"
+      },
+      {
+        "name": "easycron_timezone",
+        "definition": "TEXT NULL"
+      },
+      {
+        "name": "schedule_launch",
+        "definition": "BOOLEAN NOT NULL DEFAULT TRUE"
+      },
+      {
+        "name": "schedule_delay",
+        "definition": "BOOLEAN NOT NULL DEFAULT TRUE"
+      },
+      {
+        "name": "created_at",
+        "definition": "TIMESTAMPTZ NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "TIMESTAMPTZ NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\047_push_device_tokens.sql",
+    "table": "push_device_tokens",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "scope",
+        "definition": "text NOT NULL CHECK (scope IN ('global', 'company'))"
+      },
+      {
+        "name": "company_id",
+        "definition": "uuid NULL REFERENCES companies(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "user_id",
+        "definition": "uuid NULL REFERENCES users(id) ON DELETE SET NULL"
+      },
+      {
+        "name": "device_token",
+        "definition": "text NOT NULL"
+      },
+      {
+        "name": "platform",
+        "definition": "text NULL"
+      },
+      {
+        "name": "device_id",
+        "definition": "text NULL"
+      },
+      {
+        "name": "is_active",
+        "definition": "boolean NOT NULL DEFAULT TRUE"
+      },
+      {
+        "name": "last_seen_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\048_marketing_campaign_schedules.sql",
+    "table": "marketing_campaign_schedules",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "UUID PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "company_id",
+        "definition": "UUID NULL"
+      },
+      {
+        "name": "campaign_id",
+        "definition": "UUID NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "node_id",
+        "definition": "TEXT NOT NULL"
+      },
+      {
+        "name": "node_key",
+        "definition": "TEXT NOT NULL"
+      },
+      {
+        "name": "run_at",
+        "definition": "TIMESTAMPTZ NOT NULL"
+      },
+      {
+        "name": "status",
+        "definition": "TEXT NOT NULL DEFAULT 'pending', -- pending | scheduled | running | completed | failed | cancelled"
+      },
+      {
+        "name": "easycron_job_id",
+        "definition": "TEXT NULL"
+      },
+      {
+        "name": "easycron_payload",
+        "definition": "JSONB NULL"
+      },
+      {
+        "name": "last_run_at",
+        "definition": "TIMESTAMPTZ NULL"
+      },
+      {
+        "name": "error",
+        "definition": "TEXT NULL"
+      },
+      {
+        "name": "created_at",
+        "definition": "TIMESTAMPTZ NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "TIMESTAMPTZ NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\049_marketing_campaign_events.sql",
+    "table": "marketing_email_events",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "UUID PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "company_id",
+        "definition": "UUID NULL"
+      },
+      {
+        "name": "campaign_id",
+        "definition": "UUID NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "node_id",
+        "definition": "TEXT NULL"
+      },
+      {
+        "name": "recipient",
+        "definition": "TEXT NULL"
+      },
+      {
+        "name": "event_type",
+        "definition": "TEXT NOT NULL"
+      },
+      {
+        "name": "provider_message_id",
+        "definition": "TEXT NULL"
+      },
+      {
+        "name": "metadata",
+        "definition": "JSONB NULL"
+      },
+      {
+        "name": "occurred_at",
+        "definition": "TIMESTAMPTZ NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "created_at",
+        "definition": "TIMESTAMPTZ NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\049_marketing_campaign_events.sql",
+    "table": "marketing_whatsapp_events",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "UUID PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "company_id",
+        "definition": "UUID NULL"
+      },
+      {
+        "name": "campaign_id",
+        "definition": "UUID NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "node_id",
+        "definition": "TEXT NULL"
+      },
+      {
+        "name": "recipient",
+        "definition": "TEXT NULL"
+      },
+      {
+        "name": "event_type",
+        "definition": "TEXT NOT NULL"
+      },
+      {
+        "name": "provider_message_id",
+        "definition": "TEXT NULL"
+      },
+      {
+        "name": "metadata",
+        "definition": "JSONB NULL"
+      },
+      {
+        "name": "occurred_at",
+        "definition": "TIMESTAMPTZ NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "created_at",
+        "definition": "TIMESTAMPTZ NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\049_marketing_campaign_events.sql",
+    "table": "marketing_sms_events",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "UUID PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "company_id",
+        "definition": "UUID NULL"
+      },
+      {
+        "name": "campaign_id",
+        "definition": "UUID NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "node_id",
+        "definition": "TEXT NULL"
+      },
+      {
+        "name": "recipient",
+        "definition": "TEXT NULL"
+      },
+      {
+        "name": "event_type",
+        "definition": "TEXT NOT NULL"
+      },
+      {
+        "name": "provider_message_id",
+        "definition": "TEXT NULL"
+      },
+      {
+        "name": "metadata",
+        "definition": "JSONB NULL"
+      },
+      {
+        "name": "occurred_at",
+        "definition": "TIMESTAMPTZ NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "created_at",
+        "definition": "TIMESTAMPTZ NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\049_marketing_campaign_events.sql",
+    "table": "marketing_push_events",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "UUID PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "company_id",
+        "definition": "UUID NULL"
+      },
+      {
+        "name": "campaign_id",
+        "definition": "UUID NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "node_id",
+        "definition": "TEXT NULL"
+      },
+      {
+        "name": "recipient",
+        "definition": "TEXT NULL"
+      },
+      {
+        "name": "event_type",
+        "definition": "TEXT NOT NULL"
+      },
+      {
+        "name": "provider_message_id",
+        "definition": "TEXT NULL"
+      },
+      {
+        "name": "metadata",
+        "definition": "JSONB NULL"
+      },
+      {
+        "name": "occurred_at",
+        "definition": "TIMESTAMPTZ NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "created_at",
+        "definition": "TIMESTAMPTZ NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\058_customer_wallet_transactions.sql",
+    "table": "customer_wallet_transactions",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "company_id",
+        "definition": "uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "customer_id",
+        "definition": "uuid NOT NULL REFERENCES customers(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "amount",
+        "definition": "numeric(14,2) NOT NULL"
+      },
+      {
+        "name": "payment_method",
+        "definition": "text NULL"
+      },
+      {
+        "name": "payment_date",
+        "definition": "date NULL"
+      },
+      {
+        "name": "payment_proof_file_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "approved_at",
+        "definition": "timestamptz NULL"
+      },
+      {
+        "name": "approved_by",
+        "definition": "uuid NULL REFERENCES users(id)"
+      },
+      {
+        "name": "notes",
+        "definition": "text NULL"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\063_products_inventory_seed.sql",
+    "table": "products",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "integer PRIMARY KEY"
+      },
+      {
+        "name": "item_category",
+        "definition": "text NULL"
+      },
+      {
+        "name": "item_quantity",
+        "definition": "integer NULL DEFAULT 1"
+      },
+      {
+        "name": "item_name",
+        "definition": "text NULL"
+      },
+      {
+        "name": "item_make",
+        "definition": "text NULL"
+      },
+      {
+        "name": "item_model",
+        "definition": "text NULL"
+      },
+      {
+        "name": "item_size",
+        "definition": "text NULL"
+      },
+      {
+        "name": "item_viscosity",
+        "definition": "text NULL"
+      },
+      {
+        "name": "item_type",
+        "definition": "text NULL"
+      },
+      {
+        "name": "item_brand",
+        "definition": "text NULL"
+      },
+      {
+        "name": "item_description",
+        "definition": "text NULL"
+      },
+      {
+        "name": "item_qr_code",
+        "definition": "text NULL"
+      },
+      {
+        "name": "vendor_id",
+        "definition": "integer NULL"
+      },
+      {
+        "name": "po_id",
+        "definition": "integer NULL"
+      },
+      {
+        "name": "location",
+        "definition": "integer NULL"
+      },
+      {
+        "name": "status",
+        "definition": "text NULL DEFAULT 'Available'"
+      },
+      {
+        "name": "issue_date",
+        "definition": "timestamp NULL"
+      },
+      {
+        "name": "warranty_date",
+        "definition": "timestamp NULL"
+      },
+      {
+        "name": "supplier_date",
+        "definition": "timestamp NULL"
+      },
+      {
+        "name": "line_item_id",
+        "definition": "integer NULL"
+      },
+      {
+        "name": "cost",
+        "definition": "integer NULL"
+      },
+      {
+        "name": "chsc",
+        "definition": "integer NULL"
+      },
+      {
+        "name": "cn_image",
+        "definition": "text NULL"
+      },
+      {
+        "name": "deleted",
+        "definition": "boolean NULL"
+      },
+      {
+        "name": "date_created",
+        "definition": "timestamptz NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\064_products_seed.sql",
+    "table": "products",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "integer PRIMARY KEY"
+      },
+      {
+        "name": "name",
+        "definition": "text NULL"
+      },
+      {
+        "name": "cost",
+        "definition": "integer NULL"
+      },
+      {
+        "name": "description",
+        "definition": "text NULL"
+      },
+      {
+        "name": "type",
+        "definition": "text NULL"
+      },
+      {
+        "name": "date_created",
+        "definition": "timestamptz NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  },
+  {
+    "file": "packages\\ai-core\\migrations\\065_inspection_line_items.sql",
+    "table": "line_items",
+    "columns": [
+      {
+        "name": "id",
+        "definition": "uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+      },
+      {
+        "name": "company_id",
+        "definition": "uuid NOT NULL"
+      },
+      {
+        "name": "lead_id",
+        "definition": "uuid NULL"
+      },
+      {
+        "name": "inspection_id",
+        "definition": "uuid NOT NULL REFERENCES inspections(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "product_id",
+        "definition": "integer NULL"
+      },
+      {
+        "name": "product_name",
+        "definition": "text NULL"
+      },
+      {
+        "name": "description",
+        "definition": "text NULL"
+      },
+      {
+        "name": "quantity",
+        "definition": "integer NOT NULL DEFAULT 1"
+      },
+      {
+        "name": "reason",
+        "definition": "text NULL"
+      },
+      {
+        "name": "status",
+        "definition": "text NOT NULL DEFAULT 'Pending'"
+      },
+      {
+        "name": "media_file_id",
+        "definition": "text NULL"
+      },
+      {
+        "name": "created_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      },
+      {
+        "name": "updated_at",
+        "definition": "timestamptz NOT NULL DEFAULT now()"
+      }
+    ],
+    "constraints": []
+  }
+]

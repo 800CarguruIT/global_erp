@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { Crm } from "@repo/ai-core";
-import { buildScopeContextFromRoute, requirePermission } from "../../../lib/auth/permissions";
+import { buildScopeContextFromRoute, requirePermission } from "@/lib/auth/permissions";
 
 const updateSchema = z.object({
   scope: z.enum(["global", "company"]).default("company"),
@@ -22,6 +22,8 @@ const updateSchema = z.object({
   phoneAlt: z.string().optional().nullable(),
   whatsappPhone: z.string().optional().nullable(),
   address: z.string().optional().nullable(),
+  country: z.string().optional().nullable(),
+  city: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
   isActive: z.boolean().optional(),
   is_active: z.boolean().optional(), // allow snake_case from callers
