@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "Node",
+    "strict": true,
+    "jsx": "preserve",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "baseUrl": ".",
+    "paths": {
+      "@repo/ui": ["packages/ui/src"],
+      "@repo/ui/*": ["packages/ui/src/*"],
+      "@repo/ai-core": ["packages/ai-core/src"],
+      "@repo/ai-core/*": ["packages/ai-core/src/*"],
+      "@repo/ai-core/client": ["packages/ai-core/src/client.ts"],
+      "@repo/ai-core/server": ["packages/ai-core/src/index.ts"],
+      "@repo/ai-tools": ["packages/ai-tools/src"],
+      "@repo/ai-tools/*": ["packages/ai-tools/src/*"],
+      "@repo/typescript-config/*": ["packages/typescript-config/*"],
+      "@repo/eslint-config/*": ["packages/eslint-config/*"]
+    }
+  },
+  "include": ["apps", "packages"],
+  "exclude": ["node_modules"]
+}

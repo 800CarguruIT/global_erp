@@ -1,0 +1,30 @@
+export type GatepassStatus = "pending" | "ready" | "released" | "cancelled";
+export type GatepassHandoverType = "branch" | "dropoff_recovery";
+
+export type Gatepass = {
+  id: string;
+  companyId: string;
+  leadId: string;
+  workOrderId: string;
+  invoiceId: string;
+  qualityCheckId?: string | null;
+  carId?: string | null;
+  customerId?: string | null;
+  handoverType: GatepassHandoverType;
+  status: GatepassStatus;
+  invoiceStatusSnapshot: string;
+  amountDue: number;
+  paymentOk: boolean;
+  supervisorId?: string | null;
+  supervisorApprovedAt?: string | null;
+  customerSigned: boolean;
+  customerName?: string | null;
+  customerIdNumber?: string | null;
+  handoverFormRef?: string | null;
+  customerSignatureRef?: string | null;
+  finalVideoRef?: string | null;
+  finalNote?: string | null;
+  recoveryLeadId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};

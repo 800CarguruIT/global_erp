@@ -1,0 +1,29 @@
+{
+  "name": "Global ERP",
+  "private": true,
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "check-types": "turbo run check-types",
+    "db:seed": "ts-node --transpile-only --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" packages/ai-core/scripts/seed.ts",
+    "db:bootstrap:minimal": "ts-node --transpile-only --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" packages/ai-core/scripts/bootstrap-minimal.ts"
+  },
+  "devDependencies": {
+    "prettier": "^3.6.2",
+    "ts-node": "^10.9.2",
+    "turbo": "^2.6.1",
+    "typescript": "5.9.2"
+  },
+  "packageManager": "pnpm@9.0.0",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "openai": "^6.9.1",
+    "qrcode": "^1.5.4",
+    "react-hook-form": "^7.53.0"
+  }
+}

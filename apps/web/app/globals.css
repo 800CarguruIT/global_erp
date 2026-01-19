@@ -1,0 +1,89 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* We let our ThemeProvider control colors.
+   Keep body clean / full-screen. */
+
+html,
+body {
+  padding: 0;
+  margin: 0;
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Drawflow theme polish for builder views */
+.drawflow {
+  background: transparent;
+  color: inherit;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+  background-size: 32px 32px;
+  background-position: -1px -1px;
+}
+
+.drawflow .drawflow-node {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: #ffffff;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.drawflow .drawflow-node .drawflow_content_node {
+  padding: 0;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.drawflow .drawflow-node.selected .drawflow_content_node {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.35);
+  border-radius: 12px;
+}
+
+.drawflow .connection .main-path {
+  stroke: rgba(255, 255, 255, 0.18);
+  stroke-width: 2px;
+  filter: none !important;
+}
+
+.drawflow .connection .main-path:hover {
+  stroke: rgba(255, 255, 255, 0.32);
+}
+
+.drawflow .output,
+.drawflow .input {
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(15, 23, 42, 0.4);
+  box-shadow: none !important;
+}
+
+/* Optional link + image helpers from your old file */
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.imgDark {
+  display: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  html {
+    color-scheme: dark;
+  }
+
+  .imgLight {
+    display: none;
+  }
+  .imgDark {
+    display: unset;
+  }
+}

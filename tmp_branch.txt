@@ -1,0 +1,80 @@
+  const { theme } = useTheme();
+  const inputClass = theme.input;
+  const labelClass = "block text-sm font-medium";
+  const cardClass = `${theme.cardBg} ${theme.cardBorder}`;
+  const router = useRouter();
+  const countries = useMemo(() => ReferenceData.ReferenceCountries.allCountries, []);
+  const [values, setValues] = React.useState<BranchFormValues>(() => {
+    const base: BranchFormValues = {
+      name: "",
+      display_name: "",
+      legal_name: "",
+      ownership_type: "own",
+      branch_types: [],
+      service_types: [],
+      phone_code: "",
+      phone: "",
+      phoneNumber: "",
+      email: "",
+      address_line1: "",
+      address_line2: "",
+      city: "",
+      state_region: "",
+      postal_code: "",
+      country: "",
+      trade_license_number: "",
+      trade_license_issue: "",
+      trade_license_expiry: "",
+      trade_license_file_id: "",
+      allow_branch_invoicing: false,
+      vat_certificate_file_id: "",
+      trn_number: "",
+      contacts: [],
+      bankAccounts: [],
+      is_active: true,
+      ...(initialValues ?? {}),
+    };
+
+    // Normalize existing service_types to prefixed ids to avoid overlap between categories
+    const serviceMap: string[] = [];
+    const allOptions = [
+      { id: "RSA_Jumpstart", label: "Jumpstart" },
+      { id: "RSA_Battery", label: "Battery" },
+      { id: "RSA_Tyre", label: "Tyre" },
+      { id: "RSA_Fuel", label: "Fuel" },
+      { id: "RSA_Repair", label: "Repair" },
+      { id: "Recovery_Regular", label: "Regular" },
+      { id: "Recovery_Flatbed", label: "Flatbed" },
+      { id: "Recovery_Covered", label: "Covered" },
+      { id: "Workshop_Repair", label: "Repair" },
+      { id: "Workshop_Tyre", label: "Tyre" },
+      { id: "Workshop_BodyShop", label: "BodyShop" },
+      { id: "Workshop_Service", label: "Service" },
+    ];
+    const incoming = new Set(base.service_types ?? []);
+    allOptions.forEach((opt) => {
+      // match either prefixed id or legacy raw label
+      if (incoming.has(opt.id) || incoming.has(opt.label)) {
+        serviceMap.push(opt.id);
+      }
+    });
+    base.service_types = serviceMap;
+
+    return base;
+  });
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const selectedCountry = useMemo(
+    () => countries.find((c) => c.iso2 === (values.country ?? "")),
+    [countries, values.country]
+  );
+
+  function splitPhone(value?: string | null): PhoneValue {
+    if (!value) return { dialCode: "", nationalNumber: "" };
+    const parts = value.trim().split(/\s+/);
+    const dialCode = parts.shift() ?? "";
+    return { dialCode, nationalNumber: parts.join(" ") };
+  }
+
+  function combinePhone(val: PhoneValue) {

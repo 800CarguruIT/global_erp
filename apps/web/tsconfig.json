@@ -1,0 +1,32 @@
+{
+  "extends": "@repo/typescript-config/nextjs.json",
+  "compilerOptions": {
+    "plugins": [
+      {
+    "name": "next"
+  }
+],
+"baseUrl": ".",
+"paths": {
+  "@repo/ui": ["../../packages/ui/src"],
+  "@repo/ui/*": ["../../packages/ui/src/*"],
+  "@repo/ai-core": ["../../packages/ai-core/src"],
+  "@repo/ai-core/*": ["../../packages/ai-core/src/*"],
+  "@repo/ai-core/client": ["../../packages/ai-core/src/client.ts"],
+  "@repo/ai-core/server": ["../../packages/ai-core/src/index.ts"],
+  "@repo/ai-tools": ["../../packages/ai-tools/src"],
+  "@repo/ai-tools/*": ["../../packages/ai-tools/src/*"],
+  "@/*": ["./*"]
+}
+
+
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    "next-env.d.ts",
+    "next.config.js",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": ["node_modules"]
+}
