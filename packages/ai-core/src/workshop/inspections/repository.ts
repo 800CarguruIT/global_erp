@@ -88,6 +88,27 @@ export async function listInspectionsForCompany(
   return rows.map(mapInspectionRow);
 }
 
+export async function listInspectionsForCustomer(
+  companyId: string,
+  customerId: string,
+  opts: { status?: InspectionStatus; limit?: number } = {}
+): Promise<Inspection[]> {
+  const sql = getSql();
+  const { status, limit = 100 } = opts;
+  const where =
+    status != null
+      ? sql`company_id = ${companyId} AND customer_id = ${customerId} AND status = ${status}`
+      : sql`company_id = ${companyId} AND customer_id = ${customerId}`;
+  const rows = await sql`
+    SELECT *
+    FROM inspections
+    WHERE ${where}
+    ORDER BY created_at DESC
+    LIMIT ${limit}
+  `;
+  return rows.map(mapInspectionRow);
+}
+
 export async function getInspectionById(companyId: string, inspectionId: string): Promise<Inspection | null> {
   const sql = getSql();
   const rows = await sql`

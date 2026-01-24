@@ -5,6 +5,16 @@ export async function GET(req: NextRequest) {
   const includeInactive = req.nextUrl.searchParams.get("includeInactive") === "true";
   const sql = getSql();
 
+  const [colCheck] = await sql<{ exists: boolean }[]>`
+    SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_name = 'companies'
+        AND column_name = 'allow_custom_coa'
+    ) AS exists
+  `;
+  const hasCustomCoa = Boolean(colCheck?.exists);
+
   const companies = await sql<
     Array<{
       id: string;
@@ -16,6 +26,7 @@ export async function GET(req: NextRequest) {
       company_phone: string | null;
       country: string | null;
       is_active: boolean;
+      allow_custom_coa?: boolean;
     }>
   >`
     SELECT
@@ -28,6 +39,7 @@ export async function GET(req: NextRequest) {
       company_phone,
       country,
       is_active
+      ${hasCustomCoa ? sql`, allow_custom_coa` : sql``}
     FROM companies
     ${includeInactive ? sql`` : sql`WHERE is_active = true`}
     ORDER BY display_name NULLS LAST, legal_name NULLS LAST, created_at DESC
@@ -91,6 +103,7 @@ export async function GET(req: NextRequest) {
 
   const data = companies.map((c) => ({
     ...c,
+    allow_custom_coa: hasCustomCoa ? Boolean(c.allow_custom_coa) : false,
     subscription_type: subscriptionMap[c.id]?.category ?? null,
     subscription_ends_at: subscriptionMap[c.id]?.ends_at ?? null,
     branches_count: branchesMap[c.id] ?? 0,

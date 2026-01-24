@@ -32,6 +32,7 @@ export const SIDEBAR_CONFIG: Record<NavScope, Partial<Record<NavCategory, Sideba
       { labelKey: "global.nav.hr", href: "/global/hr" },
       { labelKey: "global.nav.finance", href: "/global/accounting" },
       { label: "Invoices", href: "/global/accounting/invoices" },
+      { label: "COA Controls", href: "/global/accounting/coa-control", permissionKeys: ["accounting.manage_chart"] },
     ],
   },
   company: {
@@ -73,6 +74,7 @@ export const SIDEBAR_CONFIG: Record<NavScope, Partial<Record<NavCategory, Sideba
       { label: "Jobs", href: "/company/[companyId]/sales/jobs", moduleKey: "sales" },
     ],
     Accounting: [
+      { label: "Charts of Accounts", href: "/company/[companyId]/accounting/chart-of-accounts", permissionKeys: ["accounting.manage_chart"] },
       { label: "Accounts", href: "/company/[companyId]/accounting/accounts" },
       { label: "Journals", href: "/company/[companyId]/accounting/journals" },
       { label: "Trial Balance", href: "/company/[companyId]/accounting/trial-balance" },
@@ -274,6 +276,7 @@ export const SIDEBAR_TREE: Partial<Record<NavScope, SidebarItem[]>> = {
       href: "/company/[companyId]/accounting",
       permissionKeys: ["accounting.manage_chart", "accounting.post", "accounting.view"],
       children: [
+        { label: "Charts of Accounts", href: "/company/[companyId]/accounting/chart-of-accounts", permissionKeys: ["accounting.manage_chart"] },
         { label: "Accounts", href: "/company/[companyId]/accounting/accounts", permissionKeys: ["accounting.manage_chart"] },
         { label: "Journals", href: "/company/[companyId]/accounting/journals", permissionKeys: ["accounting.post"] },
         { label: "Trial Balance", href: "/company/[companyId]/accounting/trial-balance", permissionKeys: ["accounting.view"] },

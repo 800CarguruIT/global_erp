@@ -1,8 +1,13 @@
+import { AppLayout } from "@repo/ui";
 import TrialBalanceClient from "./TrialBalanceClient";
 
 type Params = { params: { companyId: string } | Promise<{ companyId: string }> };
 
 export default async function CompanyTrialBalancePage({ params }: Params) {
   const resolved = params instanceof Promise ? await params : params;
-  return <TrialBalanceClient companyId={resolved.companyId} />;
+  return (
+    <AppLayout forceScope={{ scope: "company", companyId: resolved.companyId }}>
+      <TrialBalanceClient companyId={resolved.companyId} />
+    </AppLayout>
+  );
 }

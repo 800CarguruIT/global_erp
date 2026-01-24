@@ -3,6 +3,9 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { AppLayout, Card, FileUploader, useTheme } from "@repo/ui";
+import type { Lead } from "@repo/ai-core/crm/leads/types";
+import type { Inspection } from "@repo/ai-core/workshop/inspections/types";
+import type { Estimate } from "@repo/ai-core/workshop/estimates/types";
 
 type Params = {
   params:
@@ -47,6 +50,15 @@ export default function CustomerDetailPage({ params }: Params) {
   const [walletTransactions, setWalletTransactions] = useState<WalletTransactionRow[]>([]);
   const [walletLoading, setWalletLoading] = useState(false);
   const [walletError, setWalletError] = useState<string | null>(null);
+  const [customerLeads, setCustomerLeads] = useState<Lead[]>([]);
+  const [customerLeadsLoading, setCustomerLeadsLoading] = useState(false);
+  const [customerLeadsError, setCustomerLeadsError] = useState<string | null>(null);
+  const [customerInspections, setCustomerInspections] = useState<Inspection[]>([]);
+  const [customerInspectionsLoading, setCustomerInspectionsLoading] = useState(false);
+  const [customerInspectionsError, setCustomerInspectionsError] = useState<string | null>(null);
+  const [customerEstimates, setCustomerEstimates] = useState<Estimate[]>([]);
+  const [customerEstimatesLoading, setCustomerEstimatesLoading] = useState(false);
+  const [customerEstimatesError, setCustomerEstimatesError] = useState<string | null>(null);
   const [topupOpen, setTopupOpen] = useState(false);
   const [topupForm, setTopupForm] = useState({
     amount: "",
@@ -75,6 +87,8 @@ export default function CustomerDetailPage({ params }: Params) {
   const [selectActionMode, setSelectActionMode] = useState<"menu" | "appointment">("menu");
   const [selectActionSaving, setSelectActionSaving] = useState(false);
   const [selectActionError, setSelectActionError] = useState<string | null>(null);
+  const [servicePickerOpen, setServicePickerOpen] = useState(false);
+  const [servicePickerError, setServicePickerError] = useState<string | null>(null);
   const [appointmentForm, setAppointmentForm] = useState({
     appointmentAt: "",
     type: "walkin",
@@ -101,6 +115,24 @@ export default function CustomerDetailPage({ params }: Params) {
     if (!companyId || !customerId) return;
     loadWalletTransactions(companyId, customerId);
   }, [companyId, customerId]);
+
+  useEffect(() => {
+    if (!companyId || !customerId) return;
+    if (activeTab !== "leads") return;
+    loadCustomerLeads(companyId, customerId);
+  }, [activeTab, companyId, customerId]);
+
+  useEffect(() => {
+    if (!companyId || !customerId) return;
+    if (activeTab !== "inspections") return;
+    loadCustomerInspections(companyId, customerId);
+  }, [activeTab, companyId, customerId]);
+
+  useEffect(() => {
+    if (!companyId || !customerId) return;
+    if (activeTab !== "estimates") return;
+    loadCustomerEstimates(companyId, customerId);
+  }, [activeTab, companyId, customerId]);
 
   useEffect(() => {
     if (!companyId) return;
@@ -178,6 +210,63 @@ export default function CustomerDetailPage({ params }: Params) {
       setWalletError(err?.message ?? "Failed to load wallet transactions");
     } finally {
       setWalletLoading(false);
+    }
+  }
+
+  async function loadCustomerLeads(cId: string, custId: string) {
+    setCustomerLeadsLoading(true);
+    setCustomerLeadsError(null);
+    try {
+      const res = await fetch(`/api/customers/${custId}/leads?companyId=${cId}`, { cache: "no-store" });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.error ?? "Failed to load leads");
+      }
+      const data = await res.json().catch(() => ({}));
+      setCustomerLeads(Array.isArray(data?.data) ? data.data : []);
+    } catch (err: any) {
+      setCustomerLeadsError(err?.message ?? "Failed to load leads");
+      setCustomerLeads([]);
+    } finally {
+      setCustomerLeadsLoading(false);
+    }
+  }
+
+  async function loadCustomerInspections(cId: string, custId: string) {
+    setCustomerInspectionsLoading(true);
+    setCustomerInspectionsError(null);
+    try {
+      const res = await fetch(`/api/customers/${custId}/inspections?companyId=${cId}`, { cache: "no-store" });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.error ?? "Failed to load inspections");
+      }
+      const data = await res.json().catch(() => ({}));
+      setCustomerInspections(Array.isArray(data?.data) ? data.data : []);
+    } catch (err: any) {
+      setCustomerInspectionsError(err?.message ?? "Failed to load inspections");
+      setCustomerInspections([]);
+    } finally {
+      setCustomerInspectionsLoading(false);
+    }
+  }
+
+  async function loadCustomerEstimates(cId: string, custId: string) {
+    setCustomerEstimatesLoading(true);
+    setCustomerEstimatesError(null);
+    try {
+      const res = await fetch(`/api/customers/${custId}/estimates?companyId=${cId}`, { cache: "no-store" });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.error ?? "Failed to load estimates");
+      }
+      const data = await res.json().catch(() => ({}));
+      setCustomerEstimates(Array.isArray(data?.data) ? data.data : []);
+    } catch (err: any) {
+      setCustomerEstimatesError(err?.message ?? "Failed to load estimates");
+      setCustomerEstimates([]);
+    } finally {
+      setCustomerEstimatesLoading(false);
     }
   }
 
@@ -302,12 +391,8 @@ export default function CustomerDetailPage({ params }: Params) {
               onClick={() => {
                 if (!isServiceRequest) return;
                 if (!selectedCarId) return;
-                const car = linkedCars.find((item) => item?.car?.id === selectedCarId)?.car ?? null;
-                if (!car) return;
-                setSelectActionCar(car);
-                setSelectActionMode("menu");
-                setSelectActionError(null);
-                setSelectActionOpen(true);
+                setServicePickerError(null);
+                setServicePickerOpen(true);
               }}
             >
               {action.label}
@@ -498,52 +583,13 @@ export default function CustomerDetailPage({ params }: Params) {
                 ))}
               </div>
 
-              {activeTab === "invoices" && (
+              {activeTab === "leads" && (
                 <div className="space-y-4 pt-4">
-                  <SectionCard title="Customer Invoices">
+                  <SectionCard title="Customer Leads">
                     <DataTable
-                      headers={[
-                        "Invoice ID",
-                        "Invoice Date",
-                        "Plate#",
-                        "Sales Agent",
-                        "Technician",
-                        "Total Amount",
-                        "Status",
-                        "Mode",
-                        "Print",
-                        "Payment Date",
-                      ]}
-                      rows={dummyInvoices}
-                    />
-                  </SectionCard>
-                  <SectionCard title="Sale Returns">
-                    <DataTable
-                      headers={[
-                        "Txn ID",
-                        "Against Invoice#",
-                        "Payment Amount",
-                        "Added By",
-                        "Remarks",
-                        "Date",
-                      ]}
-                      rows={dummyReturns}
-                    />
-                  </SectionCard>
-                  <SectionCard title="Customer Transactions">
-                    <DataTable
-                      headers={[
-                        "Txn ID",
-                        "Payment Mode",
-                        "Payment Proof",
-                        "Payment Amount",
-                        "Collect By",
-                        "Proforma",
-                        "Status",
-                        "Payment Date",
-                      ]}
+                      headers={["Lead ID", "Type", "Status", "Stage", "Car", "Updated", "Actions"]}
                       rows={
-                        walletLoading
+                        customerLeadsLoading
                           ? [[
                               "Loading...",
                               "-",
@@ -552,12 +598,10 @@ export default function CustomerDetailPage({ params }: Params) {
                               "-",
                               "-",
                               "-",
-                              "-",
                             ]]
-                          : walletTransactions.length === 0
+                          : customerLeads.length === 0
                           ? [[
-                              walletError ?? "No transactions found.",
-                              "-",
+                              customerLeadsError ?? "No leads found.",
                               "-",
                               "-",
                               "-",
@@ -565,34 +609,70 @@ export default function CustomerDetailPage({ params }: Params) {
                               "-",
                               "-",
                             ]]
-                          : walletTransactions.map((txn) => [
-                              txn.id,
-                              txn.payment_method ?? "-",
-                              txn.payment_proof_file_id ? (
-                                <a
-                                  key={`${txn.id}-proof`}
-                                  href={`/api/files/${txn.payment_proof_file_id}`}
-                                  target="_blank"
-                                  rel="noreferrer"
+                          : customerLeads.map((lead) => {
+                              const carLabel = [lead.carPlateNumber, lead.carModel].filter(Boolean).join(" ");
+                              return [
+                                lead.id,
+                                lead.leadType?.toUpperCase?.() ?? lead.leadType ?? "-",
+                                lead.leadStatus ?? "-",
+                                lead.leadStage ?? "-",
+                                carLabel || "-",
+                                formatDateTime(lead.updatedAt),
+                                <Link
+                                  key={`${lead.id}-view`}
+                                  href={companyId ? `/company/${companyId}/leads/${lead.id}` : "#"}
                                   className="rounded-md border border-white/20 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white/70 hover:bg-white/10"
                                 >
                                   View
-                                </a>
-                              ) : (
-                                "-"
-                              ),
-                              `AED ${Number(txn.amount ?? 0).toFixed(2)}`,
-                              txn.approved_by ?? "-",
-                              <button
-                                key={`${txn.id}-proforma`}
-                                type="button"
+                                </Link>,
+                              ];
+                            })
+                      }
+                    />
+                  </SectionCard>
+                </div>
+              )}
+
+              {activeTab === "inspections" && (
+                <div className="space-y-4 pt-4">
+                  <SectionCard title="Customer Inspections">
+                    <DataTable
+                      headers={["Inspection ID", "Status", "Lead", "Car", "Started", "Updated", "Actions"]}
+                      rows={
+                        customerInspectionsLoading
+                          ? [[
+                              "Loading...",
+                              "-",
+                              "-",
+                              "-",
+                              "-",
+                              "-",
+                              "-",
+                            ]]
+                          : customerInspections.length === 0
+                          ? [[
+                              customerInspectionsError ?? "No inspections found.",
+                              "-",
+                              "-",
+                              "-",
+                              "-",
+                              "-",
+                              "-",
+                            ]]
+                          : customerInspections.map((inspection) => [
+                              inspection.id,
+                              inspection.status ?? "-",
+                              inspection.leadId ?? "-",
+                              inspection.carId ?? "-",
+                              formatDateTime(inspection.startAt ?? inspection.createdAt),
+                              formatDateTime(inspection.updatedAt),
+                              <Link
+                                key={`${inspection.id}-view`}
+                                href={companyId ? `/company/${companyId}/inspections/${inspection.id}` : "#"}
                                 className="rounded-md border border-white/20 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white/70 hover:bg-white/10"
-                                onClick={() => openProforma(txn)}
                               >
-                                Proforma
-                              </button>,
-                              txn.approved_at ? "Approved" : "Unapproved",
-                              formatDateTime(txn.payment_date),
+                                View
+                              </Link>,
                             ])
                       }
                     />
@@ -600,11 +680,45 @@ export default function CustomerDetailPage({ params }: Params) {
                 </div>
               )}
 
-              {activeTab !== "invoices" && (
-                <div className={`pt-6 text-sm ${theme.mutedText}`}>
-                  <div className="rounded-md border border-dashed border-white/15 p-6 text-center">
-                    Dummy data for {tabLabels.find((tab) => tab.id === activeTab)?.label}.
-                  </div>
+              {activeTab === "estimates" && (
+                <div className="space-y-4 pt-4">
+                  <SectionCard title="Customer Estimates">
+                    <DataTable
+                      headers={["Estimate ID", "Status", "Lead", "Car", "Total", "Updated"]}
+                      rows={
+                        customerEstimatesLoading
+                          ? [[
+                              "Loading...",
+                              "-",
+                              "-",
+                              "-",
+                              "-",
+                              "-",
+                            ]]
+                          : customerEstimates.length === 0
+                          ? [[
+                              customerEstimatesError ?? "No estimates found.",
+                              "-",
+                              "-",
+                              "-",
+                              "-",
+                              "-",
+                            ]]
+                          : customerEstimates.map((estimate) => {
+                              const currency = estimate.currency ?? "AED";
+                              const total = Number(estimate.grandTotal ?? estimate.finalPrice ?? 0);
+                              return [
+                                estimate.id,
+                                estimate.status ?? "-",
+                                estimate.leadId ?? "-",
+                                estimate.carId ?? "-",
+                                `${currency} ${total.toFixed(2)}`,
+                                formatDateTime(estimate.updatedAt),
+                              ];
+                            })
+                      }
+                    />
+                  </SectionCard>
                 </div>
               )}
             </Card>
@@ -952,6 +1066,98 @@ export default function CustomerDetailPage({ params }: Params) {
         </div>
       )}
 
+      {servicePickerOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <Card className={`w-full max-w-2xl rounded-xl shadow-xl ${theme.cardBg} ${theme.cardBorder}`}>
+            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+              <div className="text-sm font-semibold">Select Service</div>
+              <button
+                type="button"
+                onClick={() => setServicePickerOpen(false)}
+                className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+              >
+                Close
+              </button>
+            </div>
+            <div className="space-y-3 p-4">
+              {servicePickerError && <div className="text-sm text-red-400">{servicePickerError}</div>}
+              <div className="grid gap-3 md:grid-cols-2">
+                <button
+                  type="button"
+                  className={`rounded-lg border px-4 py-3 text-left text-sm font-semibold ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+                  onClick={() => setServicePickerError("RSA service will be added later.")}
+                >
+                  <div className="flex flex-col items-center gap-2 text-center">
+                    <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-2xl">
+                      ⚡
+                    </span>
+                    <span>RSA (Batteries / Jump Start)</span>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  className={`rounded-lg border px-4 py-3 text-left text-sm font-semibold ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+                  onClick={() => {
+                    const car = linkedCars.find((item) => item?.car?.id === selectedCarId)?.car ?? null;
+                    if (!car) {
+                      setServicePickerError("Select a car to continue.");
+                      return;
+                    }
+                    setSelectActionCar(car);
+                    setSelectActionMode("menu");
+                    setSelectActionError(null);
+                    setSelectActionOpen(true);
+                    setServicePickerOpen(false);
+                  }}
+                >
+                  <div className="flex flex-col items-center gap-2 text-center">
+                    <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-2xl">
+                      🚗
+                    </span>
+                    <span>Service Request (Car In / Walk In)</span>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  className={`rounded-lg border px-4 py-3 text-left text-sm font-semibold ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+                  onClick={() => {
+                    const car = linkedCars.find((item) => item?.car?.id === selectedCarId)?.car ?? null;
+                    if (!car) {
+                      setServicePickerError("Select a car to continue.");
+                      return;
+                    }
+                    setSelectActionCar(car);
+                    setSelectActionMode("appointment");
+                    setSelectActionError(null);
+                    setSelectActionOpen(true);
+                    setServicePickerOpen(false);
+                  }}
+                >
+                  <div className="flex flex-col items-center gap-2 text-center">
+                    <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-2xl">
+                      📅
+                    </span>
+                    <span>Create Appointment</span>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  className={`rounded-lg border px-4 py-3 text-left text-sm font-semibold ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+                  onClick={() => setServicePickerError("Towing service will be added later.")}
+                >
+                  <div className="flex flex-col items-center gap-2 text-center">
+                    <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-2xl">
+                      🚚
+                    </span>
+                    <span>Towing Service</span>
+                  </div>
+                </button>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
+
       {selectActionOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <Card className={`w-full max-w-lg rounded-xl shadow-xl ${theme.cardBg} ${theme.cardBorder}`}>
@@ -1093,11 +1299,6 @@ export default function CustomerDetailPage({ params }: Params) {
   );
 }
 
-const dummyInvoices = [
-  ["CG-INV-000158680", "2026-01-10 06:01:47", "DXB-A-1234", "master_admin", "SC_Department", "AED 367.50", "Paid", "Loyalty Points", "Print", "2026-01-10 06:01:47"],
-  ["CG-INV-000158681", "2026-01-10 06:01:01", "DXB-D-1000", "master_admin", "SC_Department", "AED 105.00", "Paid", "Loyalty Points", "Print", "2026-01-10 06:01:01"],
-];
-
 const carMakes = ["Audi", "BMW", "Ford", "Honda", "Hyundai", "Kia", "Mazda", "Nissan", "Toyota"];
 
 const carModelsByMake: Record<string, string[]> = {
@@ -1113,16 +1314,6 @@ const carModelsByMake: Record<string, string[]> = {
 };
 
 const carYears = Array.from({ length: 30 }, (_, index) => new Date().getFullYear() - index);
-
-const dummyReturns = [
-  ["CG-RTN-000201", "CG-INV-000158680", "AED 50.00", "master_admin", "Refund issued", "2026-01-11 10:02:12"],
-];
-
-const dummyTransactions = [
-  ["CG-TXN-000208521", "Paid Cash", "View", "AED 1000.00", "master_admin", "Print", "Pending Verification", "2025-12-06 20:30:47"],
-  ["CG-TXN-000208522", "Paid Cash", "View", "AED 1000.00", "master_admin", "Print", "Pending Verification", "2025-12-06 20:35:58"],
-  ["CG-TXN-000208523", "Paid Cash", "View", "AED 500.00", "master_admin", "Print", "Pending Verification", "2025-12-06 20:38:15"],
-];
 
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
   const { theme } = useTheme();

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Lead } from "@repo/ai-core/crm/leads/types";
 import { formatStageLabel } from "@repo/ai-core/crm/leads/jobFlows";
 import { MainPageShell } from "./MainPageShell";
@@ -73,6 +73,32 @@ export function CarInDashboardMain({ companyId, companyName }: CarInDashboardMai
   const [assignBranches, setAssignBranches] = useState<any[]>([]);
   const [assignLoading, setAssignLoading] = useState(false);
   const [assignError, setAssignError] = useState<string | null>(null);
+  const [recoveryByLead, setRecoveryByLead] = useState<
+    Record<
+      string,
+      {
+        id: string;
+        type?: string | null;
+        scheduledAt?: string | null;
+        createdAt?: string | null;
+        remarks?: string | null;
+        dropoffLocation?: string | null;
+      }
+    >
+  >({});
+  const [googleMapsApiKey, setGoogleMapsApiKey] = useState<string | null>(null);
+  const [mapsReady, setMapsReady] = useState(false);
+  const [dropoffOpen, setDropoffOpen] = useState(false);
+  const [dropoffLead, setDropoffLead] = useState<Lead | null>(null);
+  const [dropoffForm, setDropoffForm] = useState({
+    dropoffLocation: "",
+    dropoffMapUrl: "",
+    scheduledAt: "",
+    remarks: "",
+  });
+  const [dropoffSaving, setDropoffSaving] = useState(false);
+  const [dropoffError, setDropoffError] = useState<string | null>(null);
+  const dropoffSearchRef = useRef<HTMLInputElement | null>(null);
 
   const load = useCallback(async () => {
     setState({ status: "loading", data: null, error: null });
@@ -185,6 +211,46 @@ export function CarInDashboardMain({ companyId, companyName }: CarInDashboardMai
       } catch (err) {
         setInvoiceByLead({});
       }
+      try {
+        const recoveryRes = await fetch(`/api/company/${companyId}/recovery-requests`);
+        if (!recoveryRes.ok) throw new Error("Failed to load recovery requests");
+        const recoveryJson = await recoveryRes.json();
+        const rows = recoveryJson.data ?? [];
+        const map: Record<
+          string,
+          {
+            id: string;
+            type?: string | null;
+            scheduledAt?: string | null;
+            createdAt?: string | null;
+            remarks?: string | null;
+            dropoffLocation?: string | null;
+          }
+        > = {};
+        rows.forEach((row: any) => {
+          const leadId = row.leadId ?? row.lead_id ?? null;
+          if (!leadId || !row.id) return;
+          const type = row.type ?? null;
+          if (type !== "dropoff") return;
+          const createdAt = row.createdAt ?? row.created_at ?? null;
+          const createdTime = createdAt ? new Date(createdAt).getTime() : 0;
+          const current = map[leadId];
+          const currentTime = current?.createdAt ? new Date(current.createdAt).getTime() : 0;
+          if (!current || createdTime >= currentTime) {
+            map[leadId] = {
+              id: row.id,
+              type,
+              scheduledAt: row.scheduledAt ?? row.scheduled_at ?? null,
+              createdAt,
+              remarks: row.remarks ?? null,
+              dropoffLocation: row.dropoffLocation ?? row.dropoff_location ?? null,
+            };
+          }
+        });
+        setRecoveryByLead(map);
+      } catch (err) {
+        setRecoveryByLead({});
+      }
     } catch (err) {
       setState({ status: "error", data: null, error: "Failed to load car-in dashboard." });
     }
@@ -200,6 +266,44 @@ export function CarInDashboardMain({ companyId, companyName }: CarInDashboardMai
       cancelled = true;
     };
   }, [load]);
+
+  useEffect(() => {
+    if (!companyId) return;
+    let active = true;
+    (async () => {
+      try {
+        const res = await fetch(`/api/company/${companyId}/profile`, { cache: "no-store" });
+        if (!res.ok) return;
+        const data = await res.json().catch(() => ({}));
+        const company = data?.data?.company ?? data?.data ?? data;
+        if (active) setGoogleMapsApiKey(company?.googleMapsApiKey ?? null);
+      } catch {
+        if (active) setGoogleMapsApiKey(null);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [companyId]);
+
+  useEffect(() => {
+    if (!googleMapsApiKey || typeof window === "undefined") return;
+    const existing = document.querySelector("script[data-google-maps='places']");
+    if (existing) {
+      if ((window as any).google?.maps?.places) setMapsReady(true);
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(
+      googleMapsApiKey
+    )}&libraries=places`;
+    script.async = true;
+    script.defer = true;
+    script.setAttribute("data-google-maps", "places");
+    script.onload = () => setMapsReady(true);
+    script.onerror = () => setMapsReady(false);
+    document.head.appendChild(script);
+  }, [googleMapsApiKey]);
 
   const scopeLabel = companyName ? `Company: ${companyName}` : "Company workspace";
   const isLoading = state.status === "loading";
@@ -282,11 +386,84 @@ export function CarInDashboardMain({ companyId, companyName }: CarInDashboardMai
     }
   }
 
+  function buildMapEmbedUrl(
+    apiKey: string,
+    opts: { placeId?: string | null; center?: string | null; query?: string | null }
+  ) {
+    if (opts.placeId) {
+      return `https://www.google.com/maps/embed/v1/place?key=${encodeURIComponent(
+        apiKey
+      )}&q=place_id:${encodeURIComponent(opts.placeId)}`;
+    }
+    if (opts.center) {
+      return `https://www.google.com/maps/embed/v1/view?key=${encodeURIComponent(
+        apiKey
+      )}&center=${encodeURIComponent(opts.center)}&zoom=16`;
+    }
+    if (opts.query) {
+      return `https://www.google.com/maps/embed/v1/search?key=${encodeURIComponent(
+        apiKey
+      )}&q=${encodeURIComponent(opts.query)}`;
+    }
+    return null;
+  }
+
+  function parseScheduledAtFromRemarks(value?: string | null) {
+    if (!value) return null;
+    const match = value.match(/Scheduled dropoff at:\s*(.+)/i);
+    return match?.[1]?.trim() || null;
+  }
+
+  function formatScheduledTime(value?: string | null) {
+    if (!value) return null;
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toLocaleString();
+  }
+
+  function toDateTimeLocalValue(value?: string | null) {
+    if (!value) return "";
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) return value;
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(
+      date.getHours()
+    )}:${pad(date.getMinutes())}`;
+  }
+
   useEffect(() => {
     if (!toastMessage) return;
     const timer = setTimeout(() => setToastMessage(null), 2500);
     return () => clearTimeout(timer);
   }, [toastMessage]);
+
+  useEffect(() => {
+    if (!mapsReady || !dropoffOpen || !dropoffSearchRef.current) return;
+    const google = (window as any).google;
+    if (!google?.maps?.places) return;
+    const autocomplete = new google.maps.places.Autocomplete(dropoffSearchRef.current, {
+      fields: ["place_id", "formatted_address", "name", "geometry"],
+    });
+    const listener = autocomplete.addListener("place_changed", () => {
+      const place = autocomplete.getPlace();
+      const placeId = place?.place_id ?? null;
+      const location = place?.formatted_address ?? place?.name ?? "";
+      const latLng = place?.geometry?.location;
+      const center = latLng ? `${latLng.lat()},${latLng.lng()}` : null;
+      const mapUrl = googleMapsApiKey
+        ? buildMapEmbedUrl(googleMapsApiKey, { placeId, center, query: location })
+        : "";
+      setDropoffForm((prev) => ({
+        ...prev,
+        dropoffLocation: location || prev.dropoffLocation,
+        dropoffMapUrl: mapUrl ?? prev.dropoffMapUrl,
+      }));
+    });
+    return () => {
+      if (listener) google.maps.event.removeListener(listener);
+    };
+  }, [dropoffOpen, googleMapsApiKey, mapsReady]);
 
   async function createEstimateFromInspection(inspectionId: string | null | undefined) {
     if (!inspectionId) {
@@ -420,6 +597,124 @@ export function CarInDashboardMain({ companyId, companyName }: CarInDashboardMai
     setAssignBranchId(null);
     setAssignBranches([]);
     setAssignError(null);
+  }
+
+  function getCarLocationLabel(lead: Lead | null) {
+    if (!lead) return "Unknown location";
+    const pickup = (lead.pickupFrom ?? "").trim();
+    const dropoff = (lead.dropoffTo ?? "").trim();
+    const branch = (lead.branchName ?? "").trim();
+    return pickup || branch || dropoff || "Unknown location";
+  }
+
+  function extractMapSrc(value?: string | null) {
+    if (!value) return null;
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    if (trimmed.includes("<iframe")) {
+      const match = trimmed.match(/src=["']([^"']+)["']/i);
+      return match?.[1] ?? null;
+    }
+    if (trimmed.startsWith("http")) return trimmed;
+    return null;
+  }
+
+  function getCarLocationMapSrc(lead: Lead | null) {
+    if (!lead) return null;
+    const pickup = extractMapSrc(lead.pickupGoogleLocation ?? null);
+    if (pickup) return pickup;
+    const dropoff = extractMapSrc(lead.dropoffGoogleLocation ?? null);
+    if (dropoff) return dropoff;
+    return null;
+  }
+
+  function openDropoffModal(lead: Lead) {
+    const recovery = recoveryByLead[lead.id];
+    const existingLocation = (recovery?.dropoffLocation ?? lead.dropoffTo ?? "").trim();
+    const existingScheduledRaw =
+      recovery?.scheduledAt ?? parseScheduledAtFromRemarks(recovery?.remarks) ?? "";
+    const existingScheduled = toDateTimeLocalValue(existingScheduledRaw);
+    const mapUrl =
+      googleMapsApiKey && existingLocation
+        ? buildMapEmbedUrl(googleMapsApiKey, { query: existingLocation })
+        : "";
+    setDropoffLead(lead);
+    setDropoffForm({
+      dropoffLocation: existingLocation,
+      dropoffMapUrl: mapUrl,
+      scheduledAt: existingScheduled,
+      remarks: recovery?.remarks ?? "",
+    });
+    setDropoffError(null);
+    setDropoffOpen(true);
+  }
+
+  function closeDropoffModal() {
+    setDropoffOpen(false);
+    setDropoffLead(null);
+    setDropoffError(null);
+  }
+
+  function updateDropoffMapFromQuery() {
+    if (!googleMapsApiKey) return;
+    const query = dropoffForm.dropoffLocation.trim();
+    if (!query) return;
+    const mapUrl = buildMapEmbedUrl(googleMapsApiKey, { query });
+    if (mapUrl) {
+      setDropoffForm((prev) => ({ ...prev, dropoffMapUrl: mapUrl }));
+    }
+  }
+
+  async function submitDropoffRecovery() {
+    if (!dropoffLead) return;
+    const location = dropoffForm.dropoffLocation.trim();
+    if (!location) {
+      setDropoffError("Dropoff location is required.");
+      return;
+    }
+    const existingRecovery = recoveryByLead[dropoffLead.id];
+    setDropoffSaving(true);
+    setDropoffError(null);
+    try {
+      const endpoint = existingRecovery
+        ? `/api/company/${companyId}/recovery-requests/${existingRecovery.id}`
+        : `/api/company/${companyId}/recovery-requests`;
+      const method = existingRecovery ? "PUT" : "POST";
+      const payload = existingRecovery
+        ? {
+            dropoffLocation: location,
+            scheduledAt: dropoffForm.scheduledAt || null,
+            remarks: dropoffForm.remarks || null,
+          }
+        : {
+            leadId: dropoffLead.id,
+            type: "dropoff",
+            pickupLocation: getCarLocationLabel(dropoffLead),
+            dropoffLocation: location,
+            scheduledAt: dropoffForm.scheduledAt || null,
+            remarks: dropoffForm.remarks || null,
+          };
+      const res = await fetch(endpoint, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error ?? "Failed to save dropoff recovery.");
+      }
+      await load();
+      setToastMessage({
+        type: "success",
+        text: existingRecovery ? "Dropoff recovery updated." : "Dropoff recovery scheduled.",
+      });
+      closeDropoffModal();
+    } catch (err: any) {
+      setDropoffError(err?.message ?? "Failed to save dropoff recovery.");
+      setToastMessage({ type: "error", text: "Failed to save dropoff recovery." });
+    } finally {
+      setDropoffSaving(false);
+    }
   }
 
   async function submitAssign() {
@@ -612,6 +907,7 @@ export function CarInDashboardMain({ companyId, companyName }: CarInDashboardMai
                   <tr className="border-b bg-muted/40 text-xs text-muted-foreground">
                     <th className="py-2 pl-3 pr-4 text-left">Customer Details</th>
                     <th className="py-2 px-4 text-left">Car Details</th>
+                    <th className="py-2 px-4 text-left">Car Location</th>
                     <th className="py-2 px-4 text-left">Lead Remarks</th>
                     <th className="py-2 px-4 text-left">Car In Time</th>
                     <th className="py-2 px-4 text-left">Inspection</th>
@@ -640,7 +936,6 @@ export function CarInDashboardMain({ companyId, companyName }: CarInDashboardMai
                     const partsStatus = getPhaseStatus(lead.leadStage, 2);
                     const jobStatus = getPhaseStatus(lead.leadStage, 3);
                     const invoiceStatus = getPhaseStatus(lead.leadStage, 4);
-                    const deliveryStatus = getPhaseStatus(lead.leadStage, 5);
                     const estimateMatch = estimateByLead[lead.id];
                     const estimateId =
                       estimateMatch?.id ??
@@ -675,6 +970,11 @@ export function CarInDashboardMain({ companyId, companyName }: CarInDashboardMai
                     const jobCardHref = jobCardMeta?.id
                       ? `/company/${companyId}/workshop/job-cards/${jobCardMeta.id}`
                       : null;
+                    const recoveryMeta = recoveryByLead[lead.id];
+                    const scheduledAtRaw =
+                      recoveryMeta?.scheduledAt ?? parseScheduledAtFromRemarks(recoveryMeta?.remarks);
+                    const scheduledAtLabel = formatScheduledTime(scheduledAtRaw);
+                    const hasScheduledDropoff = Boolean(recoveryMeta?.id);
                     const jobCardStatus = jobCardMeta?.status
                       ? jobCardMeta.status === "Completed"
                         ? "Completed"
@@ -729,6 +1029,25 @@ export function CarInDashboardMain({ companyId, companyName }: CarInDashboardMai
                           <div className="text-[10px] uppercase text-muted-foreground">
                             {lead.branchName || "Unassigned"} / {lead.agentName || "Unassigned"}
                           </div>
+                        </td>
+                        <td className="py-2 px-4 text-xs text-muted-foreground">
+                          {getCarLocationMapSrc(lead) ? (
+                            <div className="w-[220px] overflow-hidden rounded-md border border-slate-200 bg-white">
+                              <iframe
+                                title="Car location map"
+                                src={getCarLocationMapSrc(lead) as string}
+                                width="100%"
+                                height="140"
+                                style={{ border: 0 }}
+                                loading="lazy"
+                                referrerPolicy="no-referrer-when-downgrade"
+                              />
+                            </div>
+                          ) : (
+                            <div className="max-w-xs whitespace-pre-wrap">
+                              {getCarLocationLabel(lead)}
+                            </div>
+                          )}
                         </td>
                         <td className="py-2 px-4 text-xs text-muted-foreground">
                           <div className="max-w-xs whitespace-pre-wrap">
@@ -917,9 +1236,22 @@ export function CarInDashboardMain({ companyId, companyName }: CarInDashboardMai
                           </div>
                         </td>
                         <td className="py-2 px-4 text-xs">
-                          <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${statusClass(deliveryStatus)}`}>
-                            {deliveryStatus}
-                          </span>
+                          {hasScheduledDropoff && (
+                            <div className="mb-1">
+                              <span className="inline-flex rounded-full bg-sky-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase text-sky-400">
+                                Scheduled{scheduledAtLabel ? ` · ${scheduledAtLabel}` : ""}
+                              </span>
+                            </div>
+                          )}
+                          <div className="mt-1">
+                            <button
+                              type="button"
+                              onClick={() => openDropoffModal(lead)}
+                              className="inline-flex items-center rounded-md border border-slate-200 bg-white px-2 py-1 text-[9px] font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition hover:bg-slate-50 hover:shadow-md"
+                            >
+                              {hasScheduledDropoff ? "Update Dropoff" : "Schedule Dropoff"}
+                            </button>
+                          </div>
                         </td>
                         <td className="py-2 px-4 text-xs">
                           <a
@@ -1110,6 +1442,117 @@ export function CarInDashboardMain({ companyId, companyName }: CarInDashboardMai
                     onClick={submitAssign}
                   >
                     {assignLoading ? "Assigning..." : "Assign"}
+                  </button>
+                </div>
+              </div>
+            </Card>
+          </div>
+        )}
+        {dropoffOpen && dropoffLead && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+            <Card className={`w-full max-w-3xl rounded-xl shadow-xl ${theme.cardBg} ${theme.cardBorder}`}>
+              <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+                <div className="text-sm font-semibold">Schedule Dropoff Recovery</div>
+                <button
+                  type="button"
+                  onClick={closeDropoffModal}
+                  className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+                >
+                  Close
+                </button>
+              </div>
+              <div className="space-y-4 p-4">
+                {dropoffError && <div className="text-sm text-red-400">{dropoffError}</div>}
+                <div className="space-y-1">
+                  <div className={`text-xs font-semibold ${theme.mutedText}`}>Car Location</div>
+                  <div className={`rounded-md border px-3 py-2 text-xs ${theme.cardBorder} ${theme.surfaceSubtle}`}>
+                    {getCarLocationLabel(dropoffLead)}
+                  </div>
+                </div>
+                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                  <div className="space-y-2">
+                    <label className={`text-xs font-semibold ${theme.mutedText}`}>Dropoff Location</label>
+                    <input
+                      ref={dropoffSearchRef}
+                      type="text"
+                      className={theme.input}
+                      value={dropoffForm.dropoffLocation}
+                      onChange={(e) =>
+                        setDropoffForm((prev) => ({ ...prev, dropoffLocation: e.target.value }))
+                      }
+                      placeholder="Search or enter dropoff location"
+                    />
+                    <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                      <span>Use the search box to pick from Google Maps.</span>
+                      <button
+                        type="button"
+                        onClick={updateDropoffMapFromQuery}
+                        className="rounded-md border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition hover:bg-slate-50 hover:shadow-md"
+                      >
+                        Show on Map
+                      </button>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className={`text-xs font-semibold ${theme.mutedText}`}>Dropoff Map</label>
+                    <div className={`overflow-hidden rounded-lg border ${theme.cardBorder}`}>
+                      {dropoffForm.dropoffMapUrl ? (
+                        <iframe
+                          title="Dropoff map"
+                          src={dropoffForm.dropoffMapUrl}
+                          width="100%"
+                          height="220"
+                          style={{ border: 0 }}
+                          loading="lazy"
+                          referrerPolicy="no-referrer-when-downgrade"
+                        />
+                      ) : (
+                        <div className="flex h-[220px] items-center justify-center text-xs text-muted-foreground">
+                          Map preview appears here.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <div className="space-y-2">
+                    <label className={`text-xs font-semibold ${theme.mutedText}`}>Scheduled Dropoff</label>
+                    <input
+                      type="datetime-local"
+                      className={theme.input}
+                      value={dropoffForm.scheduledAt}
+                      onChange={(e) =>
+                        setDropoffForm((prev) => ({ ...prev, scheduledAt: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className={`text-xs font-semibold ${theme.mutedText}`}>Remarks</label>
+                    <textarea
+                      className={`${theme.input} min-h-[96px]`}
+                      value={dropoffForm.remarks}
+                      onChange={(e) =>
+                        setDropoffForm((prev) => ({ ...prev, remarks: e.target.value }))
+                      }
+                      placeholder="Add any special notes for the dropoff recovery."
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    className={`rounded-md px-4 py-2 text-xs font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+                    onClick={closeDropoffModal}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-md bg-primary px-4 py-2 text-xs font-semibold uppercase tracking-wide text-primary-foreground"
+                    disabled={dropoffSaving}
+                    onClick={submitDropoffRecovery}
+                  >
+                    {dropoffSaving ? "Scheduling..." : "Schedule Dropoff"}
                   </button>
                 </div>
               </div>

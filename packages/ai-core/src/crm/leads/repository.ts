@@ -121,6 +121,37 @@ export async function listLeadsForCompany(companyId: string): Promise<Lead[]> {
   return rows.map(mapLeadRow);
 }
 
+export async function listLeadsForCustomer(companyId: string, customerId: string): Promise<Lead[]> {
+  const sql = getSql();
+  await releaseExpiredAssignments(companyId, 5);
+  const rows =
+    await sql/* sql */ `
+      SELECT
+        l.*,
+        c.name AS customer_name,
+        c.phone AS customer_phone,
+        c.email AS customer_email,
+        car.plate_number AS car_plate_number,
+        car.model AS car_model,
+        COALESCE(b.display_name, b.name, b.code) AS branch_name,
+        e.full_name AS agent_name,
+        l.customer_details_requested,
+        l.customer_details_approved,
+        l.recovery_direction,
+        l.recovery_flow,
+        l.pickup_from,
+        l.dropoff_to
+      FROM leads l
+      LEFT JOIN customers c ON c.id = l.customer_id
+      LEFT JOIN cars car ON car.id = l.car_id
+      LEFT JOIN branches b ON b.id = l.branch_id
+      LEFT JOIN employees e ON e.id = l.agent_employee_id
+      WHERE l.company_id = ${companyId} AND l.customer_id = ${customerId}
+      ORDER BY l.created_at DESC
+    `;
+  return rows.map(mapLeadRow);
+}
+
 export async function getLeadById(companyId: string, leadId: string): Promise<Lead | null> {
   const sql = getSql();
   const rows =

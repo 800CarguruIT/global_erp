@@ -1,8 +1,13 @@
-import CashflowClient from "./CashflowClient";
+import { AppLayout } from "@repo/ui";
+import CashFlowClient from "./CashflowClient";
 
 type Params = { params: { companyId: string } | Promise<{ companyId: string }> };
 
-export default async function CompanyCashflowPage({ params }: Params) {
+export default async function CompanyCashFlowPage({ params }: Params) {
   const resolved = params instanceof Promise ? await params : params;
-  return <CashflowClient companyId={resolved.companyId} />;
+  return (
+    <AppLayout forceScope={{ scope: "company", companyId: resolved.companyId }}>
+      <CashFlowClient companyId={resolved.companyId} />
+    </AppLayout>
+  );
 }

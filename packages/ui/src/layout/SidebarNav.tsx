@@ -38,6 +38,26 @@ export function SidebarNav({
 }) {
   const { t } = useI18n();
 
+  const [permissions, setPermissions] = useState<string[] | null>(null);
+  const [permissionsLoaded, setPermissionsLoaded] = useState(false);
+
+  const hasAnyPermission = useMemo(() => {
+    const permSet = new Set(permissions ?? []);
+    return (keys: string[]) =>
+      keys.some(
+        (key) =>
+          permSet.has(key) ||
+          permSet.has("global.admin") ||
+          permSet.has("company.admin") ||
+          permSet.has("branch.admin")
+      );
+  }, [permissions]);
+
+  const hasAnyExactPermission = useMemo(() => {
+    const permSet = new Set(permissions ?? []);
+    return (keys: string[]) => keys.some((key) => permSet.has(key));
+  }, [permissions]);
+
   const resolveItems = (category: Category) =>
     (SIDEBAR_CONFIG[scope]?.[category] || []).filter((item) => {
       if (scope === "global" && item.href === "/global") return false;
@@ -96,9 +116,6 @@ export function SidebarNav({
       : undefined;
   const vendorId = pathParts[2] === "vendors" ? pathParts[3] : undefined;
 
-  const [permissions, setPermissions] = useState<string[] | null>(null);
-  const [permissionsLoaded, setPermissionsLoaded] = useState(false);
-
   useEffect(() => {
     let cancelled = false;
     async function loadPermissions() {
@@ -144,23 +161,6 @@ export function SidebarNav({
       cancelled = true;
     };
   }, [scope, companyId, branchId, vendorId]);
-
-  const hasAnyPermission = useMemo(() => {
-    const permSet = new Set(permissions ?? []);
-    return (keys: string[]) =>
-      keys.some(
-        (key) =>
-          permSet.has(key) ||
-          permSet.has("global.admin") ||
-          permSet.has("company.admin") ||
-          permSet.has("branch.admin")
-      );
-  }, [permissions]);
-
-  const hasAnyExactPermission = useMemo(() => {
-    const permSet = new Set(permissions ?? []);
-    return (keys: string[]) => keys.some((key) => permSet.has(key));
-  }, [permissions]);
 
   const resolveHref = (href: string): string | null => {
     let next = href;

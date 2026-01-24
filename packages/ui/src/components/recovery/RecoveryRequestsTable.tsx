@@ -10,6 +10,7 @@ export type RecoveryRequestRow = {
   type?: string | null;
   status?: string | null;
   stage?: string | null;
+  scheduledAt?: string | null;
   assignedTo?: string | null;
   createdAt?: string | null;
   pickupVideo?: string | null;

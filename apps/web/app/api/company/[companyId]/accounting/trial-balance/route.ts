@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Accounting } from "@repo/ai-core";
+import { Accounting, getSql } from "@repo/ai-core";
 import { buildScopeContextFromRoute, requirePermission } from "../../../../../../lib/auth/permissions";
 
 type Params = { params: Promise<{ companyId: string }> };
@@ -10,20 +10,58 @@ export async function GET(req: NextRequest, { params }: Params) {
   if (perm) return perm;
 
   try {
+    const url = new URL(req.url);
+    const dateTo = url.searchParams.get("dateTo") ?? new Date().toISOString().slice(0, 10);
     const entityId = await Accounting.resolveEntityId("company", companyId);
-    const rows = await Accounting.getEntityTrialBalance({
-      entityId,
-      dateTo: new Date().toISOString().slice(0, 10),
-    });
-    const data = rows.map((r) => ({
-      accountId: (r as any).accountId ?? (r as any).accountid,
-      accountCode: (r as any).accountCode ?? (r as any).accountcode,
-      accountName: (r as any).accountName ?? (r as any).accountname,
-      accountType: (r as any).accountType ?? (r as any).accounttype ?? "",
-      debit: Number((r as any).debit ?? 0),
-      credit: Number((r as any).credit ?? 0),
-    }));
-    return NextResponse.json({ data });
+    const sql = getSql();
+    const rows = await sql<
+      Array<{
+        headingName: string;
+        subheadingName: string;
+        groupName: string;
+        accountId: string;
+        accountCode: string;
+        accountName: string;
+        debit: number | null;
+        credit: number | null;
+        balance: number | null;
+      }>
+    >`
+      SELECT
+        h.name as "headingName",
+        s.name as "subheadingName",
+        g.name as "groupName",
+        a.id as "accountId",
+        a.account_code as "accountCode",
+        a.account_name as "accountName",
+        COALESCE(SUM(jl.debit), 0) as debit,
+        COALESCE(SUM(jl.credit), 0) as credit,
+        COALESCE(SUM(jl.debit - jl.credit), 0) as balance
+      FROM accounting_accounts a
+      JOIN accounting_groups g ON g.id = a.group_id
+      JOIN accounting_subheadings s ON s.id = a.subheading_id
+      JOIN accounting_headings h ON h.id = a.heading_id
+      LEFT JOIN accounting_journal_lines jl ON jl.account_id = a.id
+        AND jl.entity_id = ${entityId}
+        AND jl.created_at::date <= ${dateTo}
+      WHERE a.company_id = ${companyId}
+      GROUP BY
+        h.name,
+        s.name,
+        g.name,
+        a.id,
+        a.account_code,
+        a.account_name
+      ORDER BY h.name, s.name, g.name, a.account_code
+    `;
+    const [company] = await sql<{ display_name: string | null; legal_name: string | null }[]>`
+      SELECT display_name, legal_name
+      FROM companies
+      WHERE id = ${companyId}
+      LIMIT 1
+    `;
+    const companyName = company?.display_name || company?.legal_name || null;
+    return NextResponse.json({ data: rows ?? [], companyName });
   } catch (error) {
     console.error("GET /api/company/[companyId]/accounting/trial-balance error", error);
     return NextResponse.json({ error: "Failed to load trial balance" }, { status: 500 });

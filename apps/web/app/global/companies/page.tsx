@@ -20,6 +20,7 @@ interface CompanySummary {
   customers_count?: number;
   cars_count?: number;
   users_count?: number;
+  allow_custom_coa?: boolean;
 }
 
 export default function GlobalCompaniesPage() {
@@ -35,6 +36,7 @@ function GlobalCompaniesContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
   const { t } = useI18n();
   const { theme } = useTheme();
   const totals = useMemo(() => {
@@ -142,6 +144,27 @@ function GlobalCompaniesContent() {
     }
   }
 
+  async function handleToggleCoa(id: string, enabled: boolean) {
+    setUpdatingId(id);
+    setError(null);
+    try {
+      const res = await fetch("/api/global/accounting/coa-company-settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ companyId: id, enabled }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Failed to update");
+      setItems((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, allow_custom_coa: data?.data?.allow_custom_coa ?? enabled } : c))
+      );
+    } catch (err: any) {
+      setError(err?.message ?? "Failed to update");
+    } finally {
+      setUpdatingId(null);
+    }
+  }
+
   return (
     <div className="space-y-4 py-4">
       <div className="flex items-center justify-between">
@@ -206,6 +229,7 @@ function GlobalCompaniesContent() {
                 <th className="px-4 py-3 font-semibold">{t("companies.table.cars")}</th>
                 <th className="px-4 py-3 font-semibold">{t("companies.table.users")}</th>
                 <th className="px-4 py-3 font-semibold">{t("companies.table.country")}</th>
+                <th className="px-4 py-3 font-semibold">COA Custom</th>
                 <th className="px-4 py-3 font-semibold">{t("companies.table.actions")}</th>
               </tr>
             </thead>
@@ -225,6 +249,25 @@ function GlobalCompaniesContent() {
                   <td className="px-4 py-3">{c.cars_count ?? 0}</td>
                   <td className="px-4 py-3">{c.users_count ?? 0}</td>
                   <td className="px-4 py-3">{c.country ?? "-"}</td>
+                  <td className="px-4 py-3">
+                    <button
+                      type="button"
+                      aria-pressed={Boolean(c.allow_custom_coa)}
+                      disabled={updatingId === c.id}
+                      onClick={() => handleToggleCoa(c.id, !c.allow_custom_coa)}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full border transition ${
+                        c.allow_custom_coa
+                          ? "border-emerald-400/70 bg-emerald-500/30"
+                          : "border-white/15 bg-white/5"
+                      } ${updatingId === c.id ? "opacity-60 cursor-not-allowed" : "hover:border-white/40"}`}
+                    >
+                      <span
+                        className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${
+                          c.allow_custom_coa ? "translate-x-5" : "translate-x-1"
+                        }`}
+                      />
+                    </button>
+                  </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <button
@@ -246,7 +289,7 @@ function GlobalCompaniesContent() {
               ))}
               {items.length === 0 && (
                 <tr>
-                  <td className="px-4 py-4 text-sm opacity-80" colSpan={14}>
+                  <td className="px-4 py-4 text-sm opacity-80" colSpan={15}>
                     {t("companies.table.empty")}
                   </td>
                 </tr>

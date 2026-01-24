@@ -201,6 +201,27 @@ export async function listEstimatesForCompany(
   return rows.map(mapEstimateRow);
 }
 
+export async function listEstimatesForCustomer(
+  companyId: string,
+  customerId: string,
+  opts: { status?: EstimateStatus; limit?: number } = {}
+): Promise<Estimate[]> {
+  const sql = getSql();
+  const { status, limit = 100 } = opts;
+  const where =
+    status != null
+      ? sql`company_id = ${companyId} AND customer_id = ${customerId} AND status = ${status}`
+      : sql`company_id = ${companyId} AND customer_id = ${customerId}`;
+  const rows = await sql`
+    SELECT *
+    FROM estimates
+    WHERE ${where}
+    ORDER BY created_at DESC
+    LIMIT ${limit}
+  `;
+  return rows.map(mapEstimateRow);
+}
+
 export async function updateEstimateHeader(
   companyId: string,
   estimateId: string,
