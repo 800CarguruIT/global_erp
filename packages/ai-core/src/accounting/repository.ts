@@ -50,6 +50,14 @@ export async function getEntityByScope(
   return (rowsFrom(result)[0] as AccountingEntityRow | undefined) ?? null;
 }
 
+export async function getEntityById(id: string): Promise<AccountingEntityRow | null> {
+  const sql = getSql();
+  const result = await sql<AccountingEntityRow[]>`
+    SELECT * FROM accounting_entities WHERE id = ${id} LIMIT 1
+  `;
+  return (rowsFrom(result)[0] as AccountingEntityRow | undefined) ?? null;
+}
+
 export async function createEntityForCompany(
   companyId: string,
   name: string,
@@ -162,6 +170,8 @@ export async function insertJournal(
   input: CreateJournalInput,
   createdByUserId?: string
 ): Promise<JournalRow & { lines: JournalLineRow[] }> {
+  const entity = await getEntityById(input.entityId);
+  const journalCompanyId = entity?.company_id ?? null;
   const sql = getSql();
   const journalNo = input.reference
     ? input.reference
@@ -169,15 +179,20 @@ export async function insertJournal(
 
   const jRes = await sql<JournalRow[]>`
     INSERT INTO accounting_journals (
-      entity_id, journal_no, journal_type, date, description, reference, currency, created_by_user_id
+      entity_id,
+      company_id,
+      journal_no,
+      journal_type,
+      date,
+      description,
+      created_by_user_id
     ) VALUES (
       ${input.entityId},
+      ${journalCompanyId},
       ${journalNo},
       ${input.journalType},
       ${input.date},
       ${input.description ?? null},
-      ${input.reference ?? null},
-      ${input.currency ?? "USD"},
       ${createdByUserId ?? null}
     )
     RETURNING *
@@ -191,6 +206,7 @@ export async function insertJournal(
     const debit = Number(line.debit ?? 0);
     const credit = Number(line.credit ?? 0);
     const dims = line.dimensions ?? {};
+    const lineCompanyId = dims.companyId ?? journalCompanyId;
     const lRes = await sql<JournalLineRow[]>`
       INSERT INTO accounting_journal_lines (
         journal_id, entity_id, line_no, account_id, description, debit, credit,
@@ -203,7 +219,7 @@ export async function insertJournal(
         ${line.description ?? null},
         ${debit},
         ${credit},
-        ${dims.companyId ?? null},
+        ${lineCompanyId},
         ${dims.branchId ?? null},
         ${dims.vendorId ?? null},
         ${dims.employeeId ?? null},

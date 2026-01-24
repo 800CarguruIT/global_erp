@@ -81,11 +81,11 @@ export async function mapAccountToStandard(accountId: string, standardId: string
   return updateAccountStandard(accountId, standardId);
 }
 
-export async function postJournal(input: CreateJournalInput & { createdByUserId?: string }) {
+export async function postJournal(input: CreateJournalInput & { createdByUserId?: string; skipAccountValidation?: boolean }) {
   const accounts = await listAccounts(input.entityId);
   const accountIds = new Set(accounts.map((a) => a.id));
   for (const line of input.lines) {
-    if (!accountIds.has(line.accountId)) {
+    if (!input.skipAccountValidation && !accountIds.has(line.accountId)) {
       throw new Error(`Account ${line.accountId} not in entity`);
     }
   }
