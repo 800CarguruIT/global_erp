@@ -92,6 +92,29 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
   const [jobCardMessage, setJobCardMessage] = useState<string | null>(null);
   const [activeJobCardId, setActiveJobCardId] = useState<string | null>(null);
 
+  const renderOrderBadge = (item: ItemDraft) => {
+    if (item.status !== "approved") {
+      return null;
+    }
+    const trimmedOrderStatus = (item.orderStatus ?? "").trim();
+    const fallbackLabel = item.partOrdered === 1 ? "Ordered" : "Order Pending";
+    const badgeLabel = trimmedOrderStatus || fallbackLabel;
+    const normalizedLabel = badgeLabel.toLowerCase();
+    const badgeClass =
+      normalizedLabel === "received"
+        ? "bg-emerald-500 text-white"
+        : normalizedLabel === "returned"
+        ? "bg-sky-500 text-white"
+        : normalizedLabel === "order pending"
+        ? "bg-amber-100 text-amber-700"
+        : "bg-amber-400 text-slate-900";
+    return (
+      <span className={`rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase ${badgeClass}`}>
+        {badgeLabel}
+      </span>
+    );
+  };
+
   const productTypeByName = useMemo(() => {
     const map = new Map<string, string>();
     products.forEach((p) => {
@@ -1019,20 +1042,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                                   <option value="approved">Approved</option>
                                   <option value="rejected">Rejected</option>
                                 </select>
-                                {item.status === "approved" && (item.partOrdered === 1 || item.orderStatus) && (() => {
-                                  const statusLabel = (item.orderStatus ?? "Ordered").toLowerCase();
-                                  const badgeClass =
-                                    statusLabel === "received"
-                                      ? "bg-emerald-500 text-white"
-                                      : statusLabel === "returned"
-                                      ? "bg-sky-500 text-white"
-                                      : "bg-amber-400 text-slate-900";
-                                  return (
-                                    <span className={`rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase ${badgeClass}`}>
-                                      {item.orderStatus ?? "Ordered"}
-                                    </span>
-                                  );
-                                })()}
+                                {renderOrderBadge(item)}
                               </div>
                             </td>
                           </tr>

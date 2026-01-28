@@ -2,7 +2,8 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { AppLayout } from "@repo/ui";
-import { useParams } from "next/navigation";
+import { toast } from "sonner";
+import { useParams, useRouter } from "next/navigation";
 
 type TabId = "quoted" | "ordered" | "rejected" | "received" | "returns";
 
@@ -19,7 +20,6 @@ type QuoteRow = {
   status?: string | null;
   vendorName?: string | null;
   partName: string;
-  carId?: string | null;
   carMake?: string | null;
   carModel?: string | null;
   carPlate?: string | null;
@@ -40,17 +40,7 @@ type QuoteRow = {
   estimateItemStatus?: string | null;
   approvedType?: string | null;
   updatedAt?: string | null;
-};
-
-type CarGroup = {
-  key: string;
-  carId?: string | null;
-  carMake?: string | null;
-  carModel?: string | null;
-  carPlate?: string | null;
-  carVin?: string | null;
-  quotes: QuoteRow[];
-  statusCounts: Record<string, number>;
+  vendorId?: string | null;
 };
 
 const pickQuote = (row: QuoteRow) => {
@@ -62,20 +52,32 @@ const pickQuote = (row: QuoteRow) => {
   return { type: "-", amount: null, qty: null, etd: null };
 };
 
-const formatStatusSummary = (counts: Record<string, number>) =>
-  Object.entries(counts)
-    .map(([status, count]) => `${status} (${count})`)
-    .join(" • ");
+const ORDERED_QUOTE_PO_KEY = "orderedQuotesPoDraft";
 
 export default function PartsQuotesPage() {
   const params = useParams();
+  const router = useRouter();
   const companyId =
     typeof params?.companyId === "string" ? params.companyId : params?.companyId?.[0] ?? "";
   const [activeTab, setActiveTab] = useState<TabId>("quoted");
   const [rows, setRows] = useState<QuoteRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedCar, setSelectedCar] = useState<CarGroup | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [orderingQuoteId, setOrderingQuoteId] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedOrderedIds, setSelectedOrderedIds] = useState<string[]>([]);
+
+  const isOrderedTab = activeTab === "ordered";
+  const filteredRows = useMemo(() => {
+    if (!searchTerm.trim()) return rows;
+    const normalized = searchTerm.trim().toLowerCase();
+    return rows.filter((row) => {
+      const plate = row.carPlate?.toLowerCase() ?? "";
+      const part = row.partName?.toLowerCase() ?? "";
+      return plate.includes(normalized) || part.includes(normalized);
+    });
+  }, [rows, searchTerm]);
 
   useEffect(() => {
     if (!companyId) return;
@@ -88,60 +90,84 @@ export default function PartsQuotesPage() {
         const res = await fetch(`/api/company/${companyId}/part-quotes?status=${tab.status}`, {
           signal: controller.signal,
         });
-        if (!res.ok) {
-          throw new Error(`Failed to load parts quotes (${res.status})`);
-        }
-        const data = await res.json();
-        setRows(Array.isArray(data?.data) ? data.data : []);
+        if (!res.ok) throw new Error(`Failed to load parts quotes (${res.status})`);
+        const json = await res.json();
+        setRows(Array.isArray(json?.data) ? json.data : []);
       } catch (err: any) {
-        if (err?.name !== "AbortError") {
-          setError(err?.message ?? "Failed to load parts quotes");
-        }
+        if (err?.name !== "AbortError") setError(err?.message ?? "Failed to load parts quotes");
       } finally {
         setLoading(false);
       }
     }
     load();
     return () => controller.abort();
-  }, [companyId, activeTab]);
+  }, [companyId, activeTab, refreshKey]);
 
-  const carGroups = useMemo(() => {
-    const map = new Map<string, CarGroup>();
-    rows.forEach((row) => {
-      const candidateName = [row.carMake, row.carModel].filter(Boolean).join(" ").trim();
-      const fallbackKey = `car-${map.size + 1}`;
-      const key =
-        row.carId ??
-        row.carPlate ??
-        row.carVin ??
-        (candidateName.length ? candidateName : fallbackKey);
-      const status = row.status ?? "unknown";
-      const existing = map.get(key);
-      if (existing) {
-        existing.quotes.push(row);
-        existing.statusCounts[status] = (existing.statusCounts[status] ?? 0) + 1;
-      } else {
-        map.set(key, {
-          key,
-          carId: row.carId,
-          carMake: row.carMake,
-          carModel: row.carModel,
-          carPlate: row.carPlate,
-          carVin: row.carVin,
-          quotes: [row],
-          statusCounts: { [status]: 1 },
-        });
-      }
-    });
-    return Array.from(map.values());
-  }, [rows]);
+  useEffect(() => {
+    if (!isOrderedTab && selectedOrderedIds.length) setSelectedOrderedIds([]);
+  }, [isOrderedTab, selectedOrderedIds.length]);
 
-  const carTableBody = useMemo(() => {
+  const toggleSelection = (id: string) => {
+    setSelectedOrderedIds((prev) =>
+      prev.includes(id) ? prev.filter((existing) => existing !== id) : [...prev, id]
+    );
+  };
+
+  const handleCreatePurchaseOrder = () => {
+    if (!selectedOrderedIds.length) return;
+    const rowsToSend = rows.filter((row) => selectedOrderedIds.includes(row.id));
+    if (!rowsToSend.length) return;
+    const firstRow = rowsToSend[0];
+    const payload = {
+      vendorId: firstRow.vendorId ?? null,
+      vendorName: firstRow.vendorName ?? null,
+      lines: rowsToSend.map((row) => {
+        const quoteInfo = pickQuote(row);
+        return {
+          quoteId: row.id,
+          partLabel: row.partName ?? "Part",
+          quantity: quoteInfo.qty ?? 1,
+          unitPrice: quoteInfo.amount ?? 0,
+          unit: quoteInfo.type ?? "EA",
+          partsCatalogId: (row as any).partsCatalogId ?? null,
+          approvedType: row.approvedType ?? null,
+        };
+      }),
+    };
+    try {
+      sessionStorage.setItem(ORDERED_QUOTE_PO_KEY, JSON.stringify(payload));
+    } catch {
+      // ignore
+    }
+    router.push(`/company/${companyId}/procurement/new`);
+  };
+
+  const orderQuote = async (row: QuoteRow) => {
+    if (!companyId) return;
+    setOrderingQuoteId(row.id);
+    try {
+      const res = await fetch(`/api/company/${companyId}/part-quotes/order`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ quoteId: row.id }),
+      });
+      if (!res.ok) throw new Error(`Failed to order quote (${res.status})`);
+      toast.success("Quote marked as ordered");
+      setRefreshKey((prev) => prev + 1);
+    } catch (err) {
+      console.error(err);
+      toast.error("Unable to order this quote");
+    } finally {
+      setOrderingQuoteId(null);
+    }
+  };
+
+  const renderTableBody = () => {
     if (loading) {
       return (
         <tr>
-          <td className="px-3 py-8 text-center text-sm text-slate-300/80" colSpan={7}>
-            Loading cars with part quotes...
+          <td className="px-3 py-8 text-center text-sm text-slate-300/80" colSpan={11}>
+            Loading part quotes...
           </td>
         </tr>
       );
@@ -149,54 +175,98 @@ export default function PartsQuotesPage() {
     if (error) {
       return (
         <tr>
-          <td className="px-3 py-8 text-center text-sm text-rose-300" colSpan={7}>
+          <td className="px-3 py-8 text-center text-sm text-rose-300" colSpan={11}>
             {error}
           </td>
         </tr>
       );
     }
-    if (!carGroups.length) {
+    if (!filteredRows.length) {
       return (
         <tr>
-          <td className="px-3 py-8 text-center text-sm text-slate-300/80" colSpan={7}>
-            No cars with part quotes found.
+          <td className="px-3 py-8 text-center text-sm text-slate-300/80" colSpan={11}>
+            No parts found for this tab.
           </td>
         </tr>
       );
     }
-    return carGroups.map((car, index) => {
-      const carLabel = [car.carMake, car.carModel].filter(Boolean).join(" ").trim() || "Unknown car";
-      const statusSummary = formatStatusSummary(car.statusCounts) || "No status";
+    return filteredRows.map((row, index) => {
+      const statusLabel = row.estimateItemStatus ?? row.status ?? "pending";
+      const derivedStatus = statusLabel.toLowerCase();
+      const isApproved = derivedStatus === "approved";
+      const types = [
+        { name: "OEM", value: row.oem, etd: row.oemEtd },
+        { name: "OE", value: row.oe, etd: row.oeEtd },
+        { name: "AFTM", value: row.aftm, etd: row.aftmEtd },
+        { name: "Used", value: row.used, etd: row.usedEtd },
+      ];
+      const approvedTypeKey = row.approvedType?.toLowerCase() ?? "";
+      const approvedTypeEntry = types.find((type) => type.name.toLowerCase() === approvedTypeKey);
+      const canOrder = Boolean(isApproved && approvedTypeEntry && approvedTypeEntry.value != null);
+      const isOrderingThis = orderingQuoteId === row.id;
+      const carLabel = [row.carMake, row.carModel].filter(Boolean).join(" ") || "Unknown car";
+      const partName = row.partName || "Unnamed part";
+      const quoteInfo = pickQuote(row);
+      const quoteAmount = quoteInfo.amount != null ? `${quoteInfo.amount.toFixed(2)} AED` : "-";
+      const orderedOn = row.updatedAt ? new Date(row.updatedAt).toLocaleDateString() : "-";
       return (
-        <tr key={car.key} className="border-t border-white/5">
+        <tr key={row.id} className="border-t border-white/5">
           <td className="px-3 py-3 text-xs text-slate-300/80">{index + 1}</td>
-          <td className="px-3 py-3 text-sm">{carLabel}</td>
-          <td className="px-3 py-3">{car.carPlate ?? "-"}</td>
-          <td className="px-3 py-3">{car.carVin ?? "-"}</td>
-          <td className="px-3 py-3 text-xs text-muted-foreground">{statusSummary}</td>
-          <td className="px-3 py-3 text-sm">{car.quotes.length}</td>
-          <td className="px-3 py-3 text-right">
-            <button
-              type="button"
-              onClick={() => setSelectedCar(car)}
-              className="rounded-md border border-border px-3 py-1 text-xs font-semibold text-slate-100 hover:border-emerald-500 hover:text-emerald-500"
-            >
-              View quotes
-            </button>
+          <td className="px-3 py-3 text-xs text-slate-200">{row.vendorName ?? "Unknown vendor"}</td>
+          <td className="px-3 py-3 text-xs">{carLabel}</td>
+          <td className="px-3 py-3 text-xs">{row.carPlate ?? "-"}</td>
+          <td className="px-3 py-3 text-xs">{row.carVin ?? "-"}</td>
+          <td className="px-3 py-3 text-sm font-semibold">
+            <div>{partName}</div>
+            <div className="text-[11px] text-slate-400">{row.remarks ?? ""}</div>
           </td>
+          <td className="px-3 py-3 text-xs">
+            <div className="font-semibold">{quoteInfo.type}</div>
+            <div>{quoteAmount}</div>
+            <div className="text-[10px] uppercase text-slate-400">{quoteInfo.etd ?? ""}</div>
+          </td>
+          <td className="px-3 py-3 text-xs uppercase">{statusLabel}</td>
+          <td className="px-3 py-3 text-xs uppercase">{row.status ?? "Requested"}</td>
+          <td className="px-3 py-3 text-xs">{orderedOn}</td>
+          {isOrderedTab ? (
+            <td className="px-3 py-3 text-center">
+              <input
+                type="checkbox"
+                checked={selectedOrderedIds.includes(row.id)}
+                onChange={() => toggleSelection(row.id)}
+                className="h-4 w-4 rounded border border-slate-600 bg-slate-900/70 text-emerald-500"
+                aria-label="Select ordered part"
+              />
+            </td>
+          ) : (
+            <td className="px-3 py-3 text-right">
+              {canOrder ? (
+                <button
+                  type="button"
+                  onClick={() => orderQuote(row)}
+                  disabled={isOrderingThis}
+                  className="rounded-md border border-emerald-500 px-3 py-1 text-xs font-semibold text-emerald-500 hover:bg-emerald-500/10 disabled:opacity-70"
+                >
+                  {isOrderingThis ? "Ordering..." : "Order part"}
+                </button>
+              ) : (
+                <span className="rounded-full bg-amber-500/10 px-3 py-1 text-[10px] font-semibold text-amber-300">
+                  Approval pending
+                </span>
+              )}
+            </td>
+          )}
         </tr>
       );
     });
-  }, [carGroups, loading, error]);
-
-  const selectedCarQuotes = selectedCar?.quotes ?? [];
+  };
 
   return (
     <AppLayout>
       <div className="space-y-6 py-4">
         <div>
-          <h1 className="text-2xl font-semibold">Part Quotes by Car</h1>
-          <p className="text-sm text-muted-foreground">Grouped view of cars that have received vendor quotes.</p>
+          <h1 className="text-2xl font-semibold">Part Quotes</h1>
+          <p className="text-sm text-muted-foreground">List of vendor quotes across cars and statuses.</p>
         </div>
 
         <div className="rounded-2xl bg-slate-950/80 p-2">
@@ -228,144 +298,65 @@ export default function PartsQuotesPage() {
             </div>
             <span className="text-xs text-slate-400">Updated just now</span>
           </div>
+          <div className="flex flex-wrap items-center gap-3 px-4 pb-3">
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="Search by plate or part"
+              className="flex-1 min-w-[220px] rounded-md border border-slate-800 bg-slate-900/70 px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/70"
+            />
+            {isOrderedTab && selectedOrderedIds.length > 0 && (
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={() => handleCreatePurchaseOrder()}
+                  className="rounded-md bg-emerald-500 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white shadow-lg shadow-emerald-500/40 transition hover:bg-emerald-400"
+                >
+                  Create Purchase Order
+                </button>
+                <div className="text-[11px] font-semibold uppercase text-slate-300">Selected parts</div>
+                <div className="flex flex-wrap gap-2 text-[11px] text-slate-200">
+                  {rows
+                    .filter((row) => selectedOrderedIds.includes(row.id))
+                    .map((row) => (
+                      <span
+                        key={`chip-${row.id}`}
+                        className="rounded-full border border-emerald-500/40 bg-emerald-500/5 px-2 py-1"
+                      >
+                        {row.partName ?? "Part"}
+                      </span>
+                    ))}
+                </div>
+              </div>
+            )}
+          </div>
           <div className="overflow-x-auto">
-            <table className="min-w-[800px] text-sm text-slate-100">
+            <table className="w-full min-w-[1400px] text-sm text-slate-100">
               <thead className="bg-slate-900 text-xs uppercase tracking-wide text-slate-300">
                 <tr>
                   <th className="px-3 py-2 text-left">#</th>
+                  <th className="px-3 py-2 text-left">Vendor</th>
                   <th className="px-3 py-2 text-left">Car</th>
                   <th className="px-3 py-2 text-left">Plate</th>
                   <th className="px-3 py-2 text-left">VIN</th>
+                  <th className="px-3 py-2 text-left">Part</th>
+                  <th className="px-3 py-2 text-left">Quote</th>
                   <th className="px-3 py-2 text-left">Status</th>
-                  <th className="px-3 py-2 text-left">Quotes</th>
-                  <th className="px-3 py-2 text-right">Actions</th>
+                  <th className="px-3 py-2 text-left">Quote status</th>
+                  <th className="px-3 py-2 text-left">Ordered On</th>
+                  {isOrderedTab ? (
+                    <th className="px-3 py-2 text-center">Select</th>
+                  ) : (
+                    <th className="px-3 py-2 text-right">Action</th>
+                  )}
                 </tr>
               </thead>
-              <tbody>{carTableBody}</tbody>
+              <tbody>{renderTableBody()}</tbody>
             </table>
           </div>
         </div>
       </div>
-
-      {selectedCar && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6">
-          <div
-            className="absolute inset-0 bg-black/60"
-            onClick={() => setSelectedCar(null)}
-          />
-          <div className="relative w-full max-w-4xl rounded-2xl border border-white/10 bg-slate-950 p-6 shadow-2xl">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-lg font-semibold text-white">
-                  Quotes for{" "}
-                  {[selectedCar.carMake, selectedCar.carModel].filter(Boolean).join(" ") ||
-                    "Unknown car"}
-                </div>
-                <div className="text-xs text-slate-400">
-                  Plate: {selectedCar.carPlate ?? "-"} • VIN: {selectedCar.carVin ?? "-"}
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedCar(null)}
-                className="rounded-full border border-white/20 px-3 py-1 text-xs font-semibold text-white hover:border-rose-400 hover:text-rose-400"
-              >
-                Close
-              </button>
-            </div>
-            <div className="mt-4 overflow-x-auto">
-              <table className="min-w-full text-sm text-slate-100">
-                <thead className="bg-slate-900 text-[11px] uppercase tracking-wide text-slate-400">
-                <tr>
-                  <th className="px-3 py-2 text-left">#</th>
-                  <th className="px-3 py-2 text-left">Vendor</th>
-                  <th className="px-3 py-2 text-left">Part</th>
-                  <th className="px-3 py-2 text-left">OEM</th>
-                  <th className="px-3 py-2 text-left">OE</th>
-                  <th className="px-3 py-2 text-left">AFTM</th>
-                  <th className="px-3 py-2 text-left">Used</th>
-                  <th className="px-3 py-2 text-left">Date</th>
-                  <th className="px-3 py-2 text-left">Status</th>
-                  <th className="px-3 py-2 text-right">Action</th>
-                </tr>
-                </thead>
-            <tbody>
-              {selectedCarQuotes.length === 0 ? (
-                <tr>
-                  <td colSpan={10} className="px-3 py-4 text-center text-xs text-slate-400">
-                    No quotes for this vehicle.
-                  </td>
-                </tr>
-              ) : (
-                selectedCarQuotes.map((row, index) => {
-                  const statusLabel = row.estimateItemStatus ?? row.status ?? "pending";
-                  const isApproved = statusLabel.toLowerCase() === "approved";
-                  const normalizedApprovedType = row.approvedType?.toLowerCase() ?? "";
-                  const types = [
-                    { name: "OEM", value: row.oem, etd: row.oemEtd },
-                    { name: "OE", value: row.oe, etd: row.oeEtd },
-                    { name: "AFTM", value: row.aftm, etd: row.aftmEtd },
-                    { name: "Used", value: row.used, etd: row.usedEtd },
-                  ];
-                  return (
-                    <tr key={row.id} className="border-t border-white/5">
-                      <td className="px-3 py-3 text-xs text-slate-300/80">{index + 1}</td>
-                      <td className="px-3 py-3 text-sm font-semibold">{row.vendorName ?? "-"}</td>
-                      <td className="px-3 py-3 text-sm">
-                        <div>{row.partName}</div>
-                        <div className="text-[11px] text-slate-500">{row.remarks ?? ""}</div>
-                      </td>
-                      {types.map((type) => {
-                        const typeKey = type.name.toLowerCase();
-                        const isTypeApproved = isApproved && normalizedApprovedType === typeKey;
-                        return (
-                          <td key={`${row.id}-${type.name}`} className="px-3 py-3 align-top">
-                            <div className="flex items-center justify-between gap-1 text-xs">
-                              <span className="font-semibold">
-                                {type.value != null ? `${type.value.toFixed(2)} AED` : "-"}
-                              </span>
-                              {isTypeApproved && (
-                                <span className="rounded-full bg-emerald-500 px-2 py-0.5 text-[10px] font-semibold text-white">
-                                  Approved
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-[11px] text-slate-400">{type.etd ?? "-"}</div>
-                          </td>
-                        );
-                      })}
-                      <td className="px-3 py-3 text-xs text-slate-400">
-                        {row.updatedAt ? new Date(row.updatedAt).toLocaleDateString() : "-"}
-                      </td>
-                      <td className="px-3 py-3 text-xs">
-                        <span className="rounded-full border px-2 py-0.5 text-[10px] uppercase text-slate-200">
-                          {statusLabel}
-                        </span>
-                      </td>
-                      <td className="px-3 py-3 text-right">
-                        {isApproved ? (
-                          <button
-                            type="button"
-                            className="rounded-md border border-emerald-500 px-3 py-1 text-xs font-semibold text-emerald-500 hover:bg-emerald-500/10"
-                          >
-                            Accept quote
-                          </button>
-                        ) : (
-                          <span className="rounded-full bg-amber-500/10 px-3 py-1 text-[10px] font-semibold text-amber-300">
-                            Approval pending
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
     </AppLayout>
   );
 }

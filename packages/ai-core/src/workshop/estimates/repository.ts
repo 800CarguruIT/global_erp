@@ -362,46 +362,93 @@ export async function replaceEstimateItems(
   }>
 ): Promise<void> {
   const sql = getSql();
-  await sql`DELETE FROM estimate_items WHERE estimate_id = ${estimateId}`;
   if (!items.length) {
+    await sql`DELETE FROM estimate_items WHERE estimate_id = ${estimateId}`;
     await recalculateEstimateTotals(estimateId);
     return;
   }
 
-  for (const [idx, item] of items.entries()) {
+  const existingRows = await sql`
+    SELECT id
+    FROM estimate_items
+    WHERE estimate_id = ${estimateId}
+  `;
+  const existingIds = existingRows.map((row: any) => row.id as string);
+  const existingIdSet = new Set(existingIds);
+  const keepIds = new Set(items.map((item) => item.id).filter((id): id is string => Boolean(id)));
+  const deleteIds = existingIds.filter((id) => !keepIds.has(id));
+  if (deleteIds.length > 0) {
     await sql`
-      INSERT INTO estimate_items (
-        id,
-        estimate_id,
-        inspection_item_id,
-        line_no,
-        part_name,
-        description,
-        type,
-        quantity,
-        cost,
-        sale,
-        gp_percent,
-        approved_cost,
-        approved_type,
-        status
-      ) VALUES (
-        COALESCE(${item.id ?? null}, gen_random_uuid()),
-        ${estimateId},
-        ${item.inspectionItemId ?? null},
-        ${item.lineNo ?? idx + 1},
-        ${item.partName},
-        ${item.description ?? null},
-        ${item.type},
-        ${item.quantity ?? 1},
-        ${item.cost ?? 0},
-        ${item.sale ?? 0},
-        ${item.gpPercent ?? null},
-        ${item.approvedCost ?? null},
-        ${item.approvedType ?? null},
-        ${item.status ?? ("pending" as EstimateItemStatus)}
-      )
+      DELETE FROM estimate_items
+      WHERE estimate_id = ${estimateId} AND id = ANY(${deleteIds})
     `;
+  }
+
+  for (const [idx, item] of items.entries()) {
+    const inspectionItemId = item.inspectionItemId ?? null;
+    const lineNo = item.lineNo ?? idx + 1;
+    const partDescription = item.description ?? null;
+    const qty = item.quantity ?? 1;
+    const cost = item.cost ?? 0;
+    const sale = item.sale ?? 0;
+    const gpPercent = item.gpPercent ?? null;
+    const approvedCost = item.approvedCost ?? null;
+    const approvedType = item.approvedType ?? null;
+    const status = item.status ?? ("pending" as EstimateItemStatus);
+
+    if (item.id && existingIdSet.has(item.id)) {
+      await sql`
+        UPDATE estimate_items
+        SET
+          inspection_item_id = ${inspectionItemId},
+          line_no = ${lineNo},
+          part_name = ${item.partName},
+          description = ${partDescription},
+          type = ${item.type},
+          quantity = ${qty},
+          cost = ${cost},
+          sale = ${sale},
+          gp_percent = ${gpPercent},
+          approved_cost = ${approvedCost},
+          approved_type = ${approvedType},
+          status = ${status}
+        WHERE id = ${item.id} AND estimate_id = ${estimateId}
+      `;
+    } else {
+      await sql`
+        INSERT INTO estimate_items (
+          id,
+          estimate_id,
+          inspection_item_id,
+          line_no,
+          part_name,
+          description,
+          type,
+          quantity,
+          cost,
+          sale,
+          gp_percent,
+          approved_cost,
+          approved_type,
+          status
+        ) VALUES (
+          COALESCE(${item.id ?? null}, gen_random_uuid()),
+          ${estimateId},
+          ${inspectionItemId},
+          ${lineNo},
+          ${item.partName},
+          ${partDescription},
+          ${item.type},
+          ${qty},
+          ${cost},
+          ${sale},
+          ${gpPercent},
+          ${approvedCost},
+          ${approvedType},
+          ${status}
+        )
+      `;
+    }
   }
 
   await recalculateEstimateTotals(estimateId);
