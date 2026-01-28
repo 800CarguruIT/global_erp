@@ -2,7 +2,7 @@
   "info": {
     "name": "Global ERP Mobile API",
     "_postman_id": "b7c3a1c4-3f24-4f6a-9a53-3f8d1c7c3d6a",
-    "description": "Mobile JWT auth endpoints for Global ERP",
+    "description": "JWT-authenticated routes for the mobile inspection flow and selectors.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -64,6 +64,539 @@
           "path": ["api", "mobile", "auth", "refresh"]
         }
       }
+    },
+    {
+      "name": "Inspections - List",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/inspections?status=pending",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "mobile", "company", "{{companyId}}", "inspections"],
+          "query": [
+            {
+              "key": "status",
+              "value": "pending"
+            }
+          ]
+        }
+      },
+      "description": "Returns inspections scoped to the company; supports optional `status` filter."
+    },
+    {
+      "name": "Inspection - Detail",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/inspections/{{inspectionId}}",
+          "host": ["{{baseUrl}}"],
+          "path": [
+            "api",
+            "mobile",
+            "company",
+            "{{companyId}}",
+            "inspections",
+            "{{inspectionId}}"
+          ]
+        }
+      },
+      "description": "Fetches a single inspection with its line items."
+    },
+    {
+      "name": "Inspection - Update (Draft)",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"pending\",\n  \"draftPayload\": {\n    \"advisorName\": \"Main Branch\",\n    \"inspectorName\": \"Inspector 01\",\n    \"checks\": { \"engine\": \"good\" }\n  },\n  \"items\": [\n    {\n      \"partName\": \"Brake Pad\",\n      \"quantity\": 2,\n      \"productType\": \"Spare Parts\"\n    }\n  ]\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/inspections/{{inspectionId}}",
+          "host": ["{{baseUrl}}"],
+          "path": [
+            "api",
+            "mobile",
+            "company",
+            "{{companyId}}",
+            "inspections",
+            "{{inspectionId}}"
+          ]
+        }
+      },
+      "description": "Saves inspection metadata and replaces line items in one request."
+    },
+    {
+      "name": "Selector - Products",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/selectors/products?search=Brake&type=Spare%20Parts",
+          "host": ["{{baseUrl}}"],
+          "path": [
+            "api",
+            "mobile",
+            "company",
+            "{{companyId}}",
+            "selectors",
+            "products"
+          ],
+          "query": [
+            {
+              "key": "search",
+              "value": "Brake"
+            },
+            {
+              "key": "type",
+              "value": "Spare Parts"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Selector - Parts Requirements",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/selectors/parts",
+          "host": ["{{baseUrl}}"],
+          "path": [
+            "api",
+            "mobile",
+            "company",
+            "{{companyId}}",
+            "selectors",
+            "parts"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Selector - Tyre Sizes",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/selectors/cars/tyre-sizes",
+          "host": ["{{baseUrl}}"],
+          "path": [
+            "api",
+            "mobile",
+            "company",
+            "{{companyId}}",
+            "selectors",
+            "cars",
+            "tyre-sizes"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Customers",
+      "description": "Customer-focused mobile endpoints: detail, wallets, cars, leads, inspections, and estimates.",
+      "item": [
+        {
+          "name": "Customer - Detail",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/customers/{{customerId}}",
+              "host": ["{{baseUrl}}"],
+              "path": [
+                "api",
+                "mobile",
+                "company",
+                "{{companyId}}",
+                "customers",
+                "{{customerId}}"
+              ]
+            }
+          },
+          "description": "Returns the customer record with linked cars plus wallet summary data."
+        },
+        {
+          "name": "Customer - Wallet Summary",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/customers/{{customerId}}/wallet/summary",
+              "host": ["{{baseUrl}}"],
+              "path": [
+                "api",
+                "mobile",
+                "company",
+                "{{companyId}}",
+                "customers",
+                "{{customerId}}",
+                "wallet",
+                "summary"
+              ]
+            }
+          },
+          "description": "Returns wallet balances that power the customer dashboard."
+        },
+        {
+          "name": "Customer - Wallet Transactions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/customers/{{customerId}}/wallet/transactions?approvedOnly=false",
+              "host": ["{{baseUrl}}"],
+              "path": [
+                "api",
+                "mobile",
+                "company",
+                "{{companyId}}",
+                "customers",
+                "{{customerId}}",
+                "wallet",
+                "transactions"
+              ],
+              "query": [
+                {
+                  "key": "approvedOnly",
+                  "value": "false"
+                }
+              ]
+            }
+          },
+          "description": "Lists wallet transactions for a customer (defaults to approved only)."
+        },
+        {
+          "name": "Customer - Wallet Transaction (Create)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 150.0,\n  \"paymentMethod\": \"cash\",\n  \"paymentDate\": \"2025-01-27\",\n  \"notes\": \"Top-up from mobile app.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/customers/{{customerId}}/wallet/transactions",
+              "host": ["{{baseUrl}}"],
+              "path": [
+                "api",
+                "mobile",
+                "company",
+                "{{companyId}}",
+                "customers",
+                "{{customerId}}",
+                "wallet",
+                "transactions"
+              ]
+            }
+          },
+          "description": "Creates a wallet top-up entry for the customer."
+        },
+        {
+          "name": "Customer - Cars",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/customers/{{customerId}}/cars",
+              "host": ["{{baseUrl}}"],
+              "path": [
+                "api",
+                "mobile",
+                "company",
+                "{{companyId}}",
+                "customers",
+                "{{customerId}}",
+                "cars"
+              ]
+            }
+          },
+          "description": "Fetches cars linked to the customer."
+        },
+        {
+          "name": "Customer - Link Car",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"relationType\": \"owner\",\n  \"isPrimary\": true,\n  \"newCar\": {\n    \"plateNumber\": \"DXB-A-1234\",\n    \"make\": \"Toyota\",\n    \"model\": \"Corolla\",\n    \"modelYear\": 2023\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/customers/{{customerId}}/cars",
+              "host": ["{{baseUrl}}"],
+              "path": [
+                "api",
+                "mobile",
+                "company",
+                "{{companyId}}",
+                "customers",
+                "{{customerId}}",
+                "cars"
+              ]
+            }
+          },
+          "description": "Creates or links a car to the customer (can also create a car record)."
+        },
+        {
+          "name": "Customer - Update Car Link",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isPrimary\": true,\n  \"notes\": \"Preferred for appointments.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/customers/{{customerId}}/cars?linkId={{linkId}}",
+              "host": ["{{baseUrl}}"],
+              "path": [
+                "api",
+                "mobile",
+                "company",
+                "{{companyId}}",
+                "customers",
+                "{{customerId}}",
+                "cars"
+              ],
+              "query": [
+                {
+                  "key": "linkId",
+                  "value": "{{linkId}}"
+                }
+              ]
+            }
+          },
+          "description": "Updates metadata for an existing car link using linkId."
+        },
+        {
+          "name": "Customer - Unlink Car",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/customers/{{customerId}}/cars?linkId={{linkId}}",
+              "host": ["{{baseUrl}}"],
+              "path": [
+                "api",
+                "mobile",
+                "company",
+                "{{companyId}}",
+                "customers",
+                "{{customerId}}",
+                "cars"
+              ],
+              "query": [
+                {
+                  "key": "linkId",
+                  "value": "{{linkId}}"
+                }
+              ]
+            }
+          },
+          "description": "Removes a car link belonging to the customer."
+        },
+        {
+          "name": "Customer - Car Action (Select)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"carId\": \"{{carId}}\",\n  \"action\": \"car_in\",\n  \"remarks\": \"Walk-in service request from mobile.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/customers/{{customerId}}/cars/select",
+              "host": ["{{baseUrl}}"],
+              "path": [
+                "api",
+                "mobile",
+                "company",
+                "{{companyId}}",
+                "customers",
+                "{{customerId}}",
+                "cars",
+                "select"
+              ]
+            }
+          },
+          "description": "Triggers car selection workflows (car-in or appointment)."
+        },
+        {
+          "name": "Customer - Leads",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/customers/{{customerId}}/leads",
+              "host": ["{{baseUrl}}"],
+              "path": [
+                "api",
+                "mobile",
+                "company",
+                "{{companyId}}",
+                "customers",
+                "{{customerId}}",
+                "leads"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Customer - Inspections",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/customers/{{customerId}}/inspections",
+              "host": ["{{baseUrl}}"],
+              "path": [
+                "api",
+                "mobile",
+                "company",
+                "{{companyId}}",
+                "customers",
+                "{{customerId}}",
+                "inspections"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Customer - Estimates",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/customers/{{customerId}}/estimates",
+              "host": ["{{baseUrl}}"],
+              "path": [
+                "api",
+                "mobile",
+                "company",
+                "{{companyId}}",
+                "customers",
+                "{{customerId}}",
+                "estimates"
+              ]
+            }
+          }
+        }
+      ]
     }
   ],
   "variable": [
@@ -77,6 +610,26 @@
     },
     {
       "key": "refreshToken",
+      "value": ""
+    },
+    {
+      "key": "companyId",
+      "value": ""
+    },
+    {
+      "key": "inspectionId",
+      "value": ""
+    },
+    {
+      "key": "customerId",
+      "value": ""
+    },
+    {
+      "key": "linkId",
+      "value": ""
+    },
+    {
+      "key": "carId",
       "value": ""
     }
   ]

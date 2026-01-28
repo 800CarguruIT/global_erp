@@ -9,7 +9,11 @@ import {
   listInspectionLineItems,
   updateInspectionLineItem,
 } from "@repo/ai-core/workshop/inspections/repository";
-import type { EstimateItemStatus, EstimateStatus } from "@repo/ai-core/workshop/estimates/types";
+import type {
+  EstimateItemCostType,
+  EstimateItemStatus,
+  EstimateStatus,
+} from "@repo/ai-core/workshop/estimates/types";
 import type { LineItemStatus } from "@repo/ai-core/workshop/inspections/types";
 
 type Params = { params: Promise<{ companyId: string; estimateId: string }> };
@@ -58,6 +62,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       sale?: number;
       gpPercent?: number | null;
       status?: EstimateItemStatus;
+      approvedType?: EstimateItemCostType | null;
+      approvedCost?: number | null;
     }>;
 
     let inspectionItems: Awaited<ReturnType<typeof listInspectionLineItems>> = [];
@@ -132,20 +138,22 @@ export async function PATCH(req: NextRequest, { params }: Params) {
           }
         }
       }
-      mappedItems.push({
-        id: item.id,
-        lineNo: item.lineNo ?? idx + 1,
-        inspectionItemId,
-        partName: item.partName,
-        description: item.description ?? null,
-        type: item.type as any,
-        quantity: item.quantity ?? 1,
-        cost: item.cost ?? 0,
-        sale: item.sale ?? 0,
-        gpPercent: item.gpPercent ?? null,
-        status: item.status ?? ("pending" as EstimateItemStatus),
-      });
-    }
+        mappedItems.push({
+          id: item.id,
+          lineNo: item.lineNo ?? idx + 1,
+          inspectionItemId,
+          partName: item.partName,
+          description: item.description ?? null,
+          type: item.type as any,
+          quantity: item.quantity ?? 1,
+          cost: item.cost ?? 0,
+          sale: item.sale ?? 0,
+          gpPercent: item.gpPercent ?? null,
+          status: item.status ?? ("pending" as EstimateItemStatus),
+          approvedType: (item as any).approvedType ?? null,
+          approvedCost: (item as any).approvedCost ?? null,
+        });
+      }
 
     await replaceEstimateItems(estimateId, mappedItems);
   }

@@ -1,8 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import bcrypt from "bcryptjs";
 import { getSql, UserRepository } from "@repo/ai-core";
 import { createAccessToken, createRefreshToken } from "../../../../../lib/auth/mobile-jwt";
 import { getUserContext } from "../../../../../lib/auth/user-context";
+import { createMobileErrorResponse, createMobileSuccessResponse } from "../../utils";
 
 type UserRow = {
   id: string;
@@ -17,7 +18,7 @@ export async function POST(req: NextRequest) {
     const email = body?.email?.toString().trim().toLowerCase();
     const password = body?.password?.toString();
     if (!email || !password) {
-      return NextResponse.json({ error: "email and password are required" }, { status: 400 });
+      return createMobileErrorResponse("email and password are required", 400);
     }
 
     const sql = getSql();
@@ -29,20 +30,23 @@ export async function POST(req: NextRequest) {
     `;
     const user = (res as any).rows ? (res as any).rows[0] : res[0];
     if (!user || user.is_active === false) {
-      return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+      return createMobileErrorResponse("Invalid credentials", 401);
     }
 
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) {
-      return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+      return createMobileErrorResponse("Invalid credentials", 401);
     }
 
     const { token: accessToken, expiresIn } = createAccessToken(user.id);
     const { token: refreshToken, expiresIn: refreshExpiresIn } = createRefreshToken(user.id);
     const context = await getUserContext(user.id);
     const fullUser = await UserRepository.getUserById(user.id);
+    if (!fullUser) {
+      return createMobileErrorResponse("User profile missing", 500);
+    }
 
-    return NextResponse.json({
+    return createMobileSuccessResponse({
       tokenType: "Bearer",
       accessToken,
       refreshToken,
@@ -52,11 +56,13 @@ export async function POST(req: NextRequest) {
         id: fullUser.id,
         fullName: fullUser.full_name ?? null,
         email: fullUser.email ?? user.email ?? null,
+        isGlobal: context.isGlobal,
+        scope: context.scope,
+        companies: context.companies[0],
       },
-      context,
     });
   } catch (error: any) {
     console.error("POST /api/mobile/auth/login error:", error);
-    return NextResponse.json({ error: "Failed to login" }, { status: 500 });
+    return createMobileErrorResponse("Failed to login");
   }
 }

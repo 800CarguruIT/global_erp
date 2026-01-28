@@ -1,5 +1,7 @@
 export type EstimateStatus = "draft" | "pending_approval" | "approved" | "rejected" | "cancelled" | "invoiced";
 export type EstimateItemStatus = "pending" | "inquiry" | "approved" | "rejected";
+export type EstimateItemCostType = "oe" | "oem" | "aftm" | "used";
+export type EstimateItemQuoteCosts = Partial<Record<EstimateItemCostType, number>>;
 
 export type Estimate = {
   id: string;
@@ -34,7 +36,10 @@ export type EstimateItem = {
   cost: number;
   sale: number;
   gpPercent?: number | null;
+  approvedCost?: number | null;
   status: EstimateItemStatus;
   createdAt: string;
   updatedAt: string;
+  approvedType?: EstimateItemCostType | null;
+  quoteCosts?: EstimateItemQuoteCosts;
 };

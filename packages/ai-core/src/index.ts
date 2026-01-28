@@ -46,6 +46,8 @@ export type {
   EstimateItem,
   EstimateStatus,
   EstimateItemStatus,
+  EstimateItemCostType,
+  EstimateItemQuoteCosts,
 } from "./workshop/estimates/types";
 export * as WorkshopParts from "./workshop/parts/repository";
 export type { PartCatalogItem, PartsRequirementRow, ProcurementStatus } from "./workshop/parts/types";
@@ -109,5 +111,4 @@ export { getOpenAIClient } from "./ai/client";
 export { canUseAi } from "./ai/policy";
 export * as Files from "./files/repository";
 export type { FileKind, FileRecord } from "./files/types";
-
 

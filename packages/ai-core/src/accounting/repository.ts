@@ -168,10 +168,12 @@ export async function importStandardAccountsToEntity(entityId: string): Promise<
 
 export async function insertJournal(
   input: CreateJournalInput,
-  createdByUserId?: string
+  createdByUserId?: string,
+  options?: { isPosted?: boolean }
 ): Promise<JournalRow & { lines: JournalLineRow[] }> {
   const entity = await getEntityById(input.entityId);
   const journalCompanyId = entity?.company_id ?? null;
+  const isPosted = options?.isPosted ?? true;
   const sql = getSql();
   const journalNo = input.reference
     ? input.reference
@@ -185,7 +187,8 @@ export async function insertJournal(
       journal_type,
       date,
       description,
-      created_by_user_id
+      created_by_user_id,
+      is_posted
     ) VALUES (
       ${input.entityId},
       ${journalCompanyId},
@@ -193,7 +196,8 @@ export async function insertJournal(
       ${input.journalType},
       ${input.date},
       ${input.description ?? null},
-      ${createdByUserId ?? null}
+      ${createdByUserId ?? null},
+      ${isPosted}
     )
     RETURNING *
   `;
@@ -207,31 +211,114 @@ export async function insertJournal(
     const credit = Number(line.credit ?? 0);
     const dims = line.dimensions ?? {};
     const lineCompanyId = dims.companyId ?? journalCompanyId;
-    const lRes = await sql<JournalLineRow[]>`
-      INSERT INTO accounting_journal_lines (
-        journal_id, entity_id, line_no, account_id, description, debit, credit,
-        company_id, branch_id, vendor_id, employee_id, project_id, cost_center
-      ) VALUES (
-        ${journal.id},
-        ${input.entityId},
-        ${lineNo},
-        ${line.accountId},
-        ${line.description ?? null},
-        ${debit},
-        ${credit},
-        ${lineCompanyId},
-        ${dims.branchId ?? null},
-        ${dims.vendorId ?? null},
-        ${dims.employeeId ?? null},
-        ${dims.projectId ?? null},
-        ${dims.costCenter ?? null}
-      )
-      RETURNING *
-    `;
-    lines.push(rowsFrom(lRes)[0] as JournalLineRow);
+    const insertedLine = await insertJournalLine({
+      journalId: journal.id,
+      entityId: input.entityId,
+      lineNo,
+      accountId: line.accountId,
+      description: line.description ?? null,
+      debit,
+      credit,
+      companyId: lineCompanyId,
+      branchId: dims.branchId ?? null,
+      vendorId: dims.vendorId ?? null,
+      employeeId: dims.employeeId ?? null,
+      projectId: dims.projectId ?? null,
+      costCenter: dims.costCenter ?? null,
+    });
+    lines.push(insertedLine);
     lineNo += 1;
   }
   return { ...(journal as JournalRow), lines };
+}
+
+export async function insertJournalLine(params: {
+  journalId: string;
+  entityId: string;
+  lineNo: number;
+  accountId: string;
+  description?: string | null;
+  debit: number;
+  credit: number;
+  companyId: string | null;
+  branchId?: string | null;
+  vendorId?: string | null;
+  employeeId?: string | null;
+  projectId?: string | null;
+  costCenter?: string | null;
+}): Promise<JournalLineRow> {
+  const sql = getSql();
+  const result = await sql<JournalLineRow[]>`
+    INSERT INTO accounting_journal_lines (
+      journal_id, entity_id, line_no, account_id, description, debit, credit,
+      company_id, branch_id, vendor_id, employee_id, project_id, cost_center
+    ) VALUES (
+      ${params.journalId},
+      ${params.entityId},
+      ${params.lineNo},
+      ${params.accountId},
+      ${params.description ?? null},
+      ${params.debit},
+      ${params.credit},
+      ${params.companyId},
+      ${params.branchId ?? null},
+      ${params.vendorId ?? null},
+      ${params.employeeId ?? null},
+      ${params.projectId ?? null},
+      ${params.costCenter ?? null}
+    )
+    RETURNING *
+  `;
+  const row = rowsFrom(result)[0] as JournalLineRow | undefined;
+  if (!row) throw new Error("Failed to insert journal line");
+  return row;
+}
+
+export async function deleteJournalLines(journalId: string): Promise<void> {
+  const sql = getSql();
+  await sql`
+    DELETE FROM accounting_journal_lines WHERE journal_id = ${journalId}
+  `;
+}
+
+export async function updateJournalHeader(params: {
+  journalId: string;
+  journalType: string;
+  date: string;
+  description?: string | null;
+}): Promise<JournalRow | null> {
+  const sql = getSql();
+  const result = await sql<JournalRow[]>`
+    UPDATE accounting_journals
+    SET
+      journal_type = ${params.journalType},
+      date = ${params.date},
+      description = ${params.description ?? null},
+      updated_at = now()
+    WHERE id = ${params.journalId}
+    RETURNING *
+  `;
+  return (rowsFrom(result)[0] as JournalRow | undefined) ?? null;
+}
+
+export async function getJournalById(id: string): Promise<JournalRow | null> {
+  const sql = getSql();
+  const result = await sql<JournalRow[]>`
+    SELECT * FROM accounting_journals WHERE id = ${id} LIMIT 1
+  `;
+  return (rowsFrom(result)[0] as JournalRow | undefined) ?? null;
+}
+
+export async function markJournalPosted(journalId: string): Promise<JournalRow | null> {
+  const sql = getSql();
+  const result = await sql<JournalRow[]>`
+    UPDATE accounting_journals
+    SET is_posted = TRUE,
+        updated_at = now()
+    WHERE id = ${journalId}
+    RETURNING *
+  `;
+  return (rowsFrom(result)[0] as JournalRow | undefined) ?? null;
 }
 
 export async function listJournals(

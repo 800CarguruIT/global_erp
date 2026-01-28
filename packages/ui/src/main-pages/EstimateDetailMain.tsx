@@ -4,7 +4,14 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { MainPageShell } from "./MainPageShell";
 import { useTheme } from "../theme";
-import type { Estimate, EstimateItem, EstimateItemStatus, EstimateStatus } from "@repo/ai-core/workshop/estimates/types";
+import type {
+  Estimate,
+  EstimateItem,
+  EstimateItemCostType,
+  EstimateItemQuoteCosts,
+  EstimateItemStatus,
+  EstimateStatus,
+} from "@repo/ai-core/workshop/estimates/types";
 
 type EstimateDetailMainProps = {
   companyId: string;
@@ -34,6 +41,9 @@ type ItemDraft = {
   source?: "inspection" | "estimate";
   partOrdered?: number | null;
   orderStatus?: string | null;
+  approvedType?: EstimateItemCostType | null;
+  quoteCosts?: EstimateItemQuoteCosts;
+  approvedCost?: number | null;
 };
 
 type DraftState = {
@@ -44,6 +54,15 @@ type DraftState = {
   inspectorRemarks: string;
   items: ItemDraft[];
 };
+
+const COST_DISPLAY_ORDER: Array<{ key: EstimateItemCostType; label: string }> = [
+  { key: "oe", label: "OE" },
+  { key: "oem", label: "OEM" },
+  { key: "aftm", label: "AFTM" },
+  { key: "used", label: "Used" },
+];
+
+const formatCostValue = (value?: number | null) => (value != null ? value.toFixed(2) : "0.00");
 
 export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMainProps) {
   const { theme } = useTheme();
@@ -163,9 +182,13 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
             discountAmount: estimate.totalDiscount ?? 0,
             customerComplain: estimate.meta?.customerComplain ?? "",
             inspectorRemarks: estimate.meta?.inspectorRemarks ?? "",
-            items: items.map((i) => ({
-              id: i.id,
-              lineNo: i.lineNo,
+            items: items.map((i) => {
+              const defaultApprovedType = COST_DISPLAY_ORDER.find(
+                ({ key }) => i.quoteCosts?.[key] != null
+              )?.key;
+              return {
+                id: i.id,
+                lineNo: i.lineNo,
                 partName: i.partName ?? "",
                 description: i.description ?? "",
                 type: i.type,
@@ -175,13 +198,17 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                 cost: i.cost ?? 0,
                 sale: i.sale ?? 0,
                 approvedSale: i.sale ?? 0,
-              discount: 0,
-              gpPercent: i.gpPercent ?? null,
-              status: i.status,
-              source: i.inspectionItemId ? "inspection" : "estimate",
-              partOrdered: i.inspectionItemId ? lineItemOrderMap[i.inspectionItemId] ?? 0 : 0,
-              orderStatus: i.inspectionItemId ? lineItemOrderStatusMap[i.inspectionItemId] ?? null : null,
-            })),
+                discount: 0,
+                gpPercent: i.gpPercent ?? null,
+                status: i.status,
+                source: i.inspectionItemId ? "inspection" : "estimate",
+                partOrdered: i.inspectionItemId ? lineItemOrderMap[i.inspectionItemId] ?? 0 : 0,
+                orderStatus: i.inspectionItemId ? lineItemOrderStatusMap[i.inspectionItemId] ?? null : null,
+                quoteCosts: i.quoteCosts,
+                approvedType: i.approvedType ?? defaultApprovedType,
+                approvedCost: i.approvedCost ?? null,
+              };
+            }),
           });
           setCustomer(null);
           setCar(null);
@@ -341,6 +368,8 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
               : i.sale ?? 0,
           gpPercent: i.gpPercent ?? null,
           status: i.status ?? "pending",
+          approvedType: i.approvedType ?? null,
+          approvedCost: i.approvedCost ?? null,
         })),
       };
       const res = await fetch(`/api/company/${companyId}/workshop/estimates/${estimateId}`, {
@@ -417,12 +446,13 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
     const isPendingLike = (status: EstimateItemStatus) => status === "pending" || status === "inquiry";
     const getLineValues = (item: ItemDraft) => {
       const qty = Number(item.quantity) || 0;
-      const cost = Number(item.cost) || 0;
+      const baseCost = Number(item.cost) || 0;
+      const approvedCost = Number(item.approvedCost ?? item.cost) || baseCost;
       const saleValue = Number(item.sale) || 0;
       const approvedValue = Number(item.approvedSale) || 0;
       const saleBase = approvedValue > 0 ? approvedValue : saleValue;
       const discountPct = Number(item.discount) || 0;
-      const costTotal = cost * qty;
+      const costTotal = approvedCost * qty;
       const saleTotal = saleBase * qty;
       const discountAmount = (saleTotal * discountPct) / 100;
       const subTotal = saleTotal - discountAmount;
@@ -513,22 +543,24 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
       if (current.partOrdered === 1 && current.status === "approved") {
         return prev;
       }
-      const updated: ItemDraft = {
-        ...current,
-        ...patch,
-        partName: patch.partName ?? current.partName ?? "",
-        type: patch.type ?? current.type ?? "genuine",
-        quantity: patch.quantity ?? current.quantity ?? 0,
-        cost: patch.cost ?? current.cost ?? 0,
-        sale: patch.sale ?? current.sale ?? 0,
-        approvedSale: patch.approvedSale ?? current.approvedSale ?? 0,
-        discount: patch.discount ?? current.discount ?? 0,
-        productType: patch.productType ?? current.productType ?? null,
-        inspectionItemId: patch.inspectionItemId ?? current.inspectionItemId ?? null,
-        gpPercent: patch.gpPercent ?? current.gpPercent ?? null,
-        status: patch.status ?? current.status ?? "pending",
-        partOrdered: patch.partOrdered ?? current.partOrdered ?? 0,
-      };
+        const updated: ItemDraft = {
+          ...current,
+          ...patch,
+          partName: patch.partName ?? current.partName ?? "",
+          type: patch.type ?? current.type ?? "genuine",
+          quantity: patch.quantity ?? current.quantity ?? 0,
+          cost: patch.cost ?? current.cost ?? 0,
+          sale: patch.sale ?? current.sale ?? 0,
+          approvedSale: patch.approvedSale ?? current.approvedSale ?? 0,
+          discount: patch.discount ?? current.discount ?? 0,
+          productType: patch.productType ?? current.productType ?? null,
+          inspectionItemId: patch.inspectionItemId ?? current.inspectionItemId ?? null,
+          gpPercent: patch.gpPercent ?? current.gpPercent ?? null,
+          status: patch.status ?? current.status ?? "pending",
+          partOrdered: patch.partOrdered ?? current.partOrdered ?? 0,
+          approvedType: patch.approvedType ?? current.approvedType ?? null,
+          approvedCost: patch.approvedCost ?? current.approvedCost ?? null,
+        };
       next[index] = updated;
       return { ...prev, items: next };
     });
@@ -541,19 +573,22 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
             ...prev,
             items: [
               ...prev.items,
-              {
-                partName: "",
-                description: "",
-                type: "genuine",
-                productType: null,
-                quantity: 1,
-                cost: 0,
-                sale: 0,
-                approvedSale: 0,
-                discount: 0,
-                status: "pending",
-                source: "estimate",
-              },
+                {
+                  partName: "",
+                  description: "",
+                  type: "genuine",
+                  productType: null,
+                  quantity: 1,
+                  cost: 0,
+                  sale: 0,
+                  approvedSale: 0,
+                  discount: 0,
+                  status: "pending",
+                  source: "estimate",
+                  quoteCosts: undefined,
+                  approvedType: undefined,
+                  approvedCost: undefined,
+                },
             ],
           }
         : prev
@@ -777,18 +812,24 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                     ) : (
                       draft.items.map((item, idx) => {
                         const qty = Number(item.quantity) || 0;
-                        const cost = Number(item.cost) || 0;
+                        const baseCost = Number(item.cost) || 0;
+                        const approvedCostValue = Number(item.approvedCost ?? item.cost) || baseCost;
                         const discountPct = Number(item.discount) || 0;
                         const saleValue = Number(item.sale) || 0;
                         const approvedValue = Number(item.approvedSale) || 0;
                         const saleBase = approvedValue > 0 ? approvedValue : saleValue;
-                        const lineCost = cost * qty;
+                        const lineCost = approvedCostValue * qty;
                         const lineSale = saleBase * qty;
                         const discountAmount = (lineSale * discountPct) / 100;
                         const subTotal = lineSale - discountAmount;
                         const gpPercent =
                           subTotal > 0 ? ((subTotal - lineCost) / subTotal) * 100 : 0;
                         const isLocked = item.partOrdered === 1 && item.status === "approved";
+                        const availableApprovedType = COST_DISPLAY_ORDER.find(
+                          ({ key }) => item.quoteCosts?.[key] != null
+                        )?.key;
+                        const selectedApprovedType =
+                          item.approvedType ?? availableApprovedType ?? COST_DISPLAY_ORDER[0].key;
                         return (
                           <tr key={idx} className="border-b border-border/60 last:border-0">
                             <td className="px-2 py-1">
@@ -826,25 +867,53 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                               />
                             </td>
                             <td className="px-2 py-1">
+                              <div className="space-y-2">
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  className={`${theme.input} h-8 w-24 text-xs`}
+                                  value={item.cost}
+                                  disabled={isLocked}
+                                  onChange={(e) => {
+                                    const cost = Number(e.target.value) || 0;
+                                    const sale = item.sale ?? 0;
+                                    const gp = sale > 0 ? ((sale - cost) / sale) * 100 : item.gpPercent ?? null;
+                                    updateItem(idx, { cost, gpPercent: gp ?? null });
+                                  }}
+                                />
+                                <div className="space-y-1">
+                                  {COST_DISPLAY_ORDER.map(({ key, label }) => {
+                                    const costValue = item.quoteCosts?.[key];
+                                    return (
+                                      <div
+                                        key={`${idx}-${key}`}
+                                        className="rounded-md border border-border/60 bg-slate-100/80 px-2 py-1 text-right text-[10px] font-semibold dark:border-white/10 dark:bg-slate-900/60"
+                                      >
+                                        <div className="text-[11px] font-semibold text-slate-900 dark:text-slate-100">
+                                          {formatCostValue(costValue)}
+                                        </div>
+                                        <div className="text-[9px] uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                                          {label}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-2 py-1">
                               <input
                                 type="number"
                                 step="0.01"
                                 className={`${theme.input} h-8 w-24 text-xs`}
-                                value={item.cost}
+                                value={item.approvedCost ?? ""}
                                 disabled={isLocked}
                                 onChange={(e) => {
-                                  const cost = Number(e.target.value) || 0;
-                                  const sale = item.sale ?? 0;
-                                  const gp = sale > 0 ? ((sale - cost) / sale) * 100 : item.gpPercent ?? null;
-                                  updateItem(idx, { cost, gpPercent: gp ?? null });
+                                  const raw = e.target.value;
+                                  const approvedCost =
+                                    raw === "" ? null : Number(raw);
+                                  updateItem(idx, { approvedCost });
                                 }}
-                              />
-                            </td>
-                            <td className="px-2 py-1">
-                              <input
-                                className={`${theme.input} h-8 w-24 text-xs`}
-                                value={item.cost.toFixed(2)}
-                                readOnly
                               />
                             </td>
                             <td className="px-2 py-1 text-xs">{lineCost.toFixed(2)}</td>
@@ -883,23 +952,45 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                               />
                             </td>
                             <td className="px-2 py-1">
-                              <input
-                                type="number"
-                                step="0.01"
-                                className={`${theme.input} h-8 w-24 text-xs`}
-                                value={item.approvedSale}
-                                disabled={isLocked}
-                                onChange={(e) => {
-                                  const approvedSale = Number(e.target.value) || 0;
-                                  updateItem(idx, {
-                                    approvedSale,
-                                    sale:
-                                      (item.status === "pending" || item.status === "inquiry") && !item.sale
-                                        ? approvedSale
-                                        : item.sale,
-                                  });
-                                }}
-                              />
+                              <div className="space-y-1">
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  className={`${theme.input} h-8 w-24 text-xs`}
+                                  value={item.approvedSale}
+                                  disabled={isLocked}
+                                  onChange={(e) => {
+                                    const approvedSale = Number(e.target.value) || 0;
+                                    updateItem(idx, {
+                                      approvedSale,
+                                      sale:
+                                        (item.status === "pending" || item.status === "inquiry") && !item.sale
+                                          ? approvedSale
+                                          : item.sale,
+                                    });
+                                  }}
+                                />
+                                <div className="space-y-1">
+                                  <label className="text-[9px] font-semibold text-slate-500">
+                                    Approved Type
+                                  </label>
+                                  <select
+                                    className={`${theme.input} h-7 w-24 text-xs`}
+                                    value={selectedApprovedType}
+                                    disabled={isLocked}
+                                  onChange={(e) => {
+                                    const approvedType = e.target.value as EstimateItemCostType;
+                                    updateItem(idx, { approvedType });
+                                  }}
+                                  >
+                                    {COST_DISPLAY_ORDER.map(({ key, label }) => (
+                                      <option key={key} value={key}>
+                                        {label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                              </div>
                             </td>
                             <td className="px-2 py-1 text-xs">{lineSale.toFixed(2)}</td>
                             <td className="px-2 py-1">

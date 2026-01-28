@@ -27,12 +27,14 @@ export default function TrialBalanceClient({ companyId }: { companyId: string })
   const [dateTo, setDateTo] = useState(() => today.format("YYYY-MM-DD"));
   const [companyName, setCompanyName] = useState<string | null>(null);
   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
+  const [journalScope, setJournalScope] = useState<"posted" | "all">("posted");
 
   async function load() {
     setLoading(true);
     setError(null);
     try {
       const params = new URLSearchParams({ dateTo });
+      if (journalScope === "all") params.set("includeDrafts", "true");
       const res = await fetch(`/api/company/${companyId}/accounting/trial-balance?${params.toString()}`, {
         cache: "no-store",
       });
@@ -50,7 +52,7 @@ export default function TrialBalanceClient({ companyId }: { companyId: string })
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dateTo]);
+  }, [dateTo, journalScope]);
 
   useEffect(() => {
     const now = dayjs();
@@ -79,12 +81,23 @@ export default function TrialBalanceClient({ companyId }: { companyId: string })
     }
   }, [rangePreset]);
 
+  const sortedRows = React.useMemo(
+    () =>
+      [...rows].sort((a, b) =>
+        a.accountCode.localeCompare(b.accountCode, undefined, {
+          numeric: true,
+          sensitivity: "base",
+        })
+      ),
+    [rows]
+  );
+
   const grouped = React.useMemo(() => {
     const headings = new Map<
       string,
       Map<string, Map<string, { accounts: Row[]; totals: { debit: number; credit: number; balance: number } }>>
     >();
-    for (const row of rows) {
+    for (const row of sortedRows) {
       if (!headings.has(row.headingName)) headings.set(row.headingName, new Map());
       const subMap = headings.get(row.headingName)!;
       if (!subMap.has(row.subheadingName)) subMap.set(row.subheadingName, new Map());
@@ -99,7 +112,7 @@ export default function TrialBalanceClient({ companyId }: { companyId: string })
       group.totals.balance += Number(row.balance ?? 0);
     }
     return headings;
-  }, [rows]);
+  }, [sortedRows]);
 
   const toggleGroup = (heading: string, sub: string, group: string) => {
     const key = `${heading}::${sub}::${group}`;
@@ -179,6 +192,14 @@ export default function TrialBalanceClient({ companyId }: { companyId: string })
               As of {dateTo}
             </div>
           )}
+          <select
+            value={journalScope}
+            onChange={(e) => setJournalScope(e.target.value as "posted" | "all")}
+            className="rounded-full border border-white/15 bg-black/30 px-3 py-2 text-sm text-white/90"
+          >
+            <option value="posted">Posted entries</option>
+            <option value="all">All entries</option>
+          </select>
           <button
             onClick={load}
             className="rounded-full bg-primary px-3 py-1 text-sm font-semibold text-primary-foreground hover:opacity-90"

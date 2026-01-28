@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Accounting } from "@repo/ai-core";
-import { buildScopeContextFromRoute, requirePermission } from "../../../../../../lib/auth/permissions";
+import { buildScopeContextFromRoute, requirePermission } from "@/lib/auth/permissions";
 import { getCurrentUserIdFromRequest } from "../../../../../../lib/auth/current-user";
 
 type Params = { params: Promise<{ companyId: string }> };
+type JournalParams = { params: Promise<{ companyId: string; id: string }> };
 
 export async function GET(req: NextRequest, { params }: Params) {
   const { companyId } = await params;
@@ -36,7 +37,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   const date = body.date ?? new Date().toISOString().slice(0, 10);
   const entityId = await Accounting.resolveEntityId("company", companyId);
   try {
-    const journal = await Accounting.postJournal({
+    const journal = await Accounting.createDraftJournal({
       entityId,
       date,
 

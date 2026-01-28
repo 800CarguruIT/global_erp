@@ -15,6 +15,10 @@ export async function GET(req: NextRequest, { params }: Params) {
     const dateTo = url.searchParams.get("to") ?? dateFrom;
     const entityId = await Accounting.resolveEntityId("company", companyId);
     const sql = getSql();
+    const includeDrafts = url.searchParams.get("includeDrafts") === "true";
+    const postedFilter = includeDrafts
+      ? sql``
+      : sql`AND (j.is_posted = TRUE OR jl.journal_id IS NULL)`;
     const rows = await sql<
       Array<{
         headingName: string;
@@ -46,11 +50,13 @@ export async function GET(req: NextRequest, { params }: Params) {
         AND jl.entity_id = ${entityId}
         AND jl.created_at::date >= ${dateFrom}
         AND jl.created_at::date <= ${dateTo}
+      LEFT JOIN accounting_journals j ON j.id = jl.journal_id
       WHERE a.company_id = ${companyId}
         AND (
           a.account_code LIKE '4%' OR
           a.account_code LIKE '5%'
         )
+        ${postedFilter}
       GROUP BY
         h.name,
         s.name,

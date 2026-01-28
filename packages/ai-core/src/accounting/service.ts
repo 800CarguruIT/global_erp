@@ -13,6 +13,12 @@ import {
   getTrialBalance,
   importStandardAccountsToEntity,
   insertJournal,
+  insertJournalLine,
+  deleteJournalLines,
+  updateJournalHeader,
+  getJournalById,
+  getEntityById,
+  markJournalPosted,
   listAccounts,
   getProfitAndLossAll,
   getBalanceSheetAll,
@@ -81,20 +87,115 @@ export async function mapAccountToStandard(accountId: string, standardId: string
   return updateAccountStandard(accountId, standardId);
 }
 
-export async function postJournal(input: CreateJournalInput & { createdByUserId?: string; skipAccountValidation?: boolean }) {
-  const accounts = await listAccounts(input.entityId);
+async function validateJournalLines(params: {
+  entityId: string;
+  lines: JournalLineInput[];
+  skipAccountValidation?: boolean;
+}) {
+  const accounts = await listAccounts(params.entityId);
   const accountIds = new Set(accounts.map((a) => a.id));
-  for (const line of input.lines) {
-    if (!input.skipAccountValidation && !accountIds.has(line.accountId)) {
-      throw new Error(`Account ${line.accountId} not in entity`);
+  if (!params.skipAccountValidation) {
+    for (const line of params.lines) {
+      if (!accountIds.has(line.accountId)) {
+        throw new Error(`Account ${line.accountId} not in entity`);
+      }
     }
   }
-  const totalDebit = input.lines.reduce((s, l) => s + (Number(l.debit ?? 0)), 0);
-  const totalCredit = input.lines.reduce((s, l) => s + (Number(l.credit ?? 0)), 0);
+  const totalDebit = params.lines.reduce((s, l) => s + (Number(l.debit ?? 0)), 0);
+  const totalCredit = params.lines.reduce((s, l) => s + (Number(l.credit ?? 0)), 0);
   if (Number(totalDebit.toFixed(4)) !== Number(totalCredit.toFixed(4))) {
     throw new Error("Journal not balanced (debits != credits)");
   }
-  return insertJournal(input, input.createdByUserId);
+}
+
+async function saveJournal(
+  input: CreateJournalInput & { createdByUserId?: string; skipAccountValidation?: boolean },
+  isPosted: boolean
+) {
+  await validateJournalLines({
+    entityId: input.entityId,
+    lines: input.lines,
+    skipAccountValidation: input.skipAccountValidation,
+  });
+  return insertJournal(input, input.createdByUserId, { isPosted });
+}
+
+export async function postJournal(input: CreateJournalInput & { createdByUserId?: string; skipAccountValidation?: boolean }) {
+  return saveJournal(input, true);
+}
+
+export async function createDraftJournal(
+  input: CreateJournalInput & { createdByUserId?: string; skipAccountValidation?: boolean }
+) {
+  return saveJournal(input, false);
+}
+
+export async function markJournalAsPosted(journalId: string): Promise<JournalRow> {
+  const journal = await markJournalPosted(journalId);
+  if (!journal) {
+    throw new Error("Journal not found");
+  }
+  return journal;
+}
+
+export async function updateDraftJournal(params: {
+  journalId: string;
+  entityId: string;
+  journalType: string;
+  date: string;
+  description?: string | null;
+  lines: JournalLineInput[];
+  createdByUserId?: string;
+  skipAccountValidation?: boolean;
+}) {
+  const journal = await getJournalById(params.journalId);
+  if (!journal) {
+    throw new Error("Journal not found");
+  }
+  if (journal.entity_id !== params.entityId) {
+    throw new Error("Journal does not belong to the requested entity");
+  }
+  if (journal.is_posted) {
+    throw new Error("Cannot edit a posted journal");
+  }
+  await validateJournalLines({
+    entityId: params.entityId,
+    lines: params.lines,
+    skipAccountValidation: params.skipAccountValidation,
+  });
+  await updateJournalHeader({
+    journalId: params.journalId,
+    journalType: params.journalType,
+    date: params.date,
+    description: params.description ?? null,
+  });
+  await deleteJournalLines(params.journalId);
+  const entity = await getEntityById(params.entityId);
+  const journalCompanyId = entity?.company_id ?? null;
+  let lineNo = 1;
+  for (const line of params.lines) {
+    const debit = Number(line.debit ?? 0);
+    const credit = Number(line.credit ?? 0);
+    const dims = line.dimensions ?? {};
+    const lineCompanyId = dims.companyId ?? journalCompanyId;
+    await insertJournalLine({
+      journalId: params.journalId,
+      entityId: params.entityId,
+      lineNo,
+      accountId: line.accountId,
+      description: line.description ?? null,
+      debit,
+      credit,
+      companyId: lineCompanyId,
+      branchId: dims.branchId ?? null,
+      vendorId: dims.vendorId ?? null,
+      employeeId: dims.employeeId ?? null,
+      projectId: dims.projectId ?? null,
+      costCenter: dims.costCenter ?? null,
+    });
+    lineNo += 1;
+  }
+  return getJournalWithLines(params.journalId);
 }
 
 export async function getEntityTrialBalance(params: {

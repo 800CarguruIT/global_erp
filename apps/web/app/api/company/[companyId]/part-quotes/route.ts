@@ -15,7 +15,14 @@ export async function GET(req: NextRequest, { params }: Params) {
     if (!statusParam) return sql``;
     const normalized = statusParam.toLowerCase();
     if (normalized === "quoted") {
-      return sql`AND pq.status IN ('Pending', 'Quoted')`;
+      return sql`AND (
+        LOWER(pq.status) IN ('pending', 'quoted', 'approved')
+        OR (
+          LOWER(pq.status) = 'pending'
+          AND LOWER(ei.status) IN ('approved', 'inquiry')
+          AND ei.status IS NOT NULL
+        )
+      )`;
     }
     if (normalized === "completed") {
       return sql`AND pq.status IN ('Received', 'Completed')`;
@@ -46,6 +53,9 @@ export async function GET(req: NextRequest, { params }: Params) {
       pq.updated_at,
       v.name AS vendor_name,
       ei.part_name,
+      LOWER(ei.status) AS estimate_item_status,
+      ei.approved_type,
+      car.id AS car_id,
       car.make AS car_make,
       car.model AS car_model,
       car.plate_number AS car_plate,
@@ -65,6 +75,8 @@ export async function GET(req: NextRequest, { params }: Params) {
     status: row.status,
     vendorName: row.vendor_name,
     partName: row.part_name,
+    estimateItemStatus: row.estimate_item_status,
+    carId: row.car_id,
     carMake: row.car_make,
     carModel: row.car_model,
     carPlate: row.car_plate,
@@ -83,6 +95,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     usedEtd: row.used_etd,
     remarks: row.remarks,
     updatedAt: row.updated_at,
+    approvedType: row.approved_type ?? null,
   }));
 
   return NextResponse.json({ data });
