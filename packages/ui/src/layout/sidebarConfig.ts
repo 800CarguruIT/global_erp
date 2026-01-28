@@ -170,8 +170,9 @@ export const SIDEBAR_TREE: Partial<Record<NavScope, SidebarItem[]>> = {
       href: "/company/[companyId]/inventory",
       permissionKeys: ["inventory.view", "inventory.create"],
       children: [
-        { label: "Create", href: "/company/[companyId]/inventory/new", disabled: true, permissionKeys: ["inventory.create"] },
-        { label: "List", href: "/company/[companyId]/inventory", exactMatch: true, permissionKeys: ["inventory.view"] },
+        { label: "Overview", href: "/company/[companyId]/inventory", exactMatch: true, permissionKeys: ["inventory.view"] },
+        { label: "Locations", href: "/company/[companyId]/inventory/locations", permissionKeys: ["inventory.view"] },
+        { label: "Transfers", href: "/company/[companyId]/inventory/transfers", permissionKeys: ["inventory.view"] },
       ],
     },
     {

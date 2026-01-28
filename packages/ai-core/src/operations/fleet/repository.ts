@@ -164,30 +164,21 @@ async function ensureFleetLocation(companyId: string, vehicle: FleetVehicle): Pr
     return { ...vehicle, inventoryLocationId: existing.id };
   }
 
-  // Create a unique code to avoid conflicts
-  const baseCode = vehicle.code || vehicle.plateNumber || `VEH-${vehicle.id.slice(0, 6)}`;
-  let attempt = 0;
-  let lastError: unknown;
-  while (attempt < 3) {
-    try {
-      const code = attempt === 0 ? baseCode : `${baseCode}-${attempt + 1}`;
-      const loc = await createLocation(companyId, {
-        code,
-        name: vehicle.name || code,
-        locationType: "fleet_vehicle" as any,
-        branchId: vehicle.branchId,
-        fleetVehicleId: vehicle.id,
-      });
-      return { ...vehicle, inventoryLocationId: loc.id };
-    } catch (err) {
-      lastError = err;
-      attempt += 1;
-    }
+  const fallbackName =
+    vehicle.name || vehicle.plateNumber || `Fleet vehicle ${vehicle.id.slice(0, 6)}`;
+  try {
+    const loc = await createLocation(companyId, {
+      name: fallbackName,
+      locationType: "fleet_vehicle",
+      branchId: vehicle.branchId,
+      fleetVehicleId: vehicle.id,
+    });
+    return { ...vehicle, inventoryLocationId: loc.id };
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error("Failed to ensure fleet inventory location", err);
+    return vehicle;
   }
-  // If all attempts fail, return original (best-effort)
-  // eslint-disable-next-line no-console
-  console.error("Failed to ensure fleet inventory location", lastError);
-  return vehicle;
 }
 
 export async function summarizeFleetByBranch(companyId: string): Promise<FleetBranchSummary[]> {

@@ -51,6 +51,101 @@ function mapTransferItem(row: any): InventoryTransferItem {
   };
 }
 
+const LOCATION_CODE_PREFIX: Record<InventoryLocationType, string> = {
+  warehouse: "WH-M",
+  branch: "WH-B",
+  fleet_vehicle: "WH-F",
+  other: "WH-O",
+};
+
+function formatLocationCode(prefix: string, value: number) {
+  return `${prefix}-${String(value).padStart(3, "0")}`;
+}
+
+function isCentralWarehouseCandidate(input: {
+  locationType: InventoryLocationType;
+  branchId?: string | null;
+  fleetVehicleId?: string | null;
+}) {
+  return input.locationType === "warehouse" && !input.branchId && !input.fleetVehicleId;
+}
+
+function parseSequenceSuffix(code: string | undefined, prefix: string) {
+  if (!code) return 0;
+  const normalized = code.toUpperCase();
+  const expectedPrefix = `${prefix}-`;
+  if (!normalized.startsWith(expectedPrefix)) return 0;
+  const suffix = normalized.slice(expectedPrefix.length);
+  const parsed = Number.parseInt(suffix, 10);
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+async function nextCodeFromExisting(companyId: string, prefix: string) {
+  const sql = getSql();
+  try {
+    const rows = await sql/* sql */ `
+      SELECT code FROM inventory_locations
+      WHERE company_id = ${companyId} AND code LIKE ${prefix + "%"}
+      ORDER BY code DESC
+      LIMIT 1
+    `;
+    const lastCode = rows[0]?.code as string | undefined;
+    const nextValue = parseSequenceSuffix(lastCode, prefix) + 1;
+    return formatLocationCode(prefix, nextValue);
+  } catch (err: any) {
+    if (isMissingTable(err)) {
+      return formatLocationCode(prefix, 1);
+    }
+    throw err;
+  }
+}
+
+async function nextLocationCode(companyId: string, locationType: InventoryLocationType) {
+  const sql = getSql();
+  const prefix = LOCATION_CODE_PREFIX[locationType] ?? LOCATION_CODE_PREFIX.other;
+  try {
+    const rows = await sql/* sql */ `
+      INSERT INTO inventory_location_sequences (company_id, prefix, last_number)
+      VALUES (${companyId}, ${prefix}, 1)
+      ON CONFLICT (company_id, prefix)
+      DO UPDATE SET last_number = inventory_location_sequences.last_number + 1
+      RETURNING last_number
+    `;
+    const lastNumber = Number(rows[0]?.last_number ?? 1);
+    return formatLocationCode(prefix, lastNumber);
+  } catch (err: any) {
+    if (isMissingTable(err)) {
+      return nextCodeFromExisting(companyId, prefix);
+    }
+    throw err;
+  }
+}
+
+async function centralWarehouseCount(companyId: string) {
+  const sql = getSql();
+  try {
+    const rows = await sql/* sql */ `
+      SELECT COUNT(1) AS total
+      FROM inventory_locations
+      WHERE company_id = ${companyId}
+        AND location_type = ${"warehouse"}
+        AND branch_id IS NULL
+        AND fleet_vehicle_id IS NULL
+        AND is_active = TRUE
+    `;
+    return Number(rows[0]?.total ?? 0);
+  } catch (err: any) {
+    if (isMissingTable(err)) {
+      return 0;
+    }
+    throw err;
+  }
+}
+
+function isMissingTable(err: any) {
+  return err?.code === "42P01";
+}
+
 async function ensureFleetLocationForVehicle(
   companyId: string,
   vehicle: { id: string; branch_id: string | null; code?: string | null; name?: string | null; plate_number?: string | null }
@@ -72,26 +167,20 @@ async function ensureFleetLocationForVehicle(
     return mapLocation(row);
   }
 
-  const baseCode = vehicle.code || vehicle.plate_number || `VEH-${String(vehicle.id).slice(0, 6)}`;
-  let lastError: unknown;
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    const code = attempt === 0 ? baseCode : `${baseCode}-${attempt + 1}`;
-    try {
-      const loc = await createLocation(companyId, {
-        code,
-        name: vehicle.name || code,
-        locationType: "fleet_vehicle" as InventoryLocationType,
-        branchId: vehicle.branch_id,
-        fleetVehicleId: vehicle.id,
-      });
-      return loc;
-    } catch (err) {
-      lastError = err;
-    }
+  const fallbackName =
+    vehicle.name || vehicle.plate_number || `Fleet vehicle ${String(vehicle.id).slice(0, 6)}`;
+  try {
+    const loc = await createLocation(companyId, {
+      name: fallbackName,
+      locationType: "fleet_vehicle",
+      branchId: vehicle.branch_id,
+      fleetVehicleId: vehicle.id,
+    });
+    return loc;
+  } catch (err) {
+    console.error("ensureFleetLocationForVehicle failed", vehicle.id, err);
+    return null;
   }
-  // If we couldn't ensure a location after retries, log and continue
-  console.error("ensureFleetLocationForVehicle failed", vehicle.id, lastError);
-  return null;
 }
 
 export async function listLocations(companyId: string, opts: { branchId?: string | null } = {}): Promise<InventoryLocation[]> {
@@ -135,28 +224,56 @@ export async function listLocations(companyId: string, opts: { branchId?: string
 
 export async function createLocation(
   companyId: string,
-  input: { code: string; name: string; locationType: InventoryLocationType; branchId?: string | null; fleetVehicleId?: string | null }
+  input: {
+    code?: string | null;
+    name: string;
+    locationType: InventoryLocationType;
+    branchId?: string | null;
+    fleetVehicleId?: string | null;
+  }
 ): Promise<InventoryLocation> {
   const sql = getSql();
-  const rows = await sql/* sql */ `
-    INSERT INTO inventory_locations (
-      company_id,
-      code,
-      name,
-      location_type,
-      branch_id,
-      fleet_vehicle_id
-    ) VALUES (
-      ${companyId},
-      ${input.code},
-      ${input.name},
-      ${input.locationType},
-      ${input.branchId ?? null},
-      ${input.fleetVehicleId ?? null}
-    )
-    RETURNING *
-  `;
-  return mapLocation(rows[0]);
+  const centralCount = await centralWarehouseCount(companyId);
+  const isCentral = isCentralWarehouseCandidate(input);
+  if (!centralCount && !isCentral) {
+    throw new Error("Create the central warehouse before adding branches, fleets, or other locations.");
+  }
+
+  const branchId = input.branchId ?? null;
+  const fleetVehicleId = input.fleetVehicleId ?? null;
+  let manualCode = input.code?.trim() ?? undefined;
+  if (manualCode) manualCode = manualCode.toUpperCase();
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const code = manualCode ?? (await nextLocationCode(companyId, input.locationType));
+    try {
+      const rows = await sql/* sql */ `
+        INSERT INTO inventory_locations (
+          company_id,
+          code,
+          name,
+          location_type,
+          branch_id,
+          fleet_vehicle_id
+        ) VALUES (
+          ${companyId},
+          ${code},
+          ${input.name.trim()},
+          ${input.locationType},
+          ${branchId},
+          ${fleetVehicleId}
+        )
+        RETURNING *
+      `;
+      return mapLocation(rows[0]);
+    } catch (err: any) {
+      if (err?.code === "23505") {
+        manualCode = undefined;
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error("Unable to assign a unique location code, please retry.");
 }
 
 export async function updateLocation(
@@ -368,7 +485,7 @@ async function nextTransferNumber(companyId: string): Promise<string> {
   const prefix = `TR-${year}-`;
   const rows = await sql/* sql */ `
     SELECT transfer_number
-    FROM inventory_transfers
+    FROM inventory_transfer_orders
     WHERE company_id = ${companyId} AND transfer_number LIKE ${prefix + "%"}
     ORDER BY transfer_number DESC
     LIMIT 1
@@ -390,7 +507,7 @@ export async function createTransferDraft(
   const sql = getSql();
   const transferNumber = await nextTransferNumber(companyId);
   const rows = await sql/* sql */ `
-    INSERT INTO inventory_transfers (
+    INSERT INTO inventory_transfer_orders (
       company_id,
       from_location_id,
       to_location_id,
@@ -439,7 +556,7 @@ export async function listTransfers(
     : sql`company_id = ${companyId}`;
   try {
     const rows = await sql/* sql */ `
-      SELECT * FROM inventory_transfers
+      SELECT * FROM inventory_transfer_orders
       WHERE ${where}
       ORDER BY created_at DESC
     `;
@@ -459,7 +576,7 @@ export async function getTransferWithItems(
 ): Promise<{ transfer: InventoryTransfer; items: InventoryTransferItem[] } | null> {
   const sql = getSql();
   const rows =
-    await sql/* sql */ `SELECT * FROM inventory_transfers WHERE company_id = ${companyId} AND id = ${transferId} LIMIT 1`;
+    await sql/* sql */ `SELECT * FROM inventory_transfer_orders WHERE company_id = ${companyId} AND id = ${transferId} LIMIT 1`;
   if (!rows.length) return null;
   const transfer = mapTransfer(rows[0]);
   const items = await getTransferItems(transferId);
@@ -476,10 +593,6 @@ async function getTransferItems(transferId: string): Promise<InventoryTransferIt
   return rows.map(mapTransferItem);
 }
 
-function isMissingTable(err: any) {
-  return err?.code === "42P01";
-}
-
 export async function updateTransferDraft(
   companyId: string,
   transferId: string,
@@ -488,7 +601,7 @@ export async function updateTransferDraft(
   const sql = getSql();
   if (patch.notes !== undefined) {
     await sql/* sql */ `
-      UPDATE inventory_transfers
+      UPDATE inventory_transfer_orders
       SET notes = ${patch.notes}
       WHERE company_id = ${companyId} AND id = ${transferId}
     `;
@@ -554,7 +667,7 @@ export async function startTransfer(
   }
 
   await sql/* sql */ `
-    UPDATE inventory_transfers
+    UPDATE inventory_transfer_orders
     SET status = ${"in_transit" as InventoryTransferStatus}
     WHERE id = ${transferId}
   `;
@@ -600,7 +713,7 @@ export async function completeTransfer(
   }
 
   await sql/* sql */ `
-    UPDATE inventory_transfers
+    UPDATE inventory_transfer_orders
     SET status = ${"completed" as InventoryTransferStatus},
         completed_by = ${userId ?? null},
         completed_at = now()

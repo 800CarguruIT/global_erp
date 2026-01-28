@@ -371,7 +371,7 @@ export function InventoryMain({ companyId, branchId }: { companyId: string; bran
         </div>
 
         <div className="grid gap-4 lg:grid-cols-[2fr,1fr]">
-          <section className="space-y-3 rounded-xl border p-4">
+        <section className="space-y-3 rounded-2xl bg-slate-950/70 p-4 shadow-xl">
             <div className="flex flex-wrap items-center gap-3 text-sm">
               <label className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground">Location</span>
@@ -401,41 +401,44 @@ export function InventoryMain({ companyId, branchId }: { companyId: string; bran
             {isStockLoading && <p className="text-sm text-muted-foreground">Loading stock...</p>}
             {stockError && <p className="text-sm text-destructive">{stockError}</p>}
             {!isStockLoading && !stockError && (
-              <div className="overflow-x-auto rounded-md border">
-                <table className="min-w-full text-xs">
-                  <thead>
-                    <tr className="border-b bg-muted/40 text-[11px] text-muted-foreground">
-                      <th className="py-2 pl-3 pr-4 text-left">Select</th>
-                      <th className="py-2 px-4 text-left">Part</th>
-                      <th className="py-2 px-4 text-left">Location</th>
-                      <th className="py-2 px-4 text-left">On hand</th>
+              <div className="overflow-x-auto rounded-md bg-card/80">
+                <table className="min-w-full text-xs divide-y divide-muted/30">
+                  <thead className="bg-muted/10 text-[11px] text-muted-foreground">
+                    <tr>
+                      <th className="py-3 pl-3 pr-4 text-left">Select</th>
+                      <th className="py-3 px-4 text-left">Part</th>
+                      <th className="py-3 px-4 text-left">Location</th>
+                      <th className="py-3 px-4 text-left">On hand</th>
                     </tr>
                   </thead>
                   <tbody>
                     {stockRows.length === 0 ? (
                       <tr>
-                        <td colSpan={4} className="py-3 text-center text-xs text-muted-foreground">
+                        <td colSpan={4} className="py-4 text-center text-xs text-muted-foreground">
                           No stock found.
                         </td>
                       </tr>
                     ) : (
                       stockRows.map((row, idx) => (
-                        <tr key={`${row.partsCatalogId}-${row.locationId ?? idx}`} className="border-b last:border-0">
-                          <td className="py-2 pl-3 pr-4">
+                        <tr
+                          key={`${row.partsCatalogId}-${row.locationId ?? idx}`}
+                          className="bg-transparent hover:bg-muted/10"
+                        >
+                          <td className="py-3 pl-3 pr-4">
                             <input
                               type="checkbox"
                               checked={!!selectedParts[row.partsCatalogId]}
                               onChange={() => toggleSelectPart(row.partsCatalogId)}
                             />
                           </td>
-                          <td className="py-2 px-4 text-sm">
+                          <td className="py-3 px-4 text-sm">
                             <div className="font-semibold">{row.partCode}</div>
                             <div className="text-[11px] text-muted-foreground">{row.partName || "-"}</div>
                           </td>
-                          <td className="py-2 px-4 text-xs">
+                          <td className="py-3 px-4 text-xs">
                             {row.locationCode ? `${row.locationCode} - ${row.locationName ?? ""}` : "Unassigned"}
                           </td>
-                          <td className="py-2 px-4 text-xs">{row.onHand}</td>
+                          <td className="py-3 px-4 text-xs">{row.onHand}</td>
                         </tr>
                       ))
                     )}
@@ -445,7 +448,7 @@ export function InventoryMain({ companyId, branchId }: { companyId: string; bran
             )}
           </section>
 
-          <section className="space-y-4 rounded-xl border p-4">
+          <section className="space-y-4 rounded-2xl bg-slate-950/70 p-4 shadow-xl">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold">Transfer selected</h3>
               {transferStatus.message && <div className="text-xs text-emerald-600">{transferStatus.message}</div>}
@@ -504,7 +507,7 @@ export function InventoryMain({ companyId, branchId }: { companyId: string; bran
             </form>
           </section>
 
-          <section className="space-y-3 rounded-xl border p-4">
+          <section className="space-y-3 rounded-2xl bg-slate-950/70 p-4 shadow-xl">
             <div className="flex items-center justify-between gap-2">
               <h2 className="text-sm font-semibold">Transfers</h2>
               <button
@@ -518,10 +521,10 @@ export function InventoryMain({ companyId, branchId }: { companyId: string; bran
             {transfersLoading && <p className="text-sm text-muted-foreground">Loading transfers...</p>}
             {transfersError && <p className="text-sm text-destructive">{transfersError}</p>}
             {!transfersLoading && !transfersError && (
-              <div className="overflow-x-auto rounded-md border">
-                <table className="min-w-full text-xs">
-                  <thead>
-                    <tr className="border-b bg-muted/40 text-[11px] text-muted-foreground">
+              <div className="overflow-x-auto rounded-md bg-card/80">
+                <table className="min-w-full text-xs divide-y divide-muted/30">
+                  <thead className="bg-muted/10 text-[11px] text-muted-foreground">
+                    <tr>
                       <th className="py-2 pl-3 pr-4 text-left">Transfer</th>
                       <th className="py-2 px-4 text-left">From</th>
                       <th className="py-2 px-4 text-left">To</th>
@@ -532,7 +535,7 @@ export function InventoryMain({ companyId, branchId }: { companyId: string; bran
                   <tbody>
                     {transfers.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="py-3 text-center text-xs text-muted-foreground">
+                        <td colSpan={5} className="py-4 text-center text-xs text-muted-foreground">
                           No transfers yet.
                         </td>
                       </tr>
@@ -541,8 +544,8 @@ export function InventoryMain({ companyId, branchId }: { companyId: string; bran
                         const from = locationMap.get(t.fromLocationId);
                         const to = locationMap.get(t.toLocationId);
                         return (
-                          <tr key={t.id} className="border-b last:border-0">
-                            <td className="py-2 pl-3 pr-4">
+                          <tr key={t.id} className="bg-transparent hover:bg-muted/10">
+                            <td className="py-3 pl-3 pr-4">
                               <a
                                 href={`/company/${companyId}/workshop/inventory/transfers/${t.id}`}
                                 className="text-primary hover:underline"
@@ -550,12 +553,12 @@ export function InventoryMain({ companyId, branchId }: { companyId: string; bran
                                 {t.transferNumber}
                               </a>
                             </td>
-                            <td className="py-2 px-4 text-xs">
+                            <td className="py-3 px-4 text-xs">
                               {from ? `${from.code} - ${from.name}` : "Unknown"}
                             </td>
-                            <td className="py-2 px-4 text-xs">{to ? `${to.code} - ${to.name}` : "Unknown"}</td>
-                            <td className="py-2 px-4 text-xs capitalize">{t.status.replace("_", " ")}</td>
-                            <td className="py-2 px-4 text-[11px] text-muted-foreground">
+                            <td className="py-3 px-4 text-xs">{to ? `${to.code} - ${to.name}` : "Unknown"}</td>
+                            <td className="py-3 px-4 text-xs capitalize">{t.status.replace("_", " ")}</td>
+                            <td className="py-3 px-4 text-[11px] text-muted-foreground">
                               {new Date(t.updatedAt).toLocaleString()}
                             </td>
                           </tr>
