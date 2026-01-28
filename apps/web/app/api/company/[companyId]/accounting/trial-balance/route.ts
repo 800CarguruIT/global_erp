@@ -14,6 +14,8 @@ export async function GET(req: NextRequest, { params }: Params) {
     const dateTo = url.searchParams.get("dateTo") ?? new Date().toISOString().slice(0, 10);
     const entityId = await Accounting.resolveEntityId("company", companyId);
     const sql = getSql();
+    const includeDrafts = url.searchParams.get("includeDrafts") === "true";
+    const postedFilter = includeDrafts ? sql`` : sql`AND (j.is_posted = TRUE OR jl.journal_id IS NULL)`;
     const rows = await sql<
       Array<{
         headingName: string;
@@ -44,7 +46,9 @@ export async function GET(req: NextRequest, { params }: Params) {
       LEFT JOIN accounting_journal_lines jl ON jl.account_id = a.id
         AND jl.entity_id = ${entityId}
         AND jl.created_at::date <= ${dateTo}
+      LEFT JOIN accounting_journals j ON j.id = jl.journal_id
       WHERE a.company_id = ${companyId}
+        ${postedFilter}
       GROUP BY
         h.name,
         s.name,

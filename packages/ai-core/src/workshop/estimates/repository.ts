@@ -386,7 +386,7 @@ export async function replaceEstimateItems(
         approved_type,
         status
       ) VALUES (
-        COALESCE(${item.id}, gen_random_uuid()),
+        COALESCE(${item.id ?? null}, gen_random_uuid()),
         ${estimateId},
         ${item.inspectionItemId ?? null},
         ${item.lineNo ?? idx + 1},
