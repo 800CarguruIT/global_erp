@@ -3,7 +3,8 @@ import { listLeadsForCompany } from "@repo/ai-core/crm/leads/repository";
 import { getSql } from "@repo/ai-core/db";
 import { requireMobileUserId } from "@/lib/auth/mobile-auth";
 import { ensureCompanyAccess } from "@/lib/auth/mobile-company";
-import { createMobileErrorResponse, createMobileSuccessResponse, handleMobileError } from "../../../utils";
+
+import { handleMobileError,createMobileErrorResponse, createMobileSuccessResponse, } from "../utils";
 
 
 type Params = { params: Promise<{ companyId: string }> };
