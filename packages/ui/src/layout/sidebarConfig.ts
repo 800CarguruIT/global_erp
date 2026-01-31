@@ -57,6 +57,7 @@ export const SIDEBAR_CONFIG: Record<NavScope, Partial<Record<NavCategory, Sideba
       { label: "Vendors", href: "/company/[companyId]/vendors" },
       { label: "Customers", href: "/company/[companyId]/customers" },
       { label: "Car In Dashboard", href: "/company/[companyId]/car-in-dashboard" },
+      { label: "Revenue Dashboard", href: "/company/[companyId]/revenue-dashboard" },
       { label: "Inspections", href: "/company/[companyId]/inspections" },
       { label: "Cars", href: "/company/[companyId]/cars" },
     ],
@@ -121,6 +122,7 @@ export const SIDEBAR_TREE: Partial<Record<NavScope, SidebarItem[]>> = {
         { label: "Overview", href: "/company/[companyId]", exactMatch: true, permissionKeys: ["company.dashboard.view"] },
         { label: "Car In Dashboard", href: "/company/[companyId]/car-in-dashboard", permissionKeys: ["company.dashboard.view"] },
         { label: "Parts Dashboard", href: "/company/[companyId]/parts-dashboard", permissionKeys: ["company.dashboard.view"] },
+        { label: "Revenue Dashboard", href: "/company/[companyId]/revenue-dashboard", permissionKeys: ["company.dashboard.view"] },
       ],
     },
     {

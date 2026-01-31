@@ -76,9 +76,11 @@ export async function GET(req: NextRequest, { params }: Params) {
     const jobCards =
       leadIds.length > 0
         ? await sql`
-            SELECT id, lead_id, status, start_at, complete_at
-            FROM job_cards
-            WHERE company_id = ${companyId} AND lead_id = ANY(${leadIds})
+            SELECT jc.id, jc.lead_id, jc.status, jc.start_at, jc.complete_at
+            FROM job_cards jc
+            JOIN leads l ON l.id = jc.lead_id
+            WHERE l.company_id = ${companyId}
+              AND jc.lead_id = ANY(${leadIds})
           `
         : [];
 
@@ -125,17 +127,18 @@ export async function GET(req: NextRequest, { params }: Params) {
       leadIds.length > 0
         ? await sql`
             SELECT
-              lead_id,
-              id,
-              type,
-              scheduled_at,
-              created_at,
-              remarks,
-              dropoff_location
-            FROM recovery_requests
-            WHERE company_id = ${companyId}
-              AND type = 'dropoff'
-              AND lead_id = ANY(${leadIds})
+              rr.lead_id,
+              rr.id,
+              rr.type,
+              rr.scheduled_at,
+              rr.created_at,
+              rr.remarks,
+              rr.dropoff_location
+            FROM recovery_requests rr
+            JOIN leads l ON l.id = rr.lead_id
+            WHERE l.company_id = ${companyId}
+              AND rr.type = 'dropoff'
+              AND rr.lead_id = ANY(${leadIds})
           `
         : [];
     const recoveryMap = recovery.reduce((acc: Record<string, any>, row: any) => {

@@ -388,63 +388,71 @@ export function EstimateQuotesMain({ companyId }: { companyId: string }) {
   }
 
   return (
-    <MainPageShell title="Estimate Quotes" subtitle="Estimate quotation pipeline overview." scopeLabel="">
+    <MainPageShell
+      title="Estimate Quotes"
+      subtitle="Estimate quotation pipeline overview."
+      scopeLabel=""
+      contentClassName="rounded-2xl bg-card/80 p-4"
+    >
       {state.status === "loading" && <p className="text-sm text-muted-foreground">Loading estimate quotes...</p>}
       {state.status === "error" && <p className="text-sm text-destructive">{state.error}</p>}
       {state.status === "loaded" && (
-        <Card className="border-0 p-0 shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/30 px-4 py-3">
-            <div className="flex flex-wrap items-center gap-2 text-xs">
-              <button
-                type="button"
-                className="inline-flex items-center rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition hover:bg-slate-50 hover:shadow-md"
-                onClick={() => load()}
-              >
-                Refresh
-              </button>
-              <span className="text-xs text-muted-foreground">{filteredRows.length} records</span>
-            </div>
-            <div className="relative w-full max-w-xs">
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search"
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 pr-9 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/30"
-              />
-              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
-                <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
-                  <path
-                    d="M15.5 15.5L21 21M10.5 18a7.5 7.5 0 1 1 0-15a7.5 7.5 0 0 1 0 15Z"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.6"
-                    strokeLinecap="round"
-                  />
-                </svg>
-              </span>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2 border-b border-border/30 px-4 py-3 text-xs">
+        <>
+          <div className="flex flex-nowrap gap-2 px-4 py-3 text-xs">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={`rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-wide ${
-                  activeTab === tab.id ? "border-primary text-primary" : "text-muted-foreground hover:border-primary"
+                className={`min-w-[96px] rounded-full px-4 py-1.5 text-[11px] font-medium transition ${
+                  activeTab === tab.id
+                    ? "bg-gradient-to-b from-emerald-500/30 to-emerald-500/10 text-emerald-100 shadow-[0_0_8px_rgba(16,185,129,0.35)] border border-emerald-400/40"
+                    : "bg-white/5 text-white/70 border border-white/10 hover:text-white hover:border-white/30"
                 }`}
               >
                 {tab.label}
               </button>
             ))}
           </div>
-          <div className="overflow-x-auto">
+          <Card className="border-0 p-0 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <button
+                  type="button"
+                  className="inline-flex items-center rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition hover:bg-slate-50 hover:shadow-md"
+                  onClick={() => load()}
+                >
+                  Refresh
+                </button>
+                <span className="text-xs text-muted-foreground">{filteredRows.length} records</span>
+              </div>
+              <div className="relative w-full max-w-xs">
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search"
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 pr-9 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                />
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
+                  <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
+                    <path
+                      d="M15.5 15.5L21 21M10.5 18a7.5 7.5 0 1 1 0-15a7.5 7.5 0 0 1 0 15Z"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.6"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </span>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
             {filteredRows.length === 0 ? (
               <div className="px-4 py-6 text-xs text-muted-foreground">No records found.</div>
             ) : activeConfig.kind === "jobCards" ? (
               <table className="min-w-full text-sm">
                 <thead>
-                  <tr className="border-b bg-muted/40 text-xs text-muted-foreground">
+                  <tr className="bg-muted/40 text-xs text-muted-foreground">
                     <th className="py-2 pl-3 pr-4 text-left">Job Card</th>
                     <th className="py-2 px-4 text-left">Car</th>
                     <th className="py-2 px-4 text-left">Branch</th>
@@ -456,7 +464,7 @@ export function EstimateQuotesMain({ companyId }: { companyId: string }) {
                 </thead>
                 <tbody>
                   {(filteredRows as JobCardRow[]).map((row) => (
-                    <tr key={row.id} className="border-b last:border-0">
+                    <tr key={row.id}>
                       <td className="py-2 pl-3 pr-4">
                         <div className="font-medium">{row.id.slice(0, 8)}...</div>
                         <div className="text-[10px] uppercase text-muted-foreground">
@@ -488,7 +496,7 @@ export function EstimateQuotesMain({ companyId }: { companyId: string }) {
             ) : activeConfig.kind === "estimates" ? (
               <table className="min-w-full text-sm">
                 <thead>
-                  <tr className="border-b bg-muted/40 text-xs text-muted-foreground">
+                  <tr className="bg-muted/40 text-xs text-muted-foreground">
                     <th className="py-2 pl-3 pr-4 text-left">Estimate</th>
                     <th className="py-2 px-4 text-left">Inspection</th>
                     <th className="py-2 px-4 text-left">Status</th>
@@ -499,7 +507,7 @@ export function EstimateQuotesMain({ companyId }: { companyId: string }) {
                 </thead>
                 <tbody>
                   {(filteredRows as Estimate[]).map((row) => (
-                    <tr key={row.id} className="border-b last:border-0">
+                    <tr key={row.id}>
                       <td className="py-2 pl-3 pr-4">
                         <div className="font-medium">{row.id.slice(0, 8)}...</div>
                       </td>
@@ -522,7 +530,7 @@ export function EstimateQuotesMain({ companyId }: { companyId: string }) {
             ) : activeConfig.kind === "quotes" ? (
               <table className="min-w-full text-sm">
                 <thead>
-                  <tr className="border-b bg-muted/40 text-xs text-muted-foreground">
+                  <tr className="bg-muted/40 text-xs text-muted-foreground">
                     <th className="py-2 pl-3 pr-4 text-left">Quote</th>
                     <th className="py-2 px-4 text-left">Type</th>
                     <th className="py-2 px-4 text-left">Status</th>
@@ -539,7 +547,7 @@ export function EstimateQuotesMain({ companyId }: { companyId: string }) {
                         ? `/company/${companyId}/quotes/branch/${row.id}`
                         : `/company/${companyId}/quotes/vendor/${row.id}`;
                     return (
-                      <tr key={row.id} className="border-b last:border-0">
+                      <tr key={row.id}>
                         <td className="py-2 pl-3 pr-4">
                           <div className="font-medium">{row.id.slice(0, 8)}...</div>
                         </td>
@@ -563,7 +571,7 @@ export function EstimateQuotesMain({ companyId }: { companyId: string }) {
             ) : (
               <table className="min-w-full text-sm">
                 <thead>
-                  <tr className="border-b bg-muted/40 text-xs text-muted-foreground">
+                  <tr className="bg-muted/40 text-xs text-muted-foreground">
                     <th className="py-2 pl-3 pr-4 text-left">Inspection</th>
                     <th className="py-2 px-4 text-left">Car</th>
                     <th className="py-2 px-4 text-left">Customer</th>
@@ -582,53 +590,54 @@ export function EstimateQuotesMain({ companyId }: { companyId: string }) {
                       ? `/company/${companyId}/leads/${row.leadId}`
                       : null;
                     return (
-                    <tr key={row.id} className="border-b last:border-0">
-                      <td className="py-2 pl-3 pr-4">
-                        <div className="font-medium">{row.id.slice(0, 8)}...</div>
-                      </td>
-                      <td className="py-2 px-4 text-xs">
-                        <div>{row.car?.plate_number ?? "N/A"}</div>
-                        <div className="text-[10px] text-muted-foreground">
-                          {[row.car?.make, row.car?.model].filter(Boolean).join(" ")}
-                        </div>
-                      </td>
-                      <td className="py-2 px-4 text-xs">
-                        <div>{row.customer?.name ?? "N/A"}</div>
-                        <div className="text-[10px] text-muted-foreground">{row.customer?.phone ?? ""}</div>
-                      </td>
-                      <td className="py-2 px-4 text-xs">
-                        {row.branch?.display_name ?? row.branch?.name ?? row.branch?.code ?? "N/A"}
-                      </td>
-                      <td className="py-2 px-4 text-xs capitalize">{row.status}</td>
-                      <td className="py-2 px-4 text-xs text-muted-foreground">{formatDate(row.updatedAt)}</td>
-                      <td className="py-2 px-4 text-xs">
-                        {actionHref ? (
-                          <div className="flex flex-col gap-1">
-                            <a href={actionHref} className="rounded-md border px-2 py-1 text-center">
-                              {hasInspection ? "Open" : "View Lead"}
-                            </a>
-                            {row.leadId ? (
-                              <button
-                                type="button"
-                                onClick={() => openAssignModal(row.leadId)}
-                                className="rounded-md border px-2 py-1"
-                              >
-                                Assign
-                              </button>
-                            ) : null}
+                      <tr key={row.id}>
+                        <td className="py-2 pl-3 pr-4">
+                          <div className="font-medium">{row.id.slice(0, 8)}...</div>
+                        </td>
+                        <td className="py-2 px-4 text-xs">
+                          <div>{row.car?.plate_number ?? "N/A"}</div>
+                          <div className="text-[10px] text-muted-foreground">
+                            {[row.car?.make, row.car?.model].filter(Boolean).join(" ")}
                           </div>
-                        ) : (
-                          "-"
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
+                        </td>
+                        <td className="py-2 px-4 text-xs">
+                          <div>{row.customer?.name ?? "N/A"}</div>
+                          <div className="text-[10px] text-muted-foreground">{row.customer?.phone ?? ""}</div>
+                        </td>
+                        <td className="py-2 px-4 text-xs">
+                          {row.branch?.display_name ?? row.branch?.name ?? row.branch?.code ?? "N/A"}
+                        </td>
+                        <td className="py-2 px-4 text-xs capitalize">{row.status}</td>
+                        <td className="py-2 px-4 text-xs text-muted-foreground">{formatDate(row.updatedAt)}</td>
+                        <td className="py-2 px-4 text-xs">
+                          {actionHref ? (
+                            <div className="flex flex-col gap-1">
+                              <a href={actionHref} className="rounded-md border px-2 py-1 text-center">
+                                {hasInspection ? "Open" : "View Lead"}
+                              </a>
+                              {row.leadId ? (
+                                <button
+                                  type="button"
+                                  onClick={() => openAssignModal(row.leadId)}
+                                  className="rounded-md border px-2 py-1"
+                                >
+                                  Assign
+                                </button>
+                              ) : null}
+                            </div>
+                          ) : (
+                            "-"
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             )}
           </div>
         </Card>
+      </>
       )}
       {assignOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
