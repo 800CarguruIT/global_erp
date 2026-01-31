@@ -34,7 +34,15 @@ function mapTransfer(row: any): InventoryTransfer {
     status: row.status,
     notes: row.notes,
     createdBy: row.created_by,
+    approvedBy: row.approved_by,
     completedBy: row.completed_by,
+    createdByName: row.created_by_name ?? null,
+    approvedByName: row.approved_by_name ?? null,
+    dispatchedByName: row.dispatched_by_name ?? null,
+    completedByName: row.completed_by_name ?? null,
+    approvedAt: row.approved_at,
+    dispatchedAt: row.dispatched_at,
+    dispatchedBy: row.dispatched_by,
     completedAt: row.completed_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -47,6 +55,8 @@ function mapTransferItem(row: any): InventoryTransferItem {
     transferId: row.transfer_id,
     lineNo: row.line_no,
     partsCatalogId: row.parts_catalog_id,
+    partCode: row.part_code ?? null,
+    partName: row.part_name ?? null,
     quantity: Number(row.quantity),
   };
 }
@@ -183,11 +193,15 @@ async function ensureFleetLocationForVehicle(
   }
 }
 
-export async function listLocations(companyId: string, opts: { branchId?: string | null } = {}): Promise<InventoryLocation[]> {
+export async function listLocations(
+  companyId: string,
+  opts: { branchId?: string | null; includeInactive?: boolean } = {}
+): Promise<InventoryLocation[]> {
   const sql = getSql();
   const rows = await sql/* sql */ `
     SELECT * FROM inventory_locations
-    WHERE company_id = ${companyId} AND is_active = TRUE
+    WHERE company_id = ${companyId}
+    ${opts.includeInactive ? sql`` : sql`AND is_active = TRUE`}
     ${opts.branchId ? sql`AND (branch_id IS NULL OR branch_id = ${opts.branchId} OR fleet_vehicle_id IS NOT NULL)` : sql``}
     ORDER BY code
   `;
@@ -282,23 +296,73 @@ export async function updateLocation(
   patch: Partial<Omit<InventoryLocation, "id" | "companyId" | "createdAt" | "updatedAt">>
 ): Promise<void> {
   const sql = getSql();
-  await sql/* sql */ `
-    UPDATE inventory_locations
-    SET ${sql({
+  const updates = Object.fromEntries(
+    Object.entries({
       code: patch.code,
       name: patch.name,
       location_type: patch.locationType,
       branch_id: patch.branchId,
       fleet_vehicle_id: patch.fleetVehicleId,
       is_active: patch.isActive,
-    })}
+    }).filter(([, value]) => value !== undefined)
+  );
+  if (Object.keys(updates).length === 0) return;
+  await sql/* sql */ `
+    UPDATE inventory_locations
+    SET ${sql(updates)}
+    WHERE company_id = ${companyId} AND id = ${locationId}
+  `;
+}
+
+export async function deleteLocation(companyId: string, locationId: string): Promise<void> {
+  const sql = getSql();
+  const rows = await sql/* sql */ `
+    SELECT code
+    FROM inventory_locations
+    WHERE company_id = ${companyId} AND id = ${locationId}
+    LIMIT 1
+  `;
+  if (!rows.length) return;
+  const code = rows[0].code as string;
+
+  const stockRows = await sql/* sql */ `
+    SELECT SUM(on_hand) as total_on_hand
+    FROM inventory_stock
+    WHERE company_id = ${companyId} AND location_code = ${code}
+  `;
+  const onHand = Number(stockRows?.[0]?.total_on_hand ?? 0);
+  if (onHand > 0) {
+    throw new Error("Location has on-hand stock. Move stock before deleting.");
+  }
+
+  const movementRows = await sql/* sql */ `
+    SELECT COUNT(*) as cnt
+    FROM inventory_movements
+    WHERE company_id = ${companyId} AND location_code = ${code}
+  `;
+  const movementCount = Number(movementRows?.[0]?.cnt ?? 0);
+  if (movementCount > 0) {
+    throw new Error("Location has movement history. Deactivate instead.");
+  }
+
+  await sql/* sql */ `
+    DELETE FROM inventory_locations
     WHERE company_id = ${companyId} AND id = ${locationId}
   `;
 }
 
 export async function listStock(
   companyId: string,
-  opts: { locationId?: string | null; search?: string | null } = {}
+  opts: {
+    locationId?: string | null;
+    search?: string | null;
+    typeId?: string | null;
+    categoryId?: string | null;
+    subcategoryId?: string | null;
+    makeId?: string | null;
+    modelId?: string | null;
+    yearId?: string | null;
+  } = {}
 ): Promise<InventoryStockRow[]> {
   const sql = getSql();
   const conditions = [sql`pc.company_id = ${companyId}`];
@@ -309,6 +373,24 @@ export async function listStock(
     const q = `%${opts.search}%`;
     conditions.push(sql`(pc.part_number ILIKE ${q} OR pc.sku ILIKE ${q} OR pc.description ILIKE ${q})`);
   }
+  if (opts.typeId) {
+    conditions.push(sql`(it.id = ${opts.typeId} OR it_code.id = ${opts.typeId})`);
+  }
+  if (opts.categoryId) {
+    conditions.push(sql`(cat.id = ${opts.categoryId} OR cat_code.id = ${opts.categoryId})`);
+  }
+  if (opts.subcategoryId) {
+    conditions.push(sql`(sc.id = ${opts.subcategoryId} OR sc_code.id = ${opts.subcategoryId})`);
+  }
+  if (opts.makeId) {
+    conditions.push(sql`mk.id = ${opts.makeId}`);
+  }
+  if (opts.modelId) {
+    conditions.push(sql`im.id = ${opts.modelId}`);
+  }
+  if (opts.yearId) {
+    conditions.push(sql`iy.id = ${opts.yearId}`);
+  }
   const where = conditions.reduce((prev, curr, idx) => (idx === 0 ? curr : sql`${prev} AND ${curr}`));
 
   try {
@@ -317,6 +399,11 @@ export async function listStock(
         pc.id AS part_id,
         pc.part_number,
         pc.description,
+        COALESCE(cat.name, cat_code.name, pc.category) AS category,
+        COALESCE(sc.name, sc_code.name, pc.subcategory) AS subcategory,
+        COALESCE(cat.code, cat_code.code) AS category_code,
+        COALESCE(sc.code, sc_code.code) AS subcategory_code,
+        COALESCE(it.code, NULLIF(split_part(pc.part_number, '-', 1), '')) AS part_type,
         loc.id AS location_id,
         st.location_code,
         loc.name AS location_name,
@@ -324,6 +411,22 @@ export async function listStock(
       FROM parts_catalog pc
       LEFT JOIN inventory_stock st ON st.part_id = pc.id AND st.company_id = pc.company_id
       LEFT JOIN inventory_locations loc ON loc.company_id = pc.company_id AND loc.code = st.location_code
+      LEFT JOIN inventory_parts ip
+        ON ip.company_id = pc.company_id
+        AND (ip.part_code = pc.part_number OR ip.part_number = pc.part_number)
+      LEFT JOIN inventory_model_years iy ON iy.id = ip.year_id
+      LEFT JOIN inventory_car_models im ON im.id = iy.model_id
+      LEFT JOIN inventory_car_makes mk ON mk.id = im.make_id
+      LEFT JOIN inventory_subcategories sc ON sc.id = mk.subcategory_id
+      LEFT JOIN inventory_categories cat ON cat.id = sc.category_id
+      LEFT JOIN inventory_categories cat_code
+        ON cat_code.company_id = pc.company_id AND cat_code.code = pc.category
+      LEFT JOIN inventory_types it_code ON it_code.id = cat_code.inventory_type_id
+      LEFT JOIN inventory_subcategories sc_code
+        ON sc_code.company_id = pc.company_id
+        AND sc_code.code = pc.subcategory
+        AND (sc_code.category_id = cat.id OR sc_code.category_id = cat_code.id)
+      LEFT JOIN inventory_types it ON it.id = cat.inventory_type_id
       WHERE ${where}
       ORDER BY pc.part_number, st.location_code
     `;
@@ -332,6 +435,11 @@ export async function listStock(
       partsCatalogId: row.part_id,
       partCode: row.part_number,
       partName: row.description,
+      partType: row.part_type,
+      category: row.category,
+      subcategory: row.subcategory,
+      categoryCode: row.category_code,
+      subcategoryCode: row.subcategory_code,
       locationId: row.location_id,
       locationCode: row.location_code,
       locationName: row.location_name,
@@ -529,11 +637,13 @@ export async function createTransferDraft(
   for (const [idx, item] of items.entries()) {
     await sql/* sql */ `
       INSERT INTO inventory_transfer_items (
+        company_id,
         transfer_id,
         line_no,
         parts_catalog_id,
         quantity
       ) VALUES (
+        ${companyId},
         ${transfer.id},
         ${idx + 1},
         ${item.partsCatalogId},
@@ -575,8 +685,21 @@ export async function getTransferWithItems(
   transferId: string
 ): Promise<{ transfer: InventoryTransfer; items: InventoryTransferItem[] } | null> {
   const sql = getSql();
-  const rows =
-    await sql/* sql */ `SELECT * FROM inventory_transfer_orders WHERE company_id = ${companyId} AND id = ${transferId} LIMIT 1`;
+  const rows = await sql/* sql */ `
+    SELECT
+      ito.*,
+      COALESCE(cu.full_name, cu.email) AS created_by_name,
+      COALESCE(au.full_name, au.email) AS approved_by_name,
+      COALESCE(du.full_name, du.email) AS dispatched_by_name,
+      COALESCE(comu.full_name, comu.email) AS completed_by_name
+    FROM inventory_transfer_orders ito
+    LEFT JOIN users cu ON cu.id = ito.created_by
+    LEFT JOIN users au ON au.id = ito.approved_by
+    LEFT JOIN users du ON du.id = ito.dispatched_by
+    LEFT JOIN users comu ON comu.id = ito.completed_by
+    WHERE ito.company_id = ${companyId} AND ito.id = ${transferId}
+    LIMIT 1
+  `;
   if (!rows.length) return null;
   const transfer = mapTransfer(rows[0]);
   const items = await getTransferItems(transferId);
@@ -586,9 +709,14 @@ export async function getTransferWithItems(
 async function getTransferItems(transferId: string): Promise<InventoryTransferItem[]> {
   const sql = getSql();
   const rows = await sql/* sql */ `
-    SELECT * FROM inventory_transfer_items
-    WHERE transfer_id = ${transferId}
-    ORDER BY line_no ASC
+    SELECT
+      iti.*,
+      pc.part_number AS part_code,
+      pc.description AS part_name
+    FROM inventory_transfer_items iti
+    LEFT JOIN parts_catalog pc ON pc.id = iti.parts_catalog_id
+    WHERE iti.transfer_id = ${transferId}
+    ORDER BY iti.line_no ASC
   `;
   return rows.map(mapTransferItem);
 }
@@ -612,11 +740,13 @@ export async function updateTransferDraft(
     for (const [idx, item] of patch.items.entries()) {
       await sql/* sql */ `
         INSERT INTO inventory_transfer_items (
+          company_id,
           transfer_id,
           line_no,
           parts_catalog_id,
           quantity
         ) VALUES (
+          ${companyId},
           ${transferId},
           ${idx + 1},
           ${item.partsCatalogId},
@@ -635,8 +765,34 @@ export async function startTransfer(
   const sql = getSql();
   const data = await getTransferWithItems(companyId, transferId);
   if (!data) throw new Error("Transfer not found");
+  if (data.transfer.status !== "approved") {
+    throw new Error("Transfer must be approved before dispatch");
+  }
 
   const fromCode = await getLocationCode(data.transfer.fromLocationId);
+  const insufficient: string[] = [];
+
+  for (const item of data.items) {
+    const stockRows = await sql/* sql */ `
+      SELECT s.on_hand, pc.part_number
+      FROM parts_catalog pc
+      LEFT JOIN inventory_stock s
+        ON s.part_id = pc.id
+        AND s.company_id = ${companyId}
+        AND s.location_code = ${fromCode}
+      WHERE pc.id = ${item.partsCatalogId}
+      LIMIT 1
+    `;
+    const onHand = Number(stockRows?.[0]?.on_hand ?? 0);
+    if (onHand < Number(item.quantity)) {
+      const label = stockRows?.[0]?.part_number ?? item.partsCatalogId;
+      insufficient.push(`${label} (on hand ${onHand})`);
+    }
+  }
+
+  if (insufficient.length > 0) {
+    throw new Error(`INSUFFICIENT_STOCK:${insufficient.join(", ")}`);
+  }
 
   for (const item of data.items) {
     await sql/* sql */ `
@@ -669,7 +825,26 @@ export async function startTransfer(
   await sql/* sql */ `
     UPDATE inventory_transfer_orders
     SET status = ${"in_transit" as InventoryTransferStatus}
+      , dispatched_at = now()
+      , dispatched_by = ${userId ?? null}
     WHERE id = ${transferId}
+  `;
+}
+
+export async function approveTransfer(
+  companyId: string,
+  transferId: string,
+  userId?: string | null
+): Promise<void> {
+  const sql = getSql();
+  await sql/* sql */ `
+    UPDATE inventory_transfer_orders
+    SET status = ${"approved" as InventoryTransferStatus},
+        approved_at = now(),
+        approved_by = ${userId ?? null}
+    WHERE company_id = ${companyId}
+      AND id = ${transferId}
+      AND status = ${"draft" as InventoryTransferStatus}
   `;
 }
 

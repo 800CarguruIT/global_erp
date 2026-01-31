@@ -29,6 +29,7 @@ export type PurchaseOrderItem = {
   purchaseOrderId: string;
   lineNo: number;
   estimateItemId?: string | null;
+  inventoryRequestItemId?: string | null;
   partsCatalogId?: string | null;
   name: string;
   description?: string | null;
@@ -36,5 +37,17 @@ export type PurchaseOrderItem = {
   unitCost: number;
   totalCost: number;
   receivedQty: number;
+  movedToInventory?: boolean;
+  inventoryTypeId?: string | null;
+  categoryId?: string | null;
+  subcategoryId?: string | null;
+  makeId?: string | null;
+  modelId?: string | null;
+  yearId?: string | null;
+  partType?: string | null;
+  unit?: string | null;
+  partBrand?: string | null;
+  category?: string | null;
+  subcategory?: string | null;
   status: "pending" | "partial" | "received" | "cancelled";
 };

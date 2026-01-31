@@ -122,12 +122,20 @@ export function ProcurementMain({ companyId }: { companyId: string }) {
               <option value="cancelled">Cancelled</option>
             </select>
           </div>
+          <div className="flex items-center gap-2">
+            <a
+              href={`/company/${companyId}/inventory/order-requests`}
+              className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-neutral-900 dark:text-slate-50"
+            >
+              Inventory requests
+            </a>
             <button
               className="rounded-md border border-primary/40 bg-primary/10 px-3 py-2 text-sm font-medium text-primary hover:bg-primary/20 dark:border-primary/60 dark:bg-primary/20"
               onClick={() => setShowManualForm((v) => !v)}
             >
               {showManualForm ? "Close manual PO" : "New manual PO / LPO"}
             </button>
+          </div>
           </div>
 
         {showManualForm && (

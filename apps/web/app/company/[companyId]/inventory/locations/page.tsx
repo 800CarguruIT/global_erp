@@ -79,6 +79,11 @@ function InventoryLocationsPanel({ companyId }: { companyId: string }) {
   });
   const [status, setStatus] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [statusOverrides, setStatusOverrides] = useState<Record<string, boolean>>({});
+  const [statusUpdating, setStatusUpdating] = useState<Record<string, boolean>>({});
+  const [statusError, setStatusError] = useState<string | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState<Record<string, boolean>>({});
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [branches, setBranches] = useState<Array<{ id: string; name: string }>>([]);
   useEffect(() => {
     let cancelled = false;
@@ -86,7 +91,9 @@ function InventoryLocationsPanel({ companyId }: { companyId: string }) {
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch(`/api/company/${companyId}/workshop/inventory/locations`);
+        const res = await fetch(
+          `/api/company/${companyId}/workshop/inventory/locations?includeInactive=true`
+        );
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         if (!cancelled) setLocations(data.data ?? []);
@@ -126,6 +133,57 @@ function InventoryLocationsPanel({ companyId }: { companyId: string }) {
     return map;
   }, [branches]);
 
+  function getStatus(loc: InventoryLocation) {
+    return statusOverrides[loc.id] ?? loc.isActive;
+  }
+
+  async function toggleStatus(loc: InventoryLocation) {
+    const current = getStatus(loc);
+    const next = !current;
+    setStatusError(null);
+    setStatusOverrides((prev) => ({ ...prev, [loc.id]: next }));
+    setStatusUpdating((prev) => ({ ...prev, [loc.id]: true }));
+    try {
+      const res = await fetch(`/api/company/${companyId}/workshop/inventory/locations`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: loc.id, isActive: next }),
+      });
+      if (!res.ok) {
+        throw new Error(`Failed to update status (${res.status})`);
+      }
+      setLocations((prev) => prev.map((row) => (row.id === loc.id ? { ...row, isActive: next } : row)));
+    } catch (err) {
+      console.error("Failed to update location status", err);
+      setStatusOverrides((prev) => ({ ...prev, [loc.id]: current }));
+      setStatusError("Failed to update location status. Please try again.");
+    } finally {
+      setStatusUpdating((prev) => ({ ...prev, [loc.id]: false }));
+    }
+  }
+
+  async function handleDelete(loc: InventoryLocation) {
+    setDeleteError(null);
+    const confirmed = window.confirm(`Delete location "${loc.name}"? This cannot be undone.`);
+    if (!confirmed) return;
+    setDeleteBusy((prev) => ({ ...prev, [loc.id]: true }));
+    try {
+      const res = await fetch(`/api/company/${companyId}/workshop/inventory/locations`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: loc.id }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error || "Failed to delete location.");
+      setLocations((prev) => prev.filter((row) => row.id !== loc.id));
+    } catch (err: any) {
+      setDeleteError(err?.message || "Failed to delete location.");
+    } finally {
+      setDeleteBusy((prev) => ({ ...prev, [loc.id]: false }));
+    }
+  }
+
+
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     if (!form.name.trim()) {
@@ -150,7 +208,9 @@ function InventoryLocationsPanel({ companyId }: { companyId: string }) {
       const created = data?.data as InventoryLocation | undefined;
       setStatus(created ? `Location created (${created.code}).` : "Location created.");
       setForm((prev) => ({ ...prev, name: "", branchId: "" }));
-      const fresh = await fetch(`/api/company/${companyId}/workshop/inventory/locations`);
+      const fresh = await fetch(
+        `/api/company/${companyId}/workshop/inventory/locations?includeInactive=true`
+      );
       const next = await fresh.json();
       setLocations(next.data ?? []);
     } catch (err: any) {
@@ -224,8 +284,14 @@ function InventoryLocationsPanel({ companyId }: { companyId: string }) {
                 </span>
               ))}
             </div>
-          <div className="mt-4 overflow-x-auto rounded-md bg-card/80">
-            <table className="min-w-full text-xs divide-y divide-muted/30">
+            {statusError && (
+              <div className="mt-3 text-[11px] text-destructive">{statusError}</div>
+            )}
+            {deleteError && (
+              <div className="mt-2 text-[11px] text-destructive">{deleteError}</div>
+            )}
+            <div className="mt-4 overflow-x-auto rounded-md bg-card/80">
+              <table className="min-w-full text-xs divide-y divide-muted/30">
               <thead className="bg-muted/10 text-[11px] text-muted-foreground">
                 <tr>
                   <th className="py-3 px-3 text-left">Code</th>
@@ -233,24 +299,25 @@ function InventoryLocationsPanel({ companyId }: { companyId: string }) {
                   <th className="py-3 px-3 text-left">Type</th>
                   <th className="py-3 px-3 text-left">Branch</th>
                   <th className="py-3 px-3 text-left">Status</th>
+                  <th className="py-3 px-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={5} className="py-4 text-center text-xs text-muted-foreground">
+                    <td colSpan={6} className="py-4 text-center text-xs text-muted-foreground">
                       Loading locations…
                     </td>
                   </tr>
                 ) : error ? (
                     <tr>
-                      <td colSpan={5} className="py-3 text-center text-xs text-destructive">
+                      <td colSpan={6} className="py-3 text-center text-xs text-destructive">
                         {error}
                       </td>
                     </tr>
                 ) : locations.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-3 text-center text-xs text-muted-foreground">
+                    <td colSpan={6} className="py-3 text-center text-xs text-muted-foreground">
                       No locations yet.
                     </td>
                   </tr>
@@ -279,7 +346,49 @@ function InventoryLocationsPanel({ companyId }: { companyId: string }) {
                             : "Company (Central)"}
                         </td>
                         <td className="py-2 px-3 text-[11px]">
-                          {loc.isActive ? "Active" : "Inactive"}
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                                getStatus(loc)
+                                  ? "bg-emerald-500/15 text-emerald-300"
+                                  : "bg-amber-500/15 text-amber-300"
+                              }`}
+                            >
+                              {getStatus(loc) ? "Active" : "Inactive"}
+                            </span>
+                            {!rowIsCentral && (
+                              <button
+                                type="button"
+                                role="switch"
+                                aria-checked={getStatus(loc)}
+                                aria-busy={statusUpdating[loc.id] ?? false}
+                                aria-label={`Toggle ${loc.name} status`}
+                                disabled={statusUpdating[loc.id] ?? false}
+                                onClick={() => toggleStatus(loc)}
+                                className={`relative inline-flex h-4 w-7 items-center rounded-full border transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                                  getStatus(loc)
+                                    ? "border-emerald-400 bg-emerald-500/30"
+                                    : "border-border/40 bg-muted/40"
+                                }`}
+                              >
+                                <span
+                                  className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition ${
+                                    getStatus(loc) ? "translate-x-3.5" : "translate-x-1"
+                                  }`}
+                                />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-2 px-3 text-right">
+                          <button
+                            type="button"
+                            disabled={rowIsCentral || deleteBusy[loc.id]}
+                            onClick={() => handleDelete(loc)}
+                            className="rounded-md border border-rose-500/40 px-2 py-1 text-[10px] font-semibold text-rose-200 hover:bg-rose-500/10 disabled:cursor-not-allowed disabled:border-slate-700 disabled:text-slate-500"
+                          >
+                            {deleteBusy[loc.id] ? "Deleting..." : "Delete"}
+                          </button>
                         </td>
                       </tr>
                     );

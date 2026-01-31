@@ -3,6 +3,7 @@ import {
   listLocations,
   createLocation,
   updateLocation,
+  deleteLocation,
 } from "@repo/ai-core/workshop/inventory/repository";
 import type { InventoryLocationType } from "@repo/ai-core/workshop/inventory/types";
 
@@ -11,8 +12,9 @@ type Params = { params: Promise<{ companyId: string }> };
 export async function GET(req: NextRequest, { params }: Params) {
   const { companyId } = await params;
   const branchId = req.nextUrl.searchParams.get("branchId") || undefined;
+  const includeInactive = req.nextUrl.searchParams.get("includeInactive") === "true";
   try {
-    const data = await listLocations(companyId, { branchId });
+    const data = await listLocations(companyId, { branchId, includeInactive });
     return NextResponse.json({ data });
   } catch (err) {
     console.error("inventory/locations error", err);
@@ -56,4 +58,16 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (!body.id) return new NextResponse("id required", { status: 400 });
   await updateLocation(companyId, body.id, body);
   return NextResponse.json({ ok: true });
+}
+
+export async function DELETE(req: NextRequest, { params }: Params) {
+  const { companyId } = await params;
+  const body = await req.json().catch(() => ({}));
+  if (!body.id) return new NextResponse("id required", { status: 400 });
+  try {
+    await deleteLocation(companyId, body.id);
+    return NextResponse.json({ ok: true });
+  } catch (err: any) {
+    return NextResponse.json({ error: err?.message ?? "delete_failed" }, { status: 400 });
+  }
 }

@@ -19,8 +19,8 @@ export async function GET(req: NextRequest, { params }: Params) {
         LOWER(pq.status) IN ('pending', 'quoted', 'approved')
         OR (
           LOWER(pq.status) = 'pending'
-          AND LOWER(ei.status) IN ('approved', 'inquiry')
-          AND ei.status IS NOT NULL
+          AND LOWER(COALESCE(ei.status, iori.status)) IN ('approved', 'inquiry')
+          AND COALESCE(ei.status, iori.status) IS NOT NULL
         )
       )`;
     }
@@ -51,18 +51,25 @@ export async function GET(req: NextRequest, { params }: Params) {
       pq.used_etd,
       pq.remarks,
       pq.updated_at,
+      pq.inventory_request_item_id,
+      pq.inventory_request_id,
+      pq.estimate_item_id,
       v.name AS vendor_name,
-      ei.part_name,
-      LOWER(ei.status) AS estimate_item_status,
+      COALESCE(ei.part_name, iori.part_name) AS part_name,
+      LOWER(COALESCE(ei.status, iori.status)) AS item_status,
       ei.approved_type,
       car.id AS car_id,
       car.make AS car_make,
       car.model AS car_model,
       car.plate_number AS car_plate,
-      car.vin AS car_vin
+      car.vin AS car_vin,
+      ior.request_number,
+      v.id AS vendor_id
     FROM part_quotes pq
-    INNER JOIN estimate_items ei ON ei.id = pq.estimate_item_id
-    INNER JOIN estimates est ON est.id = pq.estimate_id
+    LEFT JOIN estimate_items ei ON ei.id = pq.estimate_item_id
+    LEFT JOIN estimates est ON est.id = pq.estimate_id
+    LEFT JOIN inventory_order_request_items iori ON iori.id = pq.inventory_request_item_id
+    LEFT JOIN inventory_order_requests ior ON ior.id = pq.inventory_request_id
     LEFT JOIN vendors v ON v.id = pq.vendor_id
     LEFT JOIN cars car ON car.id = est.car_id
     WHERE pq.company_id = ${companyId}
@@ -75,12 +82,17 @@ export async function GET(req: NextRequest, { params }: Params) {
     status: row.status,
     vendorName: row.vendor_name,
     partName: row.part_name,
-    estimateItemStatus: row.estimate_item_status,
+    estimateItemStatus: row.item_status,
     carId: row.car_id,
     carMake: row.car_make,
     carModel: row.car_model,
     carPlate: row.car_plate,
     carVin: row.car_vin,
+    requestNumber: row.request_number ?? null,
+    sourceType: row.inventory_request_item_id ? "inventory" : "estimate",
+    inventoryRequestItemId: row.inventory_request_item_id ?? null,
+    estimateItemId: row.estimate_item_id ?? null,
+    vendorId: row.vendor_id ?? null,
     oem: row.oem != null ? Number(row.oem) : null,
     oe: row.oe != null ? Number(row.oe) : null,
     aftm: row.aftm != null ? Number(row.aftm) : null,

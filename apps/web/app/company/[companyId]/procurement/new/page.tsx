@@ -12,6 +12,7 @@ type StockPart = { partsCatalogId: string; partName: string; partCode: string };
 
 type LineItemDraft = {
   id: string;
+  quoteId?: string | null;
   partId?: string;
   partLabel: string;
   unit: string;
@@ -20,6 +21,8 @@ type LineItemDraft = {
   discount: number;
   tax: number;
   approvedType?: string | null;
+  inventoryRequestItemId?: string | null;
+  lineStatus?: "Received" | "Return" | null;
 };
 
 type PreselectedLine = {
@@ -30,6 +33,8 @@ type PreselectedLine = {
   unit?: string;
   partsCatalogId?: string | null;
   approvedType?: string | null;
+  inventoryRequestItemId?: string | null;
+  lineStatus?: "Received" | "Return" | null;
 };
 
 type PreselectedDraft = {
@@ -79,6 +84,7 @@ export default function CreatePurchaseOrderPage() {
   const [error, setError] = useState<string | null>(null);
   const [draftFromQuotes, setDraftFromQuotes] = useState<PreselectedDraft | null>(null);
   const poDate = useMemo(() => formatDate(new Date()), []);
+  const [poNumberPreview, setPoNumberPreview] = useState("Loading...");
   const status = "Draft";
 
   useEffect(() => {
@@ -99,6 +105,24 @@ export default function CreatePurchaseOrderPage() {
         );
       })
       .catch(() => setVendors([]));
+  }, [companyId]);
+
+  useEffect(() => {
+    if (!companyId) return;
+    let active = true;
+    fetch(`/api/company/${companyId}/workshop/procurement/next-po-number`)
+      .then((res) => (res.ok ? res.json() : Promise.reject()))
+      .then((json) => {
+        if (!active) return;
+        setPoNumberPreview(json?.data?.poNumber ?? "PO-YYMMDD-0000");
+      })
+      .catch(() => {
+        if (!active) return;
+        setPoNumberPreview("PO-YYMMDD-0000");
+      });
+    return () => {
+      active = false;
+    };
   }, [companyId]);
 
   useEffect(() => {
@@ -161,6 +185,7 @@ export default function CreatePurchaseOrderPage() {
     setItems(
       draftFromQuotes.lines.map((line) => ({
         id: randomId(),
+        quoteId: line.quoteId ?? null,
         partId: line.partsCatalogId ?? undefined,
         partLabel: line.partLabel ?? "Part",
         unit: line.unit ?? "EA",
@@ -169,6 +194,8 @@ export default function CreatePurchaseOrderPage() {
         discount: 0,
         tax: line.tax ?? 5,
         approvedType: line.approvedType ?? null,
+        inventoryRequestItemId: line.inventoryRequestItemId ?? null,
+        lineStatus: line.lineStatus ?? null,
       }))
     );
   }, [draftFromQuotes]);
@@ -226,7 +253,11 @@ export default function CreatePurchaseOrderPage() {
     };
   }, [items]);
 
-  const hasValidItems = items.some((item) => item.partId && (item.quantity > 0 || item.unitPrice > 0));
+  const hasValidItems = items.some(
+    (item) =>
+      (item.partId || item.inventoryRequestItemId || item.partLabel) &&
+      (item.quantity > 0 || item.unitPrice > 0)
+  );
   const canSubmit = !!companyId && !!supplierId && hasValidItems && !saving;
 
   const updateItem = (index: number, patch: Partial<LineItemDraft>) => {
@@ -254,17 +285,41 @@ export default function CreatePurchaseOrderPage() {
       setError("Please select supplier and add at least one item.");
       return;
     }
+    const missingStatus = items.filter(
+      (item) =>
+        (item.partId || item.inventoryRequestItemId || item.partLabel) &&
+        (item.quantity > 0 || item.unitPrice > 0) &&
+        !item.lineStatus
+    );
+    if (missingStatus.length) {
+      setError("Select line status (Received/Return) for all items before creating the PO.");
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
       const supplier = vendors.find((v) => v.id === supplierId);
       const payloadItems = items
-        .filter((item) => item.partId && (item.quantity > 0 || item.unitPrice > 0))
+        .filter(
+          (item) =>
+            (item.partId || item.inventoryRequestItemId || item.partLabel) &&
+            (item.quantity > 0 || item.unitPrice > 0)
+        )
         .map((item) => ({
           name: item.partLabel || "Part",
-          description: `Unit: ${item.unit}`,
+          description: [
+            `Unit: ${item.unit}`,
+            item.lineStatus ? `Status: ${item.lineStatus}` : null,
+            item.approvedType ? `Type: ${item.approvedType}` : null,
+          ]
+            .filter(Boolean)
+            .join(" | "),
           quantity: Number(item.quantity) || 0,
           unitCost: Number(item.unitPrice) || 0,
+          partsCatalogId: item.partId ?? null,
+          inventoryRequestItemId: item.inventoryRequestItemId ?? null,
+          quoteId: item.quoteId ?? null,
+          lineStatus: item.lineStatus ?? null,
         }));
       const notesPieces = [
         notes.trim(),
@@ -344,7 +399,12 @@ export default function CreatePurchaseOrderPage() {
           <div className="grid gap-4 md:grid-cols-3">
             <div className="space-y-1">
               <label className="text-xs font-medium uppercase text-slate-400">PO Number</label>
-              <div className="text-sm text-slate-100">Auto (assigned as PO-YYYYMM-####)</div>
+              <input
+                className="w-full rounded border border-slate-800 bg-slate-900 px-2 py-1 text-sm text-slate-100"
+                readOnly
+                value={poNumberPreview}
+              />
+              <div className="text-[11px] text-slate-400">Auto-assigned on save.</div>
             </div>
             <div className="space-y-1">
               <label className="text-xs font-medium uppercase text-slate-400">PO Date</label>
@@ -483,7 +543,8 @@ export default function CreatePurchaseOrderPage() {
             <tr className="border-b border-slate-800 text-xs text-slate-400">
               <th className="py-2 px-3 text-left">Part</th>
               <th className="py-2 px-3 text-left">Qty Ordered</th>
-                  <th className="py-2 px-3 text-left">Type</th>
+              <th className="py-2 px-3 text-left">Type</th>
+              <th className="py-2 px-3 text-left">Status</th>
               <th className="py-2 px-3 text-left">Unit price</th>
               <th className="py-2 px-3 text-left">Discount %</th>
               <th className="py-2 px-3 text-left">VAT (%)</th>
@@ -494,7 +555,7 @@ export default function CreatePurchaseOrderPage() {
               <tbody>
                 {items.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-4 text-center text-xs text-slate-500">
+                    <td colSpan={9} className="py-4 text-center text-xs text-slate-500">
                       No line items yet.
                     </td>
                   </tr>
@@ -527,7 +588,25 @@ export default function CreatePurchaseOrderPage() {
                         </td>
                         <td className="py-2 px-3 text-xs">
                           <div className="text-xs font-semibold text-slate-100">{item.unit}</div>
+                          {item.lineStatus && (
+                            <div className="text-[11px] text-slate-400">Status: {item.lineStatus}</div>
+                          )}
                          
+                        </td>
+                        <td className="py-2 px-3">
+                          <select
+                            className="w-28 rounded border border-slate-800 bg-slate-900 px-2 py-1 text-xs text-slate-100"
+                            value={item.lineStatus ?? ""}
+                            onChange={(event) =>
+                              updateItem(index, {
+                                lineStatus: (event.target.value as "Received" | "Return" | "") || null,
+                              })
+                            }
+                          >
+                            <option value="">Select</option>
+                            <option value="Received">Received</option>
+                            <option value="Return">Return</option>
+                          </select>
                         </td>
                         <td className="py-2 px-3">
                           <input
@@ -580,11 +659,18 @@ export default function CreatePurchaseOrderPage() {
               </tbody>
             </table>
           </div>
-          <div className="flex flex-col gap-1 text-xs text-slate-300 md:flex-row md:justify-end md:text-right">
-            <div>Subtotal: {totals.subtotal.toFixed(2)}</div>
-            <div>Discount: -{totals.discount.toFixed(2)}</div>
-            <div>Tax: +{totals.taxTotal.toFixed(2)}</div>
-            <div className="text-slate-100">Total: {totals.total.toFixed(2)}</div>
+          <div className="flex flex-col items-end gap-3 text-xs text-slate-300">
+            <div className="grid w-full max-w-md gap-2 rounded-xl border border-slate-800/80 bg-slate-950/80 p-3 sm:grid-cols-2">
+              <div className="text-[11px] uppercase tracking-wide text-slate-400">Subtotal</div>
+              <div className="text-right text-sm font-semibold text-slate-100">{totals.subtotal.toFixed(2)}</div>
+              <div className="text-[11px] uppercase tracking-wide text-slate-400">Discount</div>
+              <div className="text-right text-sm font-semibold text-rose-200">-{totals.discount.toFixed(2)}</div>
+              <div className="text-[11px] uppercase tracking-wide text-slate-400">Tax</div>
+              <div className="text-right text-sm font-semibold text-amber-200">+{totals.taxTotal.toFixed(2)}</div>
+              <div className="col-span-2 mt-1 h-px bg-slate-800/70" />
+              <div className="text-[11px] uppercase tracking-wide text-slate-300">Total</div>
+              <div className="text-right text-lg font-semibold text-emerald-200">{totals.total.toFixed(2)}</div>
+            </div>
           </div>
         </section>
 

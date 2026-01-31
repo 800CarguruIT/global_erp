@@ -24,6 +24,9 @@ type QuoteRow = {
   carModel?: string | null;
   carPlate?: string | null;
   carVin?: string | null;
+  requestNumber?: string | null;
+  sourceType?: "inventory" | "estimate";
+  inventoryRequestItemId?: string | null;
   oem?: number | null;
   oe?: number | null;
   aftm?: number | null;
@@ -41,6 +44,7 @@ type QuoteRow = {
   approvedType?: string | null;
   updatedAt?: string | null;
   vendorId?: string | null;
+  estimateItemId?: string | null;
 };
 
 const pickQuote = (row: QuoteRow) => {
@@ -67,6 +71,12 @@ export default function PartsQuotesPage() {
   const [orderingQuoteId, setOrderingQuoteId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedOrderedIds, setSelectedOrderedIds] = useState<string[]>([]);
+  const [quotesModalOpen, setQuotesModalOpen] = useState(false);
+  const [quotesModalTitle, setQuotesModalTitle] = useState("");
+  const [quotesModalRows, setQuotesModalRows] = useState<QuoteRow[]>([]);
+  const [orderDrafts, setOrderDrafts] = useState<
+    Record<string, { oemQty: string; oeQty: string; aftmQty: string; usedQty: string }>
+  >({});
 
   const isOrderedTab = activeTab === "ordered";
   const filteredRows = useMemo(() => {
@@ -131,6 +141,7 @@ export default function PartsQuotesPage() {
           unit: quoteInfo.type ?? "EA",
           partsCatalogId: (row as any).partsCatalogId ?? null,
           approvedType: row.approvedType ?? null,
+          inventoryRequestItemId: row.inventoryRequestItemId ?? null,
         };
       }),
     };
@@ -142,18 +153,61 @@ export default function PartsQuotesPage() {
     router.push(`/company/${companyId}/procurement/new`);
   };
 
+  const openQuotesModal = (row: QuoteRow) => {
+    const key = row.sourceType === "inventory" ? row.inventoryRequestItemId : row.estimateItemId;
+    const related = key
+      ? rows.filter((r) =>
+          (row.sourceType === "inventory"
+            ? r.inventoryRequestItemId === key
+            : r.estimateItemId === key)
+        )
+      : [row];
+    setQuotesModalTitle(row.partName ?? "Quotes");
+    setQuotesModalRows(related);
+    setQuotesModalOpen(true);
+    setOrderDrafts((prev) => {
+      const next = { ...prev };
+      related.forEach((r) => {
+        if (!next[r.id]) {
+          next[r.id] = { oemQty: "", oeQty: "", aftmQty: "", usedQty: "" };
+        }
+      });
+      return next;
+    });
+  };
+
   const orderQuote = async (row: QuoteRow) => {
     if (!companyId) return;
+    const draft = orderDrafts[row.id] ?? { oemQty: "", oeQty: "", aftmQty: "", usedQty: "" };
+    const toNum = (val: string) => {
+      if (!val) return 0;
+      const num = Number(val);
+      return Number.isNaN(num) ? 0 : num;
+    };
+    const oemQty = toNum(draft.oemQty);
+    const oeQty = toNum(draft.oeQty);
+    const aftmQty = toNum(draft.aftmQty);
+    const usedQty = toNum(draft.usedQty);
+    if (oemQty + oeQty + aftmQty + usedQty <= 0) {
+      toast.error("Enter at least one quantity to order.");
+      return;
+    }
     setOrderingQuoteId(row.id);
     try {
       const res = await fetch(`/api/company/${companyId}/part-quotes/order`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ quoteId: row.id }),
+        body: JSON.stringify({
+          quoteId: row.id,
+          ordered: { oemQty, oeQty, aftmQty, usedQty },
+        }),
       });
       if (!res.ok) throw new Error(`Failed to order quote (${res.status})`);
       toast.success("Quote marked as ordered");
       setRefreshKey((prev) => prev + 1);
+      setQuotesModalRows((prev) =>
+        prev.map((r) => (r.id === row.id ? { ...r, status: "Ordered" } : r))
+      );
     } catch (err) {
       console.error(err);
       toast.error("Unable to order this quote");
@@ -202,12 +256,23 @@ export default function PartsQuotesPage() {
       ];
       const approvedTypeKey = row.approvedType?.toLowerCase() ?? "";
       const approvedTypeEntry = types.find((type) => type.name.toLowerCase() === approvedTypeKey);
-      const canOrder = Boolean(isApproved && approvedTypeEntry && approvedTypeEntry.value != null);
-      const isOrderingThis = orderingQuoteId === row.id;
-      const carLabel = [row.carMake, row.carModel].filter(Boolean).join(" ") || "Unknown car";
+      const carLabel =
+        row.sourceType === "inventory"
+          ? row.requestNumber
+            ? `Inventory ${row.requestNumber}`
+            : "Inventory request"
+          : [row.carMake, row.carModel].filter(Boolean).join(" ") || "Unknown car";
       const partName = row.partName || "Unnamed part";
       const quoteInfo = pickQuote(row);
       const quoteAmount = quoteInfo.amount != null ? `${quoteInfo.amount.toFixed(2)} AED` : "-";
+      const qtySummary = [
+        row.oemQty != null ? `OEM: ${row.oemQty}` : null,
+        row.oeQty != null ? `OE: ${row.oeQty}` : null,
+        row.aftmQty != null ? `AFTM: ${row.aftmQty}` : null,
+        row.usedQty != null ? `USED: ${row.usedQty}` : null,
+      ]
+        .filter(Boolean)
+        .join(" · ");
       const orderedOn = row.updatedAt ? new Date(row.updatedAt).toLocaleDateString() : "-";
       return (
         <tr key={row.id} className="border-t border-white/5">
@@ -224,6 +289,7 @@ export default function PartsQuotesPage() {
             <div className="font-semibold">{quoteInfo.type}</div>
             <div>{quoteAmount}</div>
             <div className="text-[10px] uppercase text-slate-400">{quoteInfo.etd ?? ""}</div>
+            {qtySummary && <div className="text-[10px] text-slate-500">{qtySummary}</div>}
           </td>
           <td className="px-3 py-3 text-xs uppercase">{statusLabel}</td>
           <td className="px-3 py-3 text-xs uppercase">{row.status ?? "Requested"}</td>
@@ -240,20 +306,13 @@ export default function PartsQuotesPage() {
             </td>
           ) : (
             <td className="px-3 py-3 text-right">
-              {canOrder ? (
-                <button
-                  type="button"
-                  onClick={() => orderQuote(row)}
-                  disabled={isOrderingThis}
-                  className="rounded-md border border-emerald-500 px-3 py-1 text-xs font-semibold text-emerald-500 hover:bg-emerald-500/10 disabled:opacity-70"
-                >
-                  {isOrderingThis ? "Ordering..." : "Order part"}
-                </button>
-              ) : (
-                <span className="rounded-full bg-amber-500/10 px-3 py-1 text-[10px] font-semibold text-amber-300">
-                  Approval pending
-                </span>
-              )}
+              <button
+                type="button"
+                onClick={() => openQuotesModal(row)}
+                className="rounded-md border border-emerald-500 px-3 py-1 text-xs font-semibold text-emerald-500 hover:bg-emerald-500/10 disabled:opacity-70"
+              >
+                View Quotes
+              </button>
             </td>
           )}
         </tr>
@@ -263,6 +322,176 @@ export default function PartsQuotesPage() {
 
   return (
     <AppLayout>
+      {quotesModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-6xl overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-slate-950/98 via-slate-950/95 to-slate-900/95 shadow-[0_30px_80px_-40px_rgba(15,23,42,0.9)]">
+            <div className="flex items-center justify-between border-b border-white/10 bg-slate-950/90 px-6 py-4">
+              <div>
+                <div className="text-xs uppercase tracking-[0.2em] text-white/50">Quotes</div>
+                <div className="text-base font-semibold text-slate-100">{quotesModalTitle}</div>
+                <div className="text-[11px] text-slate-400">
+                  Compare vendor pricing and submit the exact quantities to order.
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setQuotesModalOpen(false)}
+                className="rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-white/80 transition hover:bg-white/20"
+              >
+                Close
+              </button>
+            </div>
+            <div className="max-h-[70vh] overflow-auto px-6 py-4">
+              <table className="min-w-full text-xs text-slate-100">
+                <thead className="sticky top-0 z-10 bg-slate-900/90 text-[11px] uppercase tracking-wide text-slate-300 backdrop-blur">
+                  <tr>
+                    <th className="px-3 py-2 text-left">Vendor</th>
+                    <th className="px-3 py-2 text-left">OEM</th>
+                    <th className="px-3 py-2 text-left">OE</th>
+                    <th className="px-3 py-2 text-left">AFTM</th>
+                    <th className="px-3 py-2 text-left">Used</th>
+                    <th className="px-3 py-2 text-left">Remarks</th>
+                    <th className="px-3 py-2 text-left">Quoted Qty</th>
+                    <th className="px-3 py-2 text-left">Order Qty</th>
+                    <th className="px-3 py-2 text-left">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {quotesModalRows.length === 0 ? (
+                    <tr>
+                      <td className="px-3 py-6 text-center text-xs text-slate-400" colSpan={9}>
+                        No quotes available.
+                      </td>
+                    </tr>
+                  ) : (
+                    quotesModalRows.map((r) => (
+                      <tr key={r.id} className="border-t border-white/5">
+                        <td className="px-3 py-3">
+                          <div className="text-sm font-semibold text-slate-100">{r.vendorName ?? "—"}</div>
+                          <div className="text-[10px] text-slate-500">{r.updatedAt ? new Date(r.updatedAt).toLocaleDateString() : "—"}</div>
+                        </td>
+                        <td className="px-3 py-2">
+                          {r.oem != null ? (
+                            <div>
+                              <div className="text-sm font-semibold">{r.oem} AED</div>
+                              <div className="text-[10px] text-slate-400">QTY: {r.oemQty ?? "—"}</div>
+                            </div>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                        <td className="px-3 py-2">
+                          {r.oe != null ? (
+                            <div>
+                              <div className="text-sm font-semibold">{r.oe} AED</div>
+                              <div className="text-[10px] text-slate-400">QTY: {r.oeQty ?? "—"}</div>
+                            </div>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                        <td className="px-3 py-2">
+                          {r.aftm != null ? (
+                            <div>
+                              <div className="text-sm font-semibold">{r.aftm} AED</div>
+                              <div className="text-[10px] text-slate-400">QTY: {r.aftmQty ?? "—"}</div>
+                            </div>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                        <td className="px-3 py-2">
+                          {r.used != null ? (
+                            <div>
+                              <div className="text-sm font-semibold">{r.used} AED</div>
+                              <div className="text-[10px] text-slate-400">QTY: {r.usedQty ?? "—"}</div>
+                            </div>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                        <td className="px-3 py-2">{r.remarks ?? "—"}</td>
+                        <td className="px-3 py-2 text-[11px] text-slate-300/80">
+                          {[
+                            r.oemQty != null ? `OEM: ${r.oemQty}` : null,
+                            r.oeQty != null ? `OE: ${r.oeQty}` : null,
+                            r.aftmQty != null ? `AFTM: ${r.aftmQty}` : null,
+                            r.usedQty != null ? `USED: ${r.usedQty}` : null,
+                          ]
+                            .filter(Boolean)
+                            .join(" · ") || "—"}
+                        </td>
+                        <td className="px-3 py-2">
+                          <div className="grid grid-cols-2 gap-1 text-[11px]">
+                            <input
+                              className="w-16 rounded border border-white/10 bg-slate-900/60 px-2 py-1 text-[11px] text-white focus:border-emerald-400 focus:outline-none"
+                              placeholder="OEM"
+                              value={orderDrafts[r.id]?.oemQty ?? ""}
+                              onChange={(e) =>
+                                setOrderDrafts((prev) => ({
+                                  ...prev,
+                                  [r.id]: { ...prev[r.id], oemQty: e.target.value },
+                                }))
+                              }
+                              disabled={r.oem == null}
+                            />
+                            <input
+                              className="w-16 rounded border border-white/10 bg-slate-900/60 px-2 py-1 text-[11px] text-white focus:border-emerald-400 focus:outline-none"
+                              placeholder="OE"
+                              value={orderDrafts[r.id]?.oeQty ?? ""}
+                              onChange={(e) =>
+                                setOrderDrafts((prev) => ({
+                                  ...prev,
+                                  [r.id]: { ...prev[r.id], oeQty: e.target.value },
+                                }))
+                              }
+                              disabled={r.oe == null}
+                            />
+                            <input
+                              className="w-16 rounded border border-white/10 bg-slate-900/60 px-2 py-1 text-[11px] text-white focus:border-emerald-400 focus:outline-none"
+                              placeholder="AFTM"
+                              value={orderDrafts[r.id]?.aftmQty ?? ""}
+                              onChange={(e) =>
+                                setOrderDrafts((prev) => ({
+                                  ...prev,
+                                  [r.id]: { ...prev[r.id], aftmQty: e.target.value },
+                                }))
+                              }
+                              disabled={r.aftm == null}
+                            />
+                            <input
+                              className="w-16 rounded border border-white/10 bg-slate-900/60 px-2 py-1 text-[11px] text-white focus:border-emerald-400 focus:outline-none"
+                              placeholder="Used"
+                              value={orderDrafts[r.id]?.usedQty ?? ""}
+                              onChange={(e) =>
+                                setOrderDrafts((prev) => ({
+                                  ...prev,
+                                  [r.id]: { ...prev[r.id], usedQty: e.target.value },
+                                }))
+                              }
+                              disabled={r.used == null}
+                            />
+                          </div>
+                        </td>
+                        <td className="px-3 py-2">
+                          <button
+                            type="button"
+                            onClick={() => orderQuote(r)}
+                            disabled={orderingQuoteId === r.id}
+                            className="rounded-md border border-emerald-500/60 bg-emerald-500/10 px-2 py-1 text-[11px] font-semibold text-emerald-200 hover:bg-emerald-500/20 disabled:opacity-70"
+                          >
+                            {orderingQuoteId === r.id ? "Ordering..." : "Order"}
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="space-y-6 py-4">
         <div>
           <h1 className="text-2xl font-semibold">Part Quotes</h1>

@@ -6,7 +6,7 @@ import type {
   PurchaseOrderStatus,
   PurchaseOrderType,
 } from "./types";
-import { receivePartsForEstimateItem } from "../parts/repository";
+import { receivePartsForEstimateItem, receivePartsForInventoryRequestItem } from "../parts/repository";
 
 function mapPoRow(row: any): PurchaseOrder {
   return {
@@ -38,6 +38,7 @@ function mapItemRow(row: any): PurchaseOrderItem {
     purchaseOrderId: row.purchase_order_id,
     lineNo: row.line_no,
     estimateItemId: row.estimate_item_id,
+    inventoryRequestItemId: row.inventory_request_item_id,
     partsCatalogId: row.parts_catalog_id,
     name: row.name,
     description: row.description,
@@ -45,6 +46,18 @@ function mapItemRow(row: any): PurchaseOrderItem {
     unitCost: Number(row.unit_cost),
     totalCost: Number(row.total_cost),
     receivedQty: Number(row.received_qty),
+    movedToInventory: Boolean(row.moved_to_inventory),
+    inventoryTypeId: row.req_inventory_type_id,
+    categoryId: row.req_category_id,
+    subcategoryId: row.req_subcategory_id,
+    makeId: row.req_make_id,
+    modelId: row.req_model_id,
+    yearId: row.req_year_id,
+    partType: row.req_part_type,
+    unit: row.req_unit,
+    partBrand: row.req_part_brand,
+    category: row.req_category,
+    subcategory: row.req_subcategory,
     status: row.status,
   };
 }
@@ -52,11 +65,37 @@ function mapItemRow(row: any): PurchaseOrderItem {
 async function getPoItems(poId: string): Promise<PurchaseOrderItem[]> {
   const sql = getSql();
   const rows = await sql/* sql */ `
-    SELECT * FROM purchase_order_items
-    WHERE purchase_order_id = ${poId}
-    ORDER BY line_no ASC
+    SELECT
+      poi.*,
+      EXISTS (
+        SELECT 1
+        FROM inventory_movements im
+        WHERE im.purchase_order_id = poi.purchase_order_id
+          AND im.source_id = poi.inventory_request_item_id
+          AND im.source_type = 'receipt'
+          AND im.direction = 'in'
+      ) AS has_movement,
+      iori.part_brand AS req_part_brand,
+      iori.part_type AS req_part_type,
+      iori.unit AS req_unit,
+      iori.category AS req_category,
+      iori.subcategory AS req_subcategory,
+      iori.inventory_type_id AS req_inventory_type_id,
+      iori.category_id AS req_category_id,
+      iori.subcategory_id AS req_subcategory_id,
+      iori.make_id AS req_make_id,
+      iori.model_id AS req_model_id,
+      iori.year_id AS req_year_id
+    FROM purchase_order_items poi
+    LEFT JOIN inventory_order_request_items iori
+      ON iori.id = poi.inventory_request_item_id
+    WHERE poi.purchase_order_id = ${poId}
+    ORDER BY poi.line_no ASC
   `;
-  return rows.map(mapItemRow);
+  return rows.map((row: any) => ({
+    ...mapItemRow(row),
+    movedToInventory: Boolean(row.moved_to_inventory) || Boolean(row.has_movement),
+  }));
 }
 
 async function recalcTotals(poId: string): Promise<void> {
@@ -70,10 +109,13 @@ async function recalcTotals(poId: string): Promise<void> {
   `;
 }
 
-async function nextPoNumber(companyId: string): Promise<string> {
+export async function nextPoNumberPreview(companyId: string): Promise<string> {
   const sql = getSql();
-  const year = new Date().getFullYear();
-  const prefix = `PO-${year}-`;
+  const now = new Date();
+  const yy = String(now.getFullYear()).slice(-2);
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const dd = String(now.getDate()).padStart(2, "0");
+  const prefix = `PO-${yy}${mm}${dd}-`;
   const rows = await sql/* sql */ `
     SELECT po_number FROM purchase_orders
     WHERE company_id = ${companyId} AND po_number LIKE ${prefix + "%"}
@@ -85,6 +127,10 @@ async function nextPoNumber(companyId: string): Promise<string> {
   const last = (lastRow?.po_number as string | undefined) ?? "";
   const num = last ? parseInt(last.replace(prefix, "")) || 0 : 0;
   return `${prefix}${(num + 1).toString().padStart(4, "0")}`;
+}
+
+async function nextPoNumber(companyId: string): Promise<string> {
+  return nextPoNumberPreview(companyId);
 }
 
 export async function createPoFromVendorQuote(
@@ -173,6 +219,10 @@ export async function createManualPo(args: {
     description?: string | null;
     quantity?: number;
     unitCost?: number;
+    partsCatalogId?: string | null;
+    inventoryRequestItemId?: string | null;
+    quoteId?: string | null;
+    lineStatus?: "Received" | "Return" | null;
   }>;
 }): Promise<{ po: PurchaseOrder; items: PurchaseOrderItem[] }> {
   const sql = getSql();
@@ -209,27 +259,46 @@ export async function createManualPo(args: {
   for (const [idx, item] of items.entries()) {
     const qty = item.quantity ?? 0;
     const unit = item.unitCost ?? 0;
+    const lineStatus = item.lineStatus?.toLowerCase();
+    const poItemStatus =
+      lineStatus === "received" ? "received" : lineStatus === "return" ? "cancelled" : "pending";
+    const receivedQty = poItemStatus === "received" ? qty : 0;
     await sql/* sql */ `
       INSERT INTO purchase_order_items (
         purchase_order_id,
         line_no,
+        parts_catalog_id,
+        inventory_request_item_id,
         name,
         description,
         quantity,
         unit_cost,
         total_cost,
-        status
+        status,
+        received_qty
       ) VALUES (
         ${po.id},
         ${idx + 1},
+        ${item.partsCatalogId ?? null},
+        ${item.inventoryRequestItemId ?? null},
         ${item.name},
         ${item.description ?? null},
         ${qty},
         ${unit},
         ${qty * unit},
-        ${"pending"}
+        ${poItemStatus},
+        ${receivedQty}
       )
     `;
+    if (item.quoteId && (lineStatus === "received" || lineStatus === "return")) {
+      const quoteStatus = lineStatus === "received" ? "Received" : "Return";
+      await sql/* sql */ `
+        UPDATE part_quotes
+        SET status = ${quoteStatus},
+            updated_at = NOW()
+        WHERE company_id = ${args.companyId} AND id = ${item.quoteId}
+      `;
+    }
   }
 
   await recalcTotals(po.id);
@@ -309,6 +378,8 @@ export async function replacePurchaseOrderItems(
     description?: string | null;
     quantity?: number;
     unitCost?: number;
+    partsCatalogId?: string | null;
+    inventoryRequestItemId?: string | null;
   }>
 ): Promise<void> {
   const sql = getSql();
@@ -320,6 +391,8 @@ export async function replacePurchaseOrderItems(
       INSERT INTO purchase_order_items (
         purchase_order_id,
         line_no,
+        parts_catalog_id,
+        inventory_request_item_id,
         name,
         description,
         quantity,
@@ -329,6 +402,8 @@ export async function replacePurchaseOrderItems(
       ) VALUES (
         ${poId},
         ${item.lineNo ?? idx + 1},
+        ${item.partsCatalogId ?? null},
+        ${item.inventoryRequestItemId ?? null},
         ${item.name},
         ${item.description ?? null},
         ${qty},
@@ -380,6 +455,15 @@ export async function receivePoItems(
       } catch {
         // ignore inventory errors to not block PO receive
       }
+    } else if (current.inventoryRequestItemId) {
+      try {
+        await receivePartsForInventoryRequestItem(companyId, current.inventoryRequestItemId, {
+          quantity: entry.quantity,
+          purchaseOrderId: poId,
+        });
+      } catch {
+        // ignore inventory errors to not block PO receive
+      }
     }
   }
 
@@ -396,4 +480,90 @@ export async function receivePoItems(
 
   const poRow = await sql/* sql */ `SELECT * FROM purchase_orders WHERE id = ${poId} LIMIT 1`;
   return { po: mapPoRow(poRow[0]), items: poItems };
+}
+
+export async function movePoItemToInventory(args: {
+  companyId: string;
+  poId: string;
+  itemId: string;
+  quantity?: number;
+  partNumber?: string | null;
+  partBrand?: string | null;
+  unit?: string | null;
+  category?: string | null;
+  subcategory?: string | null;
+  partType?: string | null;
+  makeId?: string | null;
+  modelId?: string | null;
+  yearId?: string | null;
+}): Promise<{ movedQty: number; grnNumber: string | null }> {
+  const sql = getSql();
+  const rows = await sql/* sql */ `
+    SELECT * FROM purchase_order_items
+    WHERE id = ${args.itemId} AND purchase_order_id = ${args.poId}
+    LIMIT 1
+  `;
+  if (!rows.length) {
+    throw new Error("PO item not found");
+  }
+  const poItem = mapItemRow(rows[0]);
+  if (!poItem.inventoryRequestItemId) {
+    throw new Error("PO item is not linked to an inventory request");
+  }
+  if (poItem.status !== "received") {
+    throw new Error("PO item is not marked as received");
+  }
+
+  const reqRows = await sql/* sql */ `
+    SELECT quantity, received_qty, description
+    FROM inventory_order_request_items
+    WHERE id = ${poItem.inventoryRequestItemId}
+    LIMIT 1
+  `;
+  if (!reqRows.length) {
+    throw new Error("Inventory request item not found");
+  }
+  const req = reqRows[0];
+  const updatePayload: Record<string, any> = {};
+  if (args.partNumber) updatePayload.part_number = args.partNumber;
+  if (args.partBrand) updatePayload.part_brand = args.partBrand;
+  if (args.unit) updatePayload.unit = args.unit;
+  if (args.category) updatePayload.category = args.category;
+  if (args.subcategory) updatePayload.subcategory = args.subcategory;
+  if (args.makeId) updatePayload.make_id = args.makeId;
+  if (args.modelId) updatePayload.model_id = args.modelId;
+  if (args.yearId) updatePayload.year_id = args.yearId;
+  if (args.partType) {
+    const existingDesc = (req.description as string | null) ?? "";
+    const typeLabel = `Type: ${args.partType}`;
+    if (!existingDesc.toLowerCase().includes("type:")) {
+      updatePayload.description = existingDesc ? `${existingDesc} | ${typeLabel}` : typeLabel;
+    }
+  }
+  if (Object.keys(updatePayload).length) {
+    await sql/* sql */ `
+      UPDATE inventory_order_request_items
+      SET ${sql(updatePayload)}
+      WHERE id = ${poItem.inventoryRequestItemId}
+    `;
+  }
+  const remaining = Math.max(Number(req.quantity ?? 0) - Number(req.received_qty ?? 0), 0);
+  const requestedQty =
+    args.quantity != null ? Math.max(Number(args.quantity) || 0, 0) : remaining;
+  const moveQty = Math.min(requestedQty, remaining);
+  if (moveQty <= 0) {
+    return { movedQty: 0, grnNumber: null };
+  }
+
+  const result = await receivePartsForInventoryRequestItem(
+    args.companyId,
+    poItem.inventoryRequestItemId,
+    { quantity: moveQty, purchaseOrderId: args.poId }
+  );
+  await sql/* sql */ `
+    UPDATE purchase_order_items
+    SET moved_to_inventory = TRUE
+    WHERE id = ${args.itemId}
+  `;
+  return { movedQty: moveQty, grnNumber: result?.grnNumber ?? null };
 }

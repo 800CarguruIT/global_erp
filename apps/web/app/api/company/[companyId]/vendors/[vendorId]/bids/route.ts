@@ -40,14 +40,16 @@ export async function GET(req: NextRequest, { params }: Params) {
       pq.remarks,
       pq.updated_at,
       pq.status,
-      ei.part_name,
+      COALESCE(ei.part_name, iori.part_name) AS part_name,
       car.make AS car_make,
       car.model AS car_model,
       car.plate_number AS car_plate,
       car.vin AS car_vin
     FROM part_quotes pq
-    INNER JOIN estimate_items ei ON ei.id = pq.estimate_item_id
-    INNER JOIN estimates est ON est.id = pq.estimate_id
+    LEFT JOIN estimate_items ei ON ei.id = pq.estimate_item_id
+    LEFT JOIN estimates est ON est.id = pq.estimate_id
+    LEFT JOIN inventory_order_request_items iori ON iori.id = pq.inventory_request_item_id
+    LEFT JOIN inventory_order_requests ior ON ior.id = pq.inventory_request_id
     LEFT JOIN cars car ON car.id = est.car_id
     WHERE pq.company_id = ${companyId}
       AND pq.vendor_id = ${vendorId}
