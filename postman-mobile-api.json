@@ -598,6 +598,150 @@
         }
       ]
     }
+    ,
+    {
+      "name": "Leads",
+      "description": "Mobile lead endpoints for lists, the car-in dashboard, and detailed updates.",
+      "item": [
+        {
+          "name": "Leads - List",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/leads",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "mobile",
+                "company",
+                "{{companyId}}",
+                "leads"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "car"
+                },
+                {
+                  "key": "status",
+                  "value": "car_in"
+                }
+              ]
+            }
+          },
+          "description": "Fetches the company leads list with optional search/status filters."
+        },
+        {
+          "name": "Leads - Car-in Dashboard",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/leads/car-in-dashboard",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "mobile",
+                "company",
+                "{{companyId}}",
+                "leads",
+                "car-in-dashboard"
+              ]
+            }
+          },
+          "description": "Returns car-in dashboard data (leads, inspections, estimates, jobs, parts, invoices, recovery)."
+        },
+        {
+          "name": "Lead - Detail",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/leads/{{leadId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "mobile",
+                "company",
+                "{{companyId}}",
+                "leads",
+                "{{leadId}}"
+              ],
+              "query": [
+                {
+                  "key": "companyId",
+                  "value": "{{companyId}}"
+                }
+              ]
+            }
+          },
+          "description": "Fetches a single lead record."
+        },
+        {
+          "name": "Lead - Update",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"car_in\",\n  \"branchId\": \"{{branchId}}\",\n  \"assignedUserId\": \"{{assignedUserId}}\",\n  \"leadStage\": \"assigned\",\n  \"serviceType\": \"workshop\",\n  \"recoveryDirection\": \"pickup\",\n  \"recoveryFlow\": \"customer_to_branch\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/leads/{{leadId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "mobile",
+                "company",
+                "{{companyId}}",
+                "leads",
+                "{{leadId}}"
+              ],
+              "query": [
+                {
+                  "key": "companyId",
+                  "value": "{{companyId}}"
+                }
+              ]
+            }
+          },
+          "description": "Updates lead status, assignment, and recovery info."
+        }
+      ]
+    }
   ],
   "variable": [
     {
@@ -630,6 +774,19 @@
     },
     {
       "key": "carId",
+      "value": ""
+    }
+    ,
+    {
+      "key": "leadId",
+      "value": ""
+    },
+    {
+      "key": "branchId",
+      "value": ""
+    },
+    {
+      "key": "assignedUserId",
       "value": ""
     }
   ]
