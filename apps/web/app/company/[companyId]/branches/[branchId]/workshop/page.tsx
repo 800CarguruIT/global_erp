@@ -1,4 +1,5 @@
-import { AppLayout, WorkshopJobsMain } from "@repo/ui";
+import { AppLayout } from "@repo/ui";
+import { BranchWorkshopDashboard } from "./BranchWorkshopDashboard";
 
 type Props =
   | { params: { companyId: string; branchId: string } }
@@ -20,7 +21,7 @@ export default async function BranchWorkshopLayoutPage({ params }: Props) {
   return (
     <AppLayout>
       <div className="space-y-6 py-4">
-        <WorkshopJobsMain companyId={companyId} />
+        <BranchWorkshopDashboard companyId={companyId} branchId={branchId} />
       </div>
     </AppLayout>
   );

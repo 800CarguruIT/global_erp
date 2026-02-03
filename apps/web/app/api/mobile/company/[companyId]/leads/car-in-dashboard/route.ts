@@ -111,17 +111,20 @@ export async function GET(req: NextRequest, { params }: Params) {
         : [];
 
     const invoices = leadIds.length > 0 ? await listInvoicesForCompany(companyId) : [];
-    const invoiceMap = invoices.reduce((acc: Record<string, any>, invoice: any) => {
-      const leadId = invoice.leadId ?? invoice.lead_id ?? null;
-      if (!leadId) return acc;
-      acc[leadId] = {
-        id: invoice.id,
-        status: invoice.status ?? null,
-        invoiceNumber: invoice.invoiceNumber ?? invoice.invoice_number ?? null,
-        grandTotal: invoice.grandTotal ?? invoice.grand_total ?? null,
-      };
-      return acc;
-    }, {});
+    const invoiceMap =
+      invoices.length > 0
+        ? invoices.reduce((acc: Record<string, any>, invoice: any) => {
+          const leadId = invoice.leadId ?? invoice.lead_id ?? null;
+          if (!leadId) return acc;
+          acc[leadId] = {
+            id: invoice.id,
+            status: invoice.status ?? null,
+            invoiceNumber: invoice.invoiceNumber ?? invoice.invoice_number ?? null,
+            grandTotal: invoice.grandTotal ?? invoice.grand_total ?? null,
+          };
+          return acc;
+        }, {})
+        : [];
 
     const recovery =
       leadIds.length > 0
@@ -141,16 +144,20 @@ export async function GET(req: NextRequest, { params }: Params) {
               AND rr.lead_id = ANY(${leadIds})
           `
         : [];
-    const recoveryMap = recovery.reduce((acc: Record<string, any>, row: any) => {
-      if (!row?.lead_id) return acc;
-      const current = acc[row.lead_id];
-      const currentTime = current?.created_at ? new Date(current.created_at).getTime() : 0;
-      const rowTime = row.created_at ? new Date(row.created_at).getTime() : 0;
-      if (!current || rowTime >= currentTime) {
-        acc[row.lead_id] = row;
-      }
-      return acc;
-    }, {});
+        
+    const recoveryMap =
+      recovery.length > 0
+        ? recovery.reduce((acc: Record<string, any>, row: any) => {
+          if (!row?.lead_id) return acc;
+          const current = acc[row.lead_id];
+          const currentTime = current?.created_at ? new Date(current.created_at).getTime() : 0;
+          const rowTime = row.created_at ? new Date(row.created_at).getTime() : 0;
+          if (!current || rowTime >= currentTime) {
+            acc[row.lead_id] = row;
+          }
+          return acc;
+        }, {})
+        : [];
 
     return createMobileSuccessResponse({
       leads: enrichedLeads,
