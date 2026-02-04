@@ -89,6 +89,7 @@ export const BASE_MESSAGES: Record<string, string> = {
   "global.nav.dashboard": "Dashboard",
   "global.nav.userManagement": "User Management",
   "global.nav.rolesAndPermissions": "Roles And Permissions",
+  "global.nav.documentation": "Documentation",
   "global.nav.companies": "Companies",
   "global.nav.callCenter": "Call Center",
   "global.nav.leads": "Leads",

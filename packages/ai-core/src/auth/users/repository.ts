@@ -32,9 +32,11 @@ export async function listUsers(params: {
   vendorId?: string;
   activeOnly?: boolean;
   globalOnly?: boolean;
+  status?: "all" | "active" | "inactive";
 }): Promise<UserListRow[]> {
   const sql = getSql();
   const { q, limit = 50, offset = 0, companyId, branchId, vendorId, activeOnly = true, globalOnly = false } = params;
+  const resolvedStatus = params.status ?? (params.activeOnly === false ? "all" : "active");
   const search =
     q && q.trim().length
       ? sql`AND (LOWER(u.email) LIKE ${"%" + q.toLowerCase() + "%"} OR LOWER(COALESCE(u.full_name, '')) LIKE ${
@@ -63,7 +65,12 @@ export async function listUsers(params: {
         )
       )`
     : sql``;
-  const activeFilter = activeOnly ? sql`AND u.is_active = TRUE` : sql``;
+  const statusFilter =
+    resolvedStatus === "active"
+      ? sql`AND u.is_active = TRUE`
+      : resolvedStatus === "inactive"
+      ? sql`AND u.is_active = FALSE`
+      : sql``;
 
   const rows = await sql<UserListRow[]>`
     SELECT u.id, u.email, u.full_name, u.is_active, u.employee_id, u.created_at, u.updated_at, u.company_id,
@@ -79,7 +86,7 @@ export async function listUsers(params: {
       ${globalFilter}
       ${branchFilter}
       ${vendorFilter}
-      ${activeFilter}
+      ${statusFilter}
     ORDER BY u.created_at DESC
     LIMIT ${limit} OFFSET ${offset}
   `;
