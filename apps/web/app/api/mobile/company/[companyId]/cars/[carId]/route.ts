@@ -28,20 +28,30 @@ export async function GET(req: NextRequest, { params }: Params) {
       return createMobileErrorResponse("Forbidden", 403);
     }
 
-    const customers = Array.isArray((car as any).customers)
-      ? (car as any).customers
-          .filter(
-            (entry: any) =>
-              entry?.link?.is_active !== false &&
-              entry?.customer?.is_active !== false &&
-              entry?.customer?.company_id === companyId
-          )
-          .map((entry: any) => entry.customer)
+    const customerEntries = Array.isArray((car as any).customers)
+      ? (car as any).customers.filter(
+          (entry: any) =>
+            // entry?.link?.is_active !== false &&
+            // entry?.customer?.is_active !== false &&
+            entry?.customer?.company_id === companyId,
+        )
       : [];
 
-    return createMobileSuccessResponse({ data: { customers } });
+    const primaryEntry =
+      customerEntries.find((entry: any) => entry?.link?.is_primary) ??
+      customerEntries[0] ??
+      null;
+
+    return createMobileSuccessResponse({
+      ...car,
+      customer: primaryEntry?.customer ?? null,
+      link: primaryEntry?.link ?? null,
+    });
   } catch (error) {
-    console.error("GET /api/mobile/company/[companyId]/cars/[carId] error:", error);
+    console.error(
+      "GET /api/mobile/company/[companyId]/cars/[carId] error:",
+      error,
+    );
     return handleMobileError(error);
   }
 }
