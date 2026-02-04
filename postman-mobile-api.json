@@ -148,6 +148,112 @@
       "description": "Saves inspection metadata and replaces line items in one request."
     },
     {
+      "name": "Inspection - Line Items (List)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/inspections/{{inspectionId}}/line-items?source=inspection",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "mobile",
+            "company",
+            "{{companyId}}",
+            "inspections",
+            "{{inspectionId}}",
+            "line-items"
+          ],
+          "query": [
+            {
+              "key": "source",
+              "value": "inspection"
+            }
+          ]
+        }
+      },
+      "description": "Fetches line-items scoped to the inspection."
+    },
+    {
+      "name": "Inspection - Line Item (Create)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"partName\": \"Brake Disc\",\n  \"quantity\": 2,\n  \"source\": \"inspection\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/inspections/{{inspectionId}}/line-items",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "mobile",
+            "company",
+            "{{companyId}}",
+            "inspections",
+            "{{inspectionId}}",
+            "line-items"
+          ]
+        }
+      },
+      "description": "Adds or replaces a line-item for the inspection."
+    },
+    {
+      "name": "Inspection - Line Items (Mark Ordered)",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"action\": \"order_approved\",\n  \"approvedNames\": [\"Brake Disc\"]\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/inspections/{{inspectionId}}/line-items",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "mobile",
+            "company",
+            "{{companyId}}",
+            "inspections",
+            "{{inspectionId}}",
+            "line-items"
+          ]
+        }
+      },
+      "description": "Marks approved parts as ordered for the inspection."
+    },
+    {
       "name": "Selector - Products",
       "request": {
         "method": "GET",
@@ -230,8 +336,8 @@
         }
       }
     },
-    {
-      "name": "Customers",
+        {
+          "name": "Customers",
       "description": "Customer-focused mobile endpoints: detail, wallets, cars, leads, inspections, and estimates.",
       "item": [
         {
@@ -597,9 +703,41 @@
           }
         }
       ]
-    }
-    ,
-    {
+        }
+        ,
+        {
+          "name": "Cars",
+          "item": [
+            {
+              "name": "Car - Detail",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/cars/{{carId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "mobile",
+                    "company",
+                    "{{companyId}}",
+                    "cars",
+                    "{{carId}}"
+                  ]
+                }
+              },
+              "description": "Fetches the car record with its active customer links."
+            }
+          ]
+        },
+        {
       "name": "Leads",
       "description": "Mobile lead endpoints for lists, the car-in dashboard, and detailed updates.",
       "item": [

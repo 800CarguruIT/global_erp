@@ -29,12 +29,17 @@ export async function GET(req: NextRequest, { params }: Params) {
     }
 
     const customers = Array.isArray((car as any).customers)
-      ? (car as any).customers.filter(
-          (entry: any) => entry?.link?.is_active !== false && entry?.customer?.is_active !== false
-        )
+      ? (car as any).customers
+          .filter(
+            (entry: any) =>
+              entry?.link?.is_active !== false &&
+              entry?.customer?.is_active !== false &&
+              entry?.customer?.company_id === companyId
+          )
+          .map((entry: any) => entry.customer)
       : [];
 
-    return createMobileSuccessResponse({ car: { ...car, customers } });
+    return createMobileSuccessResponse({ data: { customers } });
   } catch (error) {
     console.error("GET /api/mobile/company/[companyId]/cars/[carId] error:", error);
     return handleMobileError(error);
