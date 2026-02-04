@@ -58,6 +58,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     employeeId: body.employeeId ?? null,
     roleIds: body.roleIds ?? [],
     companyId,
+    mobile: body.mobile ?? null,
   });
   return NextResponse.json({ data: user }, { status: 201 });
 }

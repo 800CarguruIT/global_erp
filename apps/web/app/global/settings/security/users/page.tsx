@@ -132,7 +132,7 @@ export default function GlobalUsersPage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex w-full max-w-md items-center gap-2">
               <input
-                className="w-full rounded-md bg-background px-4 py-2 text-sm shadow-inner outline-none focus:ring-2 focus:ring-primary/40"
+                className="w-full rounded-md bg-slate-50 px-4 py-2 text-sm  text-slate-500 shadow-inner outline-none focus:outline-none focus:ring-2 focus:ring-primary/40"
                 placeholder={t("settings.users.search")}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
@@ -143,20 +143,20 @@ export default function GlobalUsersPage() {
               <button
                 type="button"
                 onClick={load}
-                className="rounded-md border border-white/20 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white transition hover:border-white/40"
+                className="rounded-md border border-white/20 px-4 py-2 text-xs  uppercase tracking-wide text-white transition hover:border-white/40"
               >
                 {t("settings.users.searchBtn")}
               </button>
             </div>
             <div className="flex flex-wrap items-center gap-3">
-              <div className="flex flex-col text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                <span className="text-[10px] text-muted-foreground">Status</span>
+              <div className="flex flex-col text-xs  uppercase tracking-[0.2em] text-muted-foreground">
+                <span className="text-[10px] text-muted-foreground mb-1">Status</span>
                 <select
                   value={statusFilter}
                   onChange={(e) =>
                     setStatusFilter(e.target.value as "all" | "active" | "inactive")
                   }
-                  className="rounded-full bg-white/90 px-3 py-1.5 text-xs font-semibold text-slate-900 shadow-inner focus:outline-none focus:ring-2 focus:ring-primary/40"
+                className="rounded-md border border-white/20 bg-slate-50 px-3 py-1.5 text-sm  text-slate-500 shadow-inner focus:outline-none focus:ring-2 focus:ring-primary/40"
                 >
                   <option value="all">{t("settings.users.status.all")}</option>
                   <option value="active">{t("settings.users.status.active")}</option>
@@ -164,11 +164,11 @@ export default function GlobalUsersPage() {
                 </select>
               </div>
               <div className="flex flex-col text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                <span className="text-[10px] text-muted-foreground">Roles</span>
+                <span className="text-[10px] text-muted-foreground mb-1">Roles</span>
                 <select
                   value={roleFilter}
                   onChange={(e) => setRoleFilter(e.target.value)}
-                  className="rounded-full bg-white/90 px-3 py-1.5 text-xs font-semibold text-slate-900 shadow-inner focus:outline-none focus:ring-2 focus:ring-primary/40"
+                className="rounded-md border border-white/20 bg-slate-50 px-3 py-1.5 text-sm  text-slate-500 shadow-inner focus:outline-none focus:ring-2 focus:ring-primary/40"
                 >
                   <option value="">{t("settings.users.roles.all")}</option>
                   {roleOptions.map((role) => (
@@ -190,6 +190,7 @@ export default function GlobalUsersPage() {
                 onRowClick={(id) => (window.location.href = `/global/settings/security/users/${id}`)}
                 onDelete={handleDelete}
                 deletingId={deletingId}
+                hideCreateButton
               />
             )}
           </div>

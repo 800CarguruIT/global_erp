@@ -39,7 +39,7 @@ export async function GET(req: NextRequest, { params }: Params) {
           .map((entry: any) => entry.customer)
       : [];
 
-    return createMobileSuccessResponse({ data: { customers } });
+    return createMobileSuccessResponse({ car, customers });
   } catch (error) {
     console.error("GET /api/mobile/company/[companyId]/cars/[carId] error:", error);
     return handleMobileError(error);

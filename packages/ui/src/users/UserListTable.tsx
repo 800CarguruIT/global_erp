@@ -39,11 +39,12 @@ export interface UserListTableProps {
   onRowClick?: (id: string) => void;
   onDelete?: (id: string) => void;
   deletingId?: string | null;
+  hideCreateButton?: boolean;
 }
 
 export function UserListTable({
   users,
-  title = "Users list",
+  title = "",
   query,
   onQueryChange,
   onSearch,
@@ -68,6 +69,7 @@ export function UserListTable({
   onRowClick,
   onDelete,
   deletingId,
+  hideCreateButton = false,
 }: UserListTableProps) {
   const showActions = Boolean(onEdit || onDelete);
 
@@ -76,28 +78,9 @@ export function UserListTable({
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-1">
           <h2 className="text-base font-semibold">{title}</h2>
-          <p className="text-xs text-muted-foreground">Manage users and access.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {onResetFilters && (
-            <button
-              type="button"
-              onClick={onResetFilters}
-              className="inline-flex items-center rounded-md border border-slate-200 bg-white px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600 shadow-md transition hover:bg-slate-50 hover:shadow-lg"
-            >
-              <svg viewBox="0 0 24 24" className="-ml-1 mr-2 h-4 w-4" aria-hidden="true">
-                <path
-                  d="M4 6h16M7 12h10M10 18h4"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                />
-              </svg>
-              View All
-            </button>
-          )}
-          {onCreate && (
+          {onCreate && !hideCreateButton && (
             <button
               type="button"
               onClick={onCreate}
@@ -163,7 +146,7 @@ export function UserListTable({
               <select
                 value={roleFilter ?? ""}
                 onChange={(e) => onRoleFilterChange?.(e.target.value)}
-                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 shadow-md"
+                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-normal tracking-wide text-slate-500 shadow-md"
               >
                 <option value="">All roles</option>
                 {roleOptions.map((role) => (
@@ -177,7 +160,7 @@ export function UserListTable({
               <select
                 value={branchFilter ?? ""}
                 onChange={(e) => onBranchFilterChange?.(e.target.value)}
-                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 shadow-md"
+                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-normal tracking-wide text-slate-500 shadow-md"
               >
                 <option value="">All branches</option>
                 {branchOptions.map((branch) => (
@@ -195,8 +178,10 @@ export function UserListTable({
                   onKeyDown={(e) => {
                     if (e.key === "Enter") onSearch?.();
                   }}
+                  spellCheck={false}
+                  autoComplete="off"
                   placeholder="Search"
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 pr-9 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 pr-9 text-sm  text-slate-500 placeholder:text-slate-400 caret-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
                 <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
                   <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">

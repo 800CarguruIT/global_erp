@@ -13,6 +13,7 @@ type UserDetail = {
   name?: string | null;
   roles?: { id: string; name: string }[];
   employee_id?: string | null;
+  mobile?: string | null;
 };
 
 export default function GlobalUserEditPage() {
@@ -75,6 +76,7 @@ export default function GlobalUserEditPage() {
     password?: string;
     roleIds: string[];
     employeeId?: string | null;
+    mobile?: string | null;
   }) {
     if (!userId) return;
     const res = await fetch(`/api/admin/users/${userId}`, {
@@ -86,6 +88,7 @@ export default function GlobalUserEditPage() {
         password: values.password,
         roleIds: values.roleIds,
         employeeId: values.employeeId ?? null,
+        mobile: values.mobile ?? null,
       }),
     });
     if (!res.ok) {
@@ -95,12 +98,13 @@ export default function GlobalUserEditPage() {
     window.location.href = "/global/settings/security/users";
   }
 
-  const initialValues = user
+    const initialValues = user
     ? {
       email: user.email,
       name: user.full_name ?? user.name ?? "",
       roleIds: user.roles?.map((r) => r.id) ?? [],
       employeeId: user.employee_id ?? undefined,
+      mobile: user.mobile ?? undefined,
     }
     : undefined;
 

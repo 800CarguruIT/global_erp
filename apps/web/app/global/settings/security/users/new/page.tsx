@@ -55,6 +55,7 @@ export default function GlobalUserCreatePage() {
     password?: string;
     roleIds: string[];
     employeeId?: string | null;
+    mobile?: string | null;
   }) {
     const res = await fetch("/api/admin/users", {
       method: "POST",
@@ -65,6 +66,7 @@ export default function GlobalUserCreatePage() {
         password: values.password,
         roleIds: values.roleIds,
         employeeId: values.employeeId ?? null,
+        mobile: values.mobile ?? null,
       }),
     });
     if (!res.ok) {
