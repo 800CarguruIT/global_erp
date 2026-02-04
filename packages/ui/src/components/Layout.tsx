@@ -129,7 +129,6 @@ function detectScope(pathname: string): ScopeInfo {
 function LayoutInner({ children, forceScope }: LayoutProps) {
   const pathname = usePathname() || "/";
   const scopeInfo = forceScope ?? detectScope(pathname);
-  const hideSidebar = scopeInfo.scope === "global" && pathname === "/global";
   const useBranchRoot = scopeInfo.scope === "branch" && pathname.startsWith("/branches/");
   const [companyName, setCompanyName] = useState<string | null>(null);
   const [branchName, setBranchName] = useState<string | null>(null);
@@ -388,17 +387,13 @@ function LayoutInner({ children, forceScope }: LayoutProps) {
 
       {/* Content */}
       <div className="flex-1 px-4 sm:px-6 py-4 sm:py-6">
-        {hideSidebar ? (
-          <div className="mx-auto max-w-6xl w-full">{children}</div>
-        ) : (
-          <SidebarNav
-            scope={scopeInfo.scope as any}
-            activeCategory={CategoryNav.getActiveCategory(pathname)}
-            currentPathname={pathname}
-          >
-            <div className="w-full">{children}</div>
-          </SidebarNav>
-        )}
+        <SidebarNav
+          scope={scopeInfo.scope as any}
+          activeCategory={CategoryNav.getActiveCategory(pathname)}
+          currentPathname={pathname}
+        >
+          <div className="w-full">{children}</div>
+        </SidebarNav>
       </div>
     </div>
   );

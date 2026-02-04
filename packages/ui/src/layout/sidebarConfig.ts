@@ -31,8 +31,34 @@ export const SIDEBAR_CONFIG: Record<NavScope, Partial<Record<NavCategory, Sideba
       { labelKey: "global.nav.marketing", href: "/global/marketing" },
       { labelKey: "global.nav.hr", href: "/global/hr" },
       { labelKey: "global.nav.finance", href: "/global/accounting" },
+      { labelKey: "global.nav.analytics", href: "/global/analytics" },
+      { labelKey: "global.nav.reports", href: "/global/reports" },
+      { labelKey: "global.nav.docs", href: "/global/docs" },
+      { labelKey: "global.nav.integrations", href: "/global/integrations" },
+      { labelKey: "global.nav.settings", href: "/global/settings" },
+    ],
+    "Call Center": [
+      { labelKey: "global.nav.callCenter", href: "/global/call-center" },
+      { label: "History", href: "/global/call-center/history" },
+    ],
+    Leads: [
+      { labelKey: "global.nav.leads", href: "/global/leads" },
+    ],
+    Accounting: [
+      { labelKey: "global.nav.finance", href: "/global/accounting" },
+      { label: "Chart of Accounts", href: "/global/accounting/chart-of-accounts" },
+      { label: "COA Controls", href: "/global/accounting/coa-control" },
       { label: "Invoices", href: "/global/accounting/invoices" },
-      { label: "COA Controls", href: "/global/accounting/coa-control", permissionKeys: ["accounting.manage_chart"] },
+      { label: "Accounting Reports", href: "/global/accounting/reports" },
+    ],
+    Reports: [
+      { labelKey: "global.nav.reports", href: "/global/reports" },
+    ],
+    HR: [
+      { labelKey: "global.nav.hr", href: "/global/hr" },
+    ],
+    Analytics: [
+      { labelKey: "global.nav.analytics", href: "/global/analytics" },
     ],
   },
   company: {
@@ -113,6 +139,63 @@ export const SIDEBAR_CONFIG: Record<NavScope, Partial<Record<NavCategory, Sideba
 };
 
 export const SIDEBAR_TREE: Partial<Record<NavScope, SidebarItem[]>> = {
+  global: [
+    {
+      label: "Dashboard",
+      href: "/global",
+      children: [
+        { labelKey: "global.nav.companies", href: "/global/companies" },
+        { labelKey: "global.nav.docs", href: "/global/docs" },
+      ],
+    },
+    {
+      labelKey: "global.nav.callCenter",
+      href: "/global/call-center",
+      children: [{ label: "History", href: "/global/call-center/history" }],
+    },
+    {
+      labelKey: "global.nav.leads",
+      href: "/global/leads",
+    },
+    {
+      labelKey: "global.nav.finance",
+      href: "/global/accounting",
+      children: [
+        { label: "Chart of Accounts", href: "/global/accounting/chart-of-accounts" },
+        { label: "COA Controls", href: "/global/accounting/coa-control" },
+        { label: "Invoices", href: "/global/accounting/invoices" },
+        { label: "Accounting Reports", href: "/global/accounting/reports" },
+      ],
+    },
+    {
+      labelKey: "global.nav.integrations",
+      href: "/global/integrations",
+    },
+    {
+      labelKey: "global.nav.marketing",
+      href: "/global/marketing",
+    },
+    {
+      labelKey: "global.nav.hr",
+      href: "/global/hr",
+    },
+    {
+      labelKey: "global.nav.analytics",
+      href: "/global/analytics",
+    },
+    {
+      labelKey: "global.nav.docs",
+      href: "/global/docs",
+    },
+    {
+      labelKey: "global.nav.reports",
+      href: "/global/reports",
+    },
+    {
+      labelKey: "global.nav.settings",
+      href: "/global/settings",
+    },
+  ],
   company: [
     {
       label: "Dashboard",
