@@ -12,6 +12,7 @@ export type StateSelectProps = {
   disabled?: boolean;
   placeholder?: string;
   placeholderDisabled?: string;
+  required?: boolean;
 };
 
 export function StateSelect({
@@ -22,6 +23,7 @@ export function StateSelect({
   disabled,
   placeholder,
   placeholderDisabled,
+  required,
 }: StateSelectProps) {
   const options =
     countryIso2 && !disabled
@@ -44,6 +46,7 @@ export function StateSelect({
           : placeholderDisabled ?? "Select country first"
       }
       disabled={isDisabled}
+      required={required}
     />
   );
 }

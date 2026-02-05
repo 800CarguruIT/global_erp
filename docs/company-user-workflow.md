@@ -1,10 +1,10 @@
-# Company User Workflow
+ï»¿# Global Companies & Users
 
-Company administrators can invite staff via the Company Users page. When they do:
+Use the **Global Companies** screen (`/global/companies`) to oversee every company that consumes the platform, then drill into each organization's user roster when needed.
 
-1. Select the company and branch scope (optional) so that the account inherits the proper permissions.
-2. Assign one or more company-scoped roles; assign `branches.view` before enabling `workshop` jobs so dashboards render.
-3. Link HR employees via the `Employee Link` field to keep reporting aligned.
-4. Invite the user — the system sends an email with a temporary password.
+1. The list shows company status, subscribed modules, and linked branches. Filtering by "Active", "Pending", or "Paused" lets you spot onboarding issues immediately.
+2. Selecting a company takes you to its detail panel where you can review assigned global owners, manage linked branches, and see current RBAC templates.
+3. While still on the global view you can invite a new company-level user across any branch by clicking "Add User" and filling the company-specific details. The request routes through `/api/global/companies/:companyId/users` but you interact with it via the global layout.
+4. Role assignments rely on the `company_roles` catalog, and the UI designates recommended combos (e.g., enabling `branches.view` before expanding `workshop` access).
 
-The status filter on the global user list allows you to move between active, inactive, and pending accounts.
+Overview widgets highlight invite status, pending approvals, and the global user filter (Active/Inactive/Pending) so you never leave the `/global/companies` path when assessing company health.

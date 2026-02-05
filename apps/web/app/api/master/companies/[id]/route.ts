@@ -58,6 +58,7 @@ function mapToForm(company: any, contacts: any[]) {
     },
     timezone: company.timezone ?? null,
     currency: company.currency ?? null,
+    isActive: company.is_active ?? null,
   };
 }
 
@@ -96,6 +97,7 @@ function mapToUpdatePayload(body: any) {
     timezone: body.timezone ?? null,
     currency: body.currency ?? null,
     google_location: body.googleLocation ?? null,
+    is_active: body.isActive ?? null,
   };
 }
 

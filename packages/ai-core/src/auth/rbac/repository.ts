@@ -74,6 +74,18 @@ export async function getAllPermissions(): Promise<PermissionRow[]> {
   return rowsFrom(result) as PermissionRow[];
 }
 
+export async function getPermissionsByPrefix(prefix: string): Promise<PermissionRow[]> {
+  if (!prefix) return [];
+  const sql: any = getSql();
+  const result = await sql<PermissionRow[]>`
+    SELECT id, key, description
+    FROM permissions
+    WHERE key LIKE ${prefix + "%"}
+    ORDER BY key
+  `;
+  return rowsFrom(result) as PermissionRow[];
+}
+
 export async function getPermissionsByKeys(keys: string[]): Promise<PermissionRow[]> {
   if (!keys.length) return [];
   const sql: any = getSql();

@@ -132,12 +132,7 @@ export function SidebarNav({
   useEffect(() => {
     let cancelled = false;
     async function loadPermissions() {
-      if (scope === "global") {
-        setPermissions(null);
-        setPermissionsLoaded(false);
-        return;
-      }
-      if (!companyId) {
+      if (scope !== "global" && !companyId) {
         setPermissions(null);
         setPermissionsLoaded(false);
         return;
@@ -146,9 +141,11 @@ export function SidebarNav({
       try {
         const params = new URLSearchParams();
         params.set("scope", scope);
-        params.set("companyId", companyId);
-        if (branchId) params.set("branchId", branchId);
-        if (vendorId) params.set("vendorId", vendorId);
+        if (scope !== "global" && companyId) {
+          params.set("companyId", companyId);
+          if (branchId) params.set("branchId", branchId);
+          if (vendorId) params.set("vendorId", vendorId);
+        }
         const res = await fetch(`/api/auth/permissions/me?${params.toString()}`);
         if (!res.ok) {
           if (!cancelled) {
@@ -607,8 +604,8 @@ SidebarNav.getActiveCategory = CategoryNav.getActiveCategory;
 
 const GLOBAL_SUBTITLES = [
   { label: "Users Management.", href: "/global/docs/global-user-management" },
-  { label: "Roles And Permissions.", href: "/global/settings/security/roles" },
-  { label: "Companies.", href: "/global/companies" },
+  { label: "Roles And Permissions.", href: "/global/docs/global-roles-and-permissions" },
+  { label: "Companies.", href: "/global/docs/company-user-workflow" },
   { label: "Settings.", href: "/global/settings" },
 ];
 

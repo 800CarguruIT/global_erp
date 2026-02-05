@@ -4,6 +4,7 @@ import { AppLayout, useI18n, useTheme, Card } from "@repo/ui";
 import { useEffect, useMemo, useState } from "react";
 import { SIDEBAR_CONFIG } from "@repo/ui/layout/sidebarConfig";
 import Link from "next/link";
+import { useGlobalPermissions } from "../../lib/auth/global-permissions";
 
 export default function GlobalHomePage() {
   return (
@@ -122,13 +123,75 @@ function GlobalHomeContent() {
     return t("global.aiBox.appreciation.fallback");
   }, [data, t]);
 
-  const navLinks =
-    SIDEBAR_CONFIG.global?.Main?.filter(
-      (item) => item.href !== "/global" && !["/global/analytics", "/global/reports"].includes(item.href)
-    ).map((item) => ({
+  const { hasPermission, loading: permLoading } = useGlobalPermissions();
+
+  const featureGroups = useMemo(
+    () => [
+      {
+        header: "Users",
+        items: [
+          {
+            label: t("settings.users.title"),
+            description: t("settings.users.subtitle"),
+            href: "/global/settings/security/users",
+            permission: "global.users.list",
+          },
+          {
+            label: t("settings.roles.title"),
+            description: t("settings.roles.subtitle"),
+            href: "/global/settings/security/roles",
+            permission: "global.roles.list",
+          },
+        ],
+      },
+      {
+        header: "Companies",
+        items: [
+          {
+            label: t("global.nav.companies"),
+            description: t("global.nav.companies"),
+            href: "/global/companies",
+            permission: "global.companies.list",
+          },
+        ],
+      },
+      {
+        header: t("settings.title"),
+        items: [
+          {
+            label: t("settings.title"),
+            description: t("settings.subtitle"),
+            href: "/global/settings",
+            permission: "global.settings.manage",
+          },
+        ],
+      },
+    ],
+    [t]
+  );
+
+  const visibleFeatureGroups = useMemo(() => {
+    if (permLoading) return [];
+    return featureGroups
+      .map((group) => ({
+        ...group,
+        items: group.items.filter((item) => hasPermission(item.permission)),
+      }))
+      .filter((group) => group.items.length > 0);
+  }, [featureGroups, permLoading, hasPermission]);
+
+  const navLinks = (SIDEBAR_CONFIG.global?.Main ?? [])
+    .filter((item) => item.href !== "/global" && !["/global/analytics", "/global/reports"].includes(item.href))
+    .map((item) => ({
       href: item.href,
       label: item.labelKey ? t(item.labelKey) : item.label ?? item.href,
-    })) ?? [];
+      permissionKeys: item.permissionKeys ?? [],
+    }))
+    .filter((item) => {
+      if (!item.permissionKeys.length) return true;
+      if (permLoading) return false;
+      return hasPermission(item.permissionKeys);
+    });
 
   return (
     <div className="space-y-6 py-6">
@@ -202,6 +265,18 @@ function GlobalHomeContent() {
           </Card>
         </div>
 
+        {permLoading ? (
+          <div className="mt-6 rounded-2xl border border-dashed border-muted-foreground/40 bg-background/50 p-4 text-sm text-muted-foreground">
+            Loading access rights...
+          </div>
+        ) : visibleFeatureGroups.length > 0 ? (
+          <div className="mt-6 space-y-6">
+            {visibleFeatureGroups.map((group) => (
+              <FeatureGroup key={group.header} header={group.header} items={group.items} />
+            ))}
+          </div>
+        ) : null}
+
         {navLinks.length > 0 && (
           <div className="mt-6 grid gap-3 sm:grid-cols-2 md:grid-cols-3">
             {navLinks.map((link) => (
@@ -214,6 +289,36 @@ function GlobalHomeContent() {
             ))}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+type FeatureGroupItem = {
+  label: string;
+  description: string;
+  href: string;
+  permission: string;
+};
+
+function FeatureGroup({ header, items }: { header: string; items: FeatureGroupItem[] }) {
+  return (
+    <div className="space-y-3">
+      <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{header}</div>
+      <div className="grid gap-3 md:grid-cols-2">
+        {items.map((item) => (
+          <Link key={item.href} href={item.href} className="group">
+            <Card className="h-full border transition hover:border-primary/50">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-lg font-semibold">{item.label}</p>
+                  <p className="text-sm text-muted-foreground">{item.description}</p>
+                </div>
+                <span className="text-xs uppercase tracking-[0.3em] text-primary">Open</span>
+              </div>
+            </Card>
+          </Link>
+        ))}
       </div>
     </div>
   );

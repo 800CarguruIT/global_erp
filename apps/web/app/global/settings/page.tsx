@@ -3,9 +3,29 @@
 import React from "react";
 import Link from "next/link";
 import { Card, useI18n } from "@repo/ui";
+import { useGlobalPermissions } from "../../../lib/auth/global-permissions";
+import { AccessDenied } from "../../../components/AccessDenied";
 
 export default function GlobalSettingsHome() {
   const { t } = useI18n();
+  const { hasPermission, loading: permissionsLoading } = useGlobalPermissions();
+  const canManageSettings = hasPermission("global.settings.manage");
+
+  if (permissionsLoading) {
+    return <div className="py-4 text-sm text-muted-foreground">Loading access rights...</div>;
+  }
+
+  if (!canManageSettings) {
+    return (
+      <div className="py-4">
+        <AccessDenied
+          title="Settings access locked"
+          description="You need the global.settings.manage permission to open this area."
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 py-4">
       <div>

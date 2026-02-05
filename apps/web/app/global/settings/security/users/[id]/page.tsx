@@ -3,6 +3,8 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { UserForm, useI18n } from "@repo/ui";
+import { useGlobalPermissions } from "@/lib/auth/global-permissions";
+import { AccessDenied } from "@/components/AccessDenied";
 
 type Role = { id: string; name: string };
 type Employee = { id: string; name: string };
@@ -20,6 +22,8 @@ export default function GlobalUserEditPage() {
   const { t } = useI18n();
   const params = useParams<{ id: string }>();
   const userId = params?.id?.toString();
+  const { hasPermission, loading: permLoading } = useGlobalPermissions();
+  const canEditUsers = hasPermission("global.users.edit");
   const [roles, setRoles] = useState<Role[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [user, setUser] = useState<UserDetail | null>(null);
@@ -32,9 +36,18 @@ export default function GlobalUserEditPage() {
       setLoading(false);
       return;
     }
+    if (!canEditUsers) {
+      setLoading(false);
+      setError(null);
+      return;
+    }
     async function load() {
       setLoading(true);
       setError(null);
+      if (!canEditUsers) {
+        setLoading(false);
+        return;
+      }
       try {
         const [userRes, rolesRes, employeesRes] = await Promise.all([
           fetch(`/api/admin/users/${userId}`),
@@ -68,7 +81,7 @@ export default function GlobalUserEditPage() {
       }
     }
     load();
-  }, [t, userId]);
+  }, [t, userId, canEditUsers]);
 
   async function handleSubmit(values: {
     email: string;
@@ -107,6 +120,21 @@ export default function GlobalUserEditPage() {
       mobile: user.mobile ?? undefined,
     }
     : undefined;
+
+  if (permLoading) {
+    return <div className="py-4 text-sm text-muted-foreground">Loading access rights...</div>;
+  }
+
+  if (!canEditUsers) {
+    return (
+      <div className="py-4">
+        <AccessDenied
+          title="Edit users access locked"
+          description="You need the global.users.edit permission to modify users."
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4 py-4">

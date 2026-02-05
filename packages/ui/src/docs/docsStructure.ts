@@ -35,6 +35,12 @@ export const DOCUMENTATION_STRUCTURE: DocChapter[] = [
           "Role-based access patterns and how global admin permissions cascade into companies.",
         badge: "Security",
       },
+      {
+        slug: "global-roles-and-permissions",
+        title: "Roles & Permissions",
+        description: "Blueprint for defining, assigning, and auditing global role templates.",
+        badge: "Roles",
+      },
     ],
   },
   {

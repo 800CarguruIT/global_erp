@@ -2,21 +2,35 @@
 
 import React, { useEffect, useState } from "react";
 import { UserForm, useI18n } from "@repo/ui";
+import { useGlobalPermissions } from "@/lib/auth/global-permissions";
+import { AccessDenied } from "@/components/AccessDenied";
 
 type Role = { id: string; name: string };
 type Employee = { id: string; name: string };
 
 export default function GlobalUserCreatePage() {
   const { t } = useI18n();
+  const { hasPermission, loading: permLoading } = useGlobalPermissions();
+  const canCreateUsers = hasPermission("global.users.create");
   const [roles, setRoles] = useState<Role[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!canCreateUsers) {
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
     async function load() {
       setLoading(true);
       setError(null);
+      if (!canCreateUsers) {
+        setLoading(false);
+        return;
+      }
       try {
         const [rolesRes, employeesRes] = await Promise.all([
           fetch("/api/auth/roles?scope=global"),
@@ -47,7 +61,7 @@ export default function GlobalUserCreatePage() {
       }
     }
     load();
-  }, [t]);
+  }, [t, canCreateUsers]);
 
   async function handleSubmit(values: {
     email: string;
@@ -74,6 +88,21 @@ export default function GlobalUserCreatePage() {
       throw new Error(msg);
     }
     window.location.href = "/global/settings/security/users";
+  }
+
+  if (permLoading) {
+    return <div className="py-4 text-sm text-muted-foreground">Loading access rights...</div>;
+  }
+
+  if (!canCreateUsers) {
+    return (
+      <div className="py-4">
+        <AccessDenied
+          title="Create users access locked"
+          description="You need the global.users.create permission to add global users."
+        />
+      </div>
+    );
   }
 
   return (

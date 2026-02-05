@@ -113,6 +113,7 @@ export function CompanyForm({ mode, initialValues, onSubmit }: CompanyFormProps)
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const { t } = useI18n();
   const { theme } = useTheme();
   const countries = useMemo(() => ReferenceData.ReferenceCountries.allCountries, []);
@@ -137,8 +138,66 @@ export function CompanyForm({ mode, initialValues, onSubmit }: CompanyFormProps)
     setValues((prev) => ({ ...prev, [key]: value }));
   }
 
+  const contactRequiredMessage = "At least one contact person is required.";
+
+  const hasContact = useMemo(() => {
+    const contacts = values.contacts ?? [];
+    return contacts.some(
+      (contact) =>
+        Boolean(contact.name?.trim()) ||
+        Boolean(contact.phone?.trim()) ||
+        Boolean(contact.email?.trim())
+    );
+  }, [values.contacts]);
+
+  function collectValidationErrors() {
+    const errors: string[] = [];
+    const checkRequired = (value: string | null | undefined, label: string | undefined) => {
+      if (!label) return;
+      if (!(value?.toString().trim())) {
+        errors.push(`${label} is required.`);
+      }
+    };
+
+    checkRequired(values.displayName, t("companyForm.displayName"));
+    checkRequired(values.legalName, t("companyForm.legalName"));
+    checkRequired(values.companyDomain, t("companyForm.domain"));
+    checkRequired(values.address.line1, t("companyForm.address"));
+    checkRequired(values.address.city, t("companyForm.city"));
+    checkRequired(values.address.stateRegion, t("companyForm.stateRegion"));
+    checkRequired(values.address.country, t("companyForm.country"));
+    checkRequired(values.companyPhone, t("companyForm.companyPhone"));
+    checkRequired(values.companyEmail, t("companyForm.companyEmail"));
+    checkRequired(values.tradeLicense.number, t("companyForm.tradeNumber"));
+    checkRequired(values.tradeLicense.issue, t("companyForm.issueDate"));
+    checkRequired(values.tradeLicense.expiry, t("companyForm.expiryDate"));
+    checkRequired(values.ownerPassport.name, t("companyForm.ownerName"));
+    checkRequired(values.ownerPassport.phone, t("companyForm.ownerPhone"));
+    checkRequired(values.ownerPassport.email, t("companyForm.ownerEmail"));
+    checkRequired(values.ownerPassport.address, t("companyForm.ownerAddress"));
+
+    const contacts = values.contacts ?? [];
+    const hasContact = contacts.some(
+      (contact) =>
+        Boolean(contact.name?.trim()) ||
+        Boolean(contact.phone?.trim()) ||
+        Boolean(contact.email?.trim())
+    );
+    if (!hasContact) {
+      errors.push(contactRequiredMessage);
+    }
+
+    return errors;
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    const validation = collectValidationErrors();
+    if (validation.length > 0) {
+      setValidationErrors(validation);
+      return;
+    }
+    setValidationErrors([]);
     setError(null);
     setSuccess(null);
     setSaving(true);
@@ -152,19 +211,30 @@ export function CompanyForm({ mode, initialValues, onSubmit }: CompanyFormProps)
     }
   }
 
+  const showContactWarning = !hasContact && validationErrors.includes(contactRequiredMessage);
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {validationErrors.length > 0 && (
+        <div className="rounded-2xl border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-700 space-y-1">
+          {validationErrors.map((message) => (
+            <div key={message}>{message}</div>
+          ))}
+        </div>
+      )}
       <Section title={t("companyForm.section.basic")}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Input
             label={t("companyForm.displayName")}
             value={values.displayName ?? ""}
             onChange={(e) => update("displayName", e.target.value)}
+            required
           />
           <Input
             label={t("companyForm.legalName")}
             value={values.legalName ?? ""}
             onChange={(e) => update("legalName", e.target.value)}
+            required
           />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
@@ -172,6 +242,7 @@ export function CompanyForm({ mode, initialValues, onSubmit }: CompanyFormProps)
             label={t("companyForm.domain")}
             value={values.companyDomain ?? ""}
             onChange={(e) => update("companyDomain", e.target.value)}
+            required
           />
           <FileUploader
             label={t("companyForm.logo")}
@@ -185,6 +256,7 @@ export function CompanyForm({ mode, initialValues, onSubmit }: CompanyFormProps)
       <Section title={t("companyForm.section.location")}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <CountrySelect
+            required
             value={values.address.country ?? undefined}
             onChange={(country) =>
               update("address", {
@@ -198,6 +270,7 @@ export function CompanyForm({ mode, initialValues, onSubmit }: CompanyFormProps)
             placeholder={t("companyForm.country")}
           />
           <CitySelect
+            required
             countryIso2={values.address.country ?? undefined}
             value={values.address.city ?? undefined}
             onChange={(city) => update("address", { ...values.address, city })}
@@ -208,6 +281,7 @@ export function CompanyForm({ mode, initialValues, onSubmit }: CompanyFormProps)
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
           <StateSelect
+            required
             countryIso2={values.address.country ?? undefined}
             value={values.address.stateRegion ?? undefined}
             onChange={(state?: string) =>
@@ -250,6 +324,7 @@ export function CompanyForm({ mode, initialValues, onSubmit }: CompanyFormProps)
             label={t("companyForm.companyEmail")}
             value={values.companyEmail ?? ""}
             onChange={(e) => update("companyEmail", e.target.value)}
+            required
           />
         </div>
         <div className="mt-4 space-y-2">
@@ -259,6 +334,7 @@ export function CompanyForm({ mode, initialValues, onSubmit }: CompanyFormProps)
             onChange={(e) =>
               update("address", { ...values.address, line1: e.target.value })
             }
+            required
           />
           <Input
             label={t("companyForm.address2")}
@@ -294,6 +370,7 @@ export function CompanyForm({ mode, initialValues, onSubmit }: CompanyFormProps)
             onChange={(e) =>
               update("tradeLicense", { ...values.tradeLicense, number: e.target.value })
             }
+            required
           />
           <FileUploader
             label={t("companyForm.tradeFile")}
@@ -310,6 +387,7 @@ export function CompanyForm({ mode, initialValues, onSubmit }: CompanyFormProps)
             onChange={(e) =>
               update("tradeLicense", { ...values.tradeLicense, issue: e.target.value })
             }
+            required
           />
           <Input
             label={t("companyForm.expiryDate")}
@@ -318,6 +396,7 @@ export function CompanyForm({ mode, initialValues, onSubmit }: CompanyFormProps)
             onChange={(e) =>
               update("tradeLicense", { ...values.tradeLicense, expiry: e.target.value })
             }
+            required
           />
         </div>
       </Section>
@@ -398,6 +477,7 @@ export function CompanyForm({ mode, initialValues, onSubmit }: CompanyFormProps)
             onChange={(e) =>
               update("ownerPassport", { ...values.ownerPassport, name: e.target.value })
             }
+            required
           />
           <FileUploader
             label={t("companyForm.ownerPassportFile")}
@@ -424,6 +504,7 @@ export function CompanyForm({ mode, initialValues, onSubmit }: CompanyFormProps)
             onChange={(e) =>
               update("ownerPassport", { ...values.ownerPassport, email: e.target.value })
             }
+            required
           />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
@@ -460,12 +541,18 @@ export function CompanyForm({ mode, initialValues, onSubmit }: CompanyFormProps)
             onChange={(e) =>
               update("ownerPassport", { ...values.ownerPassport, address: e.target.value })
             }
+            required
           />
         </div>
       </Section>
 
       <Section title={t("companyForm.section.contacts")}>
         <div className="space-y-3">
+          {showContactWarning && (
+            <div className="rounded-lg border border-red-400/50 bg-red-400/10 px-3 py-2 text-sm text-red-700">
+              {contactRequiredMessage}
+            </div>
+          )}
           {(values.contacts ?? []).slice(0, MAX_CONTACTS).map((c, idx) => (
             <div key={idx} className={`rounded-xl ${theme.cardBorder} ${theme.surfaceSubtle} p-3 space-y-3`}>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
@@ -578,7 +665,7 @@ export function CompanyForm({ mode, initialValues, onSubmit }: CompanyFormProps)
       <button
         type="submit"
         disabled={saving}
-        className={`px-4 py-2 rounded-xl bg-gradient-to-r text-white shadow-lg disabled:opacity-50 ${theme.accent}`}
+        className={`px-4 py-2 rounded-xl border shadow-sm disabled:opacity-50 transition ${theme.surfaceSubtle} ${theme.cardBorder} ${theme.appText} hover:border-primary/60`}
       >
         {saving
           ? t("companies.save.saving")

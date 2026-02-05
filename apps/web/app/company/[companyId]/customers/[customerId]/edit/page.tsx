@@ -5,6 +5,8 @@ import Link from "next/link";
 import { AppLayout, Card, useTheme } from "@repo/ui";
 import { PhoneInput } from "@repo/ui/components/common/PhoneInput";
 import type { PhoneValue } from "@repo/ui/components/common/PhoneInput";
+import { CountrySelect } from "@repo/ui/components/common/CountrySelect";
+import { CitySelect } from "@repo/ui/components/common/CitySelect";
 
 type Params = {
   params:
@@ -55,24 +57,46 @@ export default function CustomerEditPage({ params }: Params) {
 
   useEffect(() => {
     if (!companyId || !customerId) return;
-    setLoading(true);
-    setError(null);
-    fetch(`/api/customers/${customerId}?companyId=${companyId}`)
-      .then((res) => (res.ok ? res.json() : Promise.reject(new Error("Failed to load customer"))))
-      .then((data) => {
+    const controller = new AbortController();
+    let cancelled = false;
+    async function loadCustomer() {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch(`/api/customers/${customerId}?companyId=${companyId}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        if (!res.ok) throw new Error("Failed to load customer");
+        const data = await res.json();
+        if (cancelled) return;
         setForm({
           name: data?.name ?? "",
           email: data?.email ?? "",
           phone: parsePhone(data?.phone),
           whatsappPhone: parsePhone(data?.whatsapp_phone ?? data?.whatsappPhone),
-          useDifferentWhatsapp: Boolean(data?.whatsapp_phone && data?.whatsapp_phone !== data?.phone),
+          useDifferentWhatsapp: Boolean(
+            data?.whatsapp_phone && data?.whatsapp_phone !== data?.phone
+          ),
           address: data?.address ?? "",
           country: data?.country ?? "",
           city: data?.city ?? "",
         });
-      })
-      .catch((err: any) => setError(err?.message ?? "Failed to load customer"))
-      .finally(() => setLoading(false));
+      } catch (err: any) {
+        if (!cancelled) {
+          setError(err?.message ?? "Failed to load customer");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+    loadCustomer();
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
   }, [companyId, customerId]);
 
   function update<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
@@ -170,19 +194,24 @@ export default function CustomerEditPage({ params }: Params) {
                   />
                 </div>
                 <div>
-                  <div className={labelClass}>Country</div>
-                  <input
-                    className={inputClass}
-                    value={form.country}
-                    onChange={(e) => update("country", e.target.value)}
+                  <CountrySelect
+                    value={form.country || undefined}
+                    onChange={(val) => {
+                      update("country", val ?? "");
+                      if (!val) {
+                        update("city", "");
+                      }
+                    }}
+                    label="Country"
                   />
                 </div>
                 <div>
-                  <div className={labelClass}>City</div>
-                  <input
-                    className={inputClass}
-                    value={form.city}
-                    onChange={(e) => update("city", e.target.value)}
+                  <CitySelect
+                    countryIso2={form.country || undefined}
+                    value={form.city || undefined}
+                    onChange={(val) => update("city", val ?? "")}
+                    label="City"
+                    disabled={!form.country}
                   />
                 </div>
                 <div className="md:col-span-2">

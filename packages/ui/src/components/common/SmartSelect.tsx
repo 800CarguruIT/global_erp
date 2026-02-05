@@ -13,6 +13,7 @@ export type SmartSelectProps = {
   label?: string;
   disabled?: boolean;
   allowCustomValue?: boolean;
+  required?: boolean;
 };
 
 export function SmartSelect({
@@ -23,6 +24,7 @@ export function SmartSelect({
   label,
   disabled,
   allowCustomValue = false,
+  required,
 }: SmartSelectProps) {
   const { theme } = useTheme();
   const [input, setInput] = useState("");
@@ -70,7 +72,8 @@ export function SmartSelect({
       {label && <div className="text-xs font-semibold text-muted-foreground">{label}</div>}
       <div className="relative">
         <input
-          className={`${theme.input} pr-10`}
+          required={required}
+          className={`${theme.input} pr-10 min-h-[3rem] text-sm bg-slate-950/90 `}
           placeholder={placeholder}
           value={displayValue}
           onChange={handleInputChange}
@@ -92,7 +95,7 @@ export function SmartSelect({
       </div>
       {open && (
         <div
-          className={`absolute z-30 mt-2 max-h-64 w-full overflow-auto rounded-xl ${theme.cardBorder} ${theme.cardBg} shadow-2xl backdrop-blur`}
+          className={`absolute z-30 mt-2 max-h-72 min-w-[16rem] w-full overflow-auto rounded-xl ${theme.cardBorder} bg-slate-950 shadow-2xl`}
         >
           {filtered.length === 0 ? (
             <div className="px-3 py-2 text-sm opacity-70">No matches</div>

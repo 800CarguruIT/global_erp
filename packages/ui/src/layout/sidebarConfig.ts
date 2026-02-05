@@ -25,11 +25,27 @@ export const SIDEBAR_CONFIG: Record<NavScope, Partial<Record<NavCategory, Sideba
   global: {
     Main: [
       { labelKey: "global.nav.dashboard", href: "/global" },
-      { labelKey: "global.nav.userManagement", href: "/global/settings/security/users" },
-      { labelKey: "global.nav.rolesAndPermissions", href: "/global/settings/security/roles" },
-      { labelKey: "global.nav.companies", href: "/global/companies" },
+      {
+        labelKey: "global.nav.userManagement",
+        href: "/global/settings/security/users",
+        permissionKeys: ["global.users.list"],
+      },
+      {
+        labelKey: "global.nav.rolesAndPermissions",
+        href: "/global/settings/security/roles",
+        permissionKeys: ["global.roles.list"],
+      },
+      {
+        labelKey: "global.nav.companies",
+        href: "/global/companies",
+        permissionKeys: ["global.companies.list"],
+      },
       { labelKey: "global.nav.documentation", href: "/global/docs" },
-      { labelKey: "global.nav.settings", href: "/global/settings" },
+      {
+        labelKey: "global.nav.settings",
+        href: "/global/settings",
+        permissionKeys: ["global.settings.manage"],
+      },
     ],
   },
   company: {

@@ -2,9 +2,13 @@
 
 import React, { useEffect, useState } from "react";
 import { RoleForm, useI18n } from "@repo/ui";
+import { useGlobalPermissions } from "@/lib/auth/global-permissions";
+import { AccessDenied } from "@/components/AccessDenied";
 
 export default function GlobalRoleNewSettingsPage() {
   const { t } = useI18n();
+  const { hasPermission, loading: permLoading } = useGlobalPermissions();
+  const canCreateRoles = hasPermission("global.roles.create");
   const [perms, setPerms] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -12,7 +16,7 @@ export default function GlobalRoleNewSettingsPage() {
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch("/api/auth/permissions");
+        const res = await fetch("/api/auth/permissions?scope=global");
         if (!res.ok) throw new Error(t("settings.roles.permsError"));
         const data = await res.json();
         setPerms(data.data ?? data);
@@ -24,6 +28,21 @@ export default function GlobalRoleNewSettingsPage() {
     }
     load();
   }, [t]);
+
+  if (permLoading) {
+    return <div className="py-4 text-sm text-muted-foreground">Loading access rights...</div>;
+  }
+
+  if (!canCreateRoles) {
+    return (
+      <div className="py-4">
+        <AccessDenied
+          title="Create roles access locked"
+          description="You need the global.roles.create permission to add global roles."
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4 py-4">

@@ -2,6 +2,8 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { Card, UserListTable, useI18n } from "@repo/ui";
+import { useGlobalPermissions } from "@/lib/auth/global-permissions";
+import { AccessDenied } from "@/components/AccessDenied";
 
 type UserRow = {
   id: string;
@@ -31,10 +33,20 @@ export default function GlobalUsersPage() {
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
   const [roleFilter, setRoleFilter] = useState("");
   const { t } = useI18n();
+  const { hasPermission, loading: permLoading } = useGlobalPermissions();
+  const canListUsers = hasPermission("global.users.list");
+  const canCreateUsers = hasPermission("global.users.create");
+  const canEditUsers = hasPermission("global.users.edit");
+  const canToggleStatus = hasPermission("global.users.status");
+  const canDeleteUsers = hasPermission("global.users.delete");
 
   async function load() {
     setLoading(true);
     setError(null);
+    if (!canListUsers) {
+      setLoading(false);
+      return;
+    }
     try {
       const params = new URLSearchParams();
       if (query) params.set("q", query);
@@ -58,8 +70,13 @@ export default function GlobalUsersPage() {
   }
 
   useEffect(() => {
+    if (!canListUsers) {
+      setLoading(false);
+      setError(null);
+      return;
+    }
     load();
-  }, [statusFilter]);
+  }, [statusFilter, canListUsers]);
 
   async function handleDelete(id: string) {
     const target = users.find((u) => u.id === id);
@@ -199,6 +216,21 @@ export default function GlobalUsersPage() {
     openPasswordModal(user.id, user.email);
   };
 
+  if (permLoading) {
+    return <div className="py-4 text-sm text-muted-foreground">Loading access rights...</div>;
+  }
+
+  if (!canListUsers) {
+    return (
+      <div className="py-4">
+        <AccessDenied
+          title="Users access locked"
+          description="You need the global.users.list permission to manage global users."
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4 py-4">
       <Card className="space-y-6">
@@ -275,19 +307,23 @@ export default function GlobalUsersPage() {
             {loading ? (
               <div className="text-sm text-muted-foreground">{t("settings.users.loading")}</div>
             ) : (
-              <UserListTable
-                users={filteredUsers}
-                onCreate={() => (window.location.href = "/global/settings/security/users/new")}
-                onRowClick={(id) => (window.location.href = `/global/settings/security/users/${id}`)}
-                onDelete={handleDelete}
-                deletingId={deletingId}
-                onResetPassword={handleOpenPasswordModal}
-                resettingPasswordId={resettingPasswordId}
-                onToggleStatus={handleToggleStatus}
-                statusUpdating={statusUpdating}
-                statusError={statusError}
-                hideCreateButton
-              />
+            <UserListTable
+              users={filteredUsers}
+              onCreate={
+                canCreateUsers ? () => (window.location.href = "/global/settings/security/users/new") : undefined
+              }
+              onRowClick={
+                canEditUsers ? (id) => (window.location.href = `/global/settings/security/users/${id}`) : undefined
+              }
+              onDelete={canDeleteUsers ? handleDelete : undefined}
+              deletingId={deletingId}
+              onResetPassword={canEditUsers ? handleOpenPasswordModal : undefined}
+              resettingPasswordId={resettingPasswordId}
+              onToggleStatus={canToggleStatus ? handleToggleStatus : undefined}
+              statusUpdating={statusUpdating}
+              statusError={statusError}
+              hideCreateButton={!canCreateUsers}
+            />
             )}
           </div>
         </div>
