@@ -6,13 +6,13 @@ import {
   updateInspectionPartial,
 } from "@repo/ai-core/workshop/inspections/repository";
 import type { InspectionItem } from "@repo/ai-core/workshop/inspections/types";
-import { requireMobileUserId } from "../../../../../../lib/auth/mobile-auth";
-import { ensureCompanyAccess } from "../../../../../../lib/auth/mobile-company";
+import { requireMobileUserId } from "@/lib/auth/mobile-auth";
+import { ensureCompanyAccess } from "@/lib/auth/mobile-company";
 import {
   createMobileErrorResponse,
   createMobileSuccessResponse,
   handleMobileError,
-} from "../../../utils";
+} from "@/app/api/mobile/utils";
 
 type Params = { params: Promise<{ companyId: string; inspectionId: string }> };
 
@@ -30,7 +30,10 @@ export async function GET(req: NextRequest, { params }: Params) {
     const items = await listInspectionItems(inspectionId);
     return createMobileSuccessResponse({ inspection, items });
   } catch (error) {
-    console.error("GET /api/mobile/company/[companyId]/inspections/[inspectionId] error:", error);
+    console.error(
+      "GET /api/mobile/company/[companyId]/inspections/[inspectionId] error:",
+      error,
+    );
     return handleMobileError(error);
   }
 }
@@ -78,13 +81,16 @@ export async function PATCH(req: NextRequest, { params }: Params) {
           techReason: item.techReason ?? null,
           laymanReason: item.laymanReason ?? null,
           photoRefs: item.photoRefs ?? null,
-        }))
+        })),
       );
     }
 
     return createMobileSuccessResponse({ ok: true });
   } catch (error) {
-    console.error("PATCH /api/mobile/company/[companyId]/inspections/[inspectionId] error:", error);
+    console.error(
+      "PATCH /api/mobile/company/[companyId]/inspections/[inspectionId] error:",
+      error,
+    );
     return handleMobileError(error);
   }
 }
