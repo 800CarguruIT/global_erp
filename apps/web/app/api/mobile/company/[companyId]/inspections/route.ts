@@ -23,6 +23,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     await ensureCompanyAccess(userId, companyId);
 
     const inspection = await getInspectionById(companyId, inspectionId);
+    console.log("GET inspection fetch", { companyId, inspectionId, found: Boolean(inspection) });
     if (!inspection) {
       return createMobileErrorResponse("Not found", 404);
     }
@@ -43,6 +44,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
     const body = await req.json().catch(() => ({}));
 
+    const inspection = await getInspectionById(companyId, inspectionId);
+    console.log("PATCH inspection fetch", { companyId, inspectionId, found: Boolean(inspection) });
     const patch = {
       status: body.status,
       startAt: body.startAt ?? body.start_at,
