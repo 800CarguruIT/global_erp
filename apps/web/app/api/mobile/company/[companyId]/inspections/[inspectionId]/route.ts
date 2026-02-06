@@ -6,13 +6,13 @@ import {
   updateInspectionPartial,
 } from "@repo/ai-core/workshop/inspections/repository";
 import type { InspectionItem } from "@repo/ai-core/workshop/inspections/types";
-import { requireMobileUserId } from "../../../../../../lib/auth/mobile-auth";
-import { ensureCompanyAccess } from "../../../../../../lib/auth/mobile-company";
+import { requireMobileUserId } from "@/lib/auth/mobile-auth";
+import { ensureCompanyAccess } from "@/lib/auth/mobile-company";
 import {
   createMobileErrorResponse,
   createMobileSuccessResponse,
   handleMobileError,
-} from "../../../utils";
+} from "@/app/api/mobile/utils";
 
 type Params = { params: Promise<{ companyId: string; inspectionId: string }> };
 
@@ -23,7 +23,6 @@ export async function GET(req: NextRequest, { params }: Params) {
     await ensureCompanyAccess(userId, companyId);
 
     const inspection = await getInspectionById(companyId, inspectionId);
-    console.log("GET inspection fetch", { companyId, inspectionId, found: Boolean(inspection) });
     if (!inspection) {
       return createMobileErrorResponse("Not found", 404);
     }
@@ -44,8 +43,6 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
     const body = await req.json().catch(() => ({}));
 
-    const inspection = await getInspectionById(companyId, inspectionId);
-    console.log("PATCH inspection fetch", { companyId, inspectionId, found: Boolean(inspection) });
     const patch = {
       status: body.status,
       startAt: body.startAt ?? body.start_at,
@@ -87,7 +84,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
     return createMobileSuccessResponse({ ok: true });
   } catch (error) {
-    console.error("PATCH /api/mobile/company/[companyId]/inspections/[inspectionId] error:",req.json(), error);
+    console.error("PATCH /api/mobile/company/[companyId]/inspections/[inspectionId] error:", error);
     return handleMobileError(error);
   }
 }
