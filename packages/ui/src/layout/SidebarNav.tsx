@@ -31,11 +31,15 @@ export function SidebarNav({
   activeCategory,
   currentPathname,
   children,
+  mobileSidebarOpen,
+  onRequestClose,
 }: {
   scope: NavScope;
   activeCategory: Category;
   currentPathname: string;
   children: React.ReactNode;
+  mobileSidebarOpen?: boolean;
+  onRequestClose?: () => void;
 }) {
   const { t } = useI18n();
 
@@ -329,14 +333,18 @@ export function SidebarNav({
     });
   }, [treeItems, currentPathname, companyId, branchId, vendorId]);
 
+
   if (!sections.length && !filteredTreeItems?.length) {
     return <div className="mx-auto max-w-6xl">{children}</div>;
   }
 
-  return (
-    <div className="mx-auto flex gap-6">
-      <aside className="w-64 shrink-0">
-        <nav className="relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-slate-950/85 via-slate-900/70 to-slate-950/85 p-4 text-sm shadow-[0_24px_60px_-32px_rgba(15,23,42,0.85)]">
+  const navBaseClass =
+    "relative max-h-[calc(100vh-2.5rem)] overflow-y-auto rounded-2xl border border-white/10 p-4 text-sm shadow-[0_24px_60px_-32px_rgba(15,23,42,0.85)]";
+  const desktopNavClass = "bg-gradient-to-b from-slate-950/85 via-slate-900/70 to-slate-950/85";
+  const mobileNavClass = "bg-slate-950 border-white/20 shadow-2xl";
+
+  const renderNav = (outerClass = desktopNavClass) => (
+    <nav className={`${navBaseClass} ${outerClass}`}>
           <div className="pointer-events-none absolute inset-0">
             <div className="absolute -right-16 -top-20 h-48 w-48 rounded-full bg-emerald-400/20 blur-3xl" />
             <div className="absolute -left-24 -bottom-24 h-52 w-52 rounded-full bg-amber-400/20 blur-3xl" />
@@ -593,21 +601,33 @@ export function SidebarNav({
             </>
           )}
         </nav>
-      </aside>
-      <div className="min-w-0 flex-1">{children}</div>
+  );
+
+  const overlayStateClass = mobileSidebarOpen
+    ? "opacity-100 pointer-events-auto"
+    : "opacity-0 pointer-events-none";
+  const panelTransformClass = mobileSidebarOpen ? "translate-x-0" : "-translate-x-full";
+
+  return (
+    <div className="relative">
+      <div className="mx-auto flex gap-6">
+        <aside className="hidden lg:block shrink-0">{renderNav()}</aside>
+        <div className="min-w-0 flex-1">{children}</div>
+      </div>
+      <div className={`lg:hidden fixed inset-0 z-50 flex transition-opacity duration-300 ${overlayStateClass}`}>
+        <button
+          type="button"
+          className="absolute inset-0 bg-black/40 transition-opacity duration-300"
+          aria-label="Close sidebar"
+          onClick={onRequestClose}
+        />
+        <div className={`relative h-full w-72 p-4 transition-transform duration-300 ${panelTransformClass}`}>
+          {renderNav(mobileNavClass)}
+        </div>
+      </div>
     </div>
   );
 }
-
-// helper for reuse
-SidebarNav.getActiveCategory = CategoryNav.getActiveCategory;
-
-const GLOBAL_SUBTITLES = [
-  { label: "Users Management.", href: "/global/docs/global-user-management" },
-  { label: "Roles And Permissions.", href: "/global/docs/global-roles-and-permissions" },
-  { label: "Companies.", href: "/global/docs/company-user-workflow" },
-  { label: "Settings.", href: "/global/settings" },
-];
 
 function DocsSidebar({ currentPathname }: { currentPathname: string }) {
   const [openChapters, setOpenChapters] = useState<Record<string, boolean>>(() => ({

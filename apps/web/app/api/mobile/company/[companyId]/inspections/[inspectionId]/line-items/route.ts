@@ -4,6 +4,7 @@ import {
   listInspectionLineItems,
   markApprovedLineItemsOrdered,
   markLineItemsOrderedByNames,
+  updateInspectionLineItem,
 } from "@repo/ai-core/workshop/inspections/repository";
 import { requireMobileUserId } from "@/lib/auth/mobile-auth";
 import { ensureCompanyAccess } from "@/lib/auth/mobile-company";
@@ -37,10 +38,9 @@ export async function POST(req: NextRequest, { params }: Params) {
     await ensureCompanyAccess(userId, companyId);
 
     const body = await req.json().catch(() => ({}));
-    const created = await createInspectionLineItem({
+    const lineItemPayload = {
       companyId,
       inspectionId,
-      leadId: body.leadId ?? null,
       source: body.source ?? "inspection",
       productId: body.productId ?? null,
       productName: body.productName ?? null,
@@ -49,6 +49,31 @@ export async function POST(req: NextRequest, { params }: Params) {
       reason: body.reason ?? null,
       status: body.status ?? "Pending",
       mediaFileId: body.mediaFileId ?? null,
+    };
+
+    if (body?.id) {
+      const updated = await updateInspectionLineItem({
+        companyId,
+        lineItemId: body.id,
+        patch: {
+          productId: lineItemPayload.productId,
+          productName: lineItemPayload.productName,
+          description: lineItemPayload.description,
+          quantity: lineItemPayload.quantity,
+          reason: lineItemPayload.reason,
+          status: lineItemPayload.status,
+          mediaFileId: lineItemPayload.mediaFileId,
+        },
+      });
+      if (!updated) {
+        return createMobileErrorResponse("Line item not found", 404);
+      }
+      return createMobileSuccessResponse({ lineItem: updated });
+    }
+
+    const created = await createInspectionLineItem({
+      ...lineItemPayload,
+      leadId: body.leadId ?? null,
     });
     return createMobileSuccessResponse({ lineItem: created }, 201);
   } catch (error) {
