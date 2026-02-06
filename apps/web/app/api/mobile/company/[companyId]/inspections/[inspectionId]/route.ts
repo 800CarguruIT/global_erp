@@ -37,12 +37,9 @@ export async function GET(req: NextRequest, { params }: Params) {
 
 export async function PATCH(req: NextRequest, { params }: Params) {
   try {
-    const userId = requireMobileUserId(req);
-    const { companyId, inspectionId } = await params;
-    await ensureCompanyAccess(userId, companyId);
-
+   const { companyId, inspectionId } = await params;
     const body = await req.json().catch(() => ({}));
-
+  
     const patch = {
       status: body.status,
       startAt: body.startAt ?? body.start_at,
@@ -61,27 +58,27 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       aiSummaryPlain: body.aiSummaryPlain,
       draftPayload: body.draftPayload,
     };
-
+  
     await updateInspectionPartial(companyId, inspectionId, patch);
-
+  
     if (Array.isArray(body.items)) {
       const items: InspectionItem[] = body.items;
       await replaceInspectionItems(
         inspectionId,
-        items.map((item, index) => ({
+        items.map((i, index) => ({
           inspectionId,
-          lineNo: (item as any).lineNo ?? index + 1,
-          category: item.category ?? null,
-          partName: item.partName,
-          severity: item.severity ?? null,
-          requiredAction: item.requiredAction ?? null,
-          techReason: item.techReason ?? null,
-          laymanReason: item.laymanReason ?? null,
-          photoRefs: item.photoRefs ?? null,
+          lineNo: (i as any).lineNo ?? index + 1,
+          category: i.category ?? null,
+          partName: i.partName,
+          severity: i.severity ?? null,
+          requiredAction: i.requiredAction ?? null,
+          techReason: i.techReason ?? null,
+          laymanReason: i.laymanReason ?? null,
+          photoRefs: i.photoRefs ?? null,
         }))
       );
     }
-
+  
     return createMobileSuccessResponse({ ok: true });
   } catch (error) {
     console.error("PATCH /api/mobile/company/[companyId]/inspections/[inspectionId] error:", error);
