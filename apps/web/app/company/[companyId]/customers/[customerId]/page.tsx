@@ -3,7 +3,13 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { AppLayout, Card, FileUploader, useTheme } from "@repo/ui";
+import { toast } from "sonner";
 import type { Lead } from "@repo/ai-core/crm/leads/types";
+import {
+  serviceRequestTypeLabels,
+  serviceRequestTypes,
+  type ServiceRequestType,
+} from "@repo/ai-core/crm/leads/service-request-types";
 import type { Inspection } from "@repo/ai-core/workshop/inspections/types";
 import type { Estimate } from "@repo/ai-core/workshop/estimates/types";
 
@@ -37,6 +43,26 @@ type WalletTransactionRow = {
   approved_by?: string | null;
   created_at?: string | null;
 };
+
+type AppointmentFormState = {
+  appointmentAt: string;
+  type: "walkin" | "recovery";
+  recoveryType: "pickup" | "dropoff";
+  pickupLocation: string;
+  dropoffLocation: string;
+  remarks: string;
+  serviceType: ServiceRequestType;
+};
+
+const getInitialAppointmentForm = (): AppointmentFormState => ({
+  appointmentAt: "",
+  type: "walkin",
+  recoveryType: "pickup",
+  pickupLocation: "",
+  dropoffLocation: "",
+  remarks: "",
+  serviceType: serviceRequestTypes[0],
+});
 
 export default function CustomerDetailPage({ params }: Params) {
   const { theme } = useTheme();
@@ -89,14 +115,7 @@ export default function CustomerDetailPage({ params }: Params) {
   const [selectActionError, setSelectActionError] = useState<string | null>(null);
   const [servicePickerOpen, setServicePickerOpen] = useState(false);
   const [servicePickerError, setServicePickerError] = useState<string | null>(null);
-  const [appointmentForm, setAppointmentForm] = useState({
-    appointmentAt: "",
-    type: "walkin",
-    recoveryType: "pickup",
-    pickupLocation: "",
-    dropoffLocation: "",
-    remarks: "",
-  });
+  const [appointmentForm, setAppointmentForm] = useState<AppointmentFormState>(getInitialAppointmentForm());
   const [companyDropoffLocation, setCompanyDropoffLocation] = useState("");
 
   useEffect(() => {
@@ -326,6 +345,21 @@ export default function CustomerDetailPage({ params }: Params) {
     if (!companyId || !customerId || !selectActionCar) return;
     setSelectActionSaving(true);
     setSelectActionError(null);
+    let walkinRemarks: string | null = null;
+    if (action === "car_in") {
+      walkinRemarks = appointmentForm.remarks.trim();
+      if (!walkinRemarks) {
+        setSelectActionError("Remarks are required for walk-in service requests.");
+        setSelectActionSaving(false);
+        return;
+      }
+      if (!appointmentForm.serviceType) {
+        setSelectActionError("Select a service type to continue.");
+        setSelectActionSaving(false);
+        return;
+      }
+    }
+    const selectedServiceType = appointmentForm.serviceType;
     try {
       const res = await fetch(`/api/customers/${customerId}/cars/select?companyId=${companyId}`, {
         method: "POST",
@@ -338,7 +372,8 @@ export default function CustomerDetailPage({ params }: Params) {
           recoveryType: action === "appointment" ? appointmentForm.recoveryType : null,
           pickupLocation: action === "appointment" ? appointmentForm.pickupLocation : null,
           dropoffLocation: action === "appointment" ? companyDropoffLocation || null : null,
-          remarks: appointmentForm.remarks,
+          remarks: action === "car_in" ? walkinRemarks : appointmentForm.remarks,
+          serviceType: action === "car_in" ? appointmentForm.serviceType : undefined,
         }),
       });
       if (!res.ok) {
@@ -347,14 +382,14 @@ export default function CustomerDetailPage({ params }: Params) {
       }
       setSelectActionOpen(false);
       setSelectActionMode("menu");
-      setAppointmentForm({
-        appointmentAt: "",
-        type: "walkin",
-        recoveryType: "pickup",
-        pickupLocation: "",
-        dropoffLocation: "",
-        remarks: "",
-      });
+      setAppointmentForm(getInitialAppointmentForm());
+      if (action === "car_in" && selectedServiceType) {
+        toast.success(
+          `Service request (${serviceRequestTypeLabels[selectedServiceType]}) created for walk-in.`
+        );
+      } else if (action === "appointment") {
+        toast.success("Appointment created.");
+      }
     } catch (err: any) {
       setSelectActionError(err?.message ?? "Failed to create lead");
     } finally {
@@ -853,13 +888,14 @@ export default function CustomerDetailPage({ params }: Params) {
                       } else {
                         setWalletBalance((prev) => prev + amount);
                       }
-                      setTopupForm({
+                       setTopupForm({
                         amount: "",
                         method: "cash",
                         paymentDate: "",
                         proofFileId: "",
                       });
                       setTopupOpen(false);
+                      toast.success("Topup submitted; please wait for verification.");
                     } catch (err: any) {
                       setTopupError(err?.message ?? "Failed to create topup");
                     } finally {
@@ -1215,7 +1251,12 @@ export default function CustomerDetailPage({ params }: Params) {
               {selectActionMode === "menu" && (
                 <div className="space-y-3">
                   <div className="space-y-2">
-                    <label className={`text-xs font-semibold ${theme.mutedText}`}>Remarks</label>
+                    <div className="flex items-center justify-between">
+                      <label className={`text-xs font-semibold ${theme.mutedText}`}>Remarks</label>
+                      <span className="text-[10px] uppercase tracking-wide text-white/60">
+                        Required for service requests
+                      </span>
+                    </div>
                     <textarea
                       className={theme.input}
                       value={appointmentForm.remarks}
@@ -1225,6 +1266,33 @@ export default function CustomerDetailPage({ params }: Params) {
                       placeholder="Enter remarks"
                       rows={3}
                     />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className={`text-xs font-semibold ${theme.mutedText}`}>Service Type</label>
+                      <span className="text-[10px] uppercase tracking-wide text-white/60">
+                        Required
+                      </span>
+                    </div>
+                    <select
+                      className={theme.input}
+                      value={appointmentForm.serviceType}
+                      onChange={(e) =>
+                        setAppointmentForm((prev) => ({
+                          ...prev,
+                          serviceType: e.target.value as ServiceRequestType,
+                        }))
+                      }
+                    >
+                      {serviceRequestTypes.map((value) => (
+                        <option key={value} value={value}>
+                          {serviceRequestTypeLabels[value]}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-[11px] text-white/60">
+                      You can update this later from the lead details screen.
+                    </p>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <button

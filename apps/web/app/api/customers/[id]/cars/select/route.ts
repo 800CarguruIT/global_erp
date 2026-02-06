@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import {
+  serviceRequestTypes,
+  type ServiceRequestType,
+} from "@repo/ai-core/crm/leads/service-request-types";
 import { Crm } from "@repo/ai-core";
 import {
   appendLeadEvent,
@@ -18,6 +22,7 @@ const payloadSchema = z.object({
   pickupLocation: z.string().optional().nullable(),
   dropoffLocation: z.string().optional().nullable(),
   remarks: z.string().optional().nullable(),
+  serviceType: z.enum(serviceRequestTypes).optional().nullable(),
 });
 
 type ParamsCtx = { params: { id: string } } | { params: Promise<{ id: string }> };
@@ -70,6 +75,13 @@ export async function POST(req: NextRequest, routeCtx: ParamsCtx) {
     }
 
     if (parsed.data.action === "car_in") {
+      const serviceType: ServiceRequestType | null = parsed.data.serviceType ?? null;
+      if (!serviceType) {
+        return NextResponse.json(
+          { error: "serviceType is required for walk-in service requests" },
+          { status: 400 }
+        );
+      }
       const remarks = parsed.data.remarks?.trim() || null;
       const lead = await createLead({
         companyId,
@@ -78,6 +90,7 @@ export async function POST(req: NextRequest, routeCtx: ParamsCtx) {
         leadType: "workshop",
         leadStage: "checkin",
         source: "walk_in",
+        serviceType,
       });
       const checkinAt = new Date().toISOString();
       await updateLeadPartial(companyId, lead.id, {
@@ -92,7 +105,7 @@ export async function POST(req: NextRequest, routeCtx: ParamsCtx) {
         companyId,
         leadId: lead.id,
         eventType: "car_in",
-        eventPayload: { checkinAt, remarks, source: "customer_car_select" },
+        eventPayload: { checkinAt, remarks, serviceType, source: "customer_car_select" },
       });
       return NextResponse.json({ data: lead }, { status: 201 });
     }
