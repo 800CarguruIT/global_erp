@@ -1,6 +1,9 @@
 import { NextRequest } from "next/server";
+import { Crm } from "@repo/ai-core";
+import { getLeadById, updateLeadPartial } from "@repo/ai-core/crm/leads/repository";
 import {
   getInspectionById,
+  listInspectionLineItems,
   listInspectionItems,
   replaceInspectionItems,
   updateInspectionPartial,
@@ -27,8 +30,29 @@ export async function GET(req: NextRequest, { params }: Params) {
       return createMobileErrorResponse("Not found", 404);
     }
 
-    const items = await listInspectionItems(inspectionId);
-    return createMobileSuccessResponse({ inspection, items });
+    const [items, lineItems, customer, car, lead] = await Promise.all([
+      listInspectionItems(inspectionId),
+      listInspectionLineItems(inspectionId, { source: "inspection" }),
+      inspection.customerId ? Crm.getCustomerWithCars(inspection.customerId) : Promise.resolve(null),
+      inspection.carId ? Crm.getCarWithCustomers(inspection.carId) : Promise.resolve(null),
+      inspection.leadId ? getLeadById(companyId, inspection.leadId) : Promise.resolve(null),
+    ]);
+
+    return createMobileSuccessResponse({
+      inspection,
+      items,
+      lineItems,
+      customer:
+        customer && (customer as any).company_id === companyId
+          ? customer
+          : null,
+      car:
+        car && (car as any).company_id === companyId
+          ? car
+          : null,
+      lead,
+      carInVideoId: lead?.carInVideo ?? null,
+    });
   } catch (error) {
     console.error("GET /api/mobile/company/[companyId]/inspections/[inspectionId] error:", error);
     return handleMobileError(error);
@@ -37,9 +61,16 @@ export async function GET(req: NextRequest, { params }: Params) {
 
 export async function PATCH(req: NextRequest, { params }: Params) {
   try {
-   const { companyId, inspectionId } = await params;
+    const userId = requireMobileUserId(req);
+    const { companyId, inspectionId } = await params;
+    await ensureCompanyAccess(userId, companyId);
     const body = await req.json().catch(() => ({}));
-  
+
+    const inspection = await getInspectionById(companyId, inspectionId);
+    if (!inspection) {
+      return createMobileErrorResponse("Not found", 404);
+    }
+
     const patch = {
       status: body.status,
       startAt: body.startAt ?? body.start_at,
@@ -58,8 +89,11 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       aiSummaryPlain: body.aiSummaryPlain,
       draftPayload: body.draftPayload,
     };
-  
-    await updateInspectionPartial(companyId, inspectionId, patch);
+
+    const hasInspectionPatch = Object.values(patch).some((value) => value !== undefined);
+    if (hasInspectionPatch) {
+      await updateInspectionPartial(companyId, inspectionId, patch);
+    }
   
     if (Array.isArray(body.items)) {
       const items: InspectionItem[] = body.items;
@@ -77,6 +111,19 @@ export async function PATCH(req: NextRequest, { params }: Params) {
           photoRefs: i.photoRefs ?? null,
         }))
       );
+    }
+
+    const leadPatch = {
+      carInVideo: body.carInVideo ?? body.carin_video,
+      carOutVideo: body.carOutVideo ?? body.carout_video,
+    };
+    const hasLeadPatch = Object.values(leadPatch).some((value) => value !== undefined);
+    if (hasLeadPatch) {
+      const leadId = inspection.leadId ?? body.leadId ?? null;
+      if (!leadId) {
+        return createMobileErrorResponse("leadId not found for inspection", 400);
+      }
+      await updateLeadPartial(companyId, leadId, leadPatch);
     }
   
     return createMobileSuccessResponse({ ok: true });
