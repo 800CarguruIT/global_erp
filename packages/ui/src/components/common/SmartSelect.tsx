@@ -69,11 +69,11 @@ export function SmartSelect({
 
   return (
     <div className="relative space-y-1">
-      {label && <div className="text-xs font-semibold text-muted-foreground">{label}</div>}
+      {label && <div className="text-sm font-medium text-foreground/90">{label}</div>}
       <div className="relative">
         <input
           required={required}
-          className={`${theme.input} pr-10 min-h-[3rem] text-sm bg-slate-950/90 `}
+          className={`${theme.input} pr-10 min-h-[3rem] text-sm text-foreground placeholder:text-muted-foreground`}
           placeholder={placeholder}
           value={displayValue}
           onChange={handleInputChange}
@@ -89,8 +89,10 @@ export function SmartSelect({
           onKeyDown={handleKeyDown}
           disabled={disabled}
         />
-        <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs opacity-60">
-          ▾
+        <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-muted-foreground">
+          <svg viewBox="0 0 20 20" className="h-3 w-3" aria-hidden="true">
+            <path d="M6 8l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+          </svg>
         </span>
       </div>
       {open && (

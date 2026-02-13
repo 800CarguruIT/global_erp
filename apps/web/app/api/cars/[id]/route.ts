@@ -6,6 +6,8 @@ import { buildScopeContextFromRoute, requirePermission } from "@/lib/auth/permis
 const updateSchema = z.object({
   scope: z.enum(["global", "company"]).default("company"),
   companyId: z.string().optional().nullable(),
+  isActive: z.boolean().optional().nullable(),
+  is_active: z.boolean().optional().nullable(),
   code: z.string().optional(),
   plateCode: z.string().optional().nullable(),
   plateNumber: z.string().optional().nullable(),
@@ -25,6 +27,7 @@ const updateSchema = z.object({
   tyreSizeBack: z.string().optional().nullable(),
   registrationExpiry: z.string().optional().nullable(),
   registrationCardFileId: z.string().optional().nullable(),
+  vinPhotoFileId: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
 });
 
@@ -80,6 +83,7 @@ export async function PUT(req: NextRequest, routeCtx: ParamsCtx) {
     const updated = await Crm.updateCarRecord(id, {
       ...parsed.data,
       companyId: existing.company_id,
+      isActive: parsed.data.isActive ?? parsed.data.is_active ?? undefined,
     });
     return NextResponse.json(updated);
   } catch (error) {

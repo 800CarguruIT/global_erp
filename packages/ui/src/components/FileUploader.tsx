@@ -86,18 +86,19 @@ export function FileUploader({
   const helperContent = helperText ?? hint;
   const previewUrl = value ? `/api/files/${value}` : "";
   const showInlinePreview = showPreview && Boolean(value);
-  const buttonClasses = `inline-flex items-center whitespace-nowrap rounded-md border border-slate-200 bg-white px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600 shadow-md transition hover:bg-slate-50 hover:shadow-lg disabled:opacity-50${
+  const hasValue = Boolean(value);
+  const buttonClasses = `inline-flex items-center whitespace-nowrap rounded-md bg-slate-100 px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-700 shadow-md transition hover:bg-slate-200 hover:shadow-lg disabled:opacity-50${
     buttonClassName ? ` ${buttonClassName}` : ""
   }`;
 
   return (
     <div className={`space-y-1${containerClassName ? ` ${containerClassName}` : ""}`}>
       <div className="flex items-center gap-2">
-        <label className="text-xs font-semibold text-muted-foreground block">{label}</label>
+        <label className="text-sm font-medium text-foreground/90 block">{label}</label>
         {helperContent && (
           <button
             type="button"
-            className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-white/30 text-[10px] text-muted-foreground transition hover:bg-white/5 hover:text-foreground"
+            className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-muted/40 text-[10px] text-muted-foreground transition hover:bg-muted/60 hover:text-foreground"
             title={helperContent}
             aria-label={`${label} info`}
           >
@@ -140,27 +141,40 @@ export function FileUploader({
             onClick={() => fileInputRef.current?.click()}
             className={buttonClasses}
           >
-            {isUploading ? "Uploading..." : "Choose File"}
+            {isUploading ? "Uploading..." : hasValue ? "Replace file" : "Choose file"}
           </button>
         </div>
         {!buttonOnly && value && (
-          <span className="text-xs opacity-70 truncate" title={value}>
-            {value}
-          </span>
+          <div className="flex items-center gap-2 text-xs">
+            <span className="inline-flex rounded-full bg-muted/40 px-2 py-0.5 text-muted-foreground">
+              File attached
+            </span>
+            <a
+              href={previewUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-primary hover:underline"
+            >
+              Open
+            </a>
+            <span className="max-w-[18rem] truncate text-muted-foreground" title={value}>
+              {value}
+            </span>
+          </div>
         )}
       </div>
       {showInlinePreview && kind === "image" && (
         <img
           src={previewUrl}
           alt={`${label} preview`}
-          className={`h-24 w-full rounded-md border border-white/10 object-cover${
+          className={`h-24 w-full rounded-md object-cover${
             previewClassName ? ` ${previewClassName}` : ""
           }`}
         />
       )}
       {showInlinePreview && kind === "video" && (
         <video
-          className={`h-24 w-full rounded-md border border-white/10 object-cover${
+          className={`h-24 w-full rounded-md object-cover${
             previewClassName ? ` ${previewClassName}` : ""
           }`}
           controls

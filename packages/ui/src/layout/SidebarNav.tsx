@@ -339,7 +339,7 @@ export function SidebarNav({
   }
 
   const navBaseClass =
-    "relative max-h-[calc(100vh-2.5rem)] overflow-y-auto rounded-2xl border border-white/10 p-4 text-sm shadow-[0_24px_60px_-32px_rgba(15,23,42,0.85)]";
+    "relative max-h-[calc(100vh-2.5rem)] overflow-y-auto rounded-2xl border border-white/10 p-4 text-sm shadow-[0_24px_60px_-32px_rgba(15,23,42,0.85)] [scrollbar-width:thin] [scrollbar-color:rgba(148,163,184,0.45)_transparent] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/25 hover:[&::-webkit-scrollbar-thumb]:bg-white/40";
   const desktopNavClass = "bg-gradient-to-b from-slate-950/85 via-slate-900/70 to-slate-950/85";
   const mobileNavClass = "bg-slate-950 border-white/20 shadow-2xl";
 

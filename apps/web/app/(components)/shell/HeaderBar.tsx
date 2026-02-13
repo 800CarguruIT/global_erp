@@ -16,6 +16,7 @@ export function HeaderBar() {
   const [lookupResults, setLookupResults] = useState<any[]>([]);
   const [lookupLoading, setLookupLoading] = useState(false);
   const [lookupError, setLookupError] = useState<string | null>(null);
+  const [lookupAttempted, setLookupAttempted] = useState(false);
 
   let title = "Global ERP";
   let subtitle: string | undefined;
@@ -78,6 +79,7 @@ export function HeaderBar() {
     const query = lookupTerm.trim();
     if (!query) return;
     setLookupLoading(true);
+    setLookupAttempted(true);
     setLookupError(null);
     setLookupResults([]);
     try {
@@ -205,7 +207,10 @@ export function HeaderBar() {
             <div className="flex items-center gap-2">
               <input
                 value={lookupTerm}
-                onChange={(e) => setLookupTerm(e.target.value)}
+                onChange={(e) => {
+                  setLookupTerm(e.target.value);
+                  setLookupAttempted(false);
+                }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") handleLookup();
                 }}
@@ -267,8 +272,18 @@ export function HeaderBar() {
                 })}
               </div>
             )}
-            {!lookupLoading && lookupResults.length === 0 && lookupTerm.trim() && !lookupError && (
-              <div className="mt-2 text-xs text-muted-foreground">No results found.</div>
+            {!lookupLoading && lookupResults.length === 0 && lookupAttempted && !lookupError && (
+              <div className="mt-3 rounded-lg border border-border/60 p-3">
+                <div className="text-sm font-medium">Customer not found</div>
+                <div className="mt-1 text-xs text-muted-foreground">No customer matched your search.</div>
+                <Link
+                  href={`/company/${scope.companyId}/customers/new`}
+                  className="mt-3 inline-flex rounded-full border border-border/70 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition hover:border-primary"
+                  onClick={() => setLookupOpen(false)}
+                >
+                  Add Customer
+                </Link>
+              </div>
             )}
           </div>
         )}

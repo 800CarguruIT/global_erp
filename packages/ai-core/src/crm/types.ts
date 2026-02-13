@@ -128,7 +128,9 @@ export type CreateCarInput = {
   notes?: string | null;
 };
 
-export type UpdateCarInput = Partial<CreateCarInput>;
+export type UpdateCarInput = Partial<CreateCarInput> & {
+  isActive?: boolean;
+};
 
 export type LinkCustomerToCarInput = {
   companyId: string;

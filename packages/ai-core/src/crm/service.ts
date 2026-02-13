@@ -236,6 +236,7 @@ function mapCarInputToRow(companyId: string, input: UpdateCarInput): Partial<Car
     registration_card_file_id: input.registrationCardFileId ?? undefined,
     vin_photo_file_id: input.vinPhotoFileId ?? undefined,
     notes: input.notes ?? undefined,
+    is_active: input.isActive ?? undefined,
   } as any;
 }
 

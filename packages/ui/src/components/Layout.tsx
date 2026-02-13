@@ -139,6 +139,7 @@ function LayoutInner({ children, forceScope }: LayoutProps) {
   const [lookupResults, setLookupResults] = useState<any[]>([]);
   const [lookupLoading, setLookupLoading] = useState(false);
   const [lookupError, setLookupError] = useState<string | null>(null);
+  const [lookupAttempted, setLookupAttempted] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const branchBase = useBranchRoot
     ? `/branches/${scopeInfo.branchId ?? ""}`
@@ -261,6 +262,7 @@ function LayoutInner({ children, forceScope }: LayoutProps) {
     const query = lookupTerm.trim();
     if (!query) return;
     setLookupLoading(true);
+    setLookupAttempted(true);
     setLookupError(null);
     setLookupResults([]);
     try {
@@ -333,7 +335,10 @@ function LayoutInner({ children, forceScope }: LayoutProps) {
               <div className="flex items-center gap-2">
                 <input
                   value={lookupTerm}
-                  onChange={(e) => setLookupTerm(e.target.value)}
+                  onChange={(e) => {
+                    setLookupTerm(e.target.value);
+                    setLookupAttempted(false);
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") handleLookup();
                   }}
@@ -395,8 +400,18 @@ function LayoutInner({ children, forceScope }: LayoutProps) {
                   })}
                 </div>
               )}
-              {!lookupLoading && lookupResults.length === 0 && lookupTerm.trim() && !lookupError && (
-                <div className="mt-2 text-xs opacity-70">No results found.</div>
+              {!lookupLoading && lookupResults.length === 0 && lookupAttempted && !lookupError && (
+                <div className="mt-3 rounded-lg border border-white/10 p-3">
+                  <div className="text-sm font-medium">Customer not found</div>
+                  <div className="mt-1 text-xs opacity-70">No customer matched your search.</div>
+                  <Link
+                    href={`/company/${scopeInfo.companyId}/customers/new`}
+                    className="mt-3 inline-flex rounded-full border border-white/20 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide transition hover:border-white/70"
+                    onClick={() => setLookupOpen(false)}
+                  >
+                    Add Customer
+                  </Link>
+                </div>
               )}
             </div>
           )}
