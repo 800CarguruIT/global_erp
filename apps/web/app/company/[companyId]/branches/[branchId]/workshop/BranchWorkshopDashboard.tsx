@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useTheme } from "@repo/ui";
 
 const WORKSHOP_TABS = [
   { id: "inquiries", label: "New Inquiries", description: "Track the latest customer inquiries." },
@@ -31,6 +32,20 @@ const formatDate = (value?: string | null) => {
 
 const getCarLabel = (row: JobCardRow) => [row.make, row.model].filter(Boolean).join(" ");
 
+const getStatusTone = (status?: string | null) => {
+  const normalized = (status ?? "").toLowerCase();
+  if (normalized.includes("complete") || normalized.includes("done")) {
+    return "bg-emerald-500/15 text-emerald-600";
+  }
+  if (normalized.includes("cancel")) {
+    return "bg-red-500/15 text-red-600";
+  }
+  if (normalized.includes("progress") || normalized.includes("start")) {
+    return "bg-cyan-500/15 text-cyan-600";
+  }
+  return "bg-amber-500/15 text-amber-600";
+};
+
 export function BranchWorkshopDashboard({
   companyId,
   branchId,
@@ -38,6 +53,7 @@ export function BranchWorkshopDashboard({
   companyId: string;
   branchId?: string;
 }) {
+  const { theme } = useTheme();
   const [jobCards, setJobCards] = useState<JobCardRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -59,19 +75,29 @@ export function BranchWorkshopDashboard({
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json = await res.json();
-        const rows = (json.data ?? []) as any[];
+        const rows = (json.data ?? []) as Array<Record<string, unknown>>;
         const normalized: JobCardRow[] = rows.map((row) => ({
-          id: row.id,
-          make: row.make ?? null,
-          model: row.model ?? null,
-          status: row.status ?? null,
-          createdAt: row.created_at ?? row.createdAt ?? null,
-          estimateId: row.estimate_id ?? row.estimateId ?? null,
+          id: typeof row.id === "string" ? row.id : "",
+          make: typeof row.make === "string" ? row.make : null,
+          model: typeof row.model === "string" ? row.model : null,
+          status: typeof row.status === "string" ? row.status : null,
+          createdAt:
+            typeof row.created_at === "string"
+              ? row.created_at
+              : typeof row.createdAt === "string"
+              ? row.createdAt
+              : null,
+          estimateId:
+            typeof row.estimate_id === "string"
+              ? row.estimate_id
+              : typeof row.estimateId === "string"
+              ? row.estimateId
+              : null,
         }));
         if (!cancelled) {
-          setJobCards(normalized);
+          setJobCards(normalized.filter((row) => row.id));
         }
-      } catch (err) {
+      } catch {
         if (!cancelled) {
           setError("Failed to load job cards.");
         }
@@ -119,173 +145,232 @@ export function BranchWorkshopDashboard({
   const canNext = currentPage < totalPages;
 
   return (
-    <div className="space-y-8">
-      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <p className="text-2xl font-semibold text-slate-900">Welcome Rock star!</p>
-        <div className="mt-4 flex flex-wrap gap-3">
-          {WORKSHOP_TABS.map((tab) => {
-            const isActive = tab.id === activeTab;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveTab(tab.id)}
-                className={[
-                  "rounded-full px-4 py-2 text-sm font-semibold transition",
-                  isActive
-                    ? "bg-emerald-600 text-white shadow-lg"
-                    : "border border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300 hover:bg-white",
-                ].join(" ")}
-              >
-                {tab.label}
-              </button>
-            );
-          })}
+    <div className="space-y-4 py-4">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="space-y-1">
+          <h1 className="text-xl sm:text-2xl font-semibold">Workshop</h1>
+          <p className="text-sm text-muted-foreground">Track branch workshop inquiries, jobs, and job cards.</p>
         </div>
-        <p className="mt-3 text-sm text-slate-500">
-          {WORKSHOP_TABS.find((tab) => tab.id === activeTab)?.description}
-        </p>
+        {branchId && (
+          <span className="inline-flex items-center rounded-md border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600 shadow-sm">
+            Branch {branchId}
+          </span>
+        )}
       </div>
 
-      <section className="overflow-hidden rounded-3xl border border-emerald-500 bg-gradient-to-b from-emerald-600/95 to-emerald-500/90 shadow-lg">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/40 px-6 py-4 text-white">
-          <div className="flex flex-wrap items-center gap-3">
-            <h2 className="text-lg font-semibold tracking-wide">Working Job Cards</h2>
-            {branchId && (
-              <span className="text-xs uppercase tracking-[0.2em] text-white/70">Branch {branchId}</span>
-            )}
-          </div>
-          <span className="text-xs uppercase tracking-[0.2em] text-white/80">
-            {filteredJobCards.length} entries
-          </span>
-        </div>
+      <div className={`${theme.cardBg} ${theme.cardBorder} rounded-2xl p-3`}>
+        <div className="space-y-3">
+          <div className="rounded-2xl border-0 bg-background shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/30 px-4 py-3">
+              <div className="inline-flex flex-wrap rounded-lg bg-muted/40 p-1 text-xs">
+                {WORKSHOP_TABS.map((tab) => {
+                  const isActive = activeTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`rounded-md px-3 py-1.5 font-medium transition ${
+                        isActive
+                          ? "bg-background text-foreground shadow-sm border border-border/40"
+                          : "border border-transparent text-muted-foreground hover:bg-muted/50"
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="text-xs text-muted-foreground">{filteredJobCards.length} entries</div>
+            </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/30 px-6 py-3 text-sm text-white">
-          <div className="flex items-center gap-2">
-            <span>Show</span>
-            <select
-              value={entriesPerPage}
-              onChange={(event) => setEntriesPerPage(Number(event.target.value))}
-              className="rounded border border-white/40 bg-white/10 px-3 py-1 text-xs font-semibold text-white backdrop-blur"
-            >
-              {ENTRY_OPTIONS.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-            <span>entries</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <label htmlFor="job-card-search" className="text-xs uppercase tracking-[0.2em] text-white/80">
-              Search:
-            </label>
-            <input
-              id="job-card-search"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search job cards"
-              className="w-48 rounded border border-white/40 bg-white/10 px-3 py-1 text-xs font-medium text-white placeholder:text-white/60 focus:border-white focus:bg-white/20 focus:outline-none"
-            />
-          </div>
-        </div>
+            <div className="px-4 pt-3 text-xs text-muted-foreground">
+              {WORKSHOP_TABS.find((tab) => tab.id === activeTab)?.description}
+            </div>
 
-        <div className="overflow-x-auto bg-white text-slate-900">
-          <table className="min-w-full text-sm">
-            <thead>
-              <tr className="border-b bg-slate-100 text-xs uppercase tracking-[0.2em] text-slate-500">
-                <th className="py-3 px-4 text-left">Job ID</th>
-                <th className="py-3 px-4 text-left">Make</th>
-                <th className="py-3 px-4 text-left">Job Card</th>
-                <th className="py-3 px-4 text-left">Job Status</th>
-                <th className="py-3 px-4 text-left">Date</th>
-                <th className="py-3 px-4 text-left">Action</th>
-              </tr>
-            </thead>
-            <tbody>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/30 px-4 py-3">
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-muted-foreground">Show</span>
+                <select
+                  value={entriesPerPage}
+                  onChange={(event) => setEntriesPerPage(Number(event.target.value))}
+                  className="rounded-md border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600 shadow-sm"
+                >
+                  {ENTRY_OPTIONS.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-muted-foreground">entries</span>
+              </div>
+
+              <div className="relative w-full max-w-xs">
+                <input
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Search job cards"
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 pr-9 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                />
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
+                  <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
+                    <path
+                      d="M15.5 15.5L21 21M10.5 18a7.5 7.5 0 1 1 0-15a7.5 7.5 0 0 1 0 15Z"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.6"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </span>
+              </div>
+            </div>
+
+            {error && <div className="px-4 pt-3 text-xs text-red-500">{error}</div>}
+
+            <div className="space-y-3 px-3 pb-3 pt-2 md:hidden">
               {loading ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-6 text-center text-xs text-slate-500">
-                    Loading job cards…
-                  </td>
-                </tr>
-              ) : error ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-6 text-center text-xs text-destructive">
-                    {error}
-                  </td>
-                </tr>
+                <div className="rounded-xl border border-border/30 bg-muted/10 px-3 py-4 text-center text-sm text-muted-foreground">
+                  Loading job cards...
+                </div>
               ) : displayRows.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-6 text-center text-xs text-slate-400">
-                    No job cards found for the current filters.
-                  </td>
-                </tr>
+                <div className="rounded-xl border border-border/30 bg-muted/10 px-3 py-4 text-center text-sm text-muted-foreground">
+                  No job cards found.
+                </div>
               ) : (
                 displayRows.map((row) => (
-                  <tr key={row.id} className="border-b last:border-0">
-                    <td className="py-3 px-4 font-semibold text-slate-900">{row.id}</td>
-                    <td className="py-3 px-4 text-xs text-slate-600">{getCarLabel(row) || "-"}</td>
-                    <td className="py-3 px-4">
+                  <div key={row.id} className="rounded-xl border border-border/30 bg-background/70 p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-semibold text-primary">{row.id}</div>
+                        <div className="text-xs text-muted-foreground">{getCarLabel(row) || "-"}</div>
+                      </div>
+                      <span className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold ${getStatusTone(row.status)}`}>
+                        {row.status ?? "Pending"}
+                      </span>
+                    </div>
+
+                    <div className="mt-3 text-xs text-muted-foreground">{formatDate(row.createdAt)}</div>
+
+                    <div className="mt-3 flex flex-wrap gap-2">
                       <a
                         href={`/company/${companyId}/workshop/job-cards/${row.id}`}
-                        className="inline-flex items-center rounded bg-emerald-500 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white shadow-sm transition hover:bg-emerald-600"
+                        className="inline-flex items-center rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition hover:bg-slate-50 hover:shadow-md"
                       >
                         View Jobcard
                       </a>
-                    </td>
-                    <td className="py-3 px-4 text-xs text-slate-600 uppercase tracking-[0.1em]">
-                      {row.status ?? "Pending"}
-                    </td>
-                    <td className="py-3 px-4 text-xs text-slate-500">{formatDate(row.createdAt)}</td>
-                    <td className="py-3 px-4">
                       <button
                         type="button"
-                        className="inline-flex items-center rounded bg-white px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-600 shadow-sm transition hover:bg-slate-50"
+                        className="inline-flex items-center rounded-md border border-white/30 bg-primary px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary-foreground shadow-sm transition hover:opacity-90 hover:shadow-md"
                       >
                         Add Quote
                       </button>
-                    </td>
-                  </tr>
+                    </div>
+                  </div>
                 ))
               )}
-            </tbody>
-          </table>
-        </div>
-
-        {!loading && !error && (
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/30 px-6 py-3 text-xs font-semibold uppercase tracking-[0.2em] text-white/80">
-            <span>
-              Showing {startEntry} to {endEntry} of {filteredJobCards.length} entries
-            </span>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                disabled={!canPrevious}
-                className={[
-                  "rounded border border-white/40 px-3 py-1 text-xs font-semibold transition",
-                  canPrevious ? "bg-white/20 text-white hover:bg-white/30" : "cursor-not-allowed bg-white/10 text-white/40",
-                ].join(" ")}
-              >
-                Previous
-              </button>
-              <span className="px-2 text-sm font-bold text-white">{currentPage}</span>
-              <button
-                type="button"
-                onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                disabled={!canNext}
-                className={[
-                  "rounded border border-white/40 px-3 py-1 text-xs font-semibold transition",
-                  canNext ? "bg-white/20 text-white hover:bg-white/30" : "cursor-not-allowed bg-white/10 text-white/40",
-                ].join(" ")}
-              >
-                Next
-              </button>
             </div>
+
+            <div className="hidden overflow-x-auto md:block">
+              <table className="min-w-full text-sm border-separate border-spacing-0">
+                <thead>
+                  <tr className="text-left bg-muted/20">
+                    <th className="px-4 py-3 sticky top-0 bg-muted/20 backdrop-blur border-b border-border/30 text-xs font-semibold text-muted-foreground">
+                      Job ID
+                    </th>
+                    <th className="px-4 py-3 sticky top-0 bg-muted/20 backdrop-blur border-b border-border/30 text-xs font-semibold text-muted-foreground">
+                      Make
+                    </th>
+                    <th className="px-4 py-3 sticky top-0 bg-muted/20 backdrop-blur border-b border-border/30 text-xs font-semibold text-muted-foreground">
+                      Job Card
+                    </th>
+                    <th className="px-4 py-3 sticky top-0 bg-muted/20 backdrop-blur border-b border-border/30 text-xs font-semibold text-muted-foreground">
+                      Status
+                    </th>
+                    <th className="px-4 py-3 sticky top-0 bg-muted/20 backdrop-blur border-b border-border/30 text-xs font-semibold text-muted-foreground">
+                      Date
+                    </th>
+                    <th className="px-4 py-3 sticky top-0 bg-muted/20 backdrop-blur border-b border-border/30 text-xs font-semibold text-muted-foreground text-right">
+                      Action
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loading ? (
+                    <tr>
+                      <td className="px-3 py-6 text-muted-foreground text-center" colSpan={6}>
+                        Loading job cards...
+                      </td>
+                    </tr>
+                  ) : displayRows.length === 0 ? (
+                    <tr>
+                      <td className="px-3 py-6 text-muted-foreground text-center" colSpan={6}>
+                        No job cards found.
+                      </td>
+                    </tr>
+                  ) : (
+                    displayRows.map((row) => (
+                      <tr key={row.id} className="hover:bg-muted/20">
+                        <td className="px-4 py-3 border-b border-border/30 font-semibold">{row.id}</td>
+                        <td className="px-4 py-3 border-b border-border/30">{getCarLabel(row) || "-"}</td>
+                        <td className="px-4 py-3 border-b border-border/30">
+                          <a
+                            href={`/company/${companyId}/workshop/job-cards/${row.id}`}
+                            className="inline-flex items-center rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition hover:bg-slate-50 hover:shadow-md"
+                          >
+                            View Jobcard
+                          </a>
+                        </td>
+                        <td className="px-4 py-3 border-b border-border/30">
+                          <span className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold ${getStatusTone(row.status)}`}>
+                            {row.status ?? "Pending"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 border-b border-border/30 text-muted-foreground">{formatDate(row.createdAt)}</td>
+                        <td className="px-4 py-3 border-b border-border/30 text-right">
+                          <button
+                            type="button"
+                            className="inline-flex items-center rounded-md border border-white/30 bg-primary px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary-foreground shadow-sm transition hover:opacity-90 hover:shadow-md"
+                          >
+                            Add Quote
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {!loading && !error && (
+              <div className="flex items-center justify-between px-4 py-3 text-xs text-muted-foreground">
+                <span>
+                  Showing {startEntry} to {endEntry} of {filteredJobCards.length}
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                    disabled={!canPrevious}
+                    className="rounded-md border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
+                  >
+                    Previous
+                  </button>
+                  <span className="inline-flex items-center px-2 text-sm font-semibold text-foreground">{currentPage}</span>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                    disabled={!canNext}
+                    className="rounded-md border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
-        )}
-      </section>
+        </div>
+      </div>
     </div>
   );
 }

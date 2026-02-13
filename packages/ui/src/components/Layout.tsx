@@ -79,6 +79,7 @@ type ScopeInfo =
 type LayoutProps = {
   children: React.ReactNode;
   forceScope?: ScopeInfo;
+  hideSidebar?: boolean;
 };
 
 function getCookieValue(name: string): string | null {
@@ -128,7 +129,7 @@ function detectScope(pathname: string): ScopeInfo {
   return { scope: "global" };
 }
 
-function LayoutInner({ children, forceScope }: LayoutProps) {
+function LayoutInner({ children, forceScope, hideSidebar }: LayoutProps) {
   const pathname = usePathname() || "/";
   const scopeInfo = forceScope ?? detectScope(pathname);
   const useBranchRoot = scopeInfo.scope === "branch" && pathname.startsWith("/branches/");
@@ -287,15 +288,17 @@ function LayoutInner({ children, forceScope }: LayoutProps) {
     <div className="min-h-screen flex flex-col">
       <header className="relative z-50 flex flex-col gap-2 px-4 sm:px-8 py-3 sm:py-4 border-b border-white/10 bg-black/20 backdrop-blur-xl overflow-visible sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <button
-            type="button"
-            className="lg:hidden rounded-full border border-white/20 bg-black/40 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-white transition hover:border-white/40"
-            aria-label="Toggle navigation"
-            aria-expanded={sidebarOpen}
-            onClick={() => setSidebarOpen((prev) => !prev)}
-          >
-            <FontAwesomeIcon icon={faBars} className="h-3 w-3" />
-          </button>
+          {!hideSidebar && (
+            <button
+              type="button"
+              className="lg:hidden rounded-full border border-white/20 bg-black/40 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-white transition hover:border-white/40"
+              aria-label="Toggle navigation"
+              aria-expanded={sidebarOpen}
+              onClick={() => setSidebarOpen((prev) => !prev)}
+            >
+              <FontAwesomeIcon icon={faBars} className="h-3 w-3" />
+            </button>
+          )}
           <Link href={brandHref} className="flex items-center gap-3 rounded-lg px-2 py-1 hover:bg-white/5">
             <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-fuchsia-500 via-orange-400 to-emerald-400 shadow-lg" />
             <div className="leading-tight text-sm sm:text-base font-semibold uppercase tracking-wide">
@@ -420,25 +423,31 @@ function LayoutInner({ children, forceScope }: LayoutProps) {
 
       {/* Content */}
       <div className="flex-1 px-4 sm:px-6 py-4 sm:py-6">
-        <SidebarNav
-          scope={scopeInfo.scope as any}
-          activeCategory={CategoryNav.getActiveCategory(pathname)}
-          currentPathname={pathname}
-          mobileSidebarOpen={sidebarOpen}
-          onRequestClose={() => setSidebarOpen(false)}
-        >
+        {hideSidebar ? (
           <div className="w-full">{children}</div>
-        </SidebarNav>
+        ) : (
+          <SidebarNav
+            scope={scopeInfo.scope as any}
+            activeCategory={CategoryNav.getActiveCategory(pathname)}
+            currentPathname={pathname}
+            mobileSidebarOpen={sidebarOpen}
+            onRequestClose={() => setSidebarOpen(false)}
+          >
+            <div className="w-full">{children}</div>
+          </SidebarNav>
+        )}
       </div>
     </div>
   );
 }
 
-export function AppLayout({ children, forceScope }: LayoutProps) {
+export function AppLayout({ children, forceScope, hideSidebar }: LayoutProps) {
   return (
     <ThemeProvider>
       <I18nProvider>
-        <LayoutInner forceScope={forceScope}>{children}</LayoutInner>
+        <LayoutInner forceScope={forceScope} hideSidebar={hideSidebar}>
+          {children}
+        </LayoutInner>
       </I18nProvider>
     </ThemeProvider>
   );
