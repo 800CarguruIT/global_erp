@@ -9,6 +9,7 @@ export async function GET(req: NextRequest, { params }: Params) {
   const { companyId } = await params;
   const url = new URL(req.url);
   const estimateId = url.searchParams.get("estimateId");
+  const includeAll = url.searchParams.get("all") === "1" || url.searchParams.get("all") === "true";
   const sql = getSql();
   if (!estimateId) {
     const rows = await sql`
@@ -34,13 +35,22 @@ export async function GET(req: NextRequest, { params }: Params) {
     `;
     return NextResponse.json({ data: rows });
   }
+  if (includeAll) {
+    const rows = await sql`
+      SELECT *
+      FROM job_cards
+      WHERE estimate_id = ${estimateId}
+      ORDER BY created_at DESC
+    `;
+    return NextResponse.json({ data: rows });
+  }
   const rows = await sql`
-    SELECT *
-    FROM job_cards
-    WHERE estimate_id = ${estimateId}
-      AND status IN ('Pending', 'Re-Assigned')
-    LIMIT 1
-  `;
+      SELECT *
+      FROM job_cards
+      WHERE estimate_id = ${estimateId}
+        AND status IN ('Pending', 'Re-Assigned')
+      LIMIT 1
+    `;
   return NextResponse.json({ data: rows[0] ?? null });
 }
 
@@ -95,6 +105,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       SET job_card_id = ${jobCard.id}
       WHERE inspection_id = ${estimate.inspectionId}
         AND status = 'Approved'
+        AND job_card_id IS NULL
     `;
 
     return NextResponse.json({ data: jobCard }, { status: 201 });

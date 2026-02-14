@@ -55,6 +55,8 @@ const pickQuote = (row: QuoteRow) => {
   if (row.used != null) return { type: "USED", amount: row.used, qty: row.usedQty, etd: row.usedEtd };
   return { type: "-", amount: null, qty: null, etd: null };
 };
+const isApprovedType = (row: QuoteRow, type: "oem" | "oe" | "aftm" | "used") =>
+  String(row.approvedType ?? "").trim().toLowerCase() === type;
 
 const ORDERED_QUOTE_PO_KEY = "orderedQuotesPoDraft";
 
@@ -184,12 +186,12 @@ export default function PartsQuotesPage() {
       const num = Number(val);
       return Number.isNaN(num) ? 0 : num;
     };
-    const oemQty = toNum(draft.oemQty);
-    const oeQty = toNum(draft.oeQty);
-    const aftmQty = toNum(draft.aftmQty);
-    const usedQty = toNum(draft.usedQty);
+    const oemQty = toNum(draft.oemQty) || Number(row.oemQty ?? 0);
+    const oeQty = toNum(draft.oeQty) || Number(row.oeQty ?? 0);
+    const aftmQty = toNum(draft.aftmQty) || Number(row.aftmQty ?? 0);
+    const usedQty = toNum(draft.usedQty) || Number(row.usedQty ?? 0);
     if (oemQty + oeQty + aftmQty + usedQty <= 0) {
-      toast.error("Enter at least one quantity to order.");
+      toast.error("No quoted quantity available to order.");
       return;
     }
     setOrderingQuoteId(row.id);
@@ -352,14 +354,13 @@ export default function PartsQuotesPage() {
                     <th className="px-3 py-2 text-left">Used</th>
                     <th className="px-3 py-2 text-left">Remarks</th>
                     <th className="px-3 py-2 text-left">Quoted Qty</th>
-                    <th className="px-3 py-2 text-left">Order Qty</th>
                     <th className="px-3 py-2 text-left">Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {quotesModalRows.length === 0 ? (
                     <tr>
-                      <td className="px-3 py-6 text-center text-xs text-slate-400" colSpan={9}>
+                      <td className="px-3 py-6 text-center text-xs text-slate-400" colSpan={8}>
                         No quotes available.
                       </td>
                     </tr>
@@ -373,7 +374,14 @@ export default function PartsQuotesPage() {
                         <td className="px-3 py-2">
                           {r.oem != null ? (
                             <div>
-                              <div className="text-sm font-semibold">{r.oem} AED</div>
+                              <div className="flex items-center gap-2">
+                                <div className="text-sm font-semibold">{r.oem} AED</div>
+                                {isApprovedType(r, "oem") && (
+                                  <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase text-emerald-300">
+                                    Approved
+                                  </span>
+                                )}
+                              </div>
                               <div className="text-[10px] text-slate-400">QTY: {r.oemQty ?? "—"}</div>
                             </div>
                           ) : (
@@ -383,7 +391,14 @@ export default function PartsQuotesPage() {
                         <td className="px-3 py-2">
                           {r.oe != null ? (
                             <div>
-                              <div className="text-sm font-semibold">{r.oe} AED</div>
+                              <div className="flex items-center gap-2">
+                                <div className="text-sm font-semibold">{r.oe} AED</div>
+                                {isApprovedType(r, "oe") && (
+                                  <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase text-emerald-300">
+                                    Approved
+                                  </span>
+                                )}
+                              </div>
                               <div className="text-[10px] text-slate-400">QTY: {r.oeQty ?? "—"}</div>
                             </div>
                           ) : (
@@ -393,7 +408,14 @@ export default function PartsQuotesPage() {
                         <td className="px-3 py-2">
                           {r.aftm != null ? (
                             <div>
-                              <div className="text-sm font-semibold">{r.aftm} AED</div>
+                              <div className="flex items-center gap-2">
+                                <div className="text-sm font-semibold">{r.aftm} AED</div>
+                                {isApprovedType(r, "aftm") && (
+                                  <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase text-emerald-300">
+                                    Approved
+                                  </span>
+                                )}
+                              </div>
                               <div className="text-[10px] text-slate-400">QTY: {r.aftmQty ?? "—"}</div>
                             </div>
                           ) : (
@@ -403,7 +425,14 @@ export default function PartsQuotesPage() {
                         <td className="px-3 py-2">
                           {r.used != null ? (
                             <div>
-                              <div className="text-sm font-semibold">{r.used} AED</div>
+                              <div className="flex items-center gap-2">
+                                <div className="text-sm font-semibold">{r.used} AED</div>
+                                {isApprovedType(r, "used") && (
+                                  <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase text-emerald-300">
+                                    Approved
+                                  </span>
+                                )}
+                              </div>
                               <div className="text-[10px] text-slate-400">QTY: {r.usedQty ?? "—"}</div>
                             </div>
                           ) : (
@@ -420,58 +449,6 @@ export default function PartsQuotesPage() {
                           ]
                             .filter(Boolean)
                             .join(" · ") || "—"}
-                        </td>
-                        <td className="px-3 py-2">
-                          <div className="grid grid-cols-2 gap-1 text-[11px]">
-                            <input
-                              className="w-16 rounded border border-white/10 bg-slate-900/60 px-2 py-1 text-[11px] text-white focus:border-emerald-400 focus:outline-none"
-                              placeholder="OEM"
-                              value={orderDrafts[r.id]?.oemQty ?? ""}
-                              onChange={(e) =>
-                                setOrderDrafts((prev) => ({
-                                  ...prev,
-                                  [r.id]: { ...prev[r.id], oemQty: e.target.value },
-                                }))
-                              }
-                              disabled={r.oem == null}
-                            />
-                            <input
-                              className="w-16 rounded border border-white/10 bg-slate-900/60 px-2 py-1 text-[11px] text-white focus:border-emerald-400 focus:outline-none"
-                              placeholder="OE"
-                              value={orderDrafts[r.id]?.oeQty ?? ""}
-                              onChange={(e) =>
-                                setOrderDrafts((prev) => ({
-                                  ...prev,
-                                  [r.id]: { ...prev[r.id], oeQty: e.target.value },
-                                }))
-                              }
-                              disabled={r.oe == null}
-                            />
-                            <input
-                              className="w-16 rounded border border-white/10 bg-slate-900/60 px-2 py-1 text-[11px] text-white focus:border-emerald-400 focus:outline-none"
-                              placeholder="AFTM"
-                              value={orderDrafts[r.id]?.aftmQty ?? ""}
-                              onChange={(e) =>
-                                setOrderDrafts((prev) => ({
-                                  ...prev,
-                                  [r.id]: { ...prev[r.id], aftmQty: e.target.value },
-                                }))
-                              }
-                              disabled={r.aftm == null}
-                            />
-                            <input
-                              className="w-16 rounded border border-white/10 bg-slate-900/60 px-2 py-1 text-[11px] text-white focus:border-emerald-400 focus:outline-none"
-                              placeholder="Used"
-                              value={orderDrafts[r.id]?.usedQty ?? ""}
-                              onChange={(e) =>
-                                setOrderDrafts((prev) => ({
-                                  ...prev,
-                                  [r.id]: { ...prev[r.id], usedQty: e.target.value },
-                                }))
-                              }
-                              disabled={r.used == null}
-                            />
-                          </div>
                         </td>
                         <td className="px-3 py-2">
                           <button

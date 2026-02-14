@@ -54,6 +54,12 @@ type DraftState = {
   inspectorRemarks: string;
   items: ItemDraft[];
 };
+type JobCardSummary = {
+  id: string;
+  status?: string | null;
+  createdAt?: string | null;
+  completeAt?: string | null;
+};
 
 const COST_DISPLAY_ORDER: Array<{ key: EstimateItemCostType; label: string }> = [
   { key: "oe", label: "OE" },
@@ -61,6 +67,7 @@ const COST_DISPLAY_ORDER: Array<{ key: EstimateItemCostType; label: string }> = 
   { key: "aftm", label: "AFTM" },
   { key: "used", label: "Used" },
 ];
+const NEW_JOB_PRODUCT_INDEX_OFFSET = 10000;
 
 const formatCostValue = (value?: number | null) => (value != null ? value.toFixed(2) : "0.00");
 
@@ -87,18 +94,27 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
   const productDropdownRef = useRef<HTMLDivElement | null>(null);
   const [draft, setDraft] = useState<DraftState | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isRefreshingQuotes, setIsRefreshingQuotes] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [jobCardMessage, setJobCardMessage] = useState<string | null>(null);
   const [activeJobCardId, setActiveJobCardId] = useState<string | null>(null);
+  const [jobCards, setJobCards] = useState<JobCardSummary[]>([]);
+  const [inspectionLineItems, setInspectionLineItems] = useState<any[]>([]);
+  const [newJobItems, setNewJobItems] = useState<ItemDraft[]>([]);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [invoiceConvertError, setInvoiceConvertError] = useState<string | null>(null);
+  const [isConvertingInvoice, setIsConvertingInvoice] = useState(false);
 
   const renderOrderBadge = (item: ItemDraft) => {
     if (item.status !== "approved") {
       return null;
     }
     const trimmedOrderStatus = (item.orderStatus ?? "").trim();
-    const fallbackLabel = item.partOrdered === 1 ? "Ordered" : "Order Pending";
-    const badgeLabel = trimmedOrderStatus || fallbackLabel;
+    if (!trimmedOrderStatus) {
+      return null;
+    }
+    const badgeLabel = trimmedOrderStatus;
     const normalizedLabel = badgeLabel.toLowerCase();
     const badgeClass =
       normalizedLabel === "received"
@@ -134,6 +150,22 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json = await res.json();
         const estimate: Estimate = json.data?.estimate ?? json.data?.data ?? json.data.estimate ?? json.data;
+        let inspectionSnapshot: any | null = null;
+        if (estimate?.inspectionId) {
+          try {
+            const inspRes = await fetch(`/api/company/${companyId}/workshop/inspections/${estimate.inspectionId}`);
+            if (inspRes.ok) {
+              const inspJson = await inspRes.json();
+              inspectionSnapshot = inspJson?.data?.inspection ?? inspJson?.data ?? null;
+            }
+          } catch {
+            inspectionSnapshot = null;
+          }
+        }
+        const inspectionStatus = String(inspectionSnapshot?.status ?? "").toLowerCase();
+        const inspectionCompleted =
+          inspectionStatus === "completed" ||
+          Boolean(inspectionSnapshot?.completeAt ?? inspectionSnapshot?.complete_at);
         let items: EstimateItem[] = json.data?.items ?? json.items ?? json.data?.data?.items ?? [];
         let lineItemOrderMap: Record<string, number> = {};
         let lineItemOrderStatusMap: Record<string, string> = {};
@@ -162,7 +194,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
             lineItemOrderStatusMap = {};
           }
         }
-        if (items.length === 0 && estimate?.inspectionId) {
+        if (items.length === 0 && estimate?.inspectionId && inspectionCompleted) {
           try {
             const inspRes = await fetch(
               `/api/company/${companyId}/workshop/inspections/${estimate.inspectionId}/line-items`
@@ -197,6 +229,9 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
             // ignore inspection fallback
           }
         }
+        if (!inspectionCompleted) {
+          items = items.filter((item: any) => !item?.inspectionItemId && !item?.inspection_item_id);
+        }
         if (!cancelled) {
           setLoadState({ status: "loaded", data: { estimate, items }, error: null });
           setDraft({
@@ -206,9 +241,6 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
             customerComplain: estimate.meta?.customerComplain ?? "",
             inspectorRemarks: estimate.meta?.inspectorRemarks ?? "",
             items: items.map((i) => {
-              const defaultApprovedType = COST_DISPLAY_ORDER.find(
-                ({ key }) => i.quoteCosts?.[key] != null
-              )?.key;
               return {
                 id: i.id,
                 lineNo: i.lineNo,
@@ -228,7 +260,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                 partOrdered: i.inspectionItemId ? lineItemOrderMap[i.inspectionItemId] ?? 0 : 0,
                 orderStatus: i.inspectionItemId ? lineItemOrderStatusMap[i.inspectionItemId] ?? null : null,
                 quoteCosts: i.quoteCosts,
-                approvedType: i.approvedType ?? defaultApprovedType,
+                approvedType: i.approvedType ?? null,
                 approvedCost: i.approvedCost ?? null,
               };
             }),
@@ -236,7 +268,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
           setCustomer(null);
           setCar(null);
           setLead(null);
-          setInspection(null);
+          setInspection(inspectionSnapshot);
           if (estimate.customerId) {
             fetch(`/api/customers/${estimate.customerId}?companyId=${companyId}`)
               .then((res) => (res.ok ? res.json() : Promise.reject()))
@@ -255,7 +287,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
               .then((data) => setLead(data?.data?.lead ?? data?.data?.data ?? data?.data ?? data))
               .catch(() => setLead(null));
           }
-          if (estimate.inspectionId) {
+          if (estimate.inspectionId && !inspectionSnapshot) {
             fetch(`/api/company/${companyId}/workshop/inspections/${estimate.inspectionId}`)
               .then((res) => (res.ok ? res.json() : Promise.reject()))
               .then((data) => setInspection(data?.data?.inspection ?? data?.data ?? data))
@@ -281,6 +313,33 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
   }, [companyId, estimateId]);
 
   useEffect(() => {
+    const inspectionId = inspection?.id ?? loadState.data?.estimate?.inspectionId;
+    if (!inspectionId || !loadState.data?.estimate?.id) return;
+    let cancelled = false;
+    async function loadJobMeta() {
+      try {
+        const [jobsRes, lineItemsRes] = await Promise.all([
+          fetch(`/api/company/${companyId}/workshop/job-cards?estimateId=${estimateId}&all=1`),
+          fetch(`/api/company/${companyId}/workshop/inspections/${inspectionId}/line-items`),
+        ]);
+        if (!jobsRes.ok || !lineItemsRes.ok) return;
+        const [jobsJson, lineItemsJson] = await Promise.all([jobsRes.json(), lineItemsRes.json()]);
+        if (cancelled) return;
+        setJobCards(Array.isArray(jobsJson?.data) ? jobsJson.data : []);
+        setInspectionLineItems(Array.isArray(lineItemsJson?.data) ? lineItemsJson.data : []);
+      } catch {
+        if (cancelled) return;
+        setJobCards([]);
+        setInspectionLineItems([]);
+      }
+    }
+    loadJobMeta();
+    return () => {
+      cancelled = true;
+    };
+  }, [companyId, estimateId, inspection?.id, loadState.data?.estimate?.inspectionId]);
+
+  useEffect(() => {
     fetch("/api/products")
       .then((res) => (res.ok ? res.json() : Promise.reject()))
       .then((data) => setProducts(data?.data ?? []))
@@ -292,7 +351,11 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
       setProductResults([]);
       return;
     }
-    const query = draft?.items[productOpenIndex]?.partName?.trim() ?? "";
+    const isNewJobIndex = productOpenIndex >= NEW_JOB_PRODUCT_INDEX_OFFSET;
+    const queryIndex = isNewJobIndex ? productOpenIndex - NEW_JOB_PRODUCT_INDEX_OFFSET : productOpenIndex;
+    const query = isNewJobIndex
+      ? newJobItems[queryIndex]?.partName?.trim() ?? ""
+      : draft?.items[queryIndex]?.partName?.trim() ?? "";
     let active = true;
     const timer = setTimeout(() => {
       const url = query ? `/api/products?search=${encodeURIComponent(query)}` : "/api/products";
@@ -311,7 +374,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
       active = false;
       clearTimeout(timer);
     };
-  }, [productOpenIndex, draft]);
+  }, [productOpenIndex, draft, newJobItems]);
 
   useEffect(() => {
     if (!draft || productTypeByName.size === 0) return;
@@ -370,11 +433,21 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
     setIsSaving(true);
     setSaveError(null);
     try {
+      const newJobItemsToSave = newJobItems.filter((item) => item.partName.trim());
+      const combinedItems = [
+        ...draft.items,
+        ...newJobItemsToSave.map((item, idx) => ({
+          ...item,
+          id: undefined,
+          inspectionItemId: null,
+          lineNo: draft.items.length + idx + 1,
+        })),
+      ];
       const body = {
         status: draft.status,
         vatRate: draft.vatRate,
         discountAmount: draft.discountAmount,
-        items: draft.items.map((i, idx) => ({
+        items: combinedItems.map((i, idx) => ({
           id: i.id,
           lineNo: i.lineNo ?? idx + 1,
           inspectionItemId: i.inspectionItemId ?? null,
@@ -401,6 +474,28 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
         body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (newJobItemsToSave.length > 0) {
+        setDraft((prev) =>
+          prev
+            ? {
+                ...prev,
+                items: [
+                  ...prev.items,
+                  ...newJobItemsToSave.map((item) => ({
+                    ...item,
+                    id: undefined,
+                    inspectionItemId: null,
+                    source: "estimate" as const,
+                  })),
+                ],
+              }
+            : prev
+        );
+        setNewJobItems((prev) => prev.filter((item) => !item.partName.trim()));
+      }
+      if (combinedItems.some((item) => item.status === "approved")) {
+        await orderApprovedParts(true, combinedItems);
+      }
       setLastSavedAt(new Date());
     } catch (err) {
       console.error(err);
@@ -410,14 +505,19 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
     }
   }
 
-  async function orderApprovedParts() {
+  async function orderApprovedParts(silent = false, itemsOverride?: ItemDraft[]) {
     if (!estimate.inspectionId) {
-      window.alert("Inspection not found for this estimate.");
+      if (!silent) window.alert("Inspection not found for this estimate.");
       return;
     }
-    const approvedNames = draft.items
+    if (!draft) {
+      if (!silent) window.alert("Estimate data is not ready.");
+      return;
+    }
+    const approvedNames = (itemsOverride ?? draft.items)
       .filter((item) => item.status === "approved" && item.partName.trim())
       .map((item) => item.partName.trim());
+    if (approvedNames.length === 0) return;
     try {
       const res = await fetch(
         `/api/company/${companyId}/workshop/inspections/${estimate.inspectionId}/line-items`,
@@ -430,10 +530,10 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json().catch(() => ({}));
       const updated = json?.data?.updated ?? 0;
-      window.alert(`Ordered ${updated} approved parts.`);
+      if (!silent) window.alert(`Ordered ${updated} approved parts.`);
     } catch (err) {
       console.error(err);
-      window.alert("Failed to order approved parts.");
+      if (!silent) window.alert("Failed to order approved parts.");
     }
   }
 
@@ -470,15 +570,15 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
     const getLineValues = (item: ItemDraft) => {
       const qty = Number(item.quantity) || 0;
       const baseCost = Number(item.cost) || 0;
-      const approvedCost = Number(item.approvedCost ?? item.cost) || baseCost;
+      const approvedCostRaw = Number(item.approvedCost);
+      const approvedCost = Number.isFinite(approvedCostRaw) ? approvedCostRaw : baseCost * qty;
       const saleValue = Number(item.sale) || 0;
       const approvedValue = Number(item.approvedSale) || 0;
       const saleBase = approvedValue > 0 ? approvedValue : saleValue;
-      const discountPct = Number(item.discount) || 0;
-      const costTotal = approvedCost * qty;
-      const saleTotal = saleBase * qty;
-      const discountAmount = (saleTotal * discountPct) / 100;
-      const subTotal = saleTotal - discountAmount;
+      const discountAmount = Number(item.discount) || 0;
+      const costTotal = approvedCost;
+      const saleTotal = saleBase;
+      const subTotal = Math.max(0, saleTotal - discountAmount);
       return { costTotal, saleTotal, discountAmount, subTotal };
     };
     const approved = { cost: 0, sale: 0, discount: 0, subTotal: 0 };
@@ -515,9 +615,50 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
       vatRate,
     };
   }, [draft]);
+  const lineItemTableTotals = useMemo(() => {
+    if (!draft) return null;
+    const summary = {
+      qty: 0,
+      oe: 0,
+      oem: 0,
+      aftm: 0,
+      used: 0,
+      approvedCost: 0,
+      approvedSale: 0,
+      discount: 0,
+      subTotal: 0,
+    };
+    for (const item of draft.items) {
+      if (item.status === "rejected") continue;
+      const qty = Number(item.quantity) || 0;
+      const oe = Number(item.quoteCosts?.oe) || 0;
+      const oem = Number(item.quoteCosts?.oem) || 0;
+      const aftm = Number(item.quoteCosts?.aftm) || 0;
+      const used = Number(item.quoteCosts?.used) || 0;
+      const approvedCostRaw = Number(item.approvedCost);
+      const approvedCost = Number.isFinite(approvedCostRaw) ? approvedCostRaw : (Number(item.cost) || 0) * qty;
+      const approvedSale = Number(item.approvedSale ?? item.sale) || 0;
+      const lineSale = approvedSale;
+      const lineDiscount = Number(item.discount) || 0;
+      summary.qty += qty;
+      summary.oe += oe * qty;
+      summary.oem += oem * qty;
+      summary.aftm += aftm * qty;
+      summary.used += used * qty;
+      summary.approvedCost += approvedCost;
+      summary.approvedSale += lineSale;
+      summary.discount += lineDiscount;
+      summary.subTotal += Math.max(0, lineSale - lineDiscount);
+    }
+    return summary;
+  }, [draft]);
 
   async function createWorkOrder() {
     try {
+      if (!draft) return;
+      if (draft.items.some((item) => item.status === "approved")) {
+        await orderApprovedParts(true);
+      }
       const res = await fetch(`/api/company/${companyId}/workshop/job-cards`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -645,6 +786,262 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
   function updateDiscount(amount: number) {
     setDraft((prev) => (prev ? { ...prev, discountAmount: amount } : prev));
   }
+  async function refreshQuoteUpdates() {
+    setIsRefreshingQuotes(true);
+    try {
+      const res = await fetch(`/api/company/${companyId}/workshop/estimates/${estimateId}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      const refreshedEstimate: Estimate =
+        json.data?.estimate ?? json.data?.data ?? json.data?.estimate ?? json.data;
+      let refreshedItems: EstimateItem[] = json.data?.items ?? json.items ?? json.data?.data?.items ?? [];
+      let lineItemOrderMap: Record<string, number> = {};
+      let lineItemOrderStatusMap: Record<string, string> = {};
+      let inspectionSnapshot: any | null = null;
+      if (refreshedEstimate?.inspectionId) {
+        try {
+          const inspectionRes = await fetch(
+            `/api/company/${companyId}/workshop/inspections/${refreshedEstimate.inspectionId}`
+          );
+          if (inspectionRes.ok) {
+            const inspectionJson = await inspectionRes.json();
+            inspectionSnapshot = inspectionJson?.data?.inspection ?? inspectionJson?.data ?? null;
+          }
+        } catch {
+          inspectionSnapshot = null;
+        }
+        try {
+          const liRes = await fetch(
+            `/api/company/${companyId}/workshop/inspections/${refreshedEstimate.inspectionId}/line-items`
+          );
+          if (liRes.ok) {
+            const liJson = await liRes.json();
+            const liItems = liJson?.data ?? [];
+            lineItemOrderMap = liItems.reduce((acc: Record<string, number>, li: any) => {
+              if (li?.id) acc[li.id] = li.partOrdered ?? li.part_ordered ?? 0;
+              return acc;
+            }, {});
+            lineItemOrderStatusMap = liItems.reduce((acc: Record<string, string>, li: any) => {
+              if (li?.id) {
+                const status = li.orderStatus ?? li.order_status ?? "";
+                if (status) acc[li.id] = status;
+              }
+              return acc;
+            }, {});
+            const inspectionStatus = String(inspectionSnapshot?.status ?? "").toLowerCase();
+            const inspectionCompleted =
+              inspectionStatus === "completed" ||
+              Boolean(inspectionSnapshot?.completeAt ?? inspectionSnapshot?.complete_at);
+            if (refreshedItems.length === 0 && inspectionCompleted) {
+              refreshedItems = liItems.map((item: any, idx: number) => ({
+                id: item.id ?? `inspection-${idx}`,
+                estimateId: refreshedEstimate.id,
+                inspectionItemId: item.id ?? null,
+                lineNo: item.lineNo ?? idx + 1,
+                partName: item.productName ?? item.product_name ?? "",
+                description: item.description ?? item.reason ?? "",
+                type: "genuine",
+                productType: item.productType ?? item.product_type ?? item.type ?? null,
+                quantity: Number(item.quantity ?? 1),
+                cost: 0,
+                sale: 0,
+                approvedSale: 0,
+                discount: 0,
+                gpPercent: null,
+                status: "pending",
+                source: "inspection",
+                partOrdered: item.partOrdered ?? item.part_ordered ?? 0,
+                orderStatus: item.orderStatus ?? item.order_status ?? null,
+                createdAt: item.createdAt ?? new Date().toISOString(),
+                updatedAt: item.updatedAt ?? new Date().toISOString(),
+              }));
+            }
+            if (!inspectionCompleted) {
+              refreshedItems = refreshedItems.filter(
+                (item: any) => !item?.inspectionItemId && !item?.inspection_item_id
+              );
+            }
+          }
+        } catch {
+          lineItemOrderMap = {};
+          lineItemOrderStatusMap = {};
+        }
+      }
+      setLoadState({ status: "loaded", data: { estimate: refreshedEstimate, items: refreshedItems }, error: null });
+      setDraft({
+        status: refreshedEstimate.status,
+        vatRate: refreshedEstimate.vatRate,
+        discountAmount: refreshedEstimate.totalDiscount ?? 0,
+        customerComplain: refreshedEstimate.meta?.customerComplain ?? "",
+        inspectorRemarks: refreshedEstimate.meta?.inspectorRemarks ?? "",
+        items: refreshedItems.map((i) => {
+          return {
+            id: i.id,
+            lineNo: i.lineNo,
+            partName: i.partName ?? "",
+            description: i.description ?? "",
+            type: i.type,
+            productType: (i as any).productType ?? (i as any).product_type ?? null,
+            inspectionItemId: (i as any).inspectionItemId ?? (i as any).inspection_item_id ?? null,
+            quantity: i.quantity ?? 1,
+            cost: i.cost ?? 0,
+            sale: i.sale ?? 0,
+            approvedSale: i.sale ?? 0,
+            discount: 0,
+            gpPercent: i.gpPercent ?? null,
+            status: i.status,
+            source: i.inspectionItemId ? "inspection" : "estimate",
+            partOrdered: i.inspectionItemId ? lineItemOrderMap[i.inspectionItemId] ?? 0 : 0,
+            orderStatus: i.inspectionItemId ? lineItemOrderStatusMap[i.inspectionItemId] ?? null : null,
+            quoteCosts: i.quoteCosts,
+            approvedType: i.approvedType ?? null,
+            approvedCost: i.approvedCost ?? null,
+          };
+        }),
+      });
+      setInspection(inspectionSnapshot);
+    } catch (err) {
+      console.error("Failed to refresh quotes", err);
+      setSaveError("Failed to refresh quotes.");
+    } finally {
+      setIsRefreshingQuotes(false);
+    }
+  }
+
+  function addNewJobItem() {
+    setNewJobItems((prev) => [
+      ...prev,
+      {
+        partName: "",
+        description: "",
+        type: "genuine",
+        quantity: 1,
+        cost: 0,
+        sale: 0,
+        approvedSale: 0,
+        discount: 0,
+        status: "pending",
+        source: "estimate",
+        approvedType: null,
+        approvedCost: null,
+      },
+    ]);
+  }
+
+  function updateNewJobItem(index: number, patch: Partial<ItemDraft>) {
+    setNewJobItems((prev) => prev.map((item, idx) => (idx === index ? { ...item, ...patch } : item)));
+  }
+
+  function removeNewJobItem(index: number) {
+    setNewJobItems((prev) => prev.filter((_, idx) => idx !== index));
+  }
+
+  async function createAdditionalJobCard() {
+    if (!inspection?.id) return;
+    if (activeJobCardId) {
+      setSaveError("An active job card exists. Complete it before creating a new job.");
+      return;
+    }
+    const approved = newJobItems.filter((item) => item.partName.trim() && item.status === "approved");
+    if (!approved.length) {
+      setSaveError("Add approved line items for the new job.");
+      return;
+    }
+    try {
+      const createdLineItems: any[] = [];
+      for (const item of approved) {
+        const res = await fetch(`/api/company/${companyId}/workshop/inspections/${inspection.id}/line-items`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            leadId: loadState.data?.estimate?.leadId ?? null,
+            source: "estimate",
+            productName: item.partName,
+            description: item.description ?? null,
+            quantity: item.quantity ?? 1,
+            reason: item.description ?? null,
+            status: "Approved",
+          }),
+        });
+        if (!res.ok) throw new Error(`Failed to create line item: ${res.status}`);
+        const json = await res.json();
+        if (json?.data) createdLineItems.push(json.data);
+      }
+
+      setDraft((prev) =>
+        prev
+          ? {
+              ...prev,
+              items: [
+                ...prev.items,
+                ...approved.map((item, idx) => ({
+                  ...item,
+                  inspectionItemId: createdLineItems[idx]?.id ?? null,
+                  partOrdered: 0,
+                  orderStatus: null,
+                })),
+              ],
+            }
+          : prev
+      );
+      setNewJobItems([]);
+      await refreshQuoteUpdates();
+      await createWorkOrder();
+    } catch (err) {
+      console.error(err);
+      setSaveError("Failed to create additional job card.");
+    }
+  }
+
+  async function convertToInvoice() {
+    setInvoiceConvertError(null);
+    setIsConvertingInvoice(true);
+    try {
+      const res = await fetch(`/api/company/${companyId}/workshop/invoices`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ estimateId }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setInvoiceConvertError(json?.error ?? "Failed to convert to invoice.");
+        return;
+      }
+      setShowInvoiceModal(false);
+      setJobCardMessage("Invoice created successfully.");
+    } catch {
+      setInvoiceConvertError("Failed to convert to invoice.");
+    } finally {
+      setIsConvertingInvoice(false);
+    }
+  }
+  function applyApprovedTypeToAll(type: EstimateItemCostType, checked: boolean) {
+    setDraft((prev) => {
+      if (!prev) return prev;
+      const nextItems = prev.items.map((item) => {
+        const isLocked = item.partOrdered === 1 && item.status === "approved";
+        if (isLocked) return item;
+        if (!checked) {
+          if (item.approvedType !== type) return item;
+          return { ...item, approvedType: null };
+        }
+        const costByType = Number(item.quoteCosts?.[type]) || 0;
+        const currentApprovedCost = Number(item.approvedCost ?? item.cost ?? 0);
+        const qty = Number(item.quantity) || 0;
+        const approvedCost = costByType * qty;
+        if (item.approvedType === type && currentApprovedCost === approvedCost) {
+          return item;
+        }
+        return {
+          ...item,
+          approvedType: type,
+          approvedCost,
+          cost: costByType,
+        };
+      });
+      return { ...prev, items: nextItems };
+    });
+  }
 
   const estimate = loadState.data!.estimate;
   const meta = estimate.meta ?? {};
@@ -701,11 +1098,82 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
         });
   const canStartJobCard =
     hasAnyItems && ((hasApprovedSpareParts && allApprovedSparePartsOrdered) || (!hasApprovedSpareParts && hasApprovedItems));
+  const approvedItemsCount = draft.items.filter((item) => item.status === "approved").length;
+  const pendingItemsCount = draft.items.filter((item) => item.status === "pending" || item.status === "inquiry").length;
+  const estimateStatusTone =
+    estimate.status === "approved"
+      ? "bg-emerald-500/15 text-emerald-600"
+      : estimate.status === "pending_approval"
+      ? "bg-amber-500/15 text-amber-600"
+      : "bg-cyan-500/15 text-cyan-600";
+  const editableItems = draft.items.filter((item) => !(item.partOrdered === 1 && item.status === "approved"));
+  const typeSelectable = {
+    oe: editableItems.some((item) => item.quoteCosts?.oe != null),
+    oem: editableItems.some((item) => item.quoteCosts?.oem != null),
+    aftm: editableItems.some((item) => item.quoteCosts?.aftm != null),
+    used: editableItems.some((item) => item.quoteCosts?.used != null),
+  };
+  const allTypeChecked = {
+    oe: editableItems.length > 0 && editableItems.every((item) => item.approvedType === "oe"),
+    oem: editableItems.length > 0 && editableItems.every((item) => item.approvedType === "oem"),
+    aftm: editableItems.length > 0 && editableItems.every((item) => item.approvedType === "aftm"),
+    used: editableItems.length > 0 && editableItems.every((item) => item.approvedType === "used"),
+  };
+  const approvedShare =
+    totals && totals.approved.grandTotal + totals.pending.grandTotal > 0
+      ? (totals.approved.grandTotal / (totals.approved.grandTotal + totals.pending.grandTotal)) * 100
+      : 0;
+  const approvedProfit = totals ? totals.approved.subTotal - totals.approved.cost : 0;
+  const approvedMargin = totals && totals.approved.subTotal > 0 ? (approvedProfit / totals.approved.subTotal) * 100 : 0;
+  const newJobTotals = newJobItems.reduce(
+    (acc, item) => {
+      const sale = Number(item.approvedSale ?? 0);
+      const discount = Number(item.discount ?? 0);
+      const subTotal = Math.max(0, sale - discount);
+      return {
+        sale: acc.sale + sale,
+        discount: acc.discount + discount,
+        subTotal: acc.subTotal + subTotal,
+      };
+    },
+    { sale: 0, discount: 0, subTotal: 0 }
+  );
+  const hasActiveJobCard = Boolean(activeJobCardId);
+  const openJobCards = jobCards.filter((job) => {
+    const s = String(job.status ?? "").toLowerCase();
+    return s === "pending" || s === "re-assigned";
+  });
+  const approvedLineItemsNotReceived = inspectionLineItems.filter((item) => {
+    const status = String(item?.status ?? "").toLowerCase();
+    const orderStatus = String(item?.orderStatus ?? item?.order_status ?? "").toLowerCase();
+    return status === "approved" && orderStatus !== "received";
+  });
+  const hasReassignedJobCards = jobCards.some((job) => String(job.status ?? "").toLowerCase() === "re-assigned");
+  const convertBlocked = openJobCards.length > 0 || approvedLineItemsNotReceived.length > 0;
+  const estimateItemByInspectionId = new Map(
+    draft.items
+      .filter((item) => item.inspectionItemId)
+      .map((item) => [String(item.inspectionItemId), item] as const)
+  );
+  const jobCardTotals = jobCards.map((job) => {
+    const relatedLineItems = inspectionLineItems.filter((li) => String(li.jobCardId ?? li.job_card_id ?? "") === job.id);
+    const total = relatedLineItems.reduce((acc, li) => {
+      const mapped = estimateItemByInspectionId.get(String(li.id));
+      if (!mapped) return acc;
+      const sale = Number(mapped.approvedSale ?? mapped.sale ?? 0);
+      const discount = Number(mapped.discount ?? 0);
+      return acc + Math.max(0, sale - discount);
+    }, 0);
+    return { jobId: job.id, status: job.status ?? "", total };
+  });
+  const invoiceSubTotalPreview = jobCardTotals.reduce((sum, row) => sum + row.total, 0);
+  const invoiceVatPreview = (invoiceSubTotalPreview * (Number(draft.vatRate) || 0)) / 100;
+  const invoiceGrandTotalPreview = invoiceSubTotalPreview + invoiceVatPreview;
 
   return (
     <MainPageShell
       title={`Create Estimate - ${estimate.id.slice(0, 8)}`}
-      subtitle=""
+      subtitle="Estimate workflow with inspection alignment, pricing approval, and job-card readiness."
       scopeLabel=""
       primaryAction={
         <div className="flex flex-wrap items-center gap-2">
@@ -713,25 +1181,25 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
             href={`/api/company/${companyId}/workshop/estimates/${estimate.id}/quote`}
             target="_blank"
             rel="noreferrer"
-            className="rounded-md bg-slate-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm"
+            className="rounded-md border border-slate-400/40 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-white/15"
           >
             Print Quotation
           </a>
           <button
             type="button"
-            className="rounded-md bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm"
+            className="rounded-md border border-sky-400/50 bg-sky-500/15 px-3 py-1.5 text-xs font-semibold text-sky-200 shadow-sm transition hover:bg-sky-500/25"
           >
             Print Estimate - Approved
           </button>
           <button
             type="button"
-            className="rounded-md bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm"
+            className="rounded-md border border-teal-400/50 bg-teal-500/15 px-3 py-1.5 text-xs font-semibold text-teal-200 shadow-sm transition hover:bg-teal-500/25"
           >
             Print Estimate - Pending
           </button>
           <button
             type="button"
-            className="rounded-md bg-amber-400 px-3 py-1.5 text-xs font-semibold text-slate-900 shadow-sm"
+            className="rounded-md border border-amber-400/50 bg-amber-500/15 px-3 py-1.5 text-xs font-semibold text-amber-200 shadow-sm transition hover:bg-amber-500/25"
           >
             View Inspection
           </button>
@@ -747,14 +1215,37 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
           </div>
         </div>
       )}
+      <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <div className={`rounded-xl border border-slate-600/60 px-3 py-2 ${theme.cardBg}`}>
+          <div className="text-[11px] text-muted-foreground">Estimate Status</div>
+          <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${estimateStatusTone}`}>
+            {estimate.status.replace("_", " ")}
+          </span>
+        </div>
+        <div className={`rounded-xl border border-slate-600/60 px-3 py-2 ${theme.cardBg}`}>
+          <div className="text-[11px] text-muted-foreground">Approved Items</div>
+          <div className="mt-1 text-lg font-semibold text-emerald-400">{approvedItemsCount}</div>
+        </div>
+        <div className={`rounded-xl border border-slate-600/60 px-3 py-2 ${theme.cardBg}`}>
+          <div className="text-[11px] text-muted-foreground">Pending Items</div>
+          <div className="mt-1 text-lg font-semibold text-amber-400">{pendingItemsCount}</div>
+        </div>
+        <div className={`rounded-xl border border-slate-600/60 px-3 py-2 ${theme.cardBg}`}>
+          <div className="text-[11px] text-muted-foreground">Grand Total (Approved)</div>
+          <div className="mt-1 text-lg font-semibold">{totals ? totals.approved.grandTotal.toFixed(2) : "0.00"}</div>
+        </div>
+        <div className={`rounded-xl border border-slate-600/60 px-3 py-2 ${theme.cardBg}`}>
+          <div className="text-[11px] text-muted-foreground">Save Status</div>
+          <div className="mt-1 text-xs font-semibold">{saveStatusText}</div>
+        </div>
+      </div>
       <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,1fr)]">
         <div className="space-y-4">
-          <section className={`rounded-md ${theme.cardBg} ${theme.cardBorder}`}>
+          <section className={`rounded-xl border border-slate-600/60 ${theme.cardBg}`}>
             <div
-              className={`flex items-center justify-between rounded-t-md px-3 py-2 text-xs font-semibold ${theme.surfaceSubtle} ${theme.appText} border-b border-border/60`}
+              className={`flex items-center justify-between rounded-t-xl border-b border-slate-600/60 px-4 py-3 text-xs font-semibold ${theme.surfaceSubtle} ${theme.appText}`}
             >
               <span>Estimate Details</span>
-              <span className="text-base leading-none">-</span>
             </div>
             <div className="space-y-4 p-4 text-sm">
               <div className="grid gap-4 lg:grid-cols-3">
@@ -806,22 +1297,35 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                   />
                 </div>
               </div>
-              <div className={`overflow-x-auto rounded-md ${theme.cardBorder}`}>
+              <div className="flex items-center justify-end">
+                <button
+                  type="button"
+                  onClick={refreshQuoteUpdates}
+                  className="rounded-md border border-slate-500/60 bg-slate-800/60 px-3 py-1.5 text-xs font-semibold text-slate-100"
+                  disabled={isRefreshingQuotes}
+                >
+                  {isRefreshingQuotes ? "Refreshing..." : "Refresh Quotes"}
+                </button>
+              </div>
+              <div className="rounded-md border border-slate-600/60 bg-slate-900/20 px-3 py-2 text-[11px] text-slate-300">
+                Step flow: Select cost type, confirm approved cost, enter approved sale and discount, then set status.
+              </div>
+              <div className="overflow-x-auto rounded-lg border border-slate-600/60">
                 <table className="min-w-full text-xs">
-                  <thead className={`${theme.surfaceSubtle} ${theme.appText}`}>
+                  <thead className={`${theme.surfaceSubtle} ${theme.appText} text-[10px] uppercase tracking-[0.08em]`}>
                     <tr>
                       <th className="px-2 py-1 text-left">Part Name</th>
                       <th className="px-2 py-1 text-left">Description</th>
-                      <th className="px-2 py-1 text-left">Quantity</th>
-                      <th className="px-2 py-1 text-left">Cost</th>
+                      <th className="px-2 py-1 text-left">Qty</th>
+                      <th className="px-2 py-1 text-left">OE Cost</th>
+                      <th className="px-2 py-1 text-left">OEM Cost</th>
+                      <th className="px-2 py-1 text-left">AFTM Cost</th>
+                      <th className="px-2 py-1 text-left">Used Cost</th>
                       <th className="px-2 py-1 text-left">Approved Cost</th>
-                      <th className="px-2 py-1 text-left">Cost Total</th>
                       <th className="px-2 py-1 text-left">GP</th>
-                      <th className="px-2 py-1 text-left">Sale</th>
                       <th className="px-2 py-1 text-left">Approved Sale</th>
-                      <th className="px-2 py-1 text-left">Sale Total</th>
                       <th className="px-2 py-1 text-left">Discount</th>
-                      <th className="px-2 py-1 text-left">Sub-Total</th>
+                      <th className="px-2 py-1 text-left">Sub Total</th>
                       <th className="px-2 py-1 text-left">Status</th>
                     </tr>
                   </thead>
@@ -835,26 +1339,24 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                     ) : (
                       draft.items.map((item, idx) => {
                         const qty = Number(item.quantity) || 0;
+                        const oeCost = Number(item.quoteCosts?.oe) || 0;
+                        const oemCost = Number(item.quoteCosts?.oem) || 0;
+                        const aftmCost = Number(item.quoteCosts?.aftm) || 0;
+                        const usedCost = Number(item.quoteCosts?.used) || 0;
                         const baseCost = Number(item.cost) || 0;
-                        const approvedCostValue = Number(item.approvedCost ?? item.cost) || baseCost;
-                        const discountPct = Number(item.discount) || 0;
-                        const saleValue = Number(item.sale) || 0;
-                        const approvedValue = Number(item.approvedSale) || 0;
-                        const saleBase = approvedValue > 0 ? approvedValue : saleValue;
-                        const lineCost = approvedCostValue * qty;
-                        const lineSale = saleBase * qty;
-                        const discountAmount = (lineSale * discountPct) / 100;
-                        const subTotal = lineSale - discountAmount;
+                        const discountAmount = Number(item.discount) || 0;
+                        const approvedCostRaw = Number(item.approvedCost);
+                        const approvedCostValue = Number.isFinite(approvedCostRaw) ? approvedCostRaw : baseCost * qty;
+                        const saleBase = Number(item.approvedSale ?? item.sale) || 0;
+                        const lineSale = saleBase;
+                        const subTotal = Math.max(0, lineSale - discountAmount);
+                        const lineCost = approvedCostValue;
                         const gpPercent =
                           subTotal > 0 ? ((subTotal - lineCost) / subTotal) * 100 : 0;
-                        const isLocked = item.partOrdered === 1 && item.status === "approved";
-                        const availableApprovedType = COST_DISPLAY_ORDER.find(
-                          ({ key }) => item.quoteCosts?.[key] != null
-                        )?.key;
-                        const selectedApprovedType =
-                          item.approvedType ?? availableApprovedType ?? COST_DISPLAY_ORDER[0].key;
+                        const isLocked = hasActiveJobCard || (item.partOrdered === 1 && item.status === "approved");
+                        const selectedApprovedType = item.approvedType ?? null;
                         return (
-                          <tr key={idx} className="border-b border-border/60 last:border-0">
+                          <tr key={idx} className="border-b border-slate-600/60 transition-colors odd:bg-slate-900/15 hover:bg-slate-800/25 last:border-0">
                             <td className="px-2 py-1">
                               <div className="relative">
                                 <input
@@ -886,44 +1388,53 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                                 className={`${theme.input} h-8 w-20 text-xs`}
                                 value={item.quantity}
                                 disabled={isLocked}
-                                onChange={(e) => updateItem(idx, { quantity: Number(e.target.value) || 0 })}
+                                onChange={(e) => {
+                                  const nextQty = Number(e.target.value) || 0;
+                                  const selectedType = item.approvedType ?? null;
+                                  const selectedUnitCost = selectedType ? Number(item.quoteCosts?.[selectedType]) || 0 : 0;
+                                  updateItem(idx, {
+                                    quantity: nextQty,
+                                    approvedCost: selectedType ? selectedUnitCost * nextQty : item.approvedCost,
+                                  });
+                                }}
                               />
                             </td>
-                            <td className="px-2 py-1">
-                              <div className="space-y-2">
-                                <input
-                                  type="number"
-                                  step="0.01"
-                                  className={`${theme.input} h-8 w-24 text-xs`}
-                                  value={item.cost}
-                                  disabled={isLocked}
-                                  onChange={(e) => {
-                                    const cost = Number(e.target.value) || 0;
-                                    const sale = item.sale ?? 0;
-                                    const gp = sale > 0 ? ((sale - cost) / sale) * 100 : item.gpPercent ?? null;
-                                    updateItem(idx, { cost, gpPercent: gp ?? null });
-                                  }}
-                                />
-                                <div className="space-y-1">
-                                  {COST_DISPLAY_ORDER.map(({ key, label }) => {
-                                    const costValue = item.quoteCosts?.[key];
-                                    return (
-                                      <div
-                                        key={`${idx}-${key}`}
-                                        className="rounded-md border border-border/60 bg-slate-100/80 px-2 py-1 text-right text-[10px] font-semibold dark:border-white/10 dark:bg-slate-900/60"
-                                      >
-                                        <div className="text-[11px] font-semibold text-slate-900 dark:text-slate-100">
-                                          {formatCostValue(costValue)}
-                                        </div>
-                                        <div className="text-[9px] uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                                          {label}
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            </td>
+                            {COST_DISPLAY_ORDER.map(({ key }) => {
+                              const costByType =
+                                key === "oe" ? oeCost : key === "oem" ? oemCost : key === "aftm" ? aftmCost : usedCost;
+                              const isChecked = selectedApprovedType === key;
+                              const hasQuoteForType = item.quoteCosts?.[key] != null;
+                              return (
+                                <td key={`${idx}-${key}`} className="px-2 py-1">
+                                  <div className="flex flex-col items-start gap-1">
+                                    <span className="inline-flex min-w-[74px] justify-end rounded-md border border-slate-500/60 bg-slate-100/80 px-2 py-1 font-semibold text-slate-900 dark:border-slate-600/50 dark:bg-slate-900/60 dark:text-slate-100">
+                                      {formatCostValue(costByType)}
+                                    </span>
+                                    <label className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                                    <input
+                                      type="checkbox"
+                                      checked={isChecked}
+                                      disabled={isLocked || !hasQuoteForType}
+                                      onChange={(e) => {
+                                        if (!e.target.checked) {
+                                          updateItem(idx, { approvedType: null });
+                                          return;
+                                        }
+                                        const approvedType = key;
+                                        const approvedCost = costByType * qty;
+                                        updateItem(idx, {
+                                          approvedType,
+                                          approvedCost,
+                                          cost: costByType,
+                                        });
+                                      }}
+                                    />
+                                      <span className={isChecked ? "text-emerald-300" : ""}>{isChecked ? "Selected" : "Select"}</span>
+                                    </label>
+                                  </div>
+                                </td>
+                              );
+                            })}
                             <td className="px-2 py-1">
                               <input
                                 type="number"
@@ -935,26 +1446,8 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                                   const raw = e.target.value;
                                   const approvedCost =
                                     raw === "" ? null : Number(raw);
-                                  updateItem(idx, { approvedCost });
-                                }}
-                              />
-                            </td>
-                            <td className="px-2 py-1 text-xs">{lineCost.toFixed(2)}</td>
-                            <td className="px-2 py-1">
-                              <input
-                                type="number"
-                                step="0.01"
-                                className={`${theme.input} h-8 w-20 text-xs`}
-                                value={Number.isFinite(gpPercent) ? gpPercent : 0}
-                                disabled={isLocked}
-                                onChange={(e) => {
-                                  const gp = Number(e.target.value);
-                                  const cost = item.cost ?? 0;
-                                  const sale = gp ? cost * (100 / (100 - gp)) : item.sale;
                                   updateItem(idx, {
-                                    gpPercent: gp,
-                                    sale,
-                                    approvedSale: item.status === "approved" ? sale : item.approvedSale,
+                                    approvedCost,
                                   });
                                 }}
                               />
@@ -963,14 +1456,14 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                               <input
                                 type="number"
                                 step="0.01"
-                                className={`${theme.input} h-8 w-24 text-xs`}
-                                value={item.sale}
+                                className={`${theme.input} h-8 w-20 text-xs`}
+                                value={Number.isFinite(gpPercent) ? gpPercent.toFixed(2) : "0.00"}
                                 disabled={isLocked}
                                 onChange={(e) => {
-                                  const sale = Number(e.target.value) || 0;
-                                  const cost = item.cost ?? 0;
-                                  const gp = sale > 0 ? ((sale - cost) / sale) * 100 : null;
-                                  updateItem(idx, { sale, gpPercent: gp });
+                                  const gp = Number(e.target.value);
+                                  updateItem(idx, {
+                                    gpPercent: gp,
+                                  });
                                 }}
                               />
                             </td>
@@ -986,36 +1479,11 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                                     const approvedSale = Number(e.target.value) || 0;
                                     updateItem(idx, {
                                       approvedSale,
-                                      sale:
-                                        (item.status === "pending" || item.status === "inquiry") && !item.sale
-                                          ? approvedSale
-                                          : item.sale,
                                     });
                                   }}
                                 />
-                                <div className="space-y-1">
-                                  <label className="text-[9px] font-semibold text-slate-500">
-                                    Approved Type
-                                  </label>
-                                  <select
-                                    className={`${theme.input} h-7 w-24 text-xs`}
-                                    value={selectedApprovedType}
-                                    disabled={isLocked}
-                                  onChange={(e) => {
-                                    const approvedType = e.target.value as EstimateItemCostType;
-                                    updateItem(idx, { approvedType });
-                                  }}
-                                  >
-                                    {COST_DISPLAY_ORDER.map(({ key, label }) => (
-                                      <option key={key} value={key}>
-                                        {label}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </div>
                               </div>
                             </td>
-                            <td className="px-2 py-1 text-xs">{lineSale.toFixed(2)}</td>
                             <td className="px-2 py-1">
                               <input
                                 type="number"
@@ -1050,13 +1518,80 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                       })
                     )}
                   </tbody>
+                  {draft.items.length > 0 && lineItemTableTotals && (
+                    <tfoot className={`${theme.surfaceSubtle} ${theme.appText}`}>
+                      <tr className="border-t border-slate-600/60 font-semibold">
+                        <td className="px-2 py-2 text-left">Totals</td>
+                        <td className="px-2 py-2 text-left">-</td>
+                        <td className="px-2 py-2 text-left">{lineItemTableTotals.qty.toFixed(2)}</td>
+                        <td className="px-2 py-2 text-left">
+                          <label className="flex items-center gap-1.5">
+                            <input
+                              type="checkbox"
+                              checked={allTypeChecked.oe}
+                              disabled={!typeSelectable.oe}
+                              onChange={(e) => applyApprovedTypeToAll("oe", e.target.checked)}
+                            />
+                            <span>{lineItemTableTotals.oe.toFixed(2)}</span>
+                          </label>
+                        </td>
+                        <td className="px-2 py-2 text-left">
+                          <label className="flex items-center gap-1.5">
+                            <input
+                              type="checkbox"
+                              checked={allTypeChecked.oem}
+                              disabled={!typeSelectable.oem}
+                              onChange={(e) => applyApprovedTypeToAll("oem", e.target.checked)}
+                            />
+                            <span>{lineItemTableTotals.oem.toFixed(2)}</span>
+                          </label>
+                        </td>
+                        <td className="px-2 py-2 text-left">
+                          <label className="flex items-center gap-1.5">
+                            <input
+                              type="checkbox"
+                              checked={allTypeChecked.aftm}
+                              disabled={!typeSelectable.aftm}
+                              onChange={(e) => applyApprovedTypeToAll("aftm", e.target.checked)}
+                            />
+                            <span>{lineItemTableTotals.aftm.toFixed(2)}</span>
+                          </label>
+                        </td>
+                        <td className="px-2 py-2 text-left">
+                          <label className="flex items-center gap-1.5">
+                            <input
+                              type="checkbox"
+                              checked={allTypeChecked.used}
+                              disabled={!typeSelectable.used}
+                              onChange={(e) => applyApprovedTypeToAll("used", e.target.checked)}
+                            />
+                            <span>{lineItemTableTotals.used.toFixed(2)}</span>
+                          </label>
+                        </td>
+                        <td className="px-2 py-2 text-left">{lineItemTableTotals.approvedCost.toFixed(2)}</td>
+                        <td className="px-2 py-2 text-left">
+                          {lineItemTableTotals.subTotal > 0
+                            ? (((lineItemTableTotals.subTotal - lineItemTableTotals.approvedCost) /
+                                lineItemTableTotals.subTotal) *
+                                100
+                              ).toFixed(2)
+                            : "0.00"}
+                        </td>
+                        <td className="px-2 py-2 text-left">{lineItemTableTotals.approvedSale.toFixed(2)}</td>
+                        <td className="px-2 py-2 text-left">{lineItemTableTotals.discount.toFixed(2)}</td>
+                        <td className="px-2 py-2 text-left">{lineItemTableTotals.subTotal.toFixed(2)}</td>
+                        <td className="px-2 py-2 text-left">-</td>
+                      </tr>
+                    </tfoot>
+                  )}
                 </table>
               </div>
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 rounded-md border border-slate-600/60 bg-slate-900/20 p-2">
                 <button
                   type="button"
                   onClick={addItem}
                   className="rounded-md bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white"
+                  disabled={hasActiveJobCard}
                 >
                   + Add
                 </button>
@@ -1071,14 +1606,17 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                     removeItem(lastRemovableIndex);
                   }}
                   className="rounded-md bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white"
-                  disabled={!draft.items.some((item) => !item.inspectionItemId && item.source !== "inspection")}
+                  disabled={
+                    hasActiveJobCard ||
+                    !draft.items.some((item) => !item.inspectionItemId && item.source !== "inspection")
+                  }
                 >
                   Remove ?
                 </button>
               </div>
               <div className="flex justify-end">
                 <div
-                  className={`flex items-center gap-2 rounded-md px-3 py-2 text-xs font-semibold ${theme.surfaceSubtle} ${theme.appText} ${theme.cardBorder}`}
+                  className={`flex items-center gap-2 rounded-md border border-slate-600/60 px-3 py-2 text-xs font-semibold ${theme.surfaceSubtle} ${theme.appText}`}
                 >
                   <span>Show Total in Estimate</span>
                   <label className="flex items-center gap-1 text-xs">
@@ -1091,72 +1629,74 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                   </label>
                 </div>
               </div>
-              <div className="grid gap-4 lg:grid-cols-2">
-                <div className="space-y-3">
-                  <TotalsInput
-                    label="Total Cost - Approved"
-                    value={totals ? totals.approved.cost.toFixed(2) : "0"}
-                  />
-                  <TotalsInput
-                    label="Total Sale - Approved"
-                    value={totals ? totals.approved.sale.toFixed(2) : "0"}
-                  />
-                  <TotalsInput
-                    label="Discount - Approved"
-                    value={totals ? totals.approved.discount.toFixed(2) : "0"}
-                  />
-                  <TotalsInput
-                    label="Sub-Total - Approved"
-                    value={totals ? totals.approved.subTotal.toFixed(2) : "0"}
-                  />
-                  <TotalsInput
-                    label={`Tax - VAT ${totals ? totals.vatRate : 0}% - Approved`}
-                    value={totals ? totals.approved.vat.toFixed(2) : "0"}
-                  />
-                  <TotalsInput
-                    label="Grand Total - Approved"
-                    value={totals ? totals.approved.grandTotal.toFixed(2) : "0"}
-                  />
+              <div className="rounded-lg border border-slate-600/60 bg-slate-900/30 p-3">
+                <div className="mb-3 grid gap-2 sm:grid-cols-3">
+                  <div className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2">
+                    <div className="text-[10px] uppercase tracking-wide text-emerald-300">Approved Share</div>
+                    <div className="text-sm font-semibold text-emerald-200">{approvedShare.toFixed(2)}%</div>
+                  </div>
+                  <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2">
+                    <div className="text-[10px] uppercase tracking-wide text-amber-300">Pending Value</div>
+                    <div className="text-sm font-semibold text-amber-200">
+                      {totals ? totals.pending.grandTotal.toFixed(2) : "0.00"}
+                    </div>
+                  </div>
+                  <div className="rounded-md border border-sky-500/30 bg-sky-500/10 px-3 py-2">
+                    <div className="text-[10px] uppercase tracking-wide text-sky-300">Approved Profit</div>
+                    <div className="text-sm font-semibold text-sky-200">
+                      {approvedProfit.toFixed(2)} ({approvedMargin.toFixed(2)}%)
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-3">
-                  <TotalsInput
-                    label="Total Cost - Pending"
-                    value={totals ? totals.pending.cost.toFixed(2) : "0"}
-                  />
-                  <TotalsInput
-                    label="Total Sale - Pending"
-                    value={totals ? totals.pending.sale.toFixed(2) : "0"}
-                  />
-                  <TotalsInput
-                    label="Discount - Pending"
-                    value={totals ? totals.pending.discount.toFixed(2) : "0"}
-                  />
-                  <TotalsInput
-                    label="Sub-Total - Pending"
-                    value={totals ? totals.pending.subTotal.toFixed(2) : "0"}
-                  />
-                  <TotalsInput
-                    label={`Tax - VAT ${totals ? totals.vatRate : 0}% - Pending`}
-                    value={totals ? totals.pending.vat.toFixed(2) : "0"}
-                  />
-                  <TotalsInput
-                    label="Grand Total - Pending"
-                    value={totals ? totals.pending.grandTotal.toFixed(2) : "0"}
-                  />
+                <div className="overflow-x-auto rounded-md border border-slate-600/60">
+                  <table className="min-w-full text-xs">
+                    <thead className={`${theme.surfaceSubtle} ${theme.appText}`}>
+                      <tr>
+                        <th className="px-3 py-2 text-left">Metric</th>
+                        <th className="px-3 py-2 text-right">Pending</th>
+                        <th className="px-3 py-2 text-right">Approved</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className="border-t border-slate-600/60">
+                        <td className="px-3 py-2">Total Cost</td>
+                        <td className="px-3 py-2 text-right">{totals ? totals.pending.cost.toFixed(2) : "0.00"}</td>
+                        <td className="px-3 py-2 text-right">{totals ? totals.approved.cost.toFixed(2) : "0.00"}</td>
+                      </tr>
+                      <tr className="border-t border-slate-600/60">
+                        <td className="px-3 py-2">Total Sale</td>
+                        <td className="px-3 py-2 text-right">{totals ? totals.pending.sale.toFixed(2) : "0.00"}</td>
+                        <td className="px-3 py-2 text-right">{totals ? totals.approved.sale.toFixed(2) : "0.00"}</td>
+                      </tr>
+                      <tr className="border-t border-slate-600/60">
+                        <td className="px-3 py-2">Discount</td>
+                        <td className="px-3 py-2 text-right">{totals ? totals.pending.discount.toFixed(2) : "0.00"}</td>
+                        <td className="px-3 py-2 text-right">{totals ? totals.approved.discount.toFixed(2) : "0.00"}</td>
+                      </tr>
+                      <tr className="border-t border-slate-600/60">
+                        <td className="px-3 py-2">Sub Total</td>
+                        <td className="px-3 py-2 text-right">{totals ? totals.pending.subTotal.toFixed(2) : "0.00"}</td>
+                        <td className="px-3 py-2 text-right">{totals ? totals.approved.subTotal.toFixed(2) : "0.00"}</td>
+                      </tr>
+                      <tr className="border-t border-slate-600/60">
+                        <td className="px-3 py-2">{`VAT (${totals ? totals.vatRate : 0}%)`}</td>
+                        <td className="px-3 py-2 text-right">{totals ? totals.pending.vat.toFixed(2) : "0.00"}</td>
+                        <td className="px-3 py-2 text-right">{totals ? totals.approved.vat.toFixed(2) : "0.00"}</td>
+                      </tr>
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t border-slate-500/80 bg-slate-800/40 font-semibold">
+                        <td className="px-3 py-2">Grand Total</td>
+                        <td className="px-3 py-2 text-right">{totals ? totals.pending.grandTotal.toFixed(2) : "0.00"}</td>
+                        <td className="px-3 py-2 text-right">{totals ? totals.approved.grandTotal.toFixed(2) : "0.00"}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
                 </div>
               </div>
-              <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-600/60 bg-background/30 p-3">
                 <div className="text-xs text-muted-foreground">{saveStatusText}</div>
                 <div className="flex items-center gap-2">
-                  {lastSavedAt && hasApprovedSpareParts && (
-                    <button
-                      type="button"
-                      onClick={orderApprovedParts}
-                      className="rounded-md bg-amber-500 px-4 py-2 text-xs font-semibold text-slate-900 shadow-sm"
-                    >
-                      Order Approved Parts
-                    </button>
-                  )}
                   {activeJobCardId ? (
                     <a
                       href={`/company/${companyId}/workshop/job-cards/${activeJobCardId}`}
@@ -1194,11 +1734,257 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
               </div>
             </div>
           </section>
-        </div>
-        <div className="space-y-3">
-          <section className={`rounded-md ${theme.cardBg} ${theme.cardBorder}`}>
+          <section className={`rounded-xl border border-slate-600/60 ${theme.cardBg}`}>
             <div
-              className={`rounded-t-md px-3 py-2 text-xs font-semibold ${theme.surfaceSubtle} ${theme.appText} border-b border-border/60`}
+              className={`flex items-center justify-between rounded-t-xl border-b border-slate-600/60 px-4 py-3 text-xs font-semibold ${theme.surfaceSubtle} ${theme.appText}`}
+            >
+              <span>New Job</span>
+              <button
+                type="button"
+                onClick={addNewJobItem}
+                className="rounded-md border border-cyan-500/60 bg-cyan-500/10 px-3 py-1.5 text-xs font-semibold text-cyan-200"
+              >
+                Start New Job
+              </button>
+            </div>
+            {newJobItems.length > 0 ? (
+              <div className="space-y-3 p-4">
+                <div className="text-xs font-semibold text-slate-200">New Job Line Items</div>
+                <div className="rounded-md border border-slate-600/60 bg-slate-900/20 px-3 py-2 text-[11px] text-slate-300">
+                  Same process as main job card. Keep status `Pending` until advisor confirms.
+                </div>
+                <div className="overflow-x-auto rounded-lg border border-slate-600/60">
+                  <table className="min-w-full text-xs">
+                    <thead className={`${theme.surfaceSubtle} ${theme.appText} text-[10px] uppercase tracking-[0.08em]`}>
+                      <tr>
+                        <th className="px-2 py-1 text-left">Part Name</th>
+                        <th className="px-2 py-1 text-left">Description</th>
+                        <th className="px-2 py-1 text-left">Qty</th>
+                        <th className="px-2 py-1 text-left">OE Cost</th>
+                        <th className="px-2 py-1 text-left">OEM Cost</th>
+                        <th className="px-2 py-1 text-left">AFTM Cost</th>
+                        <th className="px-2 py-1 text-left">Used Cost</th>
+                        <th className="px-2 py-1 text-left">Approved Cost</th>
+                        <th className="px-2 py-1 text-left">GP</th>
+                        <th className="px-2 py-1 text-left">Approved Sale</th>
+                        <th className="px-2 py-1 text-left">Discount</th>
+                        <th className="px-2 py-1 text-left">Sub Total</th>
+                        <th className="px-2 py-1 text-left">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {newJobItems.map((item, idx) => {
+                        const qty = Number(item.quantity) || 0;
+                        const oeCost = Number(item.quoteCosts?.oe) || 0;
+                        const oemCost = Number(item.quoteCosts?.oem) || 0;
+                        const aftmCost = Number(item.quoteCosts?.aftm) || 0;
+                        const usedCost = Number(item.quoteCosts?.used) || 0;
+                        const discountAmount = Number(item.discount) || 0;
+                        const approvedCostRaw = Number(item.approvedCost);
+                        const approvedCostValue = Number.isFinite(approvedCostRaw)
+                          ? approvedCostRaw
+                          : (Number(item.cost) || 0) * qty;
+                        const lineSale = Number(item.approvedSale ?? item.sale) || 0;
+                        const subTotal = Math.max(0, lineSale - discountAmount);
+                        const lineCost = approvedCostValue;
+                        const gpPercent = subTotal > 0 ? ((subTotal - lineCost) / subTotal) * 100 : 0;
+                        const selectedApprovedType = item.approvedType ?? null;
+
+                        return (
+                          <tr key={`new-job-${idx}`} className="border-b border-slate-600/60 transition-colors odd:bg-slate-900/15 hover:bg-slate-800/25 last:border-0">
+                            <td className="px-2 py-1">
+                              <input
+                                ref={(el) => {
+                                  productInputRefs.current[NEW_JOB_PRODUCT_INDEX_OFFSET + idx] = el;
+                                }}
+                                className={`${theme.input} h-8 text-xs`}
+                                value={item.partName}
+                                onChange={(e) => updateNewJobItem(idx, { partName: e.target.value })}
+                                placeholder="Part Name"
+                                onFocus={() => setProductOpenIndex(NEW_JOB_PRODUCT_INDEX_OFFSET + idx)}
+                              />
+                            </td>
+                            <td className="px-2 py-1">
+                              <input
+                                className={`${theme.input} h-8 text-xs`}
+                                value={item.description ?? ""}
+                                onChange={(e) => updateNewJobItem(idx, { description: e.target.value })}
+                                placeholder="Description"
+                              />
+                            </td>
+                            <td className="px-2 py-1">
+                              <input
+                                type="number"
+                                className={`${theme.input} h-8 w-20 text-xs`}
+                                value={item.quantity}
+                                onChange={(e) => {
+                                  const nextQty = Number(e.target.value) || 0;
+                                  const selectedType = item.approvedType ?? null;
+                                  const selectedUnitCost = selectedType ? Number(item.quoteCosts?.[selectedType]) || 0 : 0;
+                                  updateNewJobItem(idx, {
+                                    quantity: nextQty,
+                                    approvedCost: selectedType ? selectedUnitCost * nextQty : item.approvedCost,
+                                  });
+                                }}
+                              />
+                            </td>
+                            {COST_DISPLAY_ORDER.map(({ key }) => {
+                              const costByType =
+                                key === "oe" ? oeCost : key === "oem" ? oemCost : key === "aftm" ? aftmCost : usedCost;
+                              const isChecked = selectedApprovedType === key;
+                              const hasQuoteForType = item.quoteCosts?.[key] != null;
+                              return (
+                                <td key={`new-${idx}-${key}`} className="px-2 py-1">
+                                  <div className="flex flex-col items-start gap-1">
+                                    <span className="inline-flex min-w-[74px] justify-end rounded-md border border-slate-500/60 bg-slate-100/80 px-2 py-1 font-semibold text-slate-900 dark:border-slate-600/50 dark:bg-slate-900/60 dark:text-slate-100">
+                                      {formatCostValue(costByType)}
+                                    </span>
+                                    <label className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                                    <input
+                                      type="checkbox"
+                                      checked={isChecked}
+                                      disabled={!hasQuoteForType}
+                                      onChange={(e) => {
+                                        if (!e.target.checked) {
+                                          updateNewJobItem(idx, { approvedType: null });
+                                          return;
+                                        }
+                                        const approvedType = key;
+                                        const approvedCost = costByType * qty;
+                                        updateNewJobItem(idx, {
+                                          approvedType,
+                                          approvedCost,
+                                          cost: costByType,
+                                        });
+                                      }}
+                                    />
+                                      <span className={isChecked ? "text-emerald-300" : ""}>{isChecked ? "Selected" : "Select"}</span>
+                                    </label>
+                                  </div>
+                                </td>
+                              );
+                            })}
+                            <td className="px-2 py-1">
+                              <input
+                                type="number"
+                                className={`${theme.input} h-8 w-24 text-xs`}
+                                value={item.approvedCost ?? ""}
+                                onChange={(e) => {
+                                  const raw = e.target.value;
+                                  const approvedCost = raw === "" ? null : Number(raw);
+                                  updateNewJobItem(idx, { approvedCost });
+                                }}
+                              />
+                            </td>
+                            <td className="px-2 py-1">
+                              <input
+                                type="number"
+                                step="0.01"
+                                className={`${theme.input} h-8 w-20 text-xs`}
+                                value={Number.isFinite(gpPercent) ? gpPercent.toFixed(2) : "0.00"}
+                                onChange={(e) => updateNewJobItem(idx, { gpPercent: Number(e.target.value) || 0 })}
+                              />
+                            </td>
+                            <td className="px-2 py-1">
+                              <input
+                                type="number"
+                                className={`${theme.input} h-8 w-24 text-xs`}
+                                value={item.approvedSale}
+                                onChange={(e) => updateNewJobItem(idx, { approvedSale: Number(e.target.value) || 0 })}
+                              />
+                            </td>
+                            <td className="px-2 py-1">
+                              <input
+                                type="number"
+                                className={`${theme.input} h-8 w-20 text-xs`}
+                                value={item.discount}
+                                onChange={(e) => updateNewJobItem(idx, { discount: Number(e.target.value) || 0 })}
+                              />
+                            </td>
+                            <td className="px-2 py-1 text-xs">{subTotal.toFixed(2)}</td>
+                            <td className="px-2 py-1">
+                              <div className="flex items-center gap-1">
+                                <select
+                                  className={`${theme.input} h-8 w-24 text-xs`}
+                                  value={item.status}
+                                  onChange={(e) => updateNewJobItem(idx, { status: e.target.value as EstimateItemStatus })}
+                                >
+                                  <option value="pending">Pending</option>
+                                  <option value="inquiry">Inquiry</option>
+                                  <option value="approved">Approved</option>
+                                  <option value="rejected">Rejected</option>
+                                </select>
+                                <button
+                                  type="button"
+                                  className="rounded-md bg-rose-600 px-2 py-1 text-[10px] font-semibold text-white"
+                                  onClick={() => removeNewJobItem(idx)}
+                                >
+                                  X
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="flex items-center gap-2 rounded-md border border-slate-600/60 bg-slate-900/20 p-2">
+                  <button
+                    type="button"
+                    onClick={addNewJobItem}
+                    className="rounded-md bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white"
+                  >
+                    + Add
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const lastIndex = newJobItems.length - 1;
+                      if (lastIndex >= 0) removeNewJobItem(lastIndex);
+                    }}
+                    className="rounded-md bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white"
+                    disabled={newJobItems.length === 0}
+                  >
+                    Remove ?
+                  </button>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  <div className="rounded-md border border-slate-600/60 px-2 py-2">
+                    <div className="text-[10px] text-muted-foreground">Sale</div>
+                    <div className="text-sm font-semibold">{newJobTotals.sale.toFixed(2)}</div>
+                  </div>
+                  <div className="rounded-md border border-slate-600/60 px-2 py-2">
+                    <div className="text-[10px] text-muted-foreground">Discount</div>
+                    <div className="text-sm font-semibold">{newJobTotals.discount.toFixed(2)}</div>
+                  </div>
+                  <div className="rounded-md border border-slate-600/60 px-2 py-2">
+                    <div className="text-[10px] text-muted-foreground">Sub Total</div>
+                    <div className="text-sm font-semibold">{newJobTotals.subTotal.toFixed(2)}</div>
+                  </div>
+                </div>
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={createAdditionalJobCard}
+                    className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white"
+                    disabled={hasActiveJobCard}
+                  >
+                    Create New Job Card
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="p-4 text-xs text-muted-foreground">
+                Start a new job to open a separate line-items card and create a different job card.
+              </div>
+            )}
+          </section>
+        </div>
+        <div className="space-y-3 lg:sticky lg:top-4 lg:self-start">
+          <section className={`rounded-xl border border-slate-600/60 ${theme.cardBg}`}>
+            <div
+              className={`rounded-t-xl border-b border-slate-600/60 px-3 py-2 text-xs font-semibold ${theme.surfaceSubtle} ${theme.appText}`}
             >
               Customer Details
             </div>
@@ -1213,9 +1999,9 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
               </div>
             </div>
           </section>
-          <section className={`rounded-md ${theme.cardBg} ${theme.cardBorder}`}>
+          <section className={`rounded-xl border border-slate-600/60 ${theme.cardBg}`}>
             <div
-              className={`rounded-t-md px-3 py-2 text-xs font-semibold ${theme.surfaceSubtle} ${theme.appText} border-b border-border/60`}
+              className={`rounded-t-xl border-b border-slate-600/60 px-3 py-2 text-xs font-semibold ${theme.surfaceSubtle} ${theme.appText}`}
             >
               Car Details
             </div>
@@ -1230,18 +2016,186 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
               </div>
             </div>
           </section>
-          <div className={`rounded-md ${theme.cardBg} ${theme.cardBorder} p-3`}>
+          <section className={`rounded-xl border border-slate-600/60 ${theme.cardBg}`}>
+            <div
+              className={`rounded-t-xl border-b border-slate-600/60 px-3 py-2 text-xs font-semibold ${theme.surfaceSubtle} ${theme.appText}`}
+            >
+              Invoice Summary
+            </div>
+            <div className="space-y-2 p-3 text-xs">
+              <div className="rounded-md border border-slate-600/60 bg-slate-900/30 px-2 py-2">
+                <div className="mb-1 text-[11px] font-semibold text-slate-200">Readiness</div>
+                <div className="space-y-1 text-[11px]">
+                  <div className="flex items-center justify-between">
+                    <span>All job cards completed</span>
+                    <span className={openJobCards.length === 0 ? "text-emerald-300" : "text-rose-300"}>
+                      {openJobCards.length === 0 ? "Ready" : "Blocked"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>All approved parts received</span>
+                    <span className={approvedLineItemsNotReceived.length === 0 ? "text-emerald-300" : "text-rose-300"}>
+                      {approvedLineItemsNotReceived.length === 0 ? "Ready" : "Blocked"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>No active reassignment</span>
+                    <span className={!hasReassignedJobCards ? "text-emerald-300" : "text-rose-300"}>
+                      {!hasReassignedJobCards ? "Ready" : "Blocked"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-md border border-slate-600/60 px-2 py-2">
+                <div className="mb-1 text-[11px] font-semibold text-slate-200">Job Cards</div>
+                {jobCardTotals.length === 0 ? (
+                  <div className="text-muted-foreground">No job cards yet.</div>
+                ) : (
+                  <div className="space-y-1">
+                    {jobCardTotals.map((row) => (
+                      <a
+                        key={row.jobId}
+                        href={`/company/${companyId}/workshop/job-cards/${row.jobId}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center justify-between rounded-md border border-slate-600/60 px-2 py-1.5 hover:bg-slate-800/40"
+                      >
+                        <span className="font-semibold">{row.jobId.slice(0, 8)}...</span>
+                        <span className="text-[10px] text-muted-foreground">{String(row.status || "").toUpperCase()}</span>
+                        <span className="font-semibold">AED {row.total.toFixed(2)}</span>
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="rounded-md border border-slate-500/70 bg-slate-800/40 px-2 py-2">
+                <div className="mb-1 text-[11px] font-semibold text-slate-200">Invoice Preview</div>
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-muted-foreground">Subtotal</span>
+                  <span>AED {invoiceSubTotalPreview.toFixed(2)}</span>
+                </div>
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-muted-foreground">VAT ({Number(draft.vatRate || 0).toFixed(2)}%)</span>
+                  <span>AED {invoiceVatPreview.toFixed(2)}</span>
+                </div>
+                <div className="mt-1 flex items-center justify-between border-t border-slate-600/60 pt-1 text-sm font-semibold">
+                  <span>Grand Total</span>
+                  <span>AED {invoiceGrandTotalPreview.toFixed(2)}</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                className={`w-full rounded-md px-3 py-2 text-xs font-semibold ${
+                  convertBlocked ? "cursor-not-allowed bg-slate-700/70 text-slate-300" : "bg-emerald-600 text-white"
+                }`}
+                disabled={convertBlocked}
+                onClick={() => {
+                  setInvoiceConvertError(null);
+                  setShowInvoiceModal(true);
+                }}
+              >
+                Review & Convert
+              </button>
+              {convertBlocked && (
+                <div className="space-y-1 text-[11px] text-amber-300">
+                  {openJobCards.length > 0 && <div>{openJobCards.length} job card(s) still open.</div>}
+                  {approvedLineItemsNotReceived.length > 0 && (
+                    <div>{approvedLineItemsNotReceived.length} approved part(s) not received.</div>
+                  )}
+                </div>
+              )}
+            </div>
+          </section>
+          <div className={`rounded-xl border border-slate-600/60 ${theme.cardBg} p-3`}>
             <span className="inline-flex rounded-md bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white">
               CarGuru 3000 Promo Consumed
             </span>
           </div>
         </div>
       </div>
+      {showInvoiceModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className={`w-full max-w-2xl rounded-xl border border-slate-600/60 ${theme.cardBg}`}>
+            <div className={`flex items-center justify-between rounded-t-xl border-b border-slate-600/60 px-4 py-3 ${theme.surfaceSubtle}`}>
+              <div>
+                <div className="text-sm font-semibold">Invoice Verification</div>
+                <div className="text-[11px] text-muted-foreground">Review job totals before converting.</div>
+              </div>
+              <button
+                type="button"
+                className="rounded-md border border-slate-500/60 px-2 py-1 text-xs"
+                onClick={() => setShowInvoiceModal(false)}
+              >
+                Close
+              </button>
+            </div>
+            <div className="space-y-3 p-4 text-xs">
+              <div className="space-y-2">
+                {jobCardTotals.map((row) => (
+                  <div key={`modal-${row.jobId}`} className="flex items-center justify-between rounded-md border border-slate-600/60 px-3 py-2">
+                    <div>
+                      <div className="font-semibold">{row.jobId.slice(0, 8)}...</div>
+                      <div className="text-[11px] text-muted-foreground">{String(row.status || "").toUpperCase()}</div>
+                    </div>
+                    <div className="font-semibold">AED {row.total.toFixed(2)}</div>
+                  </div>
+                ))}
+                <div className="rounded-md border border-slate-500/70 bg-slate-800/40 px-3 py-2">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-muted-foreground">Subtotal</span>
+                    <span>AED {invoiceSubTotalPreview.toFixed(2)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-muted-foreground">VAT ({Number(draft.vatRate || 0).toFixed(2)}%)</span>
+                    <span>AED {invoiceVatPreview.toFixed(2)}</span>
+                  </div>
+                  <div className="mt-1 flex items-center justify-between border-t border-slate-600/60 pt-1 font-semibold">
+                    <span>Grand Total</span>
+                    <span>AED {invoiceGrandTotalPreview.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+              {(openJobCards.length > 0 || approvedLineItemsNotReceived.length > 0) && (
+                <div className="rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-amber-200">
+                  {openJobCards.length > 0 && <div>{openJobCards.length} job card(s) are still open.</div>}
+                  {approvedLineItemsNotReceived.length > 0 && (
+                    <div>{approvedLineItemsNotReceived.length} approved part(s) are not received.</div>
+                  )}
+                </div>
+              )}
+              {invoiceConvertError && (
+                <div className="rounded-md border border-rose-500/50 bg-rose-500/10 px-3 py-2 text-rose-200">
+                  {invoiceConvertError}
+                </div>
+              )}
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  className="rounded-md border border-slate-500/60 px-3 py-1.5 text-xs font-semibold"
+                  onClick={() => setShowInvoiceModal(false)}
+                >
+                  Keep
+                </button>
+                <button
+                  type="button"
+                  className={`rounded-md px-3 py-1.5 text-xs font-semibold ${
+                    convertBlocked ? "cursor-not-allowed bg-slate-700/70 text-slate-300" : "bg-emerald-600 text-white"
+                  }`}
+                  disabled={convertBlocked || isConvertingInvoice}
+                  onClick={convertToInvoice}
+                >
+                  {isConvertingInvoice ? "Converting..." : "Convert Invoice"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {productOpenIndex !== null && productAnchor
         ? createPortal(
             <div
               ref={productDropdownRef}
-              className="fixed z-50 max-h-64 overflow-y-auto rounded-md border border-white/10 bg-slate-950 text-xs shadow-lg"
+              className="fixed z-50 max-h-64 overflow-y-auto rounded-md border border-slate-600/60 bg-slate-950 text-xs shadow-lg"
               style={{
                 top: productAnchor.top,
                 left: productAnchor.left,
@@ -1254,14 +2208,22 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                   type="button"
                   className="flex w-full items-start gap-2 px-3 py-2 text-left text-white/80 hover:bg-white/10"
                   onMouseDown={(e) => e.preventDefault()}
-                                  onClick={() => {
-                                    updateItem(productOpenIndex, {
-                                      partName: product.name,
-                                      productType: product.type ?? null,
-                                    });
-                                    setProductOpenIndex(null);
-                                  }}
-                                >
+                  onClick={() => {
+                    if (productOpenIndex >= NEW_JOB_PRODUCT_INDEX_OFFSET) {
+                      const newJobIdx = productOpenIndex - NEW_JOB_PRODUCT_INDEX_OFFSET;
+                      updateNewJobItem(newJobIdx, {
+                        partName: product.name,
+                        productType: product.type ?? null,
+                      });
+                    } else {
+                      updateItem(productOpenIndex, {
+                        partName: product.name,
+                        productType: product.type ?? null,
+                      });
+                    }
+                    setProductOpenIndex(null);
+                  }}
+                >
                   <span className="font-semibold">{product.name}</span>
                   {product.type && <span className="text-[10px] text-white/50">{product.type}</span>}
                 </button>
@@ -1274,19 +2236,5 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
           )
         : null}
     </MainPageShell>
-  );
-}
-
-function TotalsInput({ label, value }: { label: string; value: string }) {
-  const { theme } = useTheme();
-  return (
-    <div className="space-y-1">
-      <div className={`text-xs font-semibold ${theme.mutedText}`}>{label}</div>
-      <input
-        className={`${theme.input} h-9`}
-        value={value}
-        readOnly
-      />
-    </div>
   );
 }

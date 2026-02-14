@@ -176,6 +176,32 @@ export async function createInvoiceFromEstimate(
   const estimateData = await getEstimateWithItems(companyId, estimateId);
   if (!estimateData) throw new Error("Estimate not found");
   const { estimate, items: lines } = estimateData;
+  if (!estimate.inspectionId) {
+    throw new Error("Inspection not found for estimate");
+  }
+
+  const openJobs = await sql`
+    SELECT id
+    FROM job_cards
+    WHERE estimate_id = ${estimateId}
+      AND status IN ('Pending', 'Re-Assigned')
+    LIMIT 1
+  `;
+  if (openJobs.length) {
+    throw new Error("Cannot convert to invoice while job cards are still open.");
+  }
+
+  const unreceivedApproved = await sql`
+    SELECT id
+    FROM line_items
+    WHERE inspection_id = ${estimate.inspectionId}
+      AND status = 'Approved'
+      AND COALESCE(LOWER(order_status), '') <> 'received'
+    LIMIT 1
+  `;
+  if (unreceivedApproved.length) {
+    throw new Error("Cannot convert to invoice until all approved parts are received.");
+  }
 
   let workOrderId: string | null = null;
   const woRows = await sql`

@@ -43,6 +43,13 @@ export default function CompanySettingsHome({ params }: Params) {
               href={`/company/${companyId}/settings/profile`}
             />
           )}
+          {companyId && (
+            <SettingsCard
+              title="Cost Management"
+              description="Set fixed inspection cost, currency, and VAT for third-party verification earnings."
+              href={`/company/${companyId}/settings/cost-management`}
+            />
+          )}
         </div>
       </div>
     </AppLayout>

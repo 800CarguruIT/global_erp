@@ -28,7 +28,17 @@ export function CarInDashboardMain({ companyId, companyName }: CarInDashboardMai
   });
   const [query, setQuery] = useState("");
   const [inspectionByLead, setInspectionByLead] = useState<
-    Record<string, { id: string; startedAt?: string | null; completedAt?: string | null }>
+    Record<
+      string,
+      {
+        id: string;
+        status?: string | null;
+        startedAt?: string | null;
+        completedAt?: string | null;
+        cancelledAt?: string | null;
+        branchName?: string | null;
+      }
+    >
   >({});
   const [estimateByLead, setEstimateByLead] = useState<
     Record<string, { id: string; status?: string | null; inspectionId?: string | null }>
@@ -113,16 +123,29 @@ export function CarInDashboardMain({ companyId, companyName }: CarInDashboardMai
         if (!inspectionsRes.ok) throw new Error("Failed to load inspections");
         const inspectionsJson = await inspectionsRes.json();
         const inspections = inspectionsJson.data ?? [];
-        const map: Record<string, { id: string; startedAt?: string | null; completedAt?: string | null }> = {};
-        inspections.forEach((insp: any) => {
-          if (insp.leadId && insp.id) {
-            map[insp.leadId] = {
-              id: insp.id,
-              startedAt: insp.startAt ?? insp.start_at ?? null,
-              completedAt: insp.completeAt ?? insp.complete_at ?? null,
-              branchName: insp.branch?.display_name ?? insp.branch?.name ?? insp.branch?.code ?? null,
-            };
+        const map: Record<
+          string,
+          {
+            id: string;
+            status?: string | null;
+            startedAt?: string | null;
+            completedAt?: string | null;
+            cancelledAt?: string | null;
+            branchName?: string | null;
           }
+        > = {};
+        inspections.forEach((insp: any) => {
+          if (!insp.leadId || !insp.id) return;
+          // Keep only latest inspection per lead (inspections API is sorted DESC by created_at).
+          if (map[insp.leadId]) return;
+          map[insp.leadId] = {
+            id: insp.id,
+            status: insp.status ?? null,
+            startedAt: insp.startAt ?? insp.start_at ?? null,
+            completedAt: insp.completeAt ?? insp.complete_at ?? null,
+            cancelledAt: insp.cancelledAt ?? insp.cancelled_at ?? null,
+            branchName: insp.branch?.display_name ?? insp.branch?.name ?? insp.branch?.code ?? null,
+          };
         });
         setInspectionByLead(map);
       } catch (err) {
@@ -381,6 +404,8 @@ export function CarInDashboardMain({ companyId, companyName }: CarInDashboardMai
         return "bg-emerald-500/15 text-emerald-400";
       case "In Progress":
         return "bg-amber-500/15 text-amber-400";
+      case "Cancelled":
+        return "bg-rose-500/15 text-rose-400";
       default:
         return "bg-slate-500/15 text-slate-300";
     }
@@ -929,13 +954,9 @@ export function CarInDashboardMain({ companyId, companyName }: CarInDashboardMai
                     const carHref = lead.carId ? `/company/${companyId}/cars/${lead.carId}` : null;
                     const inspectionMeta = inspectionByLead[lead.id];
                     const inspectionCompleted = Boolean(inspectionMeta?.completedAt);
-                    const inspectionStatus = inspectionCompleted
-                      ? "Completed"
-                      : getPhaseStatus(lead.leadStage, 0);
-                    const estimateStatus = getPhaseStatus(lead.leadStage, 1);
-                    const partsStatus = getPhaseStatus(lead.leadStage, 2);
-                    const jobStatus = getPhaseStatus(lead.leadStage, 3);
-                    const invoiceStatus = getPhaseStatus(lead.leadStage, 4);
+                    const inspectionCancelled =
+                      String(inspectionMeta?.status ?? "").toLowerCase() === "cancelled" ||
+                      Boolean(inspectionMeta?.cancelledAt);
                     const estimateMatch = estimateByLead[lead.id];
                     const estimateId =
                       estimateMatch?.id ??
@@ -955,6 +976,35 @@ export function CarInDashboardMain({ companyId, companyName }: CarInDashboardMai
                     const jobCardMeta = jobCardByLead[lead.id];
                     const partsMeta = partsByLead[lead.id];
                     const invoiceMeta = invoiceByLead[lead.id];
+                    const hasAnyPartsActivity =
+                      (partsMeta?.orderedCount ?? 0) > 0 ||
+                      (partsMeta?.receivedCount ?? 0) > 0 ||
+                      (partsMeta?.approvedSparePendingCount ?? 0) > 0;
+                    const isFreshCarInLead =
+                      lead.leadStatus === "car_in" &&
+                      (lead.leadStage === "checkin" || !lead.leadStage) &&
+                      !inspectionMeta &&
+                      !estimateId &&
+                      !jobCardMeta &&
+                      !invoiceMeta &&
+                      !hasAnyPartsActivity;
+                    const inspectionStatus = isFreshCarInLead
+                      ? "Pending"
+                      : inspectionCancelled
+                      ? "Cancelled"
+                      : inspectionCompleted
+                      ? "Completed"
+                      : getPhaseStatus(lead.leadStage, 0);
+                    const partsStatus = isFreshCarInLead
+                      ? "Pending"
+                      : inspectionCancelled
+                      ? "Pending"
+                      : getPhaseStatus(lead.leadStage, 2);
+                    const jobStatus = isFreshCarInLead
+                      ? "Pending"
+                      : inspectionCancelled
+                      ? "Pending"
+                      : getPhaseStatus(lead.leadStage, 3);
                     const invoiceDisplayStatus = invoiceMeta?.status ?? "no_invoice";
                     const invoiceStatusLabel =
                       invoiceDisplayStatus === "paid"
@@ -984,7 +1034,7 @@ export function CarInDashboardMain({ companyId, companyName }: CarInDashboardMai
                     const jobReady = jobCardMeta?.status === "Completed";
                     const partsReady = (partsMeta?.approvedSparePendingCount ?? 0) === 0;
                     const estimateReady = Boolean(estimateId);
-                    const canCreateInvoice = inspectionReady && jobReady && partsReady && estimateReady;
+                    const canCreateInvoice = !inspectionCancelled && inspectionReady && jobReady && partsReady && estimateReady;
                     return (
                       <tr key={lead.id} className="border-b last:border-0">
                         <td className="py-2 px-4">
@@ -1083,6 +1133,11 @@ export function CarInDashboardMain({ companyId, companyName }: CarInDashboardMai
                           {inspectionMeta?.completedAt && (
                             <div className="mt-0.5 text-[10px] text-muted-foreground">
                               Complete: {new Date(inspectionMeta.completedAt).toLocaleString()}
+                            </div>
+                          )}
+                          {inspectionMeta?.cancelledAt && (
+                            <div className="mt-0.5 text-[10px] text-rose-300">
+                              Cancelled: {new Date(inspectionMeta.cancelledAt).toLocaleString()}
                             </div>
                           )}
                           {inspectionHref && (
