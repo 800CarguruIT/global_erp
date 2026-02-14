@@ -66,6 +66,7 @@ export const SIDEBAR_CONFIG: Record<NavScope, Partial<Record<NavCategory, Sideba
       { label: "Jobs", href: "/company/[companyId]/jobs" },
       { label: "Recovery Requests", href: "/company/[companyId]/recovery-requests" },
       { label: "Job Cards", href: "/company/[companyId]/workshop/job-cards" },
+      { label: "Workshop Earnings", href: "/company/[companyId]/workshop/earnings" },
       { label: "Branches", href: "/company/[companyId]/branches" },
       { label: "Vendors", href: "/company/[companyId]/vendors" },
       { label: "Customers", href: "/company/[companyId]/customers" },
@@ -141,6 +142,7 @@ export const SIDEBAR_TREE: Partial<Record<NavScope, SidebarItem[]>> = {
       permissionKeys: ["company.dashboard.view"],
       children: [
         { label: "Overview", href: "/company/[companyId]", exactMatch: true, permissionKeys: ["company.dashboard.view"] },
+        { label: "Operations Dashboard", href: "/company/[companyId]/operations-dashboard", permissionKeys: ["company.dashboard.view"] },
         { label: "Car In Dashboard", href: "/company/[companyId]/car-in-dashboard", permissionKeys: ["company.dashboard.view"] },
         { label: "Parts Dashboard", href: "/company/[companyId]/parts-dashboard", permissionKeys: ["company.dashboard.view"] },
         { label: "Revenue Dashboard", href: "/company/[companyId]/revenue-dashboard", permissionKeys: ["company.dashboard.view"] },
@@ -168,6 +170,14 @@ export const SIDEBAR_TREE: Partial<Record<NavScope, SidebarItem[]>> = {
       children: [
         { label: "Create", href: "/company/[companyId]/vendors/new", permissionKeys: ["vendors.create"] },
         { label: "List", href: "/company/[companyId]/vendors", exactMatch: true, permissionKeys: ["vendors.view"] },
+      ],
+    },
+    {
+      label: "Earnings",
+      href: "/company/[companyId]/workshop/earnings",
+      children: [
+        { label: "Workshops", href: "/company/[companyId]/workshop/earnings", exactMatch: true },
+        { label: "Vendors", href: "/company/[companyId]/workshop/earnings" },
       ],
     },
     {

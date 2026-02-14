@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   createInspectionLineItem,
+  getInspectionById,
   listInspectionLineItems,
   markApprovedLineItemsOrdered,
   markLineItemsOrderedByNames,
@@ -17,6 +18,18 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
 export async function POST(req: NextRequest, { params }: Params) {
   const { companyId, inspectionId } = await params;
+  const inspection = await getInspectionById(companyId, inspectionId);
+  if (!inspection) {
+    return NextResponse.json({ error: "Inspection not found" }, { status: 404 });
+  }
+  const locked =
+    Boolean(inspection.verifiedAt ?? (inspection as any).verified_at) ||
+    String(inspection.status ?? "").toLowerCase() === "cancelled" ||
+    Boolean((inspection as any).cancelled_at);
+  if (locked) {
+    return NextResponse.json({ error: "Inspection is locked and cannot be edited." }, { status: 400 });
+  }
+
   const body = await req.json().catch(() => ({}));
   const created = await createInspectionLineItem({
     companyId,
@@ -35,7 +48,19 @@ export async function POST(req: NextRequest, { params }: Params) {
 }
 
 export async function PATCH(req: NextRequest, { params }: Params) {
-  const { inspectionId } = await params;
+  const { companyId, inspectionId } = await params;
+  const inspection = await getInspectionById(companyId, inspectionId);
+  if (!inspection) {
+    return NextResponse.json({ error: "Inspection not found" }, { status: 404 });
+  }
+  const locked =
+    Boolean(inspection.verifiedAt ?? (inspection as any).verified_at) ||
+    String(inspection.status ?? "").toLowerCase() === "cancelled" ||
+    Boolean((inspection as any).cancelled_at);
+  if (locked) {
+    return NextResponse.json({ error: "Inspection is locked and cannot be edited." }, { status: 400 });
+  }
+
   const body = await req.json().catch(() => ({}));
   if (body?.action !== "order_approved") {
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });

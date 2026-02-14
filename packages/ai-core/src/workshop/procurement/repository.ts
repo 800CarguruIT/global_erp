@@ -455,6 +455,28 @@ export async function receivePoItems(
       } catch {
         // ignore inventory errors to not block PO receive
       }
+      try {
+        const estimateItemRows = await sql/* sql */ `
+          SELECT inspection_item_id
+          FROM estimate_items
+          WHERE id = ${current.estimateItemId}
+          LIMIT 1
+        `;
+        const inspectionItemId = estimateItemRows[0]?.inspection_item_id as string | undefined;
+        if (inspectionItemId) {
+          const nextOrderStatus = status === "received" ? "Received" : "Ordered";
+          await sql/* sql */ `
+            UPDATE line_items
+            SET part_ordered = 1,
+                order_status = ${nextOrderStatus},
+                updated_at = NOW()
+            WHERE company_id = ${companyId}
+              AND id = ${inspectionItemId}
+          `;
+        }
+      } catch {
+        // ignore line-item sync errors to avoid blocking PO receive
+      }
     } else if (current.inventoryRequestItemId) {
       try {
         await receivePartsForInventoryRequestItem(companyId, current.inventoryRequestItemId, {

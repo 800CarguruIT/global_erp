@@ -12,6 +12,11 @@ export type Inspection = {
   status: InspectionStatus;
   startAt?: string | null;
   completeAt?: string | null;
+  verifiedBy?: string | null;
+  verifiedAt?: string | null;
+  cancelledBy?: string | null;
+  cancelledAt?: string | null;
+  cancelRemarks?: string | null;
   healthEngine?: number | null;
   healthTransmission?: number | null;
   healthBrakes?: number | null;
@@ -54,6 +59,7 @@ export type InspectionLineItem = {
   companyId: string;
   leadId?: string | null;
   inspectionId: string;
+  jobCardId?: string | null;
   source?: LineItemSource | null;
   productId?: number | null;
   productName?: string | null;

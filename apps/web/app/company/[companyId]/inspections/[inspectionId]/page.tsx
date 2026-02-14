@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { AppLayout, Card, FileUploader, useTheme } from "@repo/ui";
 import { toast } from "sonner";
 
@@ -12,6 +13,13 @@ type Params =
 type InspectionData = {
   inspection: any;
   items: any[];
+};
+type InspectionLogEntry = {
+  id: string;
+  action: string;
+  by: string;
+  at: string;
+  message?: string;
 };
 
 type CheckValue = "good" | "avg" | "bad" | "";
@@ -29,8 +37,13 @@ const checkItems = [
   { key: "infotainment", label: "Infotainment" },
 ];
 
-export default function InspectionDetailPage({ params }: Params) {
+export function InspectionDetailPageClient({
+  params,
+  forceWorkshopView = false,
+  workshopBranchIdProp = null,
+}: Params & { forceWorkshopView?: boolean; workshopBranchIdProp?: string | null }) {
   const { theme } = useTheme();
+  const searchParams = useSearchParams();
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [inspectionId, setInspectionId] = useState<string | null>(null);
   const [inspection, setInspection] = useState<any | null>(null);
@@ -41,6 +54,17 @@ export default function InspectionDetailPage({ params }: Params) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [actorName, setActorName] = useState("System");
+  const [inspectionLogs, setInspectionLogs] = useState<InspectionLogEntry[]>([]);
+  const [advisorApproved, setAdvisorApproved] = useState(false);
+  const [advisorApprovedAt, setAdvisorApprovedAt] = useState<string | null>(null);
+  const [advisorApprovedBy, setAdvisorApprovedBy] = useState<string | null>(null);
+  const [customerApproved, setCustomerApproved] = useState(false);
+  const [customerApprovedAt, setCustomerApprovedAt] = useState<string | null>(null);
+  const [customerApprovedBy, setCustomerApprovedBy] = useState<string | null>(null);
+  const initialRemarksRef = useRef("");
+  const initialStatusRef = useRef("pending");
+  const initialPartsSignatureRef = useRef("[]");
   const [form, setForm] = useState({
     advisorName: "",
     inspectorName: "",
@@ -102,7 +126,16 @@ export default function InspectionDetailPage({ params }: Params) {
           customerComplain: draft.customerComplain ?? prev.customerComplain,
           inspectorRemarks: draft.inspectorRemarks ?? prev.inspectorRemarks,
         }));
+        initialRemarksRef.current = draft.inspectorRemarks ?? "";
+        initialStatusRef.current = String(payload?.status ?? "pending").toLowerCase();
         setChecks(draft.checks ?? {});
+        setInspectionLogs(Array.isArray(draft.activityLogs) ? draft.activityLogs : []);
+        setAdvisorApproved(Boolean(draft.advisorApproved));
+        setAdvisorApprovedAt(draft.advisorApprovedAt ?? null);
+        setAdvisorApprovedBy(draft.advisorApprovedBy ?? null);
+        setCustomerApproved(Boolean(draft.customerApproved));
+        setCustomerApprovedAt(draft.customerApprovedAt ?? null);
+        setCustomerApprovedBy(draft.customerApprovedBy ?? null);
         if (payload?.customerId) {
           const custRes = await fetch(
             `/api/customers/${payload.customerId}?companyId=${companyId}`
@@ -144,19 +177,31 @@ export default function InspectionDetailPage({ params }: Params) {
             const itemsJson = await itemsRes.json();
             const items = itemsJson?.data ?? [];
             if (items.length) {
+              const mappedParts = items.map((item: any) => ({
+                id: item.id,
+                productId: item.productId ?? item.product_id ?? null,
+                productType: item.productType ?? item.product_type ?? item.type ?? null,
+                part: item.productName ?? item.product_name ?? "",
+                description: item.description ?? "",
+                qty: String(item.quantity ?? 1),
+                reason: item.reason ?? "Mandatory",
+                mediaFileId: item.mediaFileId ?? item.media_file_id ?? null,
+                partOrdered: item.partOrdered ?? item.part_ordered ?? 0,
+                orderStatus: item.orderStatus ?? item.order_status ?? null,
+                isSaved: true,
+              }));
               setParts(
-                items.map((item: any) => ({
-                  id: item.id,
-                  productId: item.productId ?? item.product_id ?? null,
-                  productType: item.productType ?? item.product_type ?? item.type ?? null,
-                  part: item.productName ?? item.product_name ?? "",
-                  description: item.description ?? "",
-                  qty: String(item.quantity ?? 1),
-                  reason: item.reason ?? "Mandatory",
-                  mediaFileId: item.mediaFileId ?? item.media_file_id ?? null,
-                  partOrdered: item.partOrdered ?? item.part_ordered ?? 0,
-                  orderStatus: item.orderStatus ?? item.order_status ?? null,
-                  isSaved: true,
+                mappedParts
+              );
+              initialPartsSignatureRef.current = JSON.stringify(
+                mappedParts.map((p) => ({
+                  id: p.id ?? null,
+                  part: p.part?.trim?.() ?? "",
+                  description: p.description?.trim?.() ?? "",
+                  qty: String(p.qty ?? ""),
+                  reason: p.reason ?? "",
+                  mediaFileId: p.mediaFileId ?? null,
+                  productId: p.productId ?? null,
                 }))
               );
             }
@@ -181,6 +226,7 @@ export default function InspectionDetailPage({ params }: Params) {
           ...prev,
           inspectorName: prev.inspectorName || name,
         }));
+        setActorName(name);
       })
       .catch(() => {
         // ignore
@@ -225,10 +271,93 @@ export default function InspectionDetailPage({ params }: Params) {
   }, [car]);
   const startedAt = inspection?.startAt ?? inspection?.start_at ?? null;
   const completedAt = inspection?.completeAt ?? inspection?.complete_at ?? null;
+  const verifiedAt = inspection?.verifiedAt ?? inspection?.verified_at ?? null;
+  const cancelledAt = inspection?.cancelledAt ?? inspection?.cancelled_at ?? null;
+  const cancelledBy = inspection?.cancelledBy ?? inspection?.cancelled_by ?? null;
+  const cancelRemarks = inspection?.cancelRemarks ?? inspection?.cancel_remarks ?? null;
+  const isCancelled = String(inspection?.status ?? "").toLowerCase() === "cancelled" || Boolean(cancelledAt);
+  const isVerified = Boolean(verifiedAt);
+  const isReadOnly = isCancelled || isVerified;
+  const isWorkshopView = forceWorkshopView || searchParams.get("view") === "workshop" || Boolean(workshopBranchIdProp);
+  const workshopBranchId = workshopBranchIdProp ?? searchParams.get("branchId");
+  const backHref =
+    isWorkshopView && companyId && workshopBranchId
+      ? `/company/${companyId}/branches/${workshopBranchId}/workshop`
+      : companyId
+      ? `/company/${companyId}/inspections`
+      : "#";
 
   const updateCheck = (key: string, value: CheckValue) => {
     setChecks((prev) => ({ ...prev, [key]: value }));
   };
+
+  const serializePartsForCompare = (rows: typeof parts) =>
+    JSON.stringify(
+      rows.map((p) => ({
+        id: p.id ?? null,
+        part: p.part?.trim?.() ?? "",
+        description: p.description?.trim?.() ?? "",
+        qty: String(p.qty ?? ""),
+        reason: p.reason ?? "",
+        mediaFileId: p.mediaFileId ?? null,
+        productId: p.productId ?? null,
+      }))
+    );
+
+  const appendInspectionLog = (
+    action: InspectionLogEntry["action"],
+    at: string,
+    message?: string,
+    baseLogs: InspectionLogEntry[] = inspectionLogs
+  ) => {
+    const entry: InspectionLogEntry = {
+      id: `${action}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      action,
+      by: actorName || form.inspectorName || "System",
+      at,
+      message,
+    };
+    const next = [entry, ...baseLogs];
+    setInspectionLogs(next);
+    return next;
+  };
+
+  const buildDraftPayload = (
+    activityLogs: InspectionLogEntry[],
+    rows: typeof parts = parts,
+    approvals?: {
+      advisorApproved?: boolean;
+      advisorApprovedAt?: string | null;
+      advisorApprovedBy?: string | null;
+      customerApproved?: boolean;
+      customerApprovedAt?: string | null;
+      customerApprovedBy?: string | null;
+    }
+  ) => ({
+    advisorName: form.advisorName,
+    inspectorName: form.inspectorName,
+    carInMileage: form.carInMileage,
+    customerComplain: form.customerComplain,
+    inspectorRemarks: form.inspectorRemarks,
+    checks,
+    parts: rows.map((p) => ({
+      id: p.id,
+      productId: p.productId ?? null,
+      productType: p.productType ?? null,
+      part: p.part,
+      description: p.description,
+      qty: p.qty,
+      reason: p.reason,
+      mediaFileId: p.mediaFileId ?? null,
+    })),
+    advisorApproved: approvals?.advisorApproved ?? advisorApproved,
+    advisorApprovedAt: approvals?.advisorApprovedAt ?? advisorApprovedAt,
+    advisorApprovedBy: approvals?.advisorApprovedBy ?? advisorApprovedBy,
+    customerApproved: approvals?.customerApproved ?? customerApproved,
+    customerApprovedAt: approvals?.customerApprovedAt ?? customerApprovedAt,
+    customerApprovedBy: approvals?.customerApprovedBy ?? customerApprovedBy,
+    activityLogs,
+  });
 
 
   const updatePart = (
@@ -277,19 +406,6 @@ export default function InspectionDetailPage({ params }: Params) {
     }));
   };
 
-  const serializeParts = () =>
-    parts.map((p) => ({
-      id: p.id,
-      productId: p.productId ?? null,
-      productType: p.productType ?? null,
-      part: p.part,
-      description: p.description,
-      qty: p.qty,
-      reason: p.reason,
-
-      mediaFileId: p.mediaFileId ?? null,
-    }));
-
   const normalizeProductType = (value?: string | null) =>
     (value ?? "")
       .trim()
@@ -318,6 +434,10 @@ export default function InspectionDetailPage({ params }: Params) {
 
   const saveLineItem = async (index: number) => {
     if (!companyId || !inspectionId) return;
+    if (isReadOnly) {
+      toast.error("Verified/cancelled inspection is read-only.");
+      return;
+    }
     const row = parts[index];
     if (row?.partOrdered === 1 || row?.orderStatus === "Ordered" || row?.orderStatus === "Received") {
       toast.error("Ordered/received items cannot be edited.");
@@ -340,6 +460,7 @@ export default function InspectionDetailPage({ params }: Params) {
       setLineItemErrors((prev) => ({ ...prev, [index]: nextErrors }));
       return;
     }
+    const wasExisting = Boolean(row.id);
     setParts((prev) => prev.map((p, i) => (i === index ? { ...p, isSaving: true } : p)));
     try {
       const payload = {
@@ -364,19 +485,28 @@ export default function InspectionDetailPage({ params }: Params) {
       if (!res.ok) throw new Error("Failed to save line item");
       const data = await res.json();
       const saved = data?.data ?? {};
-      setParts((prev) =>
-        prev.map((p, i) =>
-          i === index
-            ? {
-                ...p,
-                id: saved.id ?? p.id,
-                isSaved: true,
-                isSaving: false,
-
-              }
-            : p
-        )
+      const nextParts = parts.map((p, i) =>
+        i === index
+          ? {
+              ...p,
+              id: saved.id ?? p.id,
+              isSaved: true,
+              isSaving: false,
+            }
+          : p
       );
+      setParts(nextParts);
+      const actionAt = new Date().toISOString();
+      const actionMessage = `${wasExisting ? "Line item updated" : "Line item added"}: ${row.part || "Unnamed part"}`;
+      const nextLogs = appendInspectionLog("updated", actionAt, actionMessage);
+      await fetch(`/api/company/${companyId}/workshop/inspections/${inspectionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          draftPayload: buildDraftPayload(nextLogs, nextParts),
+        }),
+      });
+      initialPartsSignatureRef.current = serializePartsForCompare(nextParts);
       toast.success("Line item saved successfully.");
       setLineItemErrors((prev) => ({ ...prev, [index]: {} }));
     } catch (err) {
@@ -386,6 +516,10 @@ export default function InspectionDetailPage({ params }: Params) {
   };
 
   const deleteLineItem = async (index: number) => {
+    if (isReadOnly) {
+      toast.error("Verified/cancelled inspection is read-only.");
+      return;
+    }
     const row = parts[index];
     if (row?.partOrdered === 1 || row?.orderStatus === "Ordered" || row?.orderStatus === "Received") {
       toast.error("Ordered/received items cannot be deleted.");
@@ -402,7 +536,7 @@ export default function InspectionDetailPage({ params }: Params) {
   };
 
   return (
-    <AppLayout>
+    <AppLayout hideSidebar={isWorkshopView}>
       <div className="space-y-4 py-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -412,30 +546,43 @@ export default function InspectionDetailPage({ params }: Params) {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {(startedAt || completedAt) && (
+            {(startedAt || completedAt || cancelledAt) && (
               <div className="hidden flex-col items-end text-[11px] text-muted-foreground sm:flex">
                 {startedAt && <div>Started: {new Date(startedAt).toLocaleString()}</div>}
                 {completedAt && <div>Completed: {new Date(completedAt).toLocaleString()}</div>}
+                {cancelledAt && <div className="text-rose-300">Cancelled: {new Date(cancelledAt).toLocaleString()}</div>}
               </div>
             )}
             <Link
-              href={companyId ? `/company/${companyId}/inspections` : "#"}
-              className="text-sm text-primary hover:underline"
+              href={backHref}
+              className="inline-flex items-center rounded-md border border-white/25 bg-transparent px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-white shadow-sm transition hover:bg-white/10"
             >
-              Back to inspections
+              Back
             </Link>
           </div>
         </div>
-        {(startedAt || completedAt) && (
+        {(startedAt || completedAt || cancelledAt) && (
           <div className="flex flex-col gap-1 text-[11px] text-muted-foreground sm:hidden">
             {startedAt && <div>Started: {new Date(startedAt).toLocaleString()}</div>}
             {completedAt && <div>Completed: {new Date(completedAt).toLocaleString()}</div>}
+            {cancelledAt && <div className="text-rose-300">Cancelled: {new Date(cancelledAt).toLocaleString()}</div>}
           </div>
         )}
 
         {error && <div className="text-sm text-destructive">{error}</div>}
+        {isCancelled && (
+          <div className="rounded-md border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
+            Inspection is cancelled{cancelledBy ? ` by ${cancelledBy}` : ""}{cancelledAt ? ` at ${new Date(cancelledAt).toLocaleString()}` : ""}.
+            {cancelRemarks ? ` Remarks: ${cancelRemarks}` : ""}
+          </div>
+        )}
+        {isVerified && !isCancelled && (
+          <div className="rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300">
+            Inspection is verified and locked from further edits.
+          </div>
+        )}
 
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <div className={`grid gap-4 ${isWorkshopView ? "" : "lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]"}`}>
           <Card className={`p-4 ${theme.cardBg} ${theme.cardBorder}`}>
             <div className="flex items-center justify-between border-b border-white/10 pb-2">
               <div className="text-sm font-semibold">Inspection Details</div>
@@ -459,6 +606,7 @@ export default function InspectionDetailPage({ params }: Params) {
                             type="radio"
                             name={`check-${item.key}`}
                             checked={checks[item.key] === val}
+                            disabled={isReadOnly}
                             onChange={() => updateCheck(item.key, val)}
                           />
                           <span className="capitalize">{val}</span>
@@ -497,6 +645,7 @@ export default function InspectionDetailPage({ params }: Params) {
                   type="text"
                   className={theme.input}
                   value={form.carInMileage}
+                  readOnly={isReadOnly}
                   onChange={(e) => setForm((prev) => ({ ...prev, carInMileage: e.target.value }))}
                   placeholder="543367685"
                 />
@@ -519,6 +668,7 @@ export default function InspectionDetailPage({ params }: Params) {
                   className={theme.input}
                   rows={4}
                   value={form.inspectorRemarks}
+                  readOnly={isReadOnly}
                   onChange={(e) => setForm((prev) => ({ ...prev, inspectorRemarks: e.target.value }))}
                 />
               </div>
@@ -537,7 +687,7 @@ export default function InspectionDetailPage({ params }: Params) {
                 <div className="mt-2 space-y-2">
                   {parts.map((row, index) => {
                     const isLocked =
-                      row.partOrdered === 1 || row.orderStatus === "Ordered" || row.orderStatus === "Received";
+                      isReadOnly || row.partOrdered === 1 || row.orderStatus === "Ordered" || row.orderStatus === "Received";
                     return (
                       <div key={index} className="grid w-full items-start gap-3 lg:grid-cols-[2fr_2fr_1fr_1fr_1.5fr]">
                         <div className="space-y-1">
@@ -684,7 +834,7 @@ export default function InspectionDetailPage({ params }: Params) {
                         { part: "", description: "", qty: "1", reason: "Mandatory" },
                       ])
                     }
-                    disabled={parts.some((p) => !p.isSaved)}
+                    disabled={isReadOnly || parts.some((p) => !p.isSaved)}
                   >
                     + Add
                   </button>
@@ -693,7 +843,15 @@ export default function InspectionDetailPage({ params }: Params) {
             </div>
 
             <div className="mt-6 flex items-center justify-end gap-2">
-              {!startedAt ? (
+              {isReadOnly ? (
+                <button
+                  type="button"
+                  className={`rounded-md px-6 py-2 text-xs font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText}`}
+                  disabled
+                >
+                  {isCancelled ? "Inspection Cancelled" : "Inspection Verified"}
+                </button>
+              ) : !startedAt ? (
                 <button
                   type="button"
                   className={`rounded-md px-6 py-2 text-xs font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
@@ -701,6 +859,8 @@ export default function InspectionDetailPage({ params }: Params) {
                   onClick={async () => {
                     if (!companyId || !inspectionId) return;
                     setSaving(true);
+                    const actionAt = new Date().toISOString();
+                    const nextLogs = appendInspectionLog("started", actionAt, "Status changed to pending (inspection started)");
                     try {
                       const res = await fetch(
                         `/api/company/${companyId}/workshop/inspections/${inspectionId}`,
@@ -709,16 +869,8 @@ export default function InspectionDetailPage({ params }: Params) {
                           headers: { "Content-Type": "application/json" },
                           body: JSON.stringify({
                             status: "pending",
-                            startAt: new Date().toISOString(),
-                            draftPayload: {
-                              advisorName: form.advisorName,
-                              inspectorName: form.inspectorName,
-                              carInMileage: form.carInMileage,
-                              customerComplain: form.customerComplain,
-                              inspectorRemarks: form.inspectorRemarks,
-                              checks,
-                              parts: serializeParts(),
-                            },
+                            startAt: actionAt,
+                            draftPayload: buildDraftPayload(nextLogs),
                           }),
                         }
                       );
@@ -738,9 +890,13 @@ export default function InspectionDetailPage({ params }: Params) {
                       }
                       setInspection((prev: any) => ({
                         ...prev,
-                        startAt: new Date().toISOString(),
+                        startAt: actionAt,
                       }));
+                      initialStatusRef.current = "pending";
+                      initialRemarksRef.current = form.inspectorRemarks ?? "";
+                      initialPartsSignatureRef.current = serializePartsForCompare(parts);
                     } catch (err) {
+                      setInspectionLogs((prev) => prev.filter((log) => log.at !== actionAt || log.action !== "started"));
                       setError("Failed to start inspection");
                     } finally {
                       setSaving(false);
@@ -750,55 +906,148 @@ export default function InspectionDetailPage({ params }: Params) {
                   {saving ? "Saving..." : "Start Inspection"}
                 </button>
               ) : completedAt ? (
-                <button
-                  type="button"
-                  className={`rounded-md px-6 py-2 text-xs font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
-                  disabled={saving || !companyId || !inspectionId}
-                  onClick={async () => {
-                    if (!companyId || !inspectionId) return;
-                    setSaving(true);
-                    try {
-                      const res = await fetch(
-                        `/api/company/${companyId}/workshop/inspections/${inspectionId}`,
-                        {
-                          method: "PATCH",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({
-                            draftPayload: {
-                              advisorName: form.advisorName,
-                              inspectorName: form.inspectorName,
-                              carInMileage: form.carInMileage,
-                              customerComplain: form.customerComplain,
-                              inspectorRemarks: form.inspectorRemarks,
-                              checks,
-                              parts: serializeParts(),
-                            },
-                          }),
-                        }
-                      );
-                      if (!res.ok) throw new Error("Failed to update inspection");
-                      if (leadId) {
-                        const leadRes = await fetch(
-                          `/api/company/${companyId}/crm/leads/${leadId}`,
+                <>
+                  <button
+                    type="button"
+                    className={`rounded-md px-6 py-2 text-xs font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+                    disabled={saving || !companyId || !inspectionId}
+                    onClick={async () => {
+                      if (!companyId || !inspectionId) return;
+                      setSaving(true);
+                      const actionAt = new Date().toISOString();
+                      let nextLogs = inspectionLogs;
+                      const previousRemarks = (initialRemarksRef.current ?? "").trim();
+                      const currentRemarks = (form.inspectorRemarks ?? "").trim();
+                      if (previousRemarks !== currentRemarks) {
+                        nextLogs = appendInspectionLog("updated", actionAt, "Inspector remarks updated", nextLogs);
+                      }
+                      const partsChanged = initialPartsSignatureRef.current !== serializePartsForCompare(parts);
+                      if (partsChanged) {
+                        nextLogs = appendInspectionLog("updated", actionAt, "Line items updated", nextLogs);
+                      }
+                      if (nextLogs === inspectionLogs) {
+                        nextLogs = appendInspectionLog("updated", actionAt, "Inspection data updated", nextLogs);
+                      }
+                      try {
+                        const res = await fetch(
+                          `/api/company/${companyId}/workshop/inspections/${inspectionId}`,
                           {
                             method: "PATCH",
                             headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({
-                              carInVideo: carInVideoId || null,
+                              draftPayload: buildDraftPayload(nextLogs),
                             }),
                           }
                         );
-                        if (!leadRes.ok) throw new Error("Failed to save lead videos");
+                        if (!res.ok) throw new Error("Failed to update inspection");
+                        if (leadId) {
+                          const leadRes = await fetch(
+                            `/api/company/${companyId}/crm/leads/${leadId}`,
+                            {
+                              method: "PATCH",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                carInVideo: carInVideoId || null,
+                              }),
+                            }
+                          );
+                          if (!leadRes.ok) throw new Error("Failed to save lead videos");
+                        }
+                        initialRemarksRef.current = form.inspectorRemarks ?? "";
+                        initialPartsSignatureRef.current = serializePartsForCompare(parts);
+                      } catch (err) {
+                        setInspectionLogs((prev) => prev.filter((log) => log.at !== actionAt || log.action !== "updated"));
+                        setError("Failed to update inspection");
+                      } finally {
+                        setSaving(false);
                       }
-                    } catch (err) {
-                      setError("Failed to update inspection");
-                    } finally {
-                      setSaving(false);
-                    }
-                  }}
-                >
-                  {saving ? "Saving..." : "Update Inspection"}
-                </button>
+                    }}
+                  >
+                    {saving ? "Saving..." : "Update Inspection"}
+                  </button>
+                  {!isWorkshopView && (
+                    <>
+                      <button
+                        type="button"
+                        className={`rounded-md px-4 py-2 text-xs font-semibold uppercase tracking-wide ${
+                          advisorApproved ? "bg-emerald-600 text-white" : "bg-amber-600 text-white"
+                        }`}
+                        disabled={saving || advisorApproved || !companyId || !inspectionId}
+                        onClick={async () => {
+                          if (!companyId || !inspectionId || advisorApproved) return;
+                          setSaving(true);
+                          const actionAt = new Date().toISOString();
+                          const nextLogs = appendInspectionLog("updated", actionAt, "Advisor approved inspection");
+                          try {
+                            const res = await fetch(`/api/company/${companyId}/workshop/inspections/${inspectionId}`, {
+                              method: "PATCH",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                draftPayload: buildDraftPayload(nextLogs, parts, {
+                                  advisorApproved: true,
+                                  advisorApprovedAt: actionAt,
+                                  advisorApprovedBy: actorName || "System",
+                                }),
+                              }),
+                            });
+                            if (!res.ok) throw new Error("Failed to approve as advisor");
+                            setAdvisorApproved(true);
+                            setAdvisorApprovedAt(actionAt);
+                            setAdvisorApprovedBy(actorName || "System");
+                          } catch (err) {
+                            setInspectionLogs((prev) =>
+                              prev.filter((log) => !(log.at === actionAt && log.message === "Advisor approved inspection"))
+                            );
+                            setError("Failed to approve as advisor");
+                          } finally {
+                            setSaving(false);
+                          }
+                        }}
+                      >
+                        {advisorApproved ? "Advisor Approved" : "Advisor Approve"}
+                      </button>
+                      <button
+                        type="button"
+                        className={`rounded-md px-4 py-2 text-xs font-semibold uppercase tracking-wide ${
+                          customerApproved ? "bg-emerald-600 text-white" : "bg-cyan-600 text-white"
+                        }`}
+                        disabled={saving || customerApproved || !companyId || !inspectionId}
+                        onClick={async () => {
+                          if (!companyId || !inspectionId || customerApproved) return;
+                          setSaving(true);
+                          const actionAt = new Date().toISOString();
+                          const nextLogs = appendInspectionLog("updated", actionAt, "Customer approved inspection");
+                          try {
+                            const res = await fetch(`/api/company/${companyId}/workshop/inspections/${inspectionId}`, {
+                              method: "PATCH",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                draftPayload: buildDraftPayload(nextLogs, parts, {
+                                  customerApproved: true,
+                                  customerApprovedAt: actionAt,
+                                  customerApprovedBy: actorName || "System",
+                                }),
+                              }),
+                            });
+                            if (!res.ok) throw new Error("Failed to approve as customer");
+                            setCustomerApproved(true);
+                            setCustomerApprovedAt(actionAt);
+                            setCustomerApprovedBy(actorName || "System");
+                          } catch (err) {
+                            setInspectionLogs((prev) =>
+                              prev.filter((log) => !(log.at === actionAt && log.message === "Customer approved inspection"))
+                            );
+                            setError("Failed to approve as customer");
+                          } finally {
+                            setSaving(false);
+                          }
+                        }}
+                      >
+                        {customerApproved ? "Customer Approved" : "Customer Approve"}
+                      </button>
+                    </>
+                  )}
+                </>
               ) : (
                 <button
                   type="button"
@@ -807,6 +1056,17 @@ export default function InspectionDetailPage({ params }: Params) {
                   onClick={async () => {
                     if (!companyId || !inspectionId) return;
                     setSaving(true);
+                    const actionAt = new Date().toISOString();
+                    let nextLogs = appendInspectionLog("completed", actionAt, "Status changed to completed");
+                    const previousRemarks = (initialRemarksRef.current ?? "").trim();
+                    const currentRemarks = (form.inspectorRemarks ?? "").trim();
+                    if (previousRemarks !== currentRemarks) {
+                      nextLogs = appendInspectionLog("updated", actionAt, "Inspector remarks updated", nextLogs);
+                    }
+                    const partsChanged = initialPartsSignatureRef.current !== serializePartsForCompare(parts);
+                    if (partsChanged) {
+                      nextLogs = appendInspectionLog("updated", actionAt, "Line items updated", nextLogs);
+                    }
                     try {
                       const res = await fetch(
                         `/api/company/${companyId}/workshop/inspections/${inspectionId}`,
@@ -815,16 +1075,8 @@ export default function InspectionDetailPage({ params }: Params) {
                           headers: { "Content-Type": "application/json" },
                           body: JSON.stringify({
                             status: "completed",
-                            completeAt: new Date().toISOString(),
-                            draftPayload: {
-                              advisorName: form.advisorName,
-                              inspectorName: form.inspectorName,
-                              carInMileage: form.carInMileage,
-                              customerComplain: form.customerComplain,
-                              inspectorRemarks: form.inspectorRemarks,
-                              checks,
-                              parts: serializeParts(),
-                            },
+                            completeAt: actionAt,
+                            draftPayload: buildDraftPayload(nextLogs),
                           }),
                         }
                       );
@@ -844,9 +1096,13 @@ export default function InspectionDetailPage({ params }: Params) {
                       }
                       setInspection((prev: any) => ({
                         ...prev,
-                        completeAt: new Date().toISOString(),
+                        completeAt: actionAt,
                       }));
+                      initialStatusRef.current = "completed";
+                      initialRemarksRef.current = form.inspectorRemarks ?? "";
+                      initialPartsSignatureRef.current = serializePartsForCompare(parts);
                     } catch (err) {
+                      setInspectionLogs((prev) => prev.filter((log) => log.at !== actionAt));
                       setError("Failed to complete inspection");
                     } finally {
                       setSaving(false);
@@ -857,9 +1113,70 @@ export default function InspectionDetailPage({ params }: Params) {
                 </button>
               )}
             </div>
+
+            <div className="mt-6 rounded-md bg-white/5 p-3">
+              <div className="text-sm font-semibold">Inspection Log</div>
+              <div className="mt-2 space-y-1 text-xs text-white/80">
+                {startedAt && (
+                  <div>
+                    Start Time: <span className="font-semibold">{new Date(startedAt).toLocaleString()}</span>
+                  </div>
+                )}
+                {completedAt && (
+                  <div>
+                    End Time: <span className="font-semibold">{new Date(completedAt).toLocaleString()}</span>
+                  </div>
+                )}
+                {advisorApprovedAt && (
+                  <div>
+                    Advisor Approved: <span className="font-semibold">{new Date(advisorApprovedAt).toLocaleString()}</span>
+                    {advisorApprovedBy ? ` by ${advisorApprovedBy}` : ""}
+                  </div>
+                )}
+                {customerApprovedAt && (
+                  <div>
+                    Customer Approved:{" "}
+                    <span className="font-semibold">{new Date(customerApprovedAt).toLocaleString()}</span>
+                    {customerApprovedBy ? ` by ${customerApprovedBy}` : ""}
+                  </div>
+                )}
+                {verifiedAt && (
+                  <div>
+                    Verified At: <span className="font-semibold">{new Date(verifiedAt).toLocaleString()}</span>
+                  </div>
+                )}
+                {cancelledAt && (
+                  <div>
+                    Cancelled At: <span className="font-semibold">{new Date(cancelledAt).toLocaleString()}</span>
+                    {cancelledBy ? ` by ${cancelledBy}` : ""}
+                  </div>
+                )}
+                {!startedAt && !completedAt && <div className="text-white/60">No start/end time recorded.</div>}
+              </div>
+              <div className="mt-4">
+                {inspectionLogs.length === 0 ? (
+                  <div className="text-xs text-white/60">No activity yet.</div>
+                ) : (
+                  <div className="space-y-1.5">
+                    {inspectionLogs.map((log) => (
+                      <div key={log.id} className="rounded-md bg-white/5 px-2 py-1.5 text-[10px] text-white/85">
+                        <div>
+                          <span className="font-semibold capitalize">{log.action}</span>
+                          {log.message ? ` - ${log.message}` : ""}
+                        </div>
+                        <div className="mt-0.5 text-[9px] text-white/70">
+                          by <span className="font-semibold text-white">{log.by || "System"}</span> at{" "}
+                          {new Date(log.at).toLocaleString()}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           </Card>
 
-          <div className="space-y-4">
+          {!isWorkshopView && <div className="space-y-4">
             <Card className={`overflow-hidden ${theme.cardBg} ${theme.cardBorder}`}>
               <div className={`px-4 py-2 text-sm font-semibold ${theme.surfaceSubtle} ${theme.cardBorder}`}>
                 Customer Details
@@ -944,13 +1261,13 @@ export default function InspectionDetailPage({ params }: Params) {
               </div>
             </Card>
 
-          </div>
+          </div>}
         </div>
       </div>
     </AppLayout>
   );
 }
 
-
-
-
+export default function InspectionDetailPage({ params }: Params) {
+  return <InspectionDetailPageClient params={params} />;
+}

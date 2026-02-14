@@ -14,6 +14,11 @@ function mapInspectionRow(row: any): Inspection {
     status: row.status,
     startAt: row.start_at,
     completeAt: row.complete_at,
+    verifiedBy: row.verified_by,
+    verifiedAt: row.verified_at,
+    cancelledBy: row.cancelled_by,
+    cancelledAt: row.cancelled_at,
+    cancelRemarks: row.cancel_remarks,
     healthEngine: row.health_engine,
     healthTransmission: row.health_transmission,
     healthBrakes: row.health_brakes,
@@ -56,6 +61,7 @@ function mapLineItemRow(row: any): InspectionLineItem {
     companyId: row.company_id,
     leadId: row.lead_id,
     inspectionId: row.inspection_id,
+    jobCardId: row.job_card_id,
     source: row.source,
     productId: row.product_id,
     productName: row.product_name,
@@ -198,6 +204,11 @@ export async function updateInspectionPartial(
     status: InspectionStatus;
     startAt?: string | null;
     completeAt?: string | null;
+    verifiedBy: string | null;
+    verifiedAt: string | null;
+    cancelledBy: string | null;
+    cancelledAt: string | null;
+    cancelRemarks: string | null;
     healthEngine: number | null;
     healthTransmission: number | null;
     healthBrakes: number | null;
@@ -220,6 +231,11 @@ export async function updateInspectionPartial(
     complete_at:
       patch.completeAt ??
       (patch.status === "completed" ? new Date().toISOString() : undefined),
+    verified_by: patch.verifiedBy,
+    verified_at: patch.verifiedAt,
+    cancelled_by: patch.cancelledBy,
+    cancelled_at: patch.cancelledAt,
+    cancel_remarks: patch.cancelRemarks,
     health_engine: patch.healthEngine,
     health_transmission: patch.healthTransmission,
     health_brakes: patch.healthBrakes,
@@ -304,7 +320,47 @@ export async function listInspectionLineItems(
       ${sourceFilter}
     ORDER BY created_at ASC
   `;
-  return rows.map(mapLineItemRow);
+  if (!rows.length) return [];
+
+  const lineItemIds = rows.map((row: any) => row.id).filter(Boolean);
+  let quoteStatusByLineItemId = new Map<string, string>();
+  if (lineItemIds.length) {
+    const quoteStatusRows = await sql`
+      SELECT
+        ei.inspection_item_id AS line_item_id,
+        MAX(
+          CASE
+            WHEN LOWER(COALESCE(pq.status, '')) IN ('received', 'completed') THEN 3
+            WHEN LOWER(COALESCE(pq.status, '')) IN ('return', 'returned') THEN 2
+            WHEN LOWER(COALESCE(pq.status, '')) = 'ordered' THEN 1
+            ELSE 0
+          END
+        ) AS status_rank
+      FROM estimate_items ei
+      INNER JOIN part_quotes pq ON pq.estimate_item_id = ei.id
+      WHERE ei.inspection_item_id = ANY(${lineItemIds})
+      GROUP BY ei.inspection_item_id
+    `;
+    quoteStatusByLineItemId = new Map(
+      quoteStatusRows.map((row: any) => {
+        const rank = Number(row.status_rank ?? 0);
+        const derived =
+          rank >= 3 ? "Received" : rank === 2 ? "Returned" : rank === 1 ? "Ordered" : "";
+        return [String(row.line_item_id), derived] as const;
+      })
+    );
+  }
+
+  const mergedRows = rows.map((row: any) => {
+    const derivedStatus = quoteStatusByLineItemId.get(String(row.id));
+    if (!derivedStatus) return row;
+    return {
+      ...row,
+      part_ordered: row.part_ordered ?? 1,
+      order_status: derivedStatus,
+    };
+  });
+  return mergedRows.map(mapLineItemRow);
 }
 
 export async function createInspectionLineItem(args: {

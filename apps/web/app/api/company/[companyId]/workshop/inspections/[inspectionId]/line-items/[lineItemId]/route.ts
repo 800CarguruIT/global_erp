@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   deleteInspectionLineItem,
+  getInspectionById,
   updateInspectionLineItem,
 } from "@repo/ai-core/workshop/inspections/repository";
 
@@ -9,7 +10,19 @@ type Params = {
 };
 
 export async function PATCH(req: NextRequest, { params }: Params) {
-  const { companyId, lineItemId } = await params;
+  const { companyId, inspectionId, lineItemId } = await params;
+  const inspection = await getInspectionById(companyId, inspectionId);
+  if (!inspection) {
+    return NextResponse.json({ error: "Inspection not found" }, { status: 404 });
+  }
+  const locked =
+    Boolean(inspection.verifiedAt ?? (inspection as any).verified_at) ||
+    String(inspection.status ?? "").toLowerCase() === "cancelled" ||
+    Boolean((inspection as any).cancelled_at);
+  if (locked) {
+    return NextResponse.json({ error: "Inspection is locked and cannot be edited." }, { status: 400 });
+  }
+
   const body = await req.json().catch(() => ({}));
   const updated = await updateInspectionLineItem({
     companyId,
@@ -31,7 +44,19 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 }
 
 export async function DELETE(_req: NextRequest, { params }: Params) {
-  const { companyId, lineItemId } = await params;
+  const { companyId, inspectionId, lineItemId } = await params;
+  const inspection = await getInspectionById(companyId, inspectionId);
+  if (!inspection) {
+    return NextResponse.json({ error: "Inspection not found" }, { status: 404 });
+  }
+  const locked =
+    Boolean(inspection.verifiedAt ?? (inspection as any).verified_at) ||
+    String(inspection.status ?? "").toLowerCase() === "cancelled" ||
+    Boolean((inspection as any).cancelled_at);
+  if (locked) {
+    return NextResponse.json({ error: "Inspection is locked and cannot be edited." }, { status: 400 });
+  }
+
   await deleteInspectionLineItem(companyId, lineItemId);
   return NextResponse.json({ ok: true });
 }
