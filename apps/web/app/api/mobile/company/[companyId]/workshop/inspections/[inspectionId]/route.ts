@@ -14,7 +14,7 @@ import {
   createMobileSuccessResponse,
   handleMobileError,
 } from "@/app/api/mobile/utils";
-import { InspectionItem } from "@repo/ai-core";
+import type { InspectionItem } from "@repo/ai-core/workshop/inspections/types";
 
 type Params = { params: Promise<{ companyId: string; inspectionId: string }> };
 
@@ -43,7 +43,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     const customer =
       customerRaw && customerRaw.company_id === companyId ? customerRaw : null;
     const car = carRaw && carRaw.company_id === companyId ? carRaw : null;
-    console.log(inspection, items, customer, car, lead);
+
     return createMobileSuccessResponse({
       inspection,
       items,
@@ -63,7 +63,9 @@ export async function GET(req: NextRequest, { params }: Params) {
 
 export async function PATCH(req: NextRequest, { params }: Params) {
   try {
+    const userId = requireMobileUserId(req);
     const { companyId, inspectionId } = await params;
+    await ensureCompanyAccess(userId, companyId);
     const body = await req.json().catch(() => ({}));
 
     const patch = {
