@@ -21,32 +21,58 @@ export async function POST(req: NextRequest, { params }: Params) {
   }
 
   const body = await req.json().catch(() => ({}));
-  const estimateId = toStringOrNull(body.estimateId);
-  const estimateItemId = toStringOrNull(body.estimateItemId);
+  const inspectionId = toStringOrNull(body.inspectionId ?? body.estimateId);
+  const lineItemId = toStringOrNull(body.lineItemId);
   const inventoryRequestId = toStringOrNull(body.inventoryRequestId);
   const inventoryRequestItemId = toStringOrNull(body.inventoryRequestItemId);
-  const isEstimate = !!estimateId && !!estimateItemId;
+  const isEstimate = !!lineItemId;
   const isInventory = !!inventoryRequestId && !!inventoryRequestItemId;
   if (!isEstimate && !isInventory) {
     return NextResponse.json(
-      { error: "estimateId/estimateItemId or inventoryRequestId/inventoryRequestItemId required" },
+      { error: "lineItemId or inventoryRequestId/inventoryRequestItemId required" },
       { status: 400 }
     );
   }
 
   const sql = getSql();
-  if (isEstimate) {
+  if (isEstimate && lineItemId) {
+    const existing = await sql`
+      SELECT id
+      FROM part_quotes
+      WHERE company_id = ${companyId}
+        AND vendor_id = ${vendorId}
+        AND line_item_id = ${lineItemId}
+      LIMIT 1
+    `;
+    if (existing.length) {
+      return NextResponse.json({ error: "Quote already submitted for this part." }, { status: 409 });
+    }
+  }
+  if (isInventory) {
+    const existing = await sql`
+      SELECT id
+      FROM part_quotes
+      WHERE company_id = ${companyId}
+        AND vendor_id = ${vendorId}
+        AND inventory_request_item_id = ${inventoryRequestItemId}
+      LIMIT 1
+    `;
+    if (existing.length) {
+      return NextResponse.json({ error: "Quote already submitted for this part." }, { status: 409 });
+    }
+  }
+
+  if (isEstimate && lineItemId) {
     const verifyRows = await sql`
-      SELECT ei.id
-      FROM estimate_items ei
-      INNER JOIN estimates est ON est.id = ei.estimate_id
-      WHERE ei.id = ${estimateItemId}
-        AND est.id = ${estimateId}
-        AND est.company_id = ${companyId}
+      SELECT li.id
+      FROM line_items li
+      WHERE li.id = ${lineItemId}
+        AND li.company_id = ${companyId}
+        AND (${inspectionId}::uuid IS NULL OR li.inspection_id = ${inspectionId})
       LIMIT 1
     `;
     if (!verifyRows.length) {
-      return NextResponse.json({ error: "Estimate item not found" }, { status: 404 });
+      return NextResponse.json({ error: "Line item not found" }, { status: 404 });
     }
   }
   if (isInventory) {
@@ -70,6 +96,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       vendor_id,
       estimate_id,
       estimate_item_id,
+      line_item_id,
       inventory_request_id,
       inventory_request_item_id,
       part_number,
@@ -93,8 +120,9 @@ export async function POST(req: NextRequest, { params }: Params) {
     ) VALUES (
       ${companyId},
       ${vendorId},
-      ${estimateId ?? null},
-      ${estimateItemId ?? null},
+      ${null},
+      ${null},
+      ${lineItemId ?? null},
       ${inventoryRequestId ?? null},
       ${inventoryRequestItemId ?? null},
       ${toStringOrNull(body.partNumber)},

@@ -68,7 +68,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
     let inspectionItems: Awaited<ReturnType<typeof listInspectionLineItems>> = [];
     if (estimate?.inspectionId) {
-      inspectionItems = await listInspectionLineItems(estimate.inspectionId);
+      inspectionItems = await listInspectionLineItems(estimate.inspectionId, { isAdd: 0 });
     }
     const usedLineItemIds = new Set<string>();
     const findMatchingLineItem = (name: string, description?: string | null) => {
@@ -128,6 +128,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
               inspectionId: estimate.inspectionId,
               leadId: estimate.leadId ?? null,
               source: "estimate",
+              isAdd: 0,
               productName: item.partName,
               description: item.description ?? null,
               quantity: item.quantity ?? 1,

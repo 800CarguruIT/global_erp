@@ -12,6 +12,7 @@ export function getSql() {
 
     sql = postgres(url, {
       max: 1, // tiny pool, policy calls are light
+      connect_timeout: 5,
     });
   }
   return sql;

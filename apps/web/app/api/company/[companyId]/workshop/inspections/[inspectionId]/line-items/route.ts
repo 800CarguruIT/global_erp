@@ -12,12 +12,20 @@ type Params = { params: Promise<{ companyId: string; inspectionId: string }> };
 export async function GET(_req: NextRequest, { params }: Params) {
   const { inspectionId } = await params;
   const source = _req.nextUrl.searchParams.get("source") as "inspection" | "estimate" | null;
-  const items = await listInspectionLineItems(inspectionId, source ? { source } : undefined);
+  const rawIsAdd = _req.nextUrl.searchParams.get("isAdd");
+  const isAdd = rawIsAdd === null ? undefined : rawIsAdd === "1" ? 1 : 0;
+  const items = await listInspectionLineItems(
+    inspectionId,
+    source || isAdd !== undefined ? { ...(source ? { source } : {}), ...(isAdd !== undefined ? { isAdd } : {}) } : undefined
+  );
   return NextResponse.json({ data: items });
 }
 
 export async function POST(req: NextRequest, { params }: Params) {
   const { companyId, inspectionId } = await params;
+  const body = await req.json().catch(() => ({}));
+  const isAdd = body.isAdd === 1 || body.isAdd === "1" || body.isAdd === true ? 1 : 0;
+  const allowEstimateAdditionalEdit = (body.source ?? "inspection") === "estimate" && isAdd === 1;
   const inspection = await getInspectionById(companyId, inspectionId);
   if (!inspection) {
     return NextResponse.json({ error: "Inspection not found" }, { status: 404 });
@@ -26,16 +34,15 @@ export async function POST(req: NextRequest, { params }: Params) {
     Boolean(inspection.verifiedAt ?? (inspection as any).verified_at) ||
     String(inspection.status ?? "").toLowerCase() === "cancelled" ||
     Boolean((inspection as any).cancelled_at);
-  if (locked) {
+  if (locked && !allowEstimateAdditionalEdit) {
     return NextResponse.json({ error: "Inspection is locked and cannot be edited." }, { status: 400 });
   }
-
-  const body = await req.json().catch(() => ({}));
   const created = await createInspectionLineItem({
     companyId,
     inspectionId,
     leadId: body.leadId ?? null,
     source: body.source ?? "inspection",
+    isAdd,
     productId: body.productId ?? null,
     productName: body.productName ?? null,
     description: body.description ?? null,

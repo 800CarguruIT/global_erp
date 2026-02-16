@@ -11,6 +11,9 @@ type Params = {
 
 export async function PATCH(req: NextRequest, { params }: Params) {
   const { companyId, inspectionId, lineItemId } = await params;
+  const body = await req.json().catch(() => ({}));
+  const isAdd = body.isAdd === 1 || body.isAdd === "1" || body.isAdd === true ? 1 : 0;
+  const allowEstimateAdditionalEdit = isAdd === 1;
   const inspection = await getInspectionById(companyId, inspectionId);
   if (!inspection) {
     return NextResponse.json({ error: "Inspection not found" }, { status: 404 });
@@ -19,15 +22,15 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     Boolean(inspection.verifiedAt ?? (inspection as any).verified_at) ||
     String(inspection.status ?? "").toLowerCase() === "cancelled" ||
     Boolean((inspection as any).cancelled_at);
-  if (locked) {
+  if (locked && !allowEstimateAdditionalEdit) {
     return NextResponse.json({ error: "Inspection is locked and cannot be edited." }, { status: 400 });
   }
-
-  const body = await req.json().catch(() => ({}));
   const updated = await updateInspectionLineItem({
     companyId,
     lineItemId,
     patch: {
+      isAdd:
+        body.isAdd === undefined ? undefined : isAdd,
       productId: body.productId ?? undefined,
       productName: body.productName ?? undefined,
       description: body.description ?? undefined,

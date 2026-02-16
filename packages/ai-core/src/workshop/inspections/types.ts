@@ -51,7 +51,7 @@ export type InspectionItem = {
 };
 
 export type LineItemStatus = "Pending" | "Approved" | "Inquiry" | "Rejected";
-export type OrderStatus = "Ordered" | "Received" | "Returned";
+export type OrderStatus = "Pending" | "Ordered" | "Received" | "Returned";
 export type LineItemSource = "inspection" | "estimate";
 
 export type InspectionLineItem = {
@@ -60,6 +60,7 @@ export type InspectionLineItem = {
   leadId?: string | null;
   inspectionId: string;
   jobCardId?: string | null;
+  isAdd?: number | null;
   source?: LineItemSource | null;
   productId?: number | null;
   productName?: string | null;
@@ -70,6 +71,12 @@ export type InspectionLineItem = {
   mediaFileId?: string | null;
   partOrdered?: number | null;
   orderStatus?: OrderStatus | null;
+  quoteCosts?: {
+    oem?: number;
+    oe?: number;
+    aftm?: number;
+    used?: number;
+  };
   createdAt: string;
   updatedAt: string;
 };

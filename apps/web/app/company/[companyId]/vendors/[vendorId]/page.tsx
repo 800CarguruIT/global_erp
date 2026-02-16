@@ -5,6 +5,27 @@ import { useParams } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
 
 type Props = { params: { companyId: string; vendorId: string } };
+type QuoteTypeKey = "oem" | "oe" | "aftm" | "used";
+type PartFormData = {
+  partNumber: string;
+  remarks: string;
+  oemAmount: string;
+  oeAmount: string;
+  aftmAmount: string;
+  usedAmount: string;
+  oemQty: string;
+  oeQty: string;
+  aftmQty: string;
+  usedQty: string;
+  oemEtd: string;
+  oeEtd: string;
+  aftmEtd: string;
+  usedEtd: string;
+  oemTime: string;
+  oeTime: string;
+  aftmTime: string;
+  usedTime: string;
+};
 
 type TabId = "inquiries" | "bids" | "new_orders" | "completed" | "returns";
 
@@ -30,6 +51,27 @@ const MAKES = [
   "Toyota",
   "Volkswagen",
 ];
+
+const createEmptyPartForm = (): PartFormData => ({
+  partNumber: "",
+  remarks: "",
+  oemAmount: "",
+  oeAmount: "",
+  aftmAmount: "",
+  usedAmount: "",
+  oemQty: "1",
+  oeQty: "1",
+  aftmQty: "1",
+  usedQty: "1",
+  oemEtd: "Same Day",
+  oeEtd: "Same Day",
+  aftmEtd: "Same Day",
+  usedEtd: "Same Day",
+  oemTime: "",
+  oeTime: "",
+  aftmTime: "",
+  usedTime: "",
+});
 
 function TableShell({
   title,
@@ -110,33 +152,11 @@ export default function VendorDashboardPage({ params }: Props) {
   const [partsOpen, setPartsOpen] = useState(false);
   const [partsLoading, setPartsLoading] = useState(false);
   const [partsError, setPartsError] = useState<string | null>(null);
-  const [partForms, setPartForms] = useState<
-    Record<
-      string,
-      {
-        partNumber: string;
-        remarks: string;
-        oemAmount: string;
-        oeAmount: string;
-        aftmAmount: string;
-        usedAmount: string;
-        oemQty: string;
-        oeQty: string;
-        aftmQty: string;
-        usedQty: string;
-        oemEtd: string;
-        oeEtd: string;
-        aftmEtd: string;
-        usedEtd: string;
-        oemTime: string;
-        oeTime: string;
-        aftmTime: string;
-        usedTime: string;
-      }
-    >
-  >({});
+  const [partForms, setPartForms] = useState<Record<string, PartFormData>>({});
   const [submitStatus, setSubmitStatus] = useState<Record<string, "idle" | "saving" | "saved" | "error">>({});
   const [submitErrors, setSubmitErrors] = useState<Record<string, string>>({});
+  const [submitAt, setSubmitAt] = useState<Record<string, string>>({});
+  const [draftSavedAt, setDraftSavedAt] = useState<Record<string, string>>({});
   const [selectedInquiry, setSelectedInquiry] = useState<{
     inquiryId: string;
     sourceType: "inventory" | "estimate";
@@ -153,6 +173,8 @@ export default function VendorDashboardPage({ params }: Props) {
       description?: string | null;
       quantity?: number | null;
       partType?: string | null;
+      itemSource?: "line_item";
+      isSubmitted?: boolean;
     }>
   >([]);
   const [bids, setBids] = useState<
@@ -193,7 +215,7 @@ export default function VendorDashboardPage({ params }: Props) {
   const [returnsError, setReturnsError] = useState<string | null>(null);
 
   const currentTab = useMemo(
-    () => TAB_CONFIG.find((tab) => tab.id === activeTab) ?? TAB_CONFIG[0],
+    () => TAB_CONFIG.find((tab) => tab.id === activeTab) ?? TAB_CONFIG[0]!,
     [activeTab]
   );
 
@@ -224,26 +246,7 @@ export default function VendorDashboardPage({ params }: Props) {
       const next = { ...prev };
       for (const row of partsRows) {
         if (!next[row.id]) {
-          next[row.id] = {
-            partNumber: "",
-            remarks: "",
-            oemAmount: "",
-            oeAmount: "",
-            aftmAmount: "",
-            usedAmount: "",
-            oemQty: "1",
-            oeQty: "1",
-            aftmQty: "1",
-            usedQty: "1",
-            oemEtd: "Same Day",
-            oeEtd: "Same Day",
-            aftmEtd: "Same Day",
-            usedEtd: "Same Day",
-            oemTime: "",
-            oeTime: "",
-            aftmTime: "",
-            usedTime: "",
-          };
+          next[row.id] = createEmptyPartForm();
         }
       }
       return next;
@@ -499,7 +502,15 @@ export default function VendorDashboardPage({ params }: Props) {
                   throw new Error(`Failed to load parts (${res.status})`);
                 }
                 const data = await res.json();
-                setPartsRows(Array.isArray(data?.data) ? data.data : []);
+                const rows = Array.isArray(data?.data) ? data.data : [];
+                setPartsRows(rows);
+                setSubmitStatus((prev) => {
+                  const next = { ...prev };
+                  for (const part of rows) {
+                    next[part.id] = part?.isSubmitted ? "saved" : "idle";
+                  }
+                  return next;
+                });
                 setPartForms({});
               } catch (err: any) {
                 setPartsError(err?.message ?? "Failed to load parts");
@@ -621,6 +632,48 @@ export default function VendorDashboardPage({ params }: Props) {
   const isTypeEnabled = (row: { partType?: string | null }, type: "oem" | "oe" | "aftm" | "used") => {
     if (selectedInquiry?.sourceType !== "inventory") return true;
     return allowedTypesForRow(row.partType).has(type);
+  };
+
+  const updatePartForm = (rowId: string, key: keyof PartFormData, value: string) => {
+    setPartForms((prev) => ({
+      ...prev,
+      [rowId]: { ...(prev[rowId] ?? createEmptyPartForm()), [key]: value },
+    }));
+  };
+
+  const markDraftSaved = (rowId: string) => {
+    setDraftSavedAt((prev) => ({ ...prev, [rowId]: new Date().toLocaleTimeString() }));
+  };
+
+  const toPositiveNumber = (value: string | undefined) => {
+    const parsed = Number(value ?? "");
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+  };
+
+  const getRowValidationError = (
+    row: { partType?: string | null },
+    form: PartFormData | undefined
+  ): string | null => {
+    if (!form) return "Enter at least one quote amount.";
+    const amountKeys: Array<keyof PartFormData> = ["oemAmount", "oeAmount", "aftmAmount", "usedAmount"];
+    const hasAnyAmount = amountKeys.some((key) => toPositiveNumber(form[key] as string) > 0);
+    if (!hasAnyAmount) return "Enter at least one quote amount.";
+
+    const validations: Array<{ type: QuoteTypeKey; amount: string; etd: string; time: string }> = [
+      { type: "oem", amount: form.oemAmount, etd: form.oemEtd, time: form.oemTime },
+      { type: "oe", amount: form.oeAmount, etd: form.oeEtd, time: form.oeTime },
+      { type: "aftm", amount: form.aftmAmount, etd: form.aftmEtd, time: form.aftmTime },
+      { type: "used", amount: form.usedAmount, etd: form.usedEtd, time: form.usedTime },
+    ];
+
+    for (const check of validations) {
+      if (!isTypeEnabled(row, check.type)) continue;
+      if (toPositiveNumber(check.amount) <= 0) continue;
+      if (check.etd === "Custom" && !String(check.time ?? "").trim()) {
+        return "Fill custom time for selected quote type.";
+      }
+    }
+    return null;
   };
 
   const ordersBody = useMemo(() => {
@@ -1055,403 +1108,217 @@ export default function VendorDashboardPage({ params }: Props) {
               </div>
             </div>
 
-            <div className="overflow-x-hidden bg-slate-900/30 px-4 pb-6">
+            <div className="max-h-[72vh] overflow-y-auto bg-slate-900/30 px-4 pb-6">
               {partsLoading ? (
                 <div className="py-8 text-center text-sm text-slate-500">Loading parts...</div>
               ) : partsError ? (
                 <div className="py-8 text-center text-sm text-rose-600">{partsError}</div>
+              ) : partsRows.length === 0 ? (
+                <div className="py-8 text-center text-sm text-slate-400">No inquiry parts found.</div>
               ) : (
-                <table className="w-full table-fixed border-collapse text-xs text-slate-100">
-                  <thead className="bg-slate-900 text-slate-100">
-                    <tr>
-                      <th className="px-2 py-2 text-left">Part Name</th>
-                      <th className="px-2 py-2 text-left">Requested Qty</th>
-                      <th className="px-2 py-2 text-left">Requested Type</th>
-                      <th className="px-2 py-2 text-left">Part Number</th>
-                      <th className="px-2 py-2 text-left">OEM</th>
-                      <th className="px-2 py-2 text-left">Original</th>
-                      <th className="px-2 py-2 text-left">After Market</th>
-                      <th className="px-2 py-2 text-left">Used</th>
-                      <th className="px-2 py-2 text-left">Remarks</th>
-                      <th className="px-2 py-2 text-left">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {partsRows.length === 0 ? (
-                      <tr>
-                        <td className="px-2 py-6 text-center text-sm text-slate-400" colSpan={10}>
-                          No inquiry parts found.
-                        </td>
-                      </tr>
-                    ) : (
-                      partsRows.map((row) => {
-                        const form = partForms[row.id];
-                        const status = submitStatus[row.id] ?? "idle";
-                        const oemEnabled = isTypeEnabled(row, "oem");
-                        const oeEnabled = isTypeEnabled(row, "oe");
-                        const aftmEnabled = isTypeEnabled(row, "aftm");
-                        const usedEnabled = isTypeEnabled(row, "used");
-                        return (
-                        <tr key={row.id} className="border-b border-white/10">
-                          <td className="px-2 py-3 align-top">
+                <div className="space-y-4 pt-4">
+                  {partsRows.map((row) => {
+                    const form = partForms[row.id];
+                    const status = submitStatus[row.id] ?? "idle";
+                    const validationError = getRowValidationError(row, form);
+                    const alreadySubmitted = Boolean(row.isSubmitted) || status === "saved";
+                    const submitDisabled = status === "saving" || alreadySubmitted;
+                    const options: Array<{
+                      key: QuoteTypeKey;
+                      label: string;
+                      amountKey: keyof PartFormData;
+                      qtyKey: keyof PartFormData;
+                      etdKey: keyof PartFormData;
+                      timeKey: keyof PartFormData;
+                    }> = [
+                      { key: "oem", label: "OEM", amountKey: "oemAmount", qtyKey: "oemQty", etdKey: "oemEtd", timeKey: "oemTime" },
+                      { key: "oe", label: "Original", amountKey: "oeAmount", qtyKey: "oeQty", etdKey: "oeEtd", timeKey: "oeTime" },
+                      { key: "aftm", label: "After Market", amountKey: "aftmAmount", qtyKey: "aftmQty", etdKey: "aftmEtd", timeKey: "aftmTime" },
+                      { key: "used", label: "Used", amountKey: "usedAmount", qtyKey: "usedQty", etdKey: "usedEtd", timeKey: "usedTime" },
+                    ];
+
+                    return (
+                      <div key={row.id} className="rounded-xl border border-slate-700/70 bg-slate-900/45 p-3">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
                             <div className="text-sm font-semibold text-slate-100">{row.partName}</div>
-                            <div className="text-[11px] text-slate-400">{row.description ?? ""}</div>
-                          </td>
-                          <td className="px-2 py-3 align-top text-xs text-slate-200">
-                            {row.quantity ?? "—"}
-                          </td>
-                          <td className="px-2 py-3 align-top text-xs text-slate-200">
-                            {row.partType ?? "—"}
-                          </td>
-                          <td className="px-2 py-3 align-top">
+                            <div className="text-xs text-slate-400">{row.description || "No description"}</div>
+                          </div>
+                          <div className="flex gap-2 text-[11px]">
+                            <span className="rounded-full border border-slate-600 px-2 py-1 text-slate-300">Qty: {row.quantity ?? "-"}</span>
+                            <span className="rounded-full border border-slate-600 px-2 py-1 text-slate-300">Type: {row.partType ?? "Any"}</span>
+                          </div>
+                        </div>
+
+                        <div className="mt-3 grid gap-3 md:grid-cols-[1fr,1fr]">
+                          <div className="space-y-2 rounded-lg border border-slate-700/60 bg-slate-950/30 p-3">
+                            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-300">Part Info</div>
                             <input
-                              className="w-full rounded border border-white/10 bg-slate-900/80 px-2 py-1 text-xs text-slate-100 placeholder:text-slate-500"
-                              placeholder="Enter Part #"
+                              className="w-full rounded border border-slate-700 bg-slate-950/80 px-2 py-1.5 text-xs text-slate-100 placeholder:text-slate-500"
+                              placeholder="Part Number"
                               value={form?.partNumber ?? ""}
-                              onChange={(e) =>
-                                setPartForms((prev) => ({
-                                  ...prev,
-                                  [row.id]: { ...prev[row.id], partNumber: e.target.value },
-                                }))
-                              }
+                              onChange={(e) => updatePartForm(row.id, "partNumber", e.target.value)}
+                              onBlur={() => markDraftSaved(row.id)}
                             />
-                            <div className="mt-3 text-xs font-semibold text-slate-300">Part Diagram</div>
-                            <input type="file" className="mt-1 w-full text-xs text-slate-200" />
-                          </td>
-                          <td className="px-2 py-3 align-top">
-                            <input
-                              className={`w-full rounded border border-white/10 bg-slate-900/80 px-2 py-1 text-xs text-slate-100 placeholder:text-slate-500 ${
-                                oemEnabled ? "" : "opacity-40"
-                              }`}
-                              placeholder="OEM Unit Price"
-                              value={form?.oemAmount ?? ""}
-                              onChange={(e) =>
-                                setPartForms((prev) => ({
-                                  ...prev,
-                                  [row.id]: { ...prev[row.id], oemAmount: e.target.value },
-                                }))
-                              }
-                              disabled={!oemEnabled}
-                            />
-                            <div className="mt-2 text-[11px] text-slate-400">QTY:</div>
-                            <input
-                              className={`w-full rounded border border-white/10 bg-slate-900/80 px-2 py-1 text-xs text-slate-100 ${
-                                oemEnabled ? "" : "opacity-40"
-                              }`}
-                              value={form?.oemQty ?? "1"}
-                              onChange={(e) =>
-                                setPartForms((prev) => ({
-                                  ...prev,
-                                  [row.id]: { ...prev[row.id], oemQty: e.target.value },
-                                }))
-                              }
-                              disabled={!oemEnabled}
-                            />
-                            <select
-                              className={`mt-2 w-full rounded border border-white/10 bg-slate-900/80 px-2 py-1 text-xs text-slate-100 ${
-                                oemEnabled ? "" : "opacity-40"
-                              }`}
-                              value={form?.oemEtd ?? "Same Day"}
-                              onChange={(e) =>
-                                setPartForms((prev) => ({
-                                  ...prev,
-                                  [row.id]: { ...prev[row.id], oemEtd: e.target.value },
-                                }))
-                              }
-                              disabled={!oemEnabled}
-                            >
-                              <option>Same Day</option>
-                              <option>1-2 Days</option>
-                              <option>Custom</option>
-                            </select>
-                            <input
-                              className={`mt-2 w-full rounded border border-white/10 bg-slate-900/80 px-2 py-1 text-xs text-slate-100 placeholder:text-slate-500 ${
-                                oemEnabled ? "" : "opacity-40"
-                              }`}
-                              placeholder="--:--"
-                              value={form?.oemTime ?? ""}
-                              onChange={(e) =>
-                                setPartForms((prev) => ({
-                                  ...prev,
-                                  [row.id]: { ...prev[row.id], oemTime: e.target.value },
-                                }))
-                              }
-                              disabled={!oemEnabled}
-                            />
-                          </td>
-                          <td className="px-2 py-3 align-top">
-                            <input
-                              className={`w-full rounded border border-white/10 bg-slate-900/80 px-2 py-1 text-xs text-slate-100 placeholder:text-slate-500 ${
-                                oeEnabled ? "" : "opacity-40"
-                              }`}
-                              placeholder="OE Unit Price"
-                              value={form?.oeAmount ?? ""}
-                              onChange={(e) =>
-                                setPartForms((prev) => ({
-                                  ...prev,
-                                  [row.id]: { ...prev[row.id], oeAmount: e.target.value },
-                                }))
-                              }
-                              disabled={!oeEnabled}
-                            />
-                            <div className="mt-2 text-[11px] text-slate-400">QTY:</div>
-                            <input
-                              className={`w-full rounded border border-white/10 bg-slate-900/80 px-2 py-1 text-xs text-slate-100 ${
-                                oeEnabled ? "" : "opacity-40"
-                              }`}
-                              value={form?.oeQty ?? "1"}
-                              onChange={(e) =>
-                                setPartForms((prev) => ({
-                                  ...prev,
-                                  [row.id]: { ...prev[row.id], oeQty: e.target.value },
-                                }))
-                              }
-                              disabled={!oeEnabled}
-                            />
-                            <select
-                              className={`mt-2 w-full rounded border border-white/10 bg-slate-900/80 px-2 py-1 text-xs text-slate-100 ${
-                                oeEnabled ? "" : "opacity-40"
-                              }`}
-                              value={form?.oeEtd ?? "Same Day"}
-                              onChange={(e) =>
-                                setPartForms((prev) => ({
-                                  ...prev,
-                                  [row.id]: { ...prev[row.id], oeEtd: e.target.value },
-                                }))
-                              }
-                              disabled={!oeEnabled}
-                            >
-                              <option>Same Day</option>
-                              <option>1-2 Days</option>
-                              <option>Custom</option>
-                            </select>
-                            <input
-                              className={`mt-2 w-full rounded border border-white/10 bg-slate-900/80 px-2 py-1 text-xs text-slate-100 placeholder:text-slate-500 ${
-                                oeEnabled ? "" : "opacity-40"
-                              }`}
-                              placeholder="--:--"
-                              value={form?.oeTime ?? ""}
-                              onChange={(e) =>
-                                setPartForms((prev) => ({
-                                  ...prev,
-                                  [row.id]: { ...prev[row.id], oeTime: e.target.value },
-                                }))
-                              }
-                              disabled={!oeEnabled}
-                            />
-                          </td>
-                          <td className="px-2 py-3 align-top">
-                            <input
-                              className={`w-full rounded border border-white/10 bg-slate-900/80 px-2 py-1 text-xs text-slate-100 placeholder:text-slate-500 ${
-                                aftmEnabled ? "" : "opacity-40"
-                              }`}
-                              placeholder="AFTM Unit Price"
-                              value={form?.aftmAmount ?? ""}
-                              onChange={(e) =>
-                                setPartForms((prev) => ({
-                                  ...prev,
-                                  [row.id]: { ...prev[row.id], aftmAmount: e.target.value },
-                                }))
-                              }
-                              disabled={!aftmEnabled}
-                            />
-                            <div className="mt-2 text-[11px] text-slate-400">QTY:</div>
-                            <input
-                              className={`w-full rounded border border-white/10 bg-slate-900/80 px-2 py-1 text-xs text-slate-100 ${
-                                aftmEnabled ? "" : "opacity-40"
-                              }`}
-                              value={form?.aftmQty ?? "1"}
-                              onChange={(e) =>
-                                setPartForms((prev) => ({
-                                  ...prev,
-                                  [row.id]: { ...prev[row.id], aftmQty: e.target.value },
-                                }))
-                              }
-                              disabled={!aftmEnabled}
-                            />
-                            <select
-                              className={`mt-2 w-full rounded border border-white/10 bg-slate-900/80 px-2 py-1 text-xs text-slate-100 ${
-                                aftmEnabled ? "" : "opacity-40"
-                              }`}
-                              value={form?.aftmEtd ?? "Same Day"}
-                              onChange={(e) =>
-                                setPartForms((prev) => ({
-                                  ...prev,
-                                  [row.id]: { ...prev[row.id], aftmEtd: e.target.value },
-                                }))
-                              }
-                              disabled={!aftmEnabled}
-                            >
-                              <option>Same Day</option>
-                              <option>1-2 Days</option>
-                              <option>Custom</option>
-                            </select>
-                            <input
-                              className={`mt-2 w-full rounded border border-white/10 bg-slate-900/80 px-2 py-1 text-xs text-slate-100 placeholder:text-slate-500 ${
-                                aftmEnabled ? "" : "opacity-40"
-                              }`}
-                              placeholder="--:--"
-                              value={form?.aftmTime ?? ""}
-                              onChange={(e) =>
-                                setPartForms((prev) => ({
-                                  ...prev,
-                                  [row.id]: { ...prev[row.id], aftmTime: e.target.value },
-                                }))
-                              }
-                              disabled={!aftmEnabled}
-                            />
-                          </td>
-                          <td className="px-2 py-3 align-top">
-                            <input
-                              className={`w-full rounded border border-white/10 bg-slate-900/80 px-2 py-1 text-xs text-slate-100 placeholder:text-slate-500 ${
-                                usedEnabled ? "" : "opacity-40"
-                              }`}
-                              placeholder="Used Unit Price"
-                              value={form?.usedAmount ?? ""}
-                              onChange={(e) =>
-                                setPartForms((prev) => ({
-                                  ...prev,
-                                  [row.id]: { ...prev[row.id], usedAmount: e.target.value },
-                                }))
-                              }
-                              disabled={!usedEnabled}
-                            />
-                            <div className="mt-2 text-[11px] text-slate-400">QTY:</div>
-                            <input
-                              className={`w-full rounded border border-white/10 bg-slate-900/80 px-2 py-1 text-xs text-slate-100 ${
-                                usedEnabled ? "" : "opacity-40"
-                              }`}
-                              value={form?.usedQty ?? "1"}
-                              onChange={(e) =>
-                                setPartForms((prev) => ({
-                                  ...prev,
-                                  [row.id]: { ...prev[row.id], usedQty: e.target.value },
-                                }))
-                              }
-                              disabled={!usedEnabled}
-                            />
-                            <select
-                              className={`mt-2 w-full rounded border border-white/10 bg-slate-900/80 px-2 py-1 text-xs text-slate-100 ${
-                                usedEnabled ? "" : "opacity-40"
-                              }`}
-                              value={form?.usedEtd ?? "Same Day"}
-                              onChange={(e) =>
-                                setPartForms((prev) => ({
-                                  ...prev,
-                                  [row.id]: { ...prev[row.id], usedEtd: e.target.value },
-                                }))
-                              }
-                              disabled={!usedEnabled}
-                            >
-                              <option>Same Day</option>
-                              <option>1-2 Days</option>
-                              <option>Custom</option>
-                            </select>
-                            <input
-                              className={`mt-2 w-full rounded border border-white/10 bg-slate-900/80 px-2 py-1 text-xs text-slate-100 placeholder:text-slate-500 ${
-                                usedEnabled ? "" : "opacity-40"
-                              }`}
-                              placeholder="--:--"
-                              value={form?.usedTime ?? ""}
-                              onChange={(e) =>
-                                setPartForms((prev) => ({
-                                  ...prev,
-                                  [row.id]: { ...prev[row.id], usedTime: e.target.value },
-                                }))
-                              }
-                              disabled={!usedEnabled}
-                            />
-                          </td>
-                          <td className="px-2 py-3 align-top">
+                            <input type="file" className="w-full text-xs text-slate-300" />
                             <textarea
-                              className="h-24 w-full rounded border border-white/10 bg-slate-900/80 px-2 py-1 text-xs text-slate-100 placeholder:text-slate-500"
-                              placeholder="Enter Remarks"
+                              className="h-20 w-full rounded border border-slate-700 bg-slate-950/80 px-2 py-1.5 text-xs text-slate-100 placeholder:text-slate-500"
+                              placeholder="Remarks"
                               value={form?.remarks ?? ""}
-                              onChange={(e) =>
-                                setPartForms((prev) => ({
-                                  ...prev,
-                                  [row.id]: { ...prev[row.id], remarks: e.target.value },
-                                }))
-                              }
+                              onChange={(e) => updatePartForm(row.id, "remarks", e.target.value)}
+                              onBlur={() => markDraftSaved(row.id)}
                             />
-                          </td>
-                          <td className="px-2 py-3 align-top">
-                            <button
-                              type="button"
-                              disabled={status === "saving"}
-                              onClick={async () => {
-                                if (!selectedInquiry) return;
-                                const payload = partForms[row.id];
-                                setSubmitStatus((prev) => ({ ...prev, [row.id]: "saving" }));
-                                setSubmitErrors((prev) => ({ ...prev, [row.id]: "" }));
-                                try {
-                                  const res = await fetch(
-                                    `/api/company/${companyId}/vendors/${vendorId}/part-quotes`,
-                                    {
-                                      method: "POST",
-                                      headers: { "Content-Type": "application/json" },
-                                      body: JSON.stringify({
-                                        ...(selectedInquiry.sourceType === "inventory"
-                                          ? {
-                                              inventoryRequestId: selectedInquiry.inquiryId,
-                                              inventoryRequestItemId: row.id,
-                                            }
-                                          : {
-                                              estimateId: selectedInquiry.inquiryId,
-                                              estimateItemId: row.id,
-                                            }),
-                                        partNumber: payload?.partNumber ?? "",
-                                        remarks: payload?.remarks ?? "",
-                                        oemAmount: payload?.oemAmount ?? "",
-                                        oeAmount: payload?.oeAmount ?? "",
-                                        aftmAmount: payload?.aftmAmount ?? "",
-                                        usedAmount: payload?.usedAmount ?? "",
-                                        oemQty: payload?.oemQty ?? "",
-                                        oeQty: payload?.oeQty ?? "",
-                                        aftmQty: payload?.aftmQty ?? "",
-                                        usedQty: payload?.usedQty ?? "",
-                                        oemEtd: payload?.oemEtd ?? "",
-                                        oeEtd: payload?.oeEtd ?? "",
-                                        aftmEtd: payload?.aftmEtd ?? "",
-                                        usedEtd: payload?.usedEtd ?? "",
-                                        oemTime: payload?.oemTime ?? "",
-                                        oeTime: payload?.oeTime ?? "",
-                                        aftmTime: payload?.aftmTime ?? "",
-                                        usedTime: payload?.usedTime ?? "",
-                                      }),
-                                    }
-                                  );
-                                  if (!res.ok) {
-                                    const msg = await res.text();
-                                    throw new Error(msg || `Failed to submit (${res.status})`);
-                                  }
-                                  setSubmitStatus((prev) => ({ ...prev, [row.id]: "saved" }));
-                                } catch (err: any) {
-                                  setSubmitStatus((prev) => ({ ...prev, [row.id]: "error" }));
-                                  setSubmitErrors((prev) => ({
-                                    ...prev,
-                                    [row.id]: err?.message ?? "Failed to submit",
-                                  }));
-                                }
-                              }}
-                              className="rounded bg-emerald-500 px-2 py-1 text-xs font-semibold text-white hover:bg-emerald-400 disabled:opacity-60"
-                            >
-                              {status === "saving" ? "Saving..." : status === "saved" ? "Saved" : "Submit"}
-                            </button>
+                          </div>
+
+                          <div className="space-y-2 rounded-lg border border-slate-700/60 bg-slate-950/30 p-3">
+                            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-300">Quote Options</div>
+                            <div className="grid gap-2 sm:grid-cols-2">
+                              {options.map((opt) => {
+                                const enabled = isTypeEnabled(row, opt.key);
+                                return (
+                                  <div key={opt.key} className={`rounded-lg border p-2 ${enabled ? "border-slate-700 bg-slate-900/40" : "border-slate-800 bg-slate-900/20 opacity-50"}`}>
+                                    <div className="mb-1 text-[11px] font-semibold text-slate-300">{opt.label}</div>
+                                    <input
+                                      className="w-full rounded border border-slate-700 bg-slate-950/80 px-2 py-1 text-xs text-slate-100 placeholder:text-slate-500"
+                                      placeholder={`${opt.label} Unit Price`}
+                                      value={(form?.[opt.amountKey] as string) ?? ""}
+                                      onChange={(e) => updatePartForm(row.id, opt.amountKey, e.target.value)}
+                                      onBlur={() => markDraftSaved(row.id)}
+                                      disabled={!enabled}
+                                    />
+                                    <div className="mt-1 grid grid-cols-2 gap-1">
+                                      <input
+                                        className="rounded border border-slate-700 bg-slate-950/80 px-2 py-1 text-xs text-slate-100"
+                                        placeholder="Qty"
+                                        value={(form?.[opt.qtyKey] as string) ?? "1"}
+                                        onChange={(e) => updatePartForm(row.id, opt.qtyKey, e.target.value)}
+                                        onBlur={() => markDraftSaved(row.id)}
+                                        disabled={!enabled}
+                                      />
+                                      <select
+                                        className="rounded border border-slate-700 bg-slate-950/80 px-2 py-1 text-xs text-slate-100"
+                                        value={(form?.[opt.etdKey] as string) ?? "Same Day"}
+                                        onChange={(e) => updatePartForm(row.id, opt.etdKey, e.target.value)}
+                                        onBlur={() => markDraftSaved(row.id)}
+                                        disabled={!enabled}
+                                      >
+                                        <option>Same Day</option>
+                                        <option>1-2 Days</option>
+                                        <option>Custom</option>
+                                      </select>
+                                    </div>
+                                    <input
+                                      className="mt-1 w-full rounded border border-slate-700 bg-slate-950/80 px-2 py-1 text-xs text-slate-100 placeholder:text-slate-500"
+                                      placeholder={(form?.[opt.etdKey] as string) === "Custom" ? "Enter custom time" : "--:--"}
+                                      value={(form?.[opt.timeKey] as string) ?? ""}
+                                      onChange={(e) => updatePartForm(row.id, opt.timeKey, e.target.value)}
+                                      onBlur={() => markDraftSaved(row.id)}
+                                      disabled={!enabled}
+                                    />
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-700/60 pt-3">
+                          <div className="text-[11px]">
                             {submitErrors[row.id] ? (
-                              <div className="mt-2 text-[11px] text-rose-400">{submitErrors[row.id]}</div>
-                            ) : null}
-                          </td>
-                        </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
+                              <span className="text-rose-400">{submitErrors[row.id]}</span>
+                            ) : alreadySubmitted ? (
+                              <span className="text-emerald-300">Already submitted.</span>
+                            ) : validationError ? (
+                              <span className="text-amber-300">{validationError}</span>
+                            ) : draftSavedAt[row.id] ? (
+                              <span className="text-slate-400">Draft saved at {draftSavedAt[row.id]}</span>
+                            ) : (
+                              <span className="text-slate-400">Fill at least one quote option.</span>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            disabled={submitDisabled}
+                            onClick={async () => {
+                              if (!selectedInquiry || !form) return;
+                              if (alreadySubmitted) return;
+                              if (validationError) {
+                                setSubmitStatus((prev) => ({ ...prev, [row.id]: "error" }));
+                                setSubmitErrors((prev) => ({ ...prev, [row.id]: validationError }));
+                                return;
+                              }
+                              setSubmitStatus((prev) => ({ ...prev, [row.id]: "saving" }));
+                              setSubmitErrors((prev) => ({ ...prev, [row.id]: "" }));
+                              try {
+                                const res = await fetch(`/api/company/${companyId}/vendors/${vendorId}/part-quotes`, {
+                                  method: "POST",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({
+                                    ...(selectedInquiry.sourceType === "inventory"
+                                      ? { inventoryRequestId: selectedInquiry.inquiryId, inventoryRequestItemId: row.id }
+                                      : { inspectionId: selectedInquiry.inquiryId, lineItemId: row.id }),
+                                    partNumber: form.partNumber ?? "",
+                                    remarks: form.remarks ?? "",
+                                    oemAmount: form.oemAmount ?? "",
+                                    oeAmount: form.oeAmount ?? "",
+                                    aftmAmount: form.aftmAmount ?? "",
+                                    usedAmount: form.usedAmount ?? "",
+                                    oemQty: form.oemQty ?? "",
+                                    oeQty: form.oeQty ?? "",
+                                    aftmQty: form.aftmQty ?? "",
+                                    usedQty: form.usedQty ?? "",
+                                    oemEtd: form.oemEtd ?? "",
+                                    oeEtd: form.oeEtd ?? "",
+                                    aftmEtd: form.aftmEtd ?? "",
+                                    usedEtd: form.usedEtd ?? "",
+                                    oemTime: form.oemTime ?? "",
+                                    oeTime: form.oeTime ?? "",
+                                    aftmTime: form.aftmTime ?? "",
+                                    usedTime: form.usedTime ?? "",
+                                  }),
+                                });
+                                if (!res.ok) {
+                                  const payload = await res.json().catch(() => null);
+                                  if (res.status === 409) {
+                                    setPartsRows((prev) =>
+                                      prev.map((p) => (p.id === row.id ? { ...p, isSubmitted: true } : p))
+                                    );
+                                    setSubmitStatus((prev) => ({ ...prev, [row.id]: "saved" }));
+                                    setSubmitErrors((prev) => ({ ...prev, [row.id]: "" }));
+                                    return;
+                                  }
+                                  throw new Error(payload?.error ?? `Failed to submit (${res.status})`);
+                                }
+                                setSubmitStatus((prev) => ({ ...prev, [row.id]: "saved" }));
+                                setSubmitAt((prev) => ({ ...prev, [row.id]: new Date().toLocaleTimeString() }));
+                                setPartsRows((prev) =>
+                                  prev.map((p) => (p.id === row.id ? { ...p, isSubmitted: true } : p))
+                                );
+                              } catch (err: any) {
+                                setSubmitStatus((prev) => ({ ...prev, [row.id]: "error" }));
+                                setSubmitErrors((prev) => ({
+                                  ...prev,
+                                  [row.id]: err?.message ?? "Failed to submit",
+                                }));
+                              }
+                            }}
+                            className="rounded-md bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {status === "saving"
+                              ? "Saving..."
+                              : alreadySubmitted
+                              ? "Submitted"
+                              : "Submit Quote"}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </div>
+            </div>
           </div>
-        </div>
       ) : null}
     </AppLayout>
   );

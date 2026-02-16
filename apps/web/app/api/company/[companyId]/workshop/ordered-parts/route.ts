@@ -39,13 +39,18 @@ export async function GET(_req: Request, { params }: Params) {
         v.name AS vendor_name,
         pq.status AS quote_status
       FROM part_quotes pq
-      INNER JOIN estimate_items ei ON ei.id = pq.estimate_item_id
-      INNER JOIN estimates est ON est.id = ei.estimate_id
+      LEFT JOIN estimate_items ei ON ei.id = pq.estimate_item_id
+      LEFT JOIN estimates est ON est.id = ei.estimate_id
       INNER JOIN vendors v ON v.id = pq.vendor_id
       WHERE
-        est.company_id = ${companyId}
-        AND est.inspection_id = li.inspection_id
-        AND LOWER(COALESCE(ei.part_name, '')) = LOWER(COALESCE(li.product_name, ''))
+        pq.company_id = ${companyId}
+        AND (
+          pq.line_item_id = li.id
+          OR (
+            est.inspection_id = li.inspection_id
+            AND LOWER(COALESCE(ei.part_name, '')) = LOWER(COALESCE(li.product_name, ''))
+          )
+        )
       ORDER BY pq.updated_at DESC
       LIMIT 1
     ) vendor_info ON TRUE

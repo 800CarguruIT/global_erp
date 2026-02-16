@@ -600,12 +600,16 @@ export function BranchWorkshopDashboard({
                       >
                         View Jobcard
                       </a>
-                      <button
-                        type="button"
+                      <a
+                        href={
+                          row.estimateId
+                            ? `/company/${companyId}/estimates/${row.estimateId}`
+                            : `/company/${companyId}/workshop/job-cards/${row.id}`
+                        }
                         className="inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary-foreground shadow-sm transition hover:opacity-90 hover:shadow-md"
                       >
                         Add Quote
-                      </button>
+                      </a>
                     </div>
                   </div>
                 ))
@@ -734,12 +738,16 @@ export function BranchWorkshopDashboard({
                           </td>
                           <td className="px-4 py-3 text-foreground/70">{formatDate(row.createdAt)}</td>
                           <td className="px-4 py-3  text-right">
-                            <button
-                              type="button"
+                            <a
+                              href={
+                                row.estimateId
+                                  ? `/company/${companyId}/estimates/${row.estimateId}`
+                                  : `/company/${companyId}/workshop/job-cards/${row.id}`
+                              }
                               className="inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary-foreground shadow-sm transition hover:opacity-90 hover:shadow-md"
                             >
                               Add Quote
-                            </button>
+                            </a>
                           </td>
                         </tr>
                       ))

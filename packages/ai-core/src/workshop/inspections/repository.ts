@@ -62,6 +62,7 @@ function mapLineItemRow(row: any): InspectionLineItem {
     leadId: row.lead_id,
     inspectionId: row.inspection_id,
     jobCardId: row.job_card_id,
+    isAdd: row.is_add,
     source: row.source,
     productId: row.product_id,
     productName: row.product_name,
@@ -72,6 +73,10 @@ function mapLineItemRow(row: any): InspectionLineItem {
     mediaFileId: row.media_file_id,
     partOrdered: row.part_ordered,
     orderStatus: row.order_status,
+    quoteCosts:
+      row.quote_costs ??
+      row.quoteCosts ??
+      undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -309,37 +314,55 @@ export async function replaceInspectionItems(
 
 export async function listInspectionLineItems(
   inspectionId: string,
-  opts: { source?: "inspection" | "estimate" } = {}
+  opts: { source?: "inspection" | "estimate"; isAdd?: 0 | 1 } = {}
 ): Promise<InspectionLineItem[]> {
   const sql = getSql();
   const sourceFilter = opts.source ? sql`AND source = ${opts.source}` : sql``;
+  const isAddFilter = opts.isAdd !== undefined ? sql`AND is_add = ${opts.isAdd}` : sql``;
   const rows = await sql`
     SELECT *
     FROM line_items
     WHERE inspection_id = ${inspectionId}
       ${sourceFilter}
+      ${isAddFilter}
     ORDER BY created_at ASC
   `;
   if (!rows.length) return [];
 
   const lineItemIds = rows.map((row: any) => row.id).filter(Boolean);
   let quoteStatusByLineItemId = new Map<string, string>();
+  let quoteCostsByLineItemId = new Map<
+    string,
+    { oem?: number; oe?: number; aftm?: number; used?: number }
+  >();
   if (lineItemIds.length) {
     const quoteStatusRows = await sql`
       SELECT
-        ei.inspection_item_id AS line_item_id,
+        source.line_item_id,
         MAX(
           CASE
-            WHEN LOWER(COALESCE(pq.status, '')) IN ('received', 'completed') THEN 3
-            WHEN LOWER(COALESCE(pq.status, '')) IN ('return', 'returned') THEN 2
-            WHEN LOWER(COALESCE(pq.status, '')) = 'ordered' THEN 1
+            WHEN LOWER(COALESCE(source.status, '')) IN ('received', 'completed') THEN 3
+            WHEN LOWER(COALESCE(source.status, '')) IN ('return', 'returned') THEN 2
+            WHEN LOWER(COALESCE(source.status, '')) = 'ordered' THEN 1
             ELSE 0
           END
         ) AS status_rank
-      FROM estimate_items ei
-      INNER JOIN part_quotes pq ON pq.estimate_item_id = ei.id
-      WHERE ei.inspection_item_id = ANY(${lineItemIds})
-      GROUP BY ei.inspection_item_id
+      FROM (
+        SELECT
+          li.id AS line_item_id,
+          pq.status
+        FROM line_items li
+        INNER JOIN part_quotes pq ON pq.line_item_id = li.id
+        WHERE li.id = ANY(${lineItemIds})
+        UNION ALL
+        SELECT
+          ei.inspection_item_id AS line_item_id,
+          pq.status
+        FROM estimate_items ei
+        INNER JOIN part_quotes pq ON pq.estimate_item_id = ei.id
+        WHERE ei.inspection_item_id = ANY(${lineItemIds})
+      ) source
+      GROUP BY source.line_item_id
     `;
     quoteStatusByLineItemId = new Map(
       quoteStatusRows.map((row: any) => {
@@ -349,16 +372,45 @@ export async function listInspectionLineItems(
         return [String(row.line_item_id), derived] as const;
       })
     );
+
+    const quoteCostRows = await sql`
+      SELECT
+        line_item_id,
+        MIN(oem) AS oem,
+        MIN(oe) AS oe,
+        MIN(aftm) AS aftm,
+        MIN(used) AS used
+      FROM part_quotes
+      WHERE line_item_id = ANY(${lineItemIds})
+      GROUP BY line_item_id
+    `;
+    quoteCostsByLineItemId = new Map(
+      quoteCostRows.map((row: any) => {
+        const costs: { oem?: number; oe?: number; aftm?: number; used?: number } = {};
+        if (row.oem != null) costs.oem = Number(row.oem);
+        if (row.oe != null) costs.oe = Number(row.oe);
+        if (row.aftm != null) costs.aftm = Number(row.aftm);
+        if (row.used != null) costs.used = Number(row.used);
+        return [String(row.line_item_id), costs] as const;
+      })
+    );
   }
 
   const mergedRows = rows.map((row: any) => {
     const derivedStatus = quoteStatusByLineItemId.get(String(row.id));
-    if (!derivedStatus) return row;
-    return {
+    const quoteCosts = quoteCostsByLineItemId.get(String(row.id));
+    if (!derivedStatus && !quoteCosts) return row;
+    const next: any = {
       ...row,
-      part_ordered: row.part_ordered ?? 1,
-      order_status: derivedStatus,
+      ...(derivedStatus
+        ? {
+            part_ordered: row.part_ordered ?? 1,
+            order_status: derivedStatus,
+          }
+        : {}),
+      ...(quoteCosts ? { quote_costs: quoteCosts } : {}),
     };
+    return next;
   });
   return mergedRows.map(mapLineItemRow);
 }
@@ -368,6 +420,7 @@ export async function createInspectionLineItem(args: {
   leadId?: string | null;
   inspectionId: string;
   source?: "inspection" | "estimate";
+  isAdd?: 0 | 1;
   productId?: number | null;
   productName?: string | null;
   description?: string | null;
@@ -383,6 +436,8 @@ export async function createInspectionLineItem(args: {
       lead_id,
       inspection_id,
       source,
+      order_status,
+      is_add,
       product_id,
       product_name,
       description,
@@ -395,6 +450,8 @@ export async function createInspectionLineItem(args: {
       ${args.leadId ?? null},
       ${args.inspectionId},
       ${args.source ?? "inspection"},
+      ${"Pending"},
+      ${args.isAdd ?? 0},
       ${args.productId ?? null},
       ${args.productName ?? null},
       ${args.description ?? null},
@@ -412,6 +469,7 @@ export async function updateInspectionLineItem(args: {
   companyId: string;
   lineItemId: string;
   patch: Partial<{
+    isAdd?: 0 | 1;
     productId?: number | null;
     productName?: string | null;
     description?: string | null;
@@ -423,6 +481,7 @@ export async function updateInspectionLineItem(args: {
 }): Promise<InspectionLineItem | null> {
   const sql = getSql();
   const updated = {
+    is_add: args.patch.isAdd,
     product_id: args.patch.productId,
     product_name: args.patch.productName,
     description: args.patch.description,

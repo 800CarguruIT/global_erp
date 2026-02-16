@@ -70,6 +70,46 @@ const COST_DISPLAY_ORDER: Array<{ key: EstimateItemCostType; label: string }> = 
 const NEW_JOB_PRODUCT_INDEX_OFFSET = 10000;
 
 const formatCostValue = (value?: number | null) => (value != null ? value.toFixed(2) : "0.00");
+type PersistedNewJobLineItemDraft = {
+  cost?: number | null;
+  sale?: number | null;
+  approvedSale?: number | null;
+  discount?: number | null;
+  approvedType?: EstimateItemCostType | null;
+  approvedCost?: number | null;
+  gpPercent?: number | null;
+};
+type PersistedNewJobDraftMap = Record<string, PersistedNewJobLineItemDraft>;
+
+const toFiniteNumberOrNull = (value: unknown): number | null => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const getPersistedNewJobDraftMap = (meta: any): PersistedNewJobDraftMap => {
+  const raw = meta?.newJobDraftByLineItemId;
+  if (!raw || typeof raw !== "object") return {};
+  const map: PersistedNewJobDraftMap = {};
+  for (const [lineItemId, value] of Object.entries(raw as Record<string, any>)) {
+    if (!lineItemId) continue;
+    map[lineItemId] = {
+      cost: toFiniteNumberOrNull(value?.cost),
+      sale: toFiniteNumberOrNull(value?.sale),
+      approvedSale: toFiniteNumberOrNull(value?.approvedSale),
+      discount: toFiniteNumberOrNull(value?.discount),
+      approvedType:
+        value?.approvedType === "oe" ||
+        value?.approvedType === "oem" ||
+        value?.approvedType === "aftm" ||
+        value?.approvedType === "used"
+          ? value.approvedType
+          : null,
+      approvedCost: toFiniteNumberOrNull(value?.approvedCost),
+      gpPercent: toFiniteNumberOrNull(value?.gpPercent),
+    };
+  }
+  return map;
+};
 
 export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMainProps) {
   const { theme } = useTheme();
@@ -96,6 +136,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
   const [isSaving, setIsSaving] = useState(false);
   const [isRefreshingQuotes, setIsRefreshingQuotes] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [jobCardMessage, setJobCardMessage] = useState<string | null>(null);
   const [activeJobCardId, setActiveJobCardId] = useState<string | null>(null);
@@ -105,6 +146,12 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [invoiceConvertError, setInvoiceConvertError] = useState<string | null>(null);
   const [isConvertingInvoice, setIsConvertingInvoice] = useState(false);
+
+  useEffect(() => {
+    if (!toastMessage) return;
+    const timer = window.setTimeout(() => setToastMessage(null), 2500);
+    return () => window.clearTimeout(timer);
+  }, [toastMessage]);
 
   const renderOrderBadge = (item: ItemDraft) => {
     if (item.status !== "approved") {
@@ -130,6 +177,72 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
       </span>
     );
   };
+
+  const isApprovedOrderLocked = (item: Pick<ItemDraft, "status" | "orderStatus" | "partOrdered">) => {
+    if (item.status !== "approved") return false;
+    const normalizedOrderStatus = String(item.orderStatus ?? "").toLowerCase();
+    return (
+      normalizedOrderStatus === "ordered" ||
+      normalizedOrderStatus === "received" ||
+      normalizedOrderStatus === "returned"
+    );
+  };
+
+  const mapAdditionalLineItemsToDraft = (
+    value: any[],
+    persistedByLineItemId: PersistedNewJobDraftMap = {}
+  ): ItemDraft[] => {
+    if (!Array.isArray(value)) return [];
+    return value
+      .map((item: any, idx: number) => {
+        const lineItemId = String(item?.id ?? "");
+        const persisted = lineItemId ? persistedByLineItemId[lineItemId] ?? {} : {};
+        return {
+          id: undefined,
+          lineNo: item?.lineNo ?? idx + 1,
+          inspectionItemId: item?.id ?? null,
+          partName: String(item?.productName ?? item?.product_name ?? "").trim(),
+          description: item?.description ?? item?.reason ?? "",
+          type: "genuine" as const,
+          productType: item?.productType ?? item?.product_type ?? null,
+          quantity: Number(item?.quantity ?? 1) || 1,
+          cost: Number(persisted?.cost ?? 0) || 0,
+          sale: Number(persisted?.sale ?? 0) || 0,
+          approvedSale: Number(persisted?.approvedSale ?? 0) || 0,
+          discount: Number(persisted?.discount ?? 0) || 0,
+          gpPercent:
+            persisted?.gpPercent != null && Number.isFinite(Number(persisted.gpPercent))
+              ? Number(persisted.gpPercent)
+              : null,
+          status:
+            String(item?.status ?? "Pending").toLowerCase() === "approved"
+              ? ("approved" as EstimateItemStatus)
+              : String(item?.status ?? "Pending").toLowerCase() === "rejected"
+              ? ("rejected" as EstimateItemStatus)
+              : String(item?.status ?? "Pending").toLowerCase() === "inquiry"
+              ? ("inquiry" as EstimateItemStatus)
+              : ("pending" as EstimateItemStatus),
+          source: "estimate" as const,
+          partOrdered: item?.partOrdered ?? item?.part_ordered ?? 0,
+          orderStatus: item?.orderStatus ?? item?.order_status ?? null,
+          quoteCosts: item?.quoteCosts ?? item?.quote_costs ?? undefined,
+          approvedType: (persisted?.approvedType ?? null) as EstimateItemCostType | null,
+          approvedCost:
+            persisted?.approvedCost != null && Number.isFinite(Number(persisted.approvedCost))
+              ? Number(persisted.approvedCost)
+              : null,
+        };
+      })
+      .filter((item) => item.partName);
+  };
+
+  const mapEstimateStatusToLineItemStatus = (status?: EstimateItemStatus) => {
+    if (status === "approved") return "Approved";
+    if (status === "rejected") return "Rejected";
+    if (status === "inquiry") return "Inquiry";
+    return "Pending";
+  };
+
 
   const productTypeByName = useMemo(() => {
     const map = new Map<string, string>();
@@ -169,6 +282,8 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
         let items: EstimateItem[] = json.data?.items ?? json.items ?? json.data?.data?.items ?? [];
         let lineItemOrderMap: Record<string, number> = {};
         let lineItemOrderStatusMap: Record<string, string> = {};
+        let additionalNewJobItems: ItemDraft[] = [];
+        const persistedNewJobDraftByLineItemId = getPersistedNewJobDraftMap(estimate?.meta);
         if (estimate?.inspectionId) {
           try {
             const liRes = await fetch(
@@ -177,6 +292,14 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
             if (liRes.ok) {
               const liJson = await liRes.json();
               const liItems = liJson?.data ?? [];
+              additionalNewJobItems = mapAdditionalLineItemsToDraft(
+                liItems.filter(
+                  (li: any) =>
+                    Number(li?.isAdd ?? li?.is_add ?? 0) === 1 &&
+                    String(li?.source ?? "").toLowerCase() === "estimate"
+                ),
+                persistedNewJobDraftByLineItemId
+              );
               lineItemOrderMap = liItems.reduce((acc: Record<string, number>, li: any) => {
                 if (li?.id) acc[li.id] = li.partOrdered ?? li.part_ordered ?? 0;
                 return acc;
@@ -265,6 +388,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
               };
             }),
           });
+          setNewJobItems(additionalNewJobItems);
           setCustomer(null);
           setCar(null);
           setLead(null);
@@ -428,26 +552,113 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
     return () => document.removeEventListener("mousedown", handleClick);
   }, [productOpenIndex]);
 
-  async function saveEstimate() {
-    if (!draft) return;
+  async function saveEstimate(): Promise<ItemDraft[] | null> {
+    if (!draft) return null;
     setIsSaving(true);
     setSaveError(null);
     try {
       const newJobItemsToSave = newJobItems.filter((item) => item.partName.trim());
-      const combinedItems = [
-        ...draft.items,
-        ...newJobItemsToSave.map((item, idx) => ({
-          ...item,
-          id: undefined,
-          inspectionItemId: null,
-          lineNo: draft.items.length + idx + 1,
-        })),
-      ];
+      const nextMeta: Record<string, any> = {
+        ...(loadState.status === "loaded" ? loadState.data?.estimate?.meta ?? {} : {}),
+        customerComplain: draft.customerComplain ?? "",
+        inspectorRemarks: draft.inspectorRemarks ?? "",
+      };
+      let savedNewJobItems: ItemDraft[] = newJobItems;
+      if (estimate.inspectionId) {
+        const upserted = await Promise.all(
+          newJobItemsToSave.map(async (item, idx) => {
+            const payload = {
+              leadId: loadState.status === "loaded" ? loadState.data?.estimate?.leadId ?? null : null,
+              source: "estimate",
+              isAdd: 1,
+              productName: item.partName,
+              description: item.description ?? null,
+              quantity: item.quantity ?? 1,
+              reason: item.description ?? null,
+              status: mapEstimateStatusToLineItemStatus(item.status),
+            };
+            if (item.inspectionItemId) {
+              const res = await fetch(
+                `/api/company/${companyId}/workshop/inspections/${estimate.inspectionId}/line-items/${item.inspectionItemId}`,
+                {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(payload),
+                }
+              );
+              if (!res.ok) throw new Error(`HTTP ${res.status}`);
+              const json = await res.json().catch(() => ({}));
+              const updated = json?.data ?? null;
+              return {
+                ...item,
+                lineNo: item.lineNo ?? idx + 1,
+                inspectionItemId: updated?.id ?? item.inspectionItemId,
+              };
+            }
+            const res = await fetch(
+              `/api/company/${companyId}/workshop/inspections/${estimate.inspectionId}/line-items`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+              }
+            );
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const json = await res.json().catch(() => ({}));
+            const created = json?.data ?? null;
+            return {
+              ...item,
+              lineNo: item.lineNo ?? idx + 1,
+              inspectionItemId: created?.id ?? null,
+            };
+          })
+        );
+        const existingAdditionalIds = (inspectionLineItems ?? [])
+          .filter(
+            (li: any) =>
+              Number(li?.isAdd ?? li?.is_add ?? 0) === 1 &&
+              String(li?.source ?? "").toLowerCase() === "estimate" &&
+              !String(li?.jobCardId ?? li?.job_card_id ?? "").trim()
+          )
+          .map((li: any) => String(li?.id ?? ""))
+          .filter(Boolean);
+        const keptIds = new Set(
+          upserted.map((item) => String(item.inspectionItemId ?? "")).filter(Boolean)
+        );
+        const toDelete = existingAdditionalIds.filter((id) => !keptIds.has(id));
+        if (toDelete.length) {
+          await Promise.all(
+            toDelete.map((lineItemId) =>
+              fetch(
+                `/api/company/${companyId}/workshop/inspections/${estimate.inspectionId}/line-items/${lineItemId}`,
+                { method: "DELETE" }
+              )
+            )
+          );
+        }
+        const blankDrafts = newJobItems.filter((item) => !item.partName.trim());
+        savedNewJobItems = [...upserted, ...blankDrafts];
+      }
+      nextMeta.newJobDraftByLineItemId = savedNewJobItems.reduce((acc, item) => {
+        const lineItemId = String(item.inspectionItemId ?? "").trim();
+        if (!lineItemId) return acc;
+        acc[lineItemId] = {
+          cost: toFiniteNumberOrNull(item.cost),
+          sale: toFiniteNumberOrNull(item.sale),
+          approvedSale: toFiniteNumberOrNull(item.approvedSale),
+          discount: toFiniteNumberOrNull(item.discount),
+          approvedType: item.approvedType ?? null,
+          approvedCost: toFiniteNumberOrNull(item.approvedCost),
+          gpPercent: toFiniteNumberOrNull(item.gpPercent),
+        };
+        return acc;
+      }, {} as PersistedNewJobDraftMap);
       const body = {
         status: draft.status,
         vatRate: draft.vatRate,
         discountAmount: draft.discountAmount,
-        items: combinedItems.map((i, idx) => ({
+        meta: nextMeta,
+        items: draft.items.map((i, idx) => ({
           id: i.id,
           lineNo: i.lineNo ?? idx + 1,
           inspectionItemId: i.inspectionItemId ?? null,
@@ -474,32 +685,24 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
         body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      if (newJobItemsToSave.length > 0) {
-        setDraft((prev) =>
-          prev
-            ? {
-                ...prev,
-                items: [
-                  ...prev.items,
-                  ...newJobItemsToSave.map((item) => ({
-                    ...item,
-                    id: undefined,
-                    inspectionItemId: null,
-                    source: "estimate" as const,
-                  })),
-                ],
-              }
-            : prev
-        );
-        setNewJobItems((prev) => prev.filter((item) => !item.partName.trim()));
-      }
-      if (combinedItems.some((item) => item.status === "approved")) {
-        await orderApprovedParts(true, combinedItems);
-      }
+      setLoadState((prev) =>
+        prev.status === "loaded"
+          ? {
+              ...prev,
+              data: {
+                ...prev.data,
+                estimate: { ...prev.data.estimate, meta: nextMeta },
+              },
+            }
+          : prev
+      );
+      setNewJobItems(savedNewJobItems);
       setLastSavedAt(new Date());
+      return savedNewJobItems;
     } catch (err) {
       console.error(err);
       setSaveError("Save failed");
+      return null;
     } finally {
       setIsSaving(false);
     }
@@ -797,6 +1000,8 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
       let refreshedItems: EstimateItem[] = json.data?.items ?? json.items ?? json.data?.data?.items ?? [];
       let lineItemOrderMap: Record<string, number> = {};
       let lineItemOrderStatusMap: Record<string, string> = {};
+      let additionalNewJobItems: ItemDraft[] = [];
+      const persistedNewJobDraftByLineItemId = getPersistedNewJobDraftMap(refreshedEstimate?.meta);
       let inspectionSnapshot: any | null = null;
       if (refreshedEstimate?.inspectionId) {
         try {
@@ -817,6 +1022,14 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
           if (liRes.ok) {
             const liJson = await liRes.json();
             const liItems = liJson?.data ?? [];
+            additionalNewJobItems = mapAdditionalLineItemsToDraft(
+              liItems.filter(
+                (li: any) =>
+                  Number(li?.isAdd ?? li?.is_add ?? 0) === 1 &&
+                  String(li?.source ?? "").toLowerCase() === "estimate"
+              ),
+              persistedNewJobDraftByLineItemId
+            );
             lineItemOrderMap = liItems.reduce((acc: Record<string, number>, li: any) => {
               if (li?.id) acc[li.id] = li.partOrdered ?? li.part_ordered ?? 0;
               return acc;
@@ -899,6 +1112,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
           };
         }),
       });
+      setNewJobItems(additionalNewJobItems);
       setInspection(inspectionSnapshot);
     } catch (err) {
       console.error("Failed to refresh quotes", err);
@@ -929,7 +1143,30 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
   }
 
   function updateNewJobItem(index: number, patch: Partial<ItemDraft>) {
-    setNewJobItems((prev) => prev.map((item, idx) => (idx === index ? { ...item, ...patch } : item)));
+    setNewJobItems((prev) =>
+      prev.map((item, idx) => {
+        if (idx !== index) return item;
+        if (isApprovedOrderLocked(item)) return item;
+        return {
+          ...item,
+          ...patch,
+          partName: patch.partName ?? item.partName ?? "",
+          type: patch.type ?? item.type ?? "genuine",
+          quantity: patch.quantity ?? item.quantity ?? 0,
+          cost: patch.cost ?? item.cost ?? 0,
+          sale: patch.sale ?? item.sale ?? 0,
+          approvedSale: patch.approvedSale ?? item.approvedSale ?? 0,
+          discount: patch.discount ?? item.discount ?? 0,
+          productType: patch.productType ?? item.productType ?? null,
+          inspectionItemId: patch.inspectionItemId ?? item.inspectionItemId ?? null,
+          gpPercent: patch.gpPercent ?? item.gpPercent ?? null,
+          status: patch.status ?? item.status ?? "pending",
+          partOrdered: patch.partOrdered ?? item.partOrdered ?? 0,
+          approvedType: patch.approvedType ?? item.approvedType ?? null,
+          approvedCost: patch.approvedCost ?? item.approvedCost ?? null,
+        };
+      })
+    );
   }
 
   function removeNewJobItem(index: number) {
@@ -938,8 +1175,12 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
 
   async function createAdditionalJobCard() {
     if (!inspection?.id) return;
-    if (activeJobCardId) {
-      setSaveError("An active job card exists. Complete it before creating a new job.");
+    const inspectionLocked =
+      Boolean(inspection?.verifiedAt ?? inspection?.verified_at) ||
+      String(inspection?.status ?? "").toLowerCase() === "cancelled" ||
+      Boolean(inspection?.cancelledAt ?? inspection?.cancelled_at);
+    if (inspectionLocked) {
+      setToastMessage({ type: "error", text: "Job card cannot be created because this inspection is locked." });
       return;
     }
     const approved = newJobItems.filter((item) => item.partName.trim() && item.status === "approved");
@@ -948,45 +1189,36 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
       return;
     }
     try {
-      const createdLineItems: any[] = [];
-      for (const item of approved) {
-        const res = await fetch(`/api/company/${companyId}/workshop/inspections/${inspection.id}/line-items`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            leadId: loadState.data?.estimate?.leadId ?? null,
-            source: "estimate",
-            productName: item.partName,
-            description: item.description ?? null,
-            quantity: item.quantity ?? 1,
-            reason: item.description ?? null,
-            status: "Approved",
-          }),
-        });
-        if (!res.ok) throw new Error(`Failed to create line item: ${res.status}`);
-        const json = await res.json();
-        if (json?.data) createdLineItems.push(json.data);
+      const savedItems = await saveEstimate();
+      if (!savedItems) {
+        setSaveError("Please save line items first.");
+        return;
       }
-
-      setDraft((prev) =>
-        prev
-          ? {
-              ...prev,
-              items: [
-                ...prev.items,
-                ...approved.map((item, idx) => ({
-                  ...item,
-                  inspectionItemId: createdLineItems[idx]?.id ?? null,
-                  partOrdered: 0,
-                  orderStatus: null,
-                })),
-              ],
-            }
-          : prev
-      );
-      setNewJobItems([]);
+      const approvedLineItemIds = savedItems
+        .filter((item) => item.partName.trim() && item.status === "approved")
+        .map((item) => String(item.inspectionItemId ?? "").trim())
+        .filter(Boolean);
+      if (!approvedLineItemIds.length) {
+        setSaveError("Approved new-job line items were not saved yet.");
+        return;
+      }
+      const res = await fetch(`/api/company/${companyId}/workshop/job-cards`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ estimateId, isAdd: true, lineItemIds: approvedLineItemIds }),
+      });
+      if (res.status === 409) {
+        setJobCardMessage("Job card already active for this estimate.");
+        return;
+      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json().catch(() => ({}));
+      const id: string | null = json?.data?.id ?? json?.data?.jobCard?.id ?? null;
+      if (id) {
+        setJobCardMessage("Additional job card created successfully.");
+        setActiveJobCardId(id);
+      }
       await refreshQuoteUpdates();
-      await createWorkOrder();
     } catch (err) {
       console.error(err);
       setSaveError("Failed to create additional job card.");
@@ -1019,7 +1251,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
     setDraft((prev) => {
       if (!prev) return prev;
       const nextItems = prev.items.map((item) => {
-        const isLocked = item.partOrdered === 1 && item.status === "approved";
+        const isLocked = isApprovedOrderLocked(item);
         if (isLocked) return item;
         if (!checked) {
           if (item.approvedType !== type) return item;
@@ -1041,6 +1273,32 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
       });
       return { ...prev, items: nextItems };
     });
+  }
+
+  function applyApprovedTypeToAllNewJob(type: EstimateItemCostType, checked: boolean) {
+    setNewJobItems((prev) =>
+      prev.map((item) => {
+        const isLocked = isApprovedOrderLocked(item);
+        if (isLocked) return item;
+        if (!checked) {
+          if (item.approvedType !== type) return item;
+          return { ...item, approvedType: null };
+        }
+        const costByType = Number(item.quoteCosts?.[type]) || 0;
+        const currentApprovedCost = Number(item.approvedCost ?? item.cost ?? 0);
+        const qty = Number(item.quantity) || 0;
+        const approvedCost = costByType * qty;
+        if (item.approvedType === type && currentApprovedCost === approvedCost) {
+          return item;
+        }
+        return {
+          ...item,
+          approvedType: type,
+          approvedCost,
+          cost: costByType,
+        };
+      })
+    );
   }
 
   const estimate = loadState.data!.estimate;
@@ -1119,26 +1377,111 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
     aftm: editableItems.length > 0 && editableItems.every((item) => item.approvedType === "aftm"),
     used: editableItems.length > 0 && editableItems.every((item) => item.approvedType === "used"),
   };
+  const newJobLineItemTableTotals = (() => {
+    const summary = {
+      qty: 0,
+      oe: 0,
+      oem: 0,
+      aftm: 0,
+      used: 0,
+      approvedCost: 0,
+      approvedSale: 0,
+      discount: 0,
+      subTotal: 0,
+    };
+    for (const item of newJobItems) {
+      if (item.status === "rejected") continue;
+      const qty = Number(item.quantity) || 0;
+      const oe = Number(item.quoteCosts?.oe) || 0;
+      const oem = Number(item.quoteCosts?.oem) || 0;
+      const aftm = Number(item.quoteCosts?.aftm) || 0;
+      const used = Number(item.quoteCosts?.used) || 0;
+      const approvedCostRaw = Number(item.approvedCost);
+      const approvedCost = Number.isFinite(approvedCostRaw) ? approvedCostRaw : (Number(item.cost) || 0) * qty;
+      const approvedSale = Number(item.approvedSale ?? item.sale) || 0;
+      const lineDiscount = Number(item.discount) || 0;
+      summary.qty += qty;
+      summary.oe += oe * qty;
+      summary.oem += oem * qty;
+      summary.aftm += aftm * qty;
+      summary.used += used * qty;
+      summary.approvedCost += approvedCost;
+      summary.approvedSale += approvedSale;
+      summary.discount += lineDiscount;
+      summary.subTotal += Math.max(0, approvedSale - lineDiscount);
+    }
+    return summary;
+  })();
+  const newJobEditableItems = newJobItems.filter((item) => !isApprovedOrderLocked(item));
+  const newJobTypeSelectable = {
+    oe: newJobEditableItems.some((item) => item.quoteCosts?.oe != null),
+    oem: newJobEditableItems.some((item) => item.quoteCosts?.oem != null),
+    aftm: newJobEditableItems.some((item) => item.quoteCosts?.aftm != null),
+    used: newJobEditableItems.some((item) => item.quoteCosts?.used != null),
+  };
+  const newJobAllTypeChecked = {
+    oe: newJobEditableItems.length > 0 && newJobEditableItems.every((item) => item.approvedType === "oe"),
+    oem: newJobEditableItems.length > 0 && newJobEditableItems.every((item) => item.approvedType === "oem"),
+    aftm: newJobEditableItems.length > 0 && newJobEditableItems.every((item) => item.approvedType === "aftm"),
+    used: newJobEditableItems.length > 0 && newJobEditableItems.every((item) => item.approvedType === "used"),
+  };
   const approvedShare =
     totals && totals.approved.grandTotal + totals.pending.grandTotal > 0
       ? (totals.approved.grandTotal / (totals.approved.grandTotal + totals.pending.grandTotal)) * 100
       : 0;
   const approvedProfit = totals ? totals.approved.subTotal - totals.approved.cost : 0;
   const approvedMargin = totals && totals.approved.subTotal > 0 ? (approvedProfit / totals.approved.subTotal) * 100 : 0;
-  const newJobTotals = newJobItems.reduce(
-    (acc, item) => {
-      const sale = Number(item.approvedSale ?? 0);
-      const discount = Number(item.discount ?? 0);
-      const subTotal = Math.max(0, sale - discount);
-      return {
-        sale: acc.sale + sale,
-        discount: acc.discount + discount,
-        subTotal: acc.subTotal + subTotal,
-      };
-    },
-    { sale: 0, discount: 0, subTotal: 0 }
-  );
+  const newJobSummary = (() => {
+    const isPendingLike = (status: EstimateItemStatus) => status === "pending" || status === "inquiry";
+    const approved = { cost: 0, sale: 0, discount: 0, subTotal: 0 };
+    const pending = { cost: 0, sale: 0, discount: 0, subTotal: 0 };
+    for (const item of newJobItems) {
+      if (item.status === "rejected" || !item.partName.trim()) continue;
+      const qty = Number(item.quantity) || 0;
+      const baseCost = Number(item.cost) || 0;
+      const approvedCostRaw = Number(item.approvedCost);
+      const approvedCost = Number.isFinite(approvedCostRaw) ? approvedCostRaw : baseCost * qty;
+      const saleValue = Number(item.sale) || 0;
+      const approvedValue = Number(item.approvedSale) || 0;
+      const saleBase = approvedValue > 0 ? approvedValue : saleValue;
+      const discountAmount = Number(item.discount) || 0;
+      const subTotal = Math.max(0, saleBase - discountAmount);
+      const hasApprovedPricing = saleBase > 0;
+      if (item.status === "approved" && hasApprovedPricing) {
+        approved.cost += approvedCost;
+        approved.sale += saleBase;
+        approved.discount += discountAmount;
+        approved.subTotal += subTotal;
+      } else if (isPendingLike(item.status) || item.status === "approved") {
+        pending.cost += approvedCost;
+        pending.sale += saleBase;
+        pending.discount += discountAmount;
+        pending.subTotal += subTotal;
+      }
+    }
+    const vatRate = Number(draft?.vatRate ?? 0) || 0;
+    const approvedVat = (approved.subTotal * vatRate) / 100;
+    const pendingVat = (pending.subTotal * vatRate) / 100;
+    return {
+      approved: { ...approved, vat: approvedVat, grandTotal: approved.subTotal + approvedVat },
+      pending: { ...pending, vat: pendingVat, grandTotal: pending.subTotal + pendingVat },
+      vatRate,
+    };
+  })();
+  const newJobApprovedShare =
+    newJobSummary.approved.grandTotal + newJobSummary.pending.grandTotal > 0
+      ? (newJobSummary.approved.grandTotal /
+          (newJobSummary.approved.grandTotal + newJobSummary.pending.grandTotal)) *
+        100
+      : 0;
+  const newJobApprovedProfit = newJobSummary.approved.subTotal - newJobSummary.approved.cost;
+  const newJobApprovedMargin =
+    newJobSummary.approved.subTotal > 0
+      ? (newJobApprovedProfit / newJobSummary.approved.subTotal) * 100
+      : 0;
   const hasActiveJobCard = Boolean(activeJobCardId);
+  const canStartAdditionalJobCard =
+    newJobItems.some((item) => item.partName.trim() && item.status === "approved");
   const openJobCards = jobCards.filter((job) => {
     const s = String(job.status ?? "").toLowerCase();
     return s === "pending" || s === "re-assigned";
@@ -1353,7 +1696,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                         const lineCost = approvedCostValue;
                         const gpPercent =
                           subTotal > 0 ? ((subTotal - lineCost) / subTotal) * 100 : 0;
-                        const isLocked = hasActiveJobCard || (item.partOrdered === 1 && item.status === "approved");
+                        const isLocked = item.partOrdered === 1 && item.status === "approved";
                         const selectedApprovedType = item.approvedType ?? null;
                         return (
                           <tr key={idx} className="border-b border-slate-600/60 transition-colors odd:bg-slate-900/15 hover:bg-slate-800/25 last:border-0">
@@ -1789,6 +2132,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                         const lineCost = approvedCostValue;
                         const gpPercent = subTotal > 0 ? ((subTotal - lineCost) / subTotal) * 100 : 0;
                         const selectedApprovedType = item.approvedType ?? null;
+                        const isLocked = isApprovedOrderLocked(item);
 
                         return (
                           <tr key={`new-job-${idx}`} className="border-b border-slate-600/60 transition-colors odd:bg-slate-900/15 hover:bg-slate-800/25 last:border-0">
@@ -1799,6 +2143,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                                 }}
                                 className={`${theme.input} h-8 text-xs`}
                                 value={item.partName}
+                                disabled={isLocked}
                                 onChange={(e) => updateNewJobItem(idx, { partName: e.target.value })}
                                 placeholder="Part Name"
                                 onFocus={() => setProductOpenIndex(NEW_JOB_PRODUCT_INDEX_OFFSET + idx)}
@@ -1808,6 +2153,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                               <input
                                 className={`${theme.input} h-8 text-xs`}
                                 value={item.description ?? ""}
+                                disabled={isLocked}
                                 onChange={(e) => updateNewJobItem(idx, { description: e.target.value })}
                                 placeholder="Description"
                               />
@@ -1817,6 +2163,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                                 type="number"
                                 className={`${theme.input} h-8 w-20 text-xs`}
                                 value={item.quantity}
+                                disabled={isLocked}
                                 onChange={(e) => {
                                   const nextQty = Number(e.target.value) || 0;
                                   const selectedType = item.approvedType ?? null;
@@ -1843,7 +2190,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                                     <input
                                       type="checkbox"
                                       checked={isChecked}
-                                      disabled={!hasQuoteForType}
+                                      disabled={isLocked || !hasQuoteForType}
                                       onChange={(e) => {
                                         if (!e.target.checked) {
                                           updateNewJobItem(idx, { approvedType: null });
@@ -1869,6 +2216,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                                 type="number"
                                 className={`${theme.input} h-8 w-24 text-xs`}
                                 value={item.approvedCost ?? ""}
+                                disabled={isLocked}
                                 onChange={(e) => {
                                   const raw = e.target.value;
                                   const approvedCost = raw === "" ? null : Number(raw);
@@ -1882,6 +2230,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                                 step="0.01"
                                 className={`${theme.input} h-8 w-20 text-xs`}
                                 value={Number.isFinite(gpPercent) ? gpPercent.toFixed(2) : "0.00"}
+                                disabled={isLocked}
                                 onChange={(e) => updateNewJobItem(idx, { gpPercent: Number(e.target.value) || 0 })}
                               />
                             </td>
@@ -1890,6 +2239,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                                 type="number"
                                 className={`${theme.input} h-8 w-24 text-xs`}
                                 value={item.approvedSale}
+                                disabled={isLocked}
                                 onChange={(e) => updateNewJobItem(idx, { approvedSale: Number(e.target.value) || 0 })}
                               />
                             </td>
@@ -1898,6 +2248,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                                 type="number"
                                 className={`${theme.input} h-8 w-20 text-xs`}
                                 value={item.discount}
+                                disabled={isLocked}
                                 onChange={(e) => updateNewJobItem(idx, { discount: Number(e.target.value) || 0 })}
                               />
                             </td>
@@ -1907,6 +2258,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                                 <select
                                   className={`${theme.input} h-8 w-24 text-xs`}
                                   value={item.status}
+                                  disabled={isLocked}
                                   onChange={(e) => updateNewJobItem(idx, { status: e.target.value as EstimateItemStatus })}
                                 >
                                   <option value="pending">Pending</option>
@@ -1918,6 +2270,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                                   type="button"
                                   className="rounded-md bg-rose-600 px-2 py-1 text-[10px] font-semibold text-white"
                                   onClick={() => removeNewJobItem(idx)}
+                                  disabled={isLocked}
                                 >
                                   X
                                 </button>
@@ -1927,6 +2280,72 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                         );
                       })}
                     </tbody>
+                    {newJobItems.length > 0 && (
+                      <tfoot className={`${theme.surfaceSubtle} ${theme.appText}`}>
+                        <tr className="border-t border-slate-600/60 font-semibold">
+                          <td className="px-2 py-2 text-left">Totals</td>
+                          <td className="px-2 py-2 text-left">-</td>
+                          <td className="px-2 py-2 text-left">{newJobLineItemTableTotals.qty.toFixed(2)}</td>
+                          <td className="px-2 py-2 text-left">
+                            <label className="flex items-center gap-1.5">
+                              <input
+                                type="checkbox"
+                                checked={newJobAllTypeChecked.oe}
+                                disabled={!newJobTypeSelectable.oe}
+                                onChange={(e) => applyApprovedTypeToAllNewJob("oe", e.target.checked)}
+                              />
+                              <span>{newJobLineItemTableTotals.oe.toFixed(2)}</span>
+                            </label>
+                          </td>
+                          <td className="px-2 py-2 text-left">
+                            <label className="flex items-center gap-1.5">
+                              <input
+                                type="checkbox"
+                                checked={newJobAllTypeChecked.oem}
+                                disabled={!newJobTypeSelectable.oem}
+                                onChange={(e) => applyApprovedTypeToAllNewJob("oem", e.target.checked)}
+                              />
+                              <span>{newJobLineItemTableTotals.oem.toFixed(2)}</span>
+                            </label>
+                          </td>
+                          <td className="px-2 py-2 text-left">
+                            <label className="flex items-center gap-1.5">
+                              <input
+                                type="checkbox"
+                                checked={newJobAllTypeChecked.aftm}
+                                disabled={!newJobTypeSelectable.aftm}
+                                onChange={(e) => applyApprovedTypeToAllNewJob("aftm", e.target.checked)}
+                              />
+                              <span>{newJobLineItemTableTotals.aftm.toFixed(2)}</span>
+                            </label>
+                          </td>
+                          <td className="px-2 py-2 text-left">
+                            <label className="flex items-center gap-1.5">
+                              <input
+                                type="checkbox"
+                                checked={newJobAllTypeChecked.used}
+                                disabled={!newJobTypeSelectable.used}
+                                onChange={(e) => applyApprovedTypeToAllNewJob("used", e.target.checked)}
+                              />
+                              <span>{newJobLineItemTableTotals.used.toFixed(2)}</span>
+                            </label>
+                          </td>
+                          <td className="px-2 py-2 text-left">{newJobLineItemTableTotals.approvedCost.toFixed(2)}</td>
+                          <td className="px-2 py-2 text-left">
+                            {newJobLineItemTableTotals.subTotal > 0
+                              ? (((newJobLineItemTableTotals.subTotal - newJobLineItemTableTotals.approvedCost) /
+                                  newJobLineItemTableTotals.subTotal) *
+                                  100
+                                ).toFixed(2)
+                              : "0.00"}
+                          </td>
+                          <td className="px-2 py-2 text-left">{newJobLineItemTableTotals.approvedSale.toFixed(2)}</td>
+                          <td className="px-2 py-2 text-left">{newJobLineItemTableTotals.discount.toFixed(2)}</td>
+                          <td className="px-2 py-2 text-left">{newJobLineItemTableTotals.subTotal.toFixed(2)}</td>
+                          <td className="px-2 py-2 text-left">-</td>
+                        </tr>
+                      </tfoot>
+                    )}
                   </table>
                 </div>
                 <div className="flex items-center gap-2 rounded-md border border-slate-600/60 bg-slate-900/20 p-2">
@@ -1949,26 +2368,89 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                     Remove ?
                   </button>
                 </div>
-                <div className="grid gap-2 sm:grid-cols-3">
-                  <div className="rounded-md border border-slate-600/60 px-2 py-2">
-                    <div className="text-[10px] text-muted-foreground">Sale</div>
-                    <div className="text-sm font-semibold">{newJobTotals.sale.toFixed(2)}</div>
+                <div className="rounded-lg border border-slate-600/60 bg-slate-900/30 p-3">
+                  <div className="mb-3 grid gap-2 sm:grid-cols-3">
+                    <div className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2">
+                      <div className="text-[10px] uppercase tracking-wide text-emerald-300">Approved Share</div>
+                      <div className="text-sm font-semibold text-emerald-200">{newJobApprovedShare.toFixed(2)}%</div>
+                    </div>
+                    <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2">
+                      <div className="text-[10px] uppercase tracking-wide text-amber-300">Pending Value</div>
+                      <div className="text-sm font-semibold text-amber-200">
+                        {newJobSummary.pending.grandTotal.toFixed(2)}
+                      </div>
+                    </div>
+                    <div className="rounded-md border border-sky-500/30 bg-sky-500/10 px-3 py-2">
+                      <div className="text-[10px] uppercase tracking-wide text-sky-300">Approved Profit</div>
+                      <div className="text-sm font-semibold text-sky-200">
+                        {newJobApprovedProfit.toFixed(2)} ({newJobApprovedMargin.toFixed(2)}%)
+                      </div>
+                    </div>
                   </div>
-                  <div className="rounded-md border border-slate-600/60 px-2 py-2">
-                    <div className="text-[10px] text-muted-foreground">Discount</div>
-                    <div className="text-sm font-semibold">{newJobTotals.discount.toFixed(2)}</div>
-                  </div>
-                  <div className="rounded-md border border-slate-600/60 px-2 py-2">
-                    <div className="text-[10px] text-muted-foreground">Sub Total</div>
-                    <div className="text-sm font-semibold">{newJobTotals.subTotal.toFixed(2)}</div>
+                  <div className="overflow-x-auto rounded-md border border-slate-600/60">
+                    <table className="min-w-full text-xs">
+                      <thead className={`${theme.surfaceSubtle} ${theme.appText}`}>
+                        <tr>
+                          <th className="px-3 py-2 text-left">Metric</th>
+                          <th className="px-3 py-2 text-right">Pending</th>
+                          <th className="px-3 py-2 text-right">Approved</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="border-t border-slate-600/60">
+                          <td className="px-3 py-2">Total Cost</td>
+                          <td className="px-3 py-2 text-right">{newJobSummary.pending.cost.toFixed(2)}</td>
+                          <td className="px-3 py-2 text-right">{newJobSummary.approved.cost.toFixed(2)}</td>
+                        </tr>
+                        <tr className="border-t border-slate-600/60">
+                          <td className="px-3 py-2">Total Sale</td>
+                          <td className="px-3 py-2 text-right">{newJobSummary.pending.sale.toFixed(2)}</td>
+                          <td className="px-3 py-2 text-right">{newJobSummary.approved.sale.toFixed(2)}</td>
+                        </tr>
+                        <tr className="border-t border-slate-600/60">
+                          <td className="px-3 py-2">Discount</td>
+                          <td className="px-3 py-2 text-right">{newJobSummary.pending.discount.toFixed(2)}</td>
+                          <td className="px-3 py-2 text-right">{newJobSummary.approved.discount.toFixed(2)}</td>
+                        </tr>
+                        <tr className="border-t border-slate-600/60">
+                          <td className="px-3 py-2">Sub Total</td>
+                          <td className="px-3 py-2 text-right">{newJobSummary.pending.subTotal.toFixed(2)}</td>
+                          <td className="px-3 py-2 text-right">{newJobSummary.approved.subTotal.toFixed(2)}</td>
+                        </tr>
+                        <tr className="border-t border-slate-600/60">
+                          <td className="px-3 py-2">{`VAT (${newJobSummary.vatRate}%)`}</td>
+                          <td className="px-3 py-2 text-right">{newJobSummary.pending.vat.toFixed(2)}</td>
+                          <td className="px-3 py-2 text-right">{newJobSummary.approved.vat.toFixed(2)}</td>
+                        </tr>
+                      </tbody>
+                      <tfoot>
+                        <tr className="border-t border-slate-500/80 bg-slate-800/40 font-semibold">
+                          <td className="px-3 py-2">Grand Total</td>
+                          <td className="px-3 py-2 text-right">{newJobSummary.pending.grandTotal.toFixed(2)}</td>
+                          <td className="px-3 py-2 text-right">{newJobSummary.approved.grandTotal.toFixed(2)}</td>
+                        </tr>
+                      </tfoot>
+                    </table>
                   </div>
                 </div>
-                <div className="flex justify-end">
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={saveEstimate}
+                    className="rounded-md border border-emerald-500/60 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-200"
+                    disabled={isSaving}
+                  >
+                    {isSaving ? "Saving..." : "Save Line Items"}
+                  </button>
                   <button
                     type="button"
                     onClick={createAdditionalJobCard}
-                    className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white"
-                    disabled={hasActiveJobCard}
+                    className={`rounded-md px-3 py-1.5 text-xs font-semibold ${
+                      canStartAdditionalJobCard
+                        ? "bg-indigo-600 text-white"
+                        : "cursor-not-allowed bg-slate-600/60 text-white/60"
+                    }`}
+                    disabled={!canStartAdditionalJobCard}
                   >
                     Create New Job Card
                   </button>
@@ -2188,6 +2670,17 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+      {toastMessage && (
+        <div className="fixed right-4 top-4 z-[70]">
+          <div
+            className={`rounded-md px-3 py-2 text-xs font-semibold text-white shadow-lg ${
+              toastMessage.type === "success" ? "bg-emerald-500" : "bg-rose-500"
+            }`}
+          >
+            {toastMessage.text}
           </div>
         </div>
       )}

@@ -19,8 +19,8 @@ export async function GET(req: NextRequest, { params }: Params) {
         LOWER(pq.status) IN ('pending', 'quoted', 'approved')
         OR (
           LOWER(pq.status) = 'pending'
-          AND LOWER(COALESCE(ei.status, iori.status)) IN ('approved', 'inquiry')
-          AND COALESCE(ei.status, iori.status) IS NOT NULL
+          AND LOWER(COALESCE(ei.status, li.status, iori.status)) IN ('approved', 'inquiry', 'pending')
+          AND COALESCE(ei.status, li.status, iori.status) IS NOT NULL
         )
       )`;
     }
@@ -54,9 +54,10 @@ export async function GET(req: NextRequest, { params }: Params) {
       pq.inventory_request_item_id,
       pq.inventory_request_id,
       pq.estimate_item_id,
+      pq.line_item_id,
       v.name AS vendor_name,
-      COALESCE(ei.part_name, iori.part_name) AS part_name,
-      LOWER(COALESCE(ei.status, iori.status)) AS item_status,
+      COALESCE(ei.part_name, li.product_name, iori.part_name) AS part_name,
+      LOWER(COALESCE(ei.status, li.status, iori.status)) AS item_status,
       ei.approved_type,
       car.id AS car_id,
       car.make AS car_make,
@@ -67,11 +68,13 @@ export async function GET(req: NextRequest, { params }: Params) {
       v.id AS vendor_id
     FROM part_quotes pq
     LEFT JOIN estimate_items ei ON ei.id = pq.estimate_item_id
+    LEFT JOIN line_items li ON li.id = pq.line_item_id
     LEFT JOIN estimates est ON est.id = pq.estimate_id
+    LEFT JOIN inspections li_inspection ON li_inspection.id = li.inspection_id
     LEFT JOIN inventory_order_request_items iori ON iori.id = pq.inventory_request_item_id
     LEFT JOIN inventory_order_requests ior ON ior.id = pq.inventory_request_id
     LEFT JOIN vendors v ON v.id = pq.vendor_id
-    LEFT JOIN cars car ON car.id = est.car_id
+    LEFT JOIN cars car ON car.id = COALESCE(est.car_id, li_inspection.car_id)
     WHERE pq.company_id = ${companyId}
       ${statusFilter}
     ORDER BY pq.updated_at DESC
@@ -92,6 +95,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     sourceType: row.inventory_request_item_id ? "inventory" : "estimate",
     inventoryRequestItemId: row.inventory_request_item_id ?? null,
     estimateItemId: row.estimate_item_id ?? null,
+    lineItemId: row.line_item_id ?? null,
     vendorId: row.vendor_id ?? null,
     oem: row.oem != null ? Number(row.oem) : null,
     oe: row.oe != null ? Number(row.oe) : null,

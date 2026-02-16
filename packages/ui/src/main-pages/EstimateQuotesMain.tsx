@@ -352,6 +352,18 @@ export function EstimateQuotesMain({
     return rows;
   }, [data.leads, latestInspectionByLead]);
 
+  const latestJobCardByEstimateId = useMemo(() => {
+    const map = new Map<string, JobCardRow>();
+    data.jobCards.forEach((row) => {
+      const estimateId = String(row.estimate_id ?? "").trim();
+      if (!estimateId) return;
+      if (!map.has(estimateId)) {
+        map.set(estimateId, row);
+      }
+    });
+    return map;
+  }, [data.jobCards]);
+
   async function openVerifyModal(row: PendingInspectionRow) {
     if (row.hasInspection === false) return;
     setVerifyOpen(true);
@@ -944,38 +956,75 @@ export function EstimateQuotesMain({
                     ))}
 
                   {activeConfig.kind === "estimates" &&
-                    (filteredRows as Estimate[]).map((row) => (
-                      <div key={row.id} className="rounded-xl border border-border/30 bg-background/70 p-3">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="text-sm font-semibold text-primary">{row.id.slice(0, 8)}...</div>
-                          <span className="inline-flex items-center rounded-full bg-muted px-2 py-1 text-[10px] font-semibold uppercase text-foreground">
-                            {row.status.replace("_", " ")}
-                          </span>
-                        </div>
-                        <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                          <div>
-                            <div className="text-muted-foreground">Inspection</div>
-                            <div>{row.inspectionId.slice(0, 8)}...</div>
+                    (filteredRows as Estimate[]).map((row) => {
+                      const lead = row.leadId ? leadById.get(row.leadId) : null;
+                      const jobCard = latestJobCardByEstimateId.get(row.id);
+                      return (
+                        <div key={row.id} className="rounded-xl border border-border/30 bg-background/70 p-3">
+                          {activeTab === "quotation-pending" ? (
+                            <div className="flex items-start justify-end gap-3">
+                              <span className="inline-flex items-center rounded-full bg-muted px-2 py-1 text-[10px] font-semibold uppercase text-foreground">
+                                {row.status.replace("_", " ")}
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="text-sm font-semibold text-primary">{row.id.slice(0, 8)}...</div>
+                              <span className="inline-flex items-center rounded-full bg-muted px-2 py-1 text-[10px] font-semibold uppercase text-foreground">
+                                {row.status.replace("_", " ")}
+                              </span>
+                            </div>
+                          )}
+                          {activeTab === "quotation-pending" ? (
+                            <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                              <div>
+                                <div className="text-muted-foreground">Car</div>
+                                <div>{lead?.carPlateNumber ?? "N/A"}</div>
+                              </div>
+                              <div>
+                                <div className="text-muted-foreground">Model</div>
+                                <div>{lead?.carModel ?? "N/A"}</div>
+                              </div>
+                              <div>
+                                <div className="text-muted-foreground">Job ID</div>
+                                <div>{jobCard?.id ? `JC-${jobCard.id.slice(0, 8)}...` : "-"}</div>
+                              </div>
+                              <div>
+                                <div className="text-muted-foreground">Job Status</div>
+                                <div className="uppercase">{jobCard?.status ?? "-"}</div>
+                              </div>
+                              <div className="col-span-2">
+                                <div className="text-muted-foreground">Date</div>
+                                <div>{formatDate(row.updatedAt)}</div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                              <div>
+                                <div className="text-muted-foreground">Inspection</div>
+                                <div>{row.inspectionId.slice(0, 8)}...</div>
+                              </div>
+                              <div>
+                                <div className="text-muted-foreground">Total</div>
+                                <div>{row.grandTotal.toFixed(2)}</div>
+                              </div>
+                              <div className="col-span-2">
+                                <div className="text-muted-foreground">Updated</div>
+                                <div>{formatDate(row.updatedAt)}</div>
+                              </div>
+                            </div>
+                          )}
+                          <div className="mt-3">
+                            <a
+                              href={`/company/${companyId}/estimates/${row.id}`}
+                              className="inline-flex items-center rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition hover:bg-slate-50"
+                            >
+                              Open
+                            </a>
                           </div>
-                          <div>
-                            <div className="text-muted-foreground">Total</div>
-                            <div>{row.grandTotal.toFixed(2)}</div>
-                          </div>
-                          <div className="col-span-2">
-                            <div className="text-muted-foreground">Updated</div>
-                            <div>{formatDate(row.updatedAt)}</div>
-                          </div>
                         </div>
-                        <div className="mt-3">
-                          <a
-                            href={`/company/${companyId}/estimates/${row.id}`}
-                            className="inline-flex items-center rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition hover:bg-slate-50"
-                          >
-                            Open
-                          </a>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
 
                   {activeConfig.kind === "quotes" &&
                     (filteredRows as Quote[]).map((row) => {
@@ -1159,34 +1208,61 @@ export function EstimateQuotesMain({
               <table className="min-w-full text-sm">
                 <thead>
                   <tr className="bg-muted/40 text-xs text-muted-foreground">
-                    <th className="py-2 pl-3 pr-4 text-left">Estimate</th>
-                    <th className="py-2 px-4 text-left">Inspection</th>
-                    <th className="py-2 px-4 text-left">Status</th>
-                    <th className="py-2 px-4 text-left">Grand Total</th>
-                    <th className="py-2 px-4 text-left">Updated</th>
+                    {activeTab === "quotation-pending" ? (
+                      <>
+                        <th className="py-2 px-4 text-left">Car Details</th>
+                        <th className="py-2 px-4 text-left">Job Details</th>
+                        <th className="py-2 px-4 text-left">Date</th>
+                      </>
+                    ) : (
+                      <>
+                        <th className="py-2 pl-3 pr-4 text-left">Estimate</th>
+                        <th className="py-2 px-4 text-left">Inspection</th>
+                        <th className="py-2 px-4 text-left">Status</th>
+                        <th className="py-2 px-4 text-left">Grand Total</th>
+                        <th className="py-2 px-4 text-left">Updated</th>
+                      </>
+                    )}
                     <th className="py-2 px-4 text-left">Action</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {(filteredRows as Estimate[]).map((row) => (
-                    <tr key={row.id}>
-                      <td className="py-2 pl-3 pr-4">
-                        <div className="font-medium">{row.id.slice(0, 8)}...</div>
-                      </td>
-                      <td className="py-2 px-4 text-xs">{row.inspectionId.slice(0, 8)}...</td>
-                      <td className="py-2 px-4 text-xs capitalize">{row.status.replace("_", " ")}</td>
-                      <td className="py-2 px-4 text-xs">{row.grandTotal.toFixed(2)}</td>
-                      <td className="py-2 px-4 text-xs text-muted-foreground">{formatDate(row.updatedAt)}</td>
-                      <td className="py-2 px-4 text-xs">
-                        <a
-                          href={`/company/${companyId}/estimates/${row.id}`}
-                          className="rounded-md border px-2 py-1"
-                        >
-                          Open
-                        </a>
-                      </td>
-                    </tr>
-                  ))}
+                  {(filteredRows as Estimate[]).map((row) => {
+                    const lead = row.leadId ? leadById.get(row.leadId) : null;
+                    const jobCard = latestJobCardByEstimateId.get(row.id);
+                    return (
+                      <tr key={row.id}>
+                        {activeTab === "quotation-pending" ? (
+                          <>
+                            <td className="py-2 px-4 text-xs">
+                              <div>{lead?.carPlateNumber ?? "N/A"}</div>
+                              <div className="text-[10px] text-muted-foreground">{lead?.carModel ?? "N/A"}</div>
+                            </td>
+                            <td className="py-2 px-4 text-xs">
+                              <div>{jobCard?.id ? `JC-${jobCard.id.slice(0, 8)}...` : "-"}</div>
+                              <div className="text-[10px] uppercase text-muted-foreground">{jobCard?.status ?? "-"}</div>
+                            </td>
+                            <td className="py-2 px-4 text-xs text-muted-foreground">{formatDate(row.updatedAt)}</td>
+                          </>
+                        ) : (
+                          <>
+                            <td className="py-2 px-4 text-xs">{row.inspectionId.slice(0, 8)}...</td>
+                            <td className="py-2 px-4 text-xs capitalize">{row.status.replace("_", " ")}</td>
+                            <td className="py-2 px-4 text-xs">{row.grandTotal.toFixed(2)}</td>
+                            <td className="py-2 px-4 text-xs text-muted-foreground">{formatDate(row.updatedAt)}</td>
+                          </>
+                        )}
+                        <td className="py-2 px-4 text-xs">
+                          <a
+                            href={`/company/${companyId}/estimates/${row.id}`}
+                            className="rounded-md border px-2 py-1"
+                          >
+                            Open
+                          </a>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             ) : activeConfig.kind === "quotes" ? (
