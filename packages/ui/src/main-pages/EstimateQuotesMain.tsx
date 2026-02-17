@@ -24,6 +24,12 @@ type JobCardRow = {
   plate_number?: string | null;
   make?: string | null;
   model?: string | null;
+  workshop_quote_id?: string | null;
+  workshop_quote_status?: string | null;
+  workshop_quote_total_amount?: number | null;
+  workshop_quote_currency?: string | null;
+  workshop_quote_verified_at?: string | null;
+  workshop_quote_verified_by?: string | null;
 };
 
 type InspectionRow = Inspection & {
@@ -58,6 +64,17 @@ type TabConfig = {
   kind: TabKind;
   group: "inspection" | "service" | "jc";
   filter: (data: EstimateQuotesData) => any[];
+};
+
+type QuotedJobCardGroup = {
+  key: string;
+  jobCardId: string | null;
+  estimateId: string | null;
+  carPlate: string;
+  carModel: string;
+  workshopName: string;
+  updatedAt: string | null;
+  quotes: Quote[];
 };
 
 type CostSettings = {
@@ -135,6 +152,16 @@ export function EstimateQuotesMain({
   const [verifyLoading, setVerifyLoading] = useState(false);
   const [verifySubmitting, setVerifySubmitting] = useState(false);
   const [verifyError, setVerifyError] = useState<string | null>(null);
+  const [quoteWorkflowLoadingId, setQuoteWorkflowLoadingId] = useState<string | null>(null);
+  const [jobVerifyLoadingId, setJobVerifyLoadingId] = useState<string | null>(null);
+  const [jobVerifyOpen, setJobVerifyOpen] = useState(false);
+  const [jobVerifyRow, setJobVerifyRow] = useState<JobCardRow | null>(null);
+  const [jobVerifyDetails, setJobVerifyDetails] = useState<any | null>(null);
+  const [jobVerifyDetailsLoading, setJobVerifyDetailsLoading] = useState(false);
+  const [jobVerifyError, setJobVerifyError] = useState<string | null>(null);
+  const [jobVerifyVatRate, setJobVerifyVatRate] = useState(0);
+  const [jobVerifyCurrency, setJobVerifyCurrency] = useState("USD");
+  const [quotesModalGroupKey, setQuotesModalGroupKey] = useState<string | null>(null);
   const [cancelRemarks, setCancelRemarks] = useState("");
   const [costSettings, setCostSettings] = useState<CostSettings>({
     inspectionFixedAmount: 0,
@@ -364,6 +391,31 @@ export function EstimateQuotesMain({
     return map;
   }, [data.jobCards]);
 
+  const latestBranchQuoteStatusByEstimateId = useMemo(() => {
+    const map = new Map<string, string>();
+    const sorted = [...data.quotes]
+      .filter((row) => row.quoteType === "branch_labor" && !!row.estimateId)
+      .sort(
+        (a, b) =>
+          new Date(b.updatedAt ?? b.createdAt ?? 0).getTime() -
+          new Date(a.updatedAt ?? a.createdAt ?? 0).getTime()
+      );
+    sorted.forEach((row) => {
+      const estimateId = String(row.estimateId ?? "").trim();
+      if (!estimateId || map.has(estimateId)) return;
+      map.set(estimateId, String(row.status ?? "").toLowerCase());
+    });
+    return map;
+  }, [data.quotes]);
+
+  const jobCardById = useMemo(() => {
+    const map = new Map<string, JobCardRow>();
+    data.jobCards.forEach((row) => {
+      if (row?.id) map.set(row.id, row);
+    });
+    return map;
+  }, [data.jobCards]);
+
   async function openVerifyModal(row: PendingInspectionRow) {
     if (row.hasInspection === false) return;
     setVerifyOpen(true);
@@ -575,14 +627,26 @@ export function EstimateQuotesMain({
         label: "In Process",
         kind: "jobCards",
         group: "jc",
-        filter: (d) => d.jobCards.filter((row) => row.start_at && !row.complete_at),
+        filter: (d) =>
+          d.jobCards.filter((row) => {
+            const completedByTime = Boolean(row.complete_at);
+            const completedByStatus = String(row.status ?? "").toLowerCase() === "completed";
+            if (completedByTime || completedByStatus) return false;
+            if (row.start_at && !row.complete_at) return true;
+            const estimateId = String(row.estimate_id ?? "").trim();
+            if (!estimateId) return false;
+            return latestBranchQuoteStatusByEstimateId.get(estimateId) === "accepted";
+          }),
       },
       {
         id: "completed",
         label: "Completed",
         kind: "jobCards",
         group: "jc",
-        filter: (d) => d.jobCards.filter((row) => (row.status ?? "").toLowerCase() === "completed"),
+        filter: (d) =>
+          d.jobCards.filter(
+            (row) => (row.status ?? "").toLowerCase() === "completed" || Boolean(row.complete_at)
+          ),
       },
       {
         id: "verified",
@@ -596,7 +660,12 @@ export function EstimateQuotesMain({
         label: "Quoted JC",
         kind: "quotes",
         group: "jc",
-        filter: (d) => d.quotes.filter((row) => ["quoted", "approved"].includes(row.status)),
+        filter: (d) =>
+          d.quotes.filter(
+            (row) =>
+              row.quoteType === "branch_labor" &&
+              ["pending", "quoted", "approved", "negotiation", "accepted", "rejected"].includes(row.status)
+          ),
       },
       {
         id: "quotation-pending",
@@ -635,11 +704,115 @@ export function EstimateQuotesMain({
         filter: (d) => d.estimates.filter((row) => row.status === "approved"),
       },
     ],
-    [pendingInspectionRows, latestInspectionRows]
+    [pendingInspectionRows, latestInspectionRows, latestBranchQuoteStatusByEstimateId]
   );
 
   const activeConfig = tabs.find((tab) => tab.id === activeTab) ?? tabs[0];
   const activeRows = activeConfig ? activeConfig.filter(data) : [];
+  async function applyQuoteWorkflowAction(
+    quoteId: string,
+    action: "accepted" | "negotiation" | "rejected"
+  ) {
+    if (!quoteId) return;
+    let negotiatedAmount: number | null = null;
+    if (action === "negotiation") {
+      const entered = window.prompt("Enter negotiated amount");
+      if (entered === null) return;
+      const amount = Number(entered);
+      if (!Number.isFinite(amount) || amount <= 0) {
+        window.alert("Enter a valid negotiated amount.");
+        return;
+      }
+      negotiatedAmount = amount;
+    }
+    setQuoteWorkflowLoadingId(quoteId);
+    try {
+      const res = await fetch(`/api/company/${companyId}/workshop/quotes/${quoteId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          workflowAction: action,
+          negotiatedAmount,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error ?? `HTTP ${res.status}`);
+      await load();
+    } catch (err: any) {
+      window.alert(err?.message ?? "Failed to update quote workflow.");
+    } finally {
+      setQuoteWorkflowLoadingId(null);
+    }
+  }
+
+  function canVerifyCompletedJob(row: JobCardRow) {
+    const completed = Boolean(row.complete_at) || String(row.status ?? "").toLowerCase() === "completed";
+    if (!completed) return false;
+    const quoteStatus = String(row.workshop_quote_status ?? "").toLowerCase();
+    if (quoteStatus !== "accepted") return false;
+    if (row.workshop_quote_verified_at) return false;
+    return true;
+  }
+
+  async function openJobVerifyModal(row: JobCardRow) {
+    if (!canVerifyCompletedJob(row)) return;
+    setJobVerifyOpen(true);
+    setJobVerifyRow(row);
+    setJobVerifyDetails(null);
+    setJobVerifyError(null);
+    setJobVerifyVatRate(0);
+    setJobVerifyCurrency(String(row.workshop_quote_currency ?? "USD"));
+    setJobVerifyDetailsLoading(true);
+    try {
+      const [jobRes, settingsRes] = await Promise.all([
+        fetch(`/api/company/${companyId}/workshop/job-cards/${row.id}`),
+        fetch(`/api/company/${companyId}/workshop/cost-settings`),
+      ]);
+      const jobJson = await jobRes.json().catch(() => ({}));
+      if (!jobRes.ok) throw new Error(jobJson?.error ?? "Failed to load job card details.");
+      setJobVerifyDetails(jobJson?.data ?? null);
+      if (settingsRes.ok) {
+        const settingsJson = await settingsRes.json().catch(() => ({}));
+        const settings = settingsJson?.data ?? {};
+        setJobVerifyVatRate(Number(settings.vatRate ?? 0));
+        setJobVerifyCurrency(String(row.workshop_quote_currency ?? settings.currency ?? "USD"));
+      }
+    } catch (err: any) {
+      setJobVerifyError(err?.message ?? "Failed to load job card details.");
+    } finally {
+      setJobVerifyDetailsLoading(false);
+    }
+  }
+
+  function closeJobVerifyModal() {
+    setJobVerifyOpen(false);
+    setJobVerifyRow(null);
+    setJobVerifyDetails(null);
+    setJobVerifyError(null);
+    setJobVerifyDetailsLoading(false);
+  }
+
+  async function submitJobVerify() {
+    if (!jobVerifyRow) return;
+    if (!canVerifyCompletedJob(jobVerifyRow)) return;
+    setJobVerifyLoadingId(jobVerifyRow.id);
+    setJobVerifyError(null);
+    try {
+      const res = await fetch(`/api/company/${companyId}/workshop/job-cards/${jobVerifyRow.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "verify" }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error ?? "Failed to verify job card.");
+      await load();
+      closeJobVerifyModal();
+    } catch (err: any) {
+      setJobVerifyError(err?.message ?? "Failed to verify job card.");
+    } finally {
+      setJobVerifyLoadingId(null);
+    }
+  }
   const rangeFilteredRows = useMemo(() => {
     if (activeTab !== "completed-insp" || activeConfig.kind !== "inspections") return activeRows;
     if (!completedDateFilterEnabled) return activeRows;
@@ -716,6 +889,56 @@ export function EstimateQuotesMain({
         return rangeFilteredRows;
     }
   }, [activeConfig.kind, query, rangeFilteredRows]);
+
+  const quotedJobCardGroups = useMemo<QuotedJobCardGroup[]>(() => {
+    if (activeTab !== "quoted-job-cards" || activeConfig.kind !== "quotes") return [];
+    const rows = filteredRows as Quote[];
+    const groups = new Map<string, QuotedJobCardGroup>();
+    rows.forEach((row) => {
+      const meta = (row.meta ?? {}) as Record<string, unknown>;
+      const metaJobCardId = typeof meta.jobCardId === "string" ? meta.jobCardId : null;
+      const byEstimate = row.estimateId ? latestJobCardByEstimateId.get(row.estimateId) : null;
+      const linkedJobCard = (metaJobCardId ? jobCardById.get(metaJobCardId) : null) ?? byEstimate ?? null;
+      const key = linkedJobCard?.id ?? row.estimateId ?? row.id;
+      const lead = linkedJobCard?.lead_id ? leadById.get(linkedJobCard.lead_id) : null;
+      const updatedAt = row.updatedAt ?? row.createdAt ?? null;
+
+      const existing = groups.get(key);
+      if (existing) {
+        existing.quotes.push(row);
+        if (updatedAt && (!existing.updatedAt || new Date(updatedAt).getTime() > new Date(existing.updatedAt).getTime())) {
+          existing.updatedAt = updatedAt;
+        }
+        return;
+      }
+
+      groups.set(key, {
+        key,
+        jobCardId: linkedJobCard?.id ?? null,
+        estimateId: row.estimateId ?? null,
+        carPlate: linkedJobCard?.plate_number ?? lead?.carPlateNumber ?? "N/A",
+        carModel: [linkedJobCard?.make, linkedJobCard?.model].filter(Boolean).join(" ") || lead?.carModel || "N/A",
+        workshopName: linkedJobCard?.branch_name ?? lead?.branchName ?? row.branchId ?? "Unassigned",
+        updatedAt,
+        quotes: [row],
+      });
+    });
+
+    return Array.from(groups.values())
+      .map((group) => ({
+        ...group,
+        quotes: [...group.quotes].sort(
+          (a, b) => new Date(b.updatedAt ?? b.createdAt ?? 0).getTime() - new Date(a.updatedAt ?? a.createdAt ?? 0).getTime()
+        ),
+      }))
+      .sort((a, b) => new Date(b.updatedAt ?? 0).getTime() - new Date(a.updatedAt ?? 0).getTime());
+  }, [activeConfig.kind, activeTab, filteredRows, jobCardById, latestJobCardByEstimateId, leadById]);
+
+  const activeQuotesModalGroup = useMemo(
+    () => quotedJobCardGroups.find((group) => group.key === quotesModalGroupKey) ?? null,
+    [quotedJobCardGroups, quotesModalGroupKey]
+  );
+  const visibleRecordsCount = activeTab === "quoted-job-cards" ? quotedJobCardGroups.length : filteredRows.length;
 
   function formatDate(value?: string | null) {
     if (!value) return "N/A";
@@ -811,7 +1034,7 @@ export function EstimateQuotesMain({
                 >
                   Refresh
                 </button>
-                <span className="text-xs text-muted-foreground">{filteredRows.length} records</span>
+                <span className="text-xs text-muted-foreground">{visibleRecordsCount} records</span>
                 {activeTab === "completed-insp" && (
                   <div className="relative ml-2">
                     <button
@@ -907,7 +1130,7 @@ export function EstimateQuotesMain({
                 </span>
               </div>
             </div>
-            {filteredRows.length === 0 ? (
+            {(activeTab === "quoted-job-cards" ? quotedJobCardGroups.length === 0 : filteredRows.length === 0) ? (
               <div className="px-4 py-6 text-xs text-muted-foreground">No records found.</div>
             ) : (
               <>
@@ -944,13 +1167,28 @@ export function EstimateQuotesMain({
                             <div>{formatDate(row.complete_at)}</div>
                           </div>
                         </div>
-                        <div className="mt-3">
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
                           <a
                             href={`/company/${companyId}/workshop/job-cards/${row.id}`}
                             className="inline-flex items-center rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition hover:bg-slate-50"
                           >
                             Open
                           </a>
+                          {activeTab === "completed" && canVerifyCompletedJob(row) ? (
+                            <button
+                              type="button"
+                              onClick={() => openJobVerifyModal(row)}
+                              disabled={jobVerifyLoadingId === row.id}
+                              className="inline-flex items-center rounded-md bg-emerald-600 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-white transition hover:bg-emerald-500 disabled:opacity-60"
+                            >
+                              {jobVerifyLoadingId === row.id ? "Verifying..." : "Verify"}
+                            </button>
+                          ) : null}
+                          {activeTab === "completed" && row.workshop_quote_verified_at ? (
+                            <span className="inline-flex items-center rounded-full bg-emerald-500/15 px-2 py-1 text-[10px] font-semibold uppercase text-emerald-400">
+                              Verified
+                            </span>
+                          ) : null}
                         </div>
                       </div>
                     ))}
@@ -1027,11 +1265,59 @@ export function EstimateQuotesMain({
                     })}
 
                   {activeConfig.kind === "quotes" &&
-                    (filteredRows as Quote[]).map((row) => {
+                    (activeTab === "quoted-job-cards" ? quotedJobCardGroups : (filteredRows as Quote[])).map((entry: any) => {
+                      if (activeTab === "quoted-job-cards") {
+                        const group = entry as QuotedJobCardGroup;
+                        return (
+                          <div key={group.key} className="rounded-xl border border-border/30 bg-background/70 p-3">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="text-sm font-semibold text-primary">
+                                {group.jobCardId ? `JC-${group.jobCardId.slice(0, 8)}...` : group.estimateId ? `EST-${group.estimateId.slice(0, 8)}...` : "Quoted Job"}
+                              </div>
+                              <span className="inline-flex items-center rounded-full bg-muted px-2 py-1 text-[10px] font-semibold uppercase text-foreground">
+                                {group.quotes.length} Quotes
+                              </span>
+                            </div>
+                            <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                              <div>
+                                <div className="text-muted-foreground">Car</div>
+                                <div>{group.carPlate}</div>
+                                <div className="text-[10px] text-muted-foreground">{group.carModel}</div>
+                              </div>
+                              <div>
+                                <div className="text-muted-foreground">Workshop</div>
+                                <div>{group.workshopName}</div>
+                              </div>
+                              <div className="col-span-2">
+                                <div className="text-muted-foreground">Latest Update</div>
+                                <div>{formatDate(group.updatedAt)}</div>
+                              </div>
+                            </div>
+                            <div className="mt-3">
+                              <button
+                                type="button"
+                                onClick={() => setQuotesModalGroupKey(group.key)}
+                                className="inline-flex items-center rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition hover:bg-slate-50"
+                              >
+                                View Quotes
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      }
+                      const row = entry as Quote;
                       const quoteHref =
                         row.quoteType === "branch_labor"
                           ? `/company/${companyId}/quotes/branch/${row.id}`
                           : `/company/${companyId}/quotes/vendor/${row.id}`;
+                      const jobCard = row.estimateId ? latestJobCardByEstimateId.get(row.estimateId) : null;
+                      const lead = jobCard?.lead_id ? leadById.get(jobCard.lead_id) : null;
+                      const carPlate = jobCard?.plate_number ?? lead?.carPlateNumber ?? "N/A";
+                      const carModel =
+                        [jobCard?.make, jobCard?.model].filter(Boolean).join(" ") ||
+                        lead?.carModel ||
+                        "N/A";
+                      const workshopName = jobCard?.branch_name ?? lead?.branchName ?? row.branchId ?? "Unassigned";
                       return (
                         <div key={row.id} className="rounded-xl border border-border/30 bg-background/70 p-3">
                           <div className="flex items-start justify-between gap-3">
@@ -1042,25 +1328,60 @@ export function EstimateQuotesMain({
                           </div>
                           <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
                             <div>
-                              <div className="text-muted-foreground">Type</div>
-                              <div>{row.quoteType.replace("_", " ")}</div>
+                              <div className="text-muted-foreground">Car</div>
+                              <div>{carPlate}</div>
+                              <div className="text-[10px] text-muted-foreground">{carModel}</div>
                             </div>
                             <div>
+                              <div className="text-muted-foreground">Workshop</div>
+                              <div>{workshopName}</div>
+                            </div>
+                            <div className="col-span-2">
                               <div className="text-muted-foreground">Total</div>
                               <div>{row.totalAmount.toFixed(2)}</div>
                             </div>
-                            <div className="col-span-2">
-                              <div className="text-muted-foreground">Estimate</div>
-                              <div>{row.estimateId ? `EST-${row.estimateId.slice(0, 8)}...` : "-"}</div>
-                            </div>
                           </div>
                           <div className="mt-3">
-                            <a
-                              href={quoteHref}
-                              className="inline-flex items-center rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition hover:bg-slate-50"
-                            >
-                              Open
-                            </a>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <a
+                                href={quoteHref}
+                                className="inline-flex items-center rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition hover:bg-slate-50"
+                              >
+                                Open
+                              </a>
+                              {activeTab === "quoted-job-cards" ? (
+                                <>
+                                  {["pending", "quoted", "negotiation"].includes(String(row.status ?? "").toLowerCase()) ? (
+                                    <>
+                                      <button
+                                        type="button"
+                                        disabled={quoteWorkflowLoadingId === row.id}
+                                        onClick={() => applyQuoteWorkflowAction(row.id, "accepted")}
+                                        className="rounded-md bg-emerald-600 px-2 py-1 text-[10px] font-semibold uppercase text-white disabled:opacity-60"
+                                      >
+                                        Accept
+                                      </button>
+                                      <button
+                                        type="button"
+                                        disabled={quoteWorkflowLoadingId === row.id}
+                                        onClick={() => applyQuoteWorkflowAction(row.id, "negotiation")}
+                                        className="rounded-md bg-amber-500 px-2 py-1 text-[10px] font-semibold uppercase text-slate-900 disabled:opacity-60"
+                                      >
+                                        Negotiate
+                                      </button>
+                                      <button
+                                        type="button"
+                                        disabled={quoteWorkflowLoadingId === row.id}
+                                        onClick={() => applyQuoteWorkflowAction(row.id, "rejected")}
+                                        className="rounded-md bg-rose-600 px-2 py-1 text-[10px] font-semibold uppercase text-white disabled:opacity-60"
+                                      >
+                                        Reject
+                                      </button>
+                                    </>
+                                  ) : null}
+                                </>
+                              ) : null}
+                            </div>
                           </div>
                         </div>
                       );
@@ -1193,12 +1514,29 @@ export function EstimateQuotesMain({
                       <td className="py-2 px-4 text-xs text-muted-foreground">{formatDate(row.start_at)}</td>
                       <td className="py-2 px-4 text-xs text-muted-foreground">{formatDate(row.complete_at)}</td>
                       <td className="py-2 px-4 text-xs">
-                        <a
-                          href={`/company/${companyId}/workshop/job-cards/${row.id}`}
-                          className="rounded-md border px-2 py-1"
-                        >
-                          Open
-                        </a>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <a
+                            href={`/company/${companyId}/workshop/job-cards/${row.id}`}
+                            className="rounded-md border px-2 py-1"
+                          >
+                            Open
+                          </a>
+                          {activeTab === "completed" && canVerifyCompletedJob(row) ? (
+                            <button
+                              type="button"
+                              onClick={() => openJobVerifyModal(row)}
+                              disabled={jobVerifyLoadingId === row.id}
+                              className="rounded-md bg-emerald-600 px-2 py-1 text-[10px] font-semibold uppercase text-white disabled:opacity-60"
+                            >
+                              {jobVerifyLoadingId === row.id ? "Verifying..." : "Verify"}
+                            </button>
+                          ) : null}
+                          {activeTab === "completed" && row.workshop_quote_verified_at ? (
+                            <span className="inline-flex items-center rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase text-emerald-400">
+                              Verified
+                            </span>
+                          ) : null}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -1269,37 +1607,113 @@ export function EstimateQuotesMain({
               <table className="min-w-full text-sm">
                 <thead>
                   <tr className="bg-muted/40 text-xs text-muted-foreground">
-                    <th className="py-2 pl-3 pr-4 text-left">Quote</th>
-                    <th className="py-2 px-4 text-left">Type</th>
-                    <th className="py-2 px-4 text-left">Status</th>
-                    <th className="py-2 px-4 text-left">Estimate</th>
-                    <th className="py-2 px-4 text-left">Total</th>
+                    <th className="py-2 pl-3 pr-4 text-left">{activeTab === "quoted-job-cards" ? "Job Card" : "Quote"}</th>
+                    <th className="py-2 px-4 text-left">Car Details</th>
+                    <th className="py-2 px-4 text-left">Workshop</th>
+                    <th className="py-2 px-4 text-left">{activeTab === "quoted-job-cards" ? "Quotes" : "Status"}</th>
+                    <th className="py-2 px-4 text-left">{activeTab === "quoted-job-cards" ? "Latest Quote" : "Total"}</th>
                     <th className="py-2 px-4 text-left">Updated</th>
                     <th className="py-2 px-4 text-left">Action</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {(filteredRows as Quote[]).map((row) => {
+                  {(activeTab === "quoted-job-cards" ? quotedJobCardGroups : (filteredRows as Quote[])).map((entry: any) => {
+                    if (activeTab === "quoted-job-cards") {
+                      const group = entry as QuotedJobCardGroup;
+                      const latest = group.quotes[0];
+                      return (
+                        <tr key={group.key}>
+                          <td className="py-2 pl-3 pr-4">
+                            <div className="font-medium">
+                              {group.jobCardId ? `JC-${group.jobCardId.slice(0, 8)}...` : group.estimateId ? `EST-${group.estimateId.slice(0, 8)}...` : "-"}
+                            </div>
+                          </td>
+                          <td className="py-2 px-4 text-xs">
+                            <div>{group.carPlate}</div>
+                            <div className="text-[10px] text-muted-foreground">{group.carModel}</div>
+                          </td>
+                          <td className="py-2 px-4 text-xs">{group.workshopName}</td>
+                          <td className="py-2 px-4 text-xs">{group.quotes.length}</td>
+                          <td className="py-2 px-4 text-xs">
+                            {(latest?.currency ?? "AED")} {Number(latest?.totalAmount ?? 0).toFixed(2)}
+                          </td>
+                          <td className="py-2 px-4 text-xs text-muted-foreground">{formatDate(group.updatedAt)}</td>
+                          <td className="py-2 px-4 text-xs">
+                            <button
+                              type="button"
+                              onClick={() => setQuotesModalGroupKey(group.key)}
+                              className="rounded-md border px-2 py-1"
+                            >
+                              View Quotes
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    }
+                    const row = entry as Quote;
                     const quoteHref =
                       row.quoteType === "branch_labor"
                         ? `/company/${companyId}/quotes/branch/${row.id}`
                         : `/company/${companyId}/quotes/vendor/${row.id}`;
+                    const jobCard = row.estimateId ? latestJobCardByEstimateId.get(row.estimateId) : null;
+                    const lead = jobCard?.lead_id ? leadById.get(jobCard.lead_id) : null;
+                    const carPlate = jobCard?.plate_number ?? lead?.carPlateNumber ?? "N/A";
+                    const carModel =
+                      [jobCard?.make, jobCard?.model].filter(Boolean).join(" ") ||
+                      lead?.carModel ||
+                      "N/A";
+                    const workshopName = jobCard?.branch_name ?? lead?.branchName ?? row.branchId ?? "Unassigned";
                     return (
                       <tr key={row.id}>
                         <td className="py-2 pl-3 pr-4">
                           <div className="font-medium">{row.id.slice(0, 8)}...</div>
                         </td>
-                        <td className="py-2 px-4 text-xs capitalize">{row.quoteType.replace("_", " ")}</td>
-                        <td className="py-2 px-4 text-xs capitalize">{row.status}</td>
                         <td className="py-2 px-4 text-xs">
-                          {row.estimateId ? `EST-${row.estimateId.slice(0, 8)}...` : "-"}
+                          <div>{carPlate}</div>
+                          <div className="text-[10px] text-muted-foreground">{carModel}</div>
                         </td>
+                        <td className="py-2 px-4 text-xs">{workshopName}</td>
+                        <td className="py-2 px-4 text-xs capitalize">{row.status}</td>
                         <td className="py-2 px-4 text-xs">{row.totalAmount.toFixed(2)}</td>
                         <td className="py-2 px-4 text-xs text-muted-foreground">{formatDate(row.updatedAt)}</td>
                         <td className="py-2 px-4 text-xs">
-                          <a href={quoteHref} className="rounded-md border px-2 py-1">
-                            Open
-                          </a>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <a href={quoteHref} className="rounded-md border px-2 py-1">
+                              Open
+                            </a>
+                            {activeTab === "quoted-job-cards" ? (
+                              <>
+                                {["pending", "quoted", "negotiation"].includes(String(row.status ?? "").toLowerCase()) ? (
+                                  <>
+                                    <button
+                                      type="button"
+                                      disabled={quoteWorkflowLoadingId === row.id}
+                                      onClick={() => applyQuoteWorkflowAction(row.id, "accepted")}
+                                      className="rounded-md bg-emerald-600 px-2 py-1 text-[10px] font-semibold uppercase text-white disabled:opacity-60"
+                                    >
+                                      Accept
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={quoteWorkflowLoadingId === row.id}
+                                      onClick={() => applyQuoteWorkflowAction(row.id, "negotiation")}
+                                      className="rounded-md bg-amber-500 px-2 py-1 text-[10px] font-semibold uppercase text-slate-900 disabled:opacity-60"
+                                    >
+                                      Negotiate
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={quoteWorkflowLoadingId === row.id}
+                                      onClick={() => applyQuoteWorkflowAction(row.id, "rejected")}
+                                      className="rounded-md bg-rose-600 px-2 py-1 text-[10px] font-semibold uppercase text-white disabled:opacity-60"
+                                    >
+                                      Reject
+                                    </button>
+                                  </>
+                                ) : null}
+                              </>
+                            ) : null}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -1413,6 +1827,239 @@ export function EstimateQuotesMain({
             )}
         </Card>
       </>
+      )}
+      {jobVerifyOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <Card className={`w-full max-w-4xl rounded-xl shadow-xl ${theme.cardBg} ${theme.cardBorder}`}>
+            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+              <div>
+                <div className="text-sm font-semibold">Verify Job Card</div>
+                <div className="text-xs text-muted-foreground">Review job details before final verification.</div>
+              </div>
+              <button
+                type="button"
+                onClick={closeJobVerifyModal}
+                className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+              >
+                Close
+              </button>
+            </div>
+            <div className="max-h-[70vh] space-y-3 overflow-auto p-4 text-sm">
+              {jobVerifyError ? (
+                <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
+                  {jobVerifyError}
+                </div>
+              ) : null}
+              {jobVerifyDetailsLoading ? (
+                <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-muted-foreground">
+                  Loading job details...
+                </div>
+              ) : null}
+              {!jobVerifyDetailsLoading && jobVerifyRow ? (
+                <>
+                  {(() => {
+                    const quoteAmount = Number((jobVerifyRow as any).workshop_quote_total_amount ?? 0);
+                    const vatAmount = Number((quoteAmount * (jobVerifyVatRate / 100)).toFixed(2));
+                    const netAmount = Number((quoteAmount + vatAmount).toFixed(2));
+                    return (
+                      <div className="grid gap-2 text-xs md:grid-cols-4">
+                        <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
+                          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Quote Amount</div>
+                          <div className="mt-1 font-semibold">
+                            {jobVerifyCurrency} {quoteAmount.toFixed(2)}
+                          </div>
+                        </div>
+                        <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
+                          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">VAT Rate</div>
+                          <div className="mt-1 font-semibold">{jobVerifyVatRate.toFixed(2)}%</div>
+                        </div>
+                        <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
+                          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">VAT Amount</div>
+                          <div className="mt-1 font-semibold">
+                            {jobVerifyCurrency} {vatAmount.toFixed(2)}
+                          </div>
+                        </div>
+                        <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2">
+                          <div className="text-[10px] uppercase tracking-wide text-emerald-300/80">Net Payable</div>
+                          <div className="mt-1 font-semibold text-emerald-300">
+                            {jobVerifyCurrency} {netAmount.toFixed(2)}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                  <div className="grid gap-2 text-xs md:grid-cols-4">
+                    <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
+                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Job Card</div>
+                      <div className="mt-1 font-semibold">{jobVerifyRow.id.slice(0, 8)}...</div>
+                    </div>
+                    <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
+                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Status</div>
+                      <div className="mt-1 font-semibold uppercase">{jobVerifyRow.status ?? "-"}</div>
+                    </div>
+                    <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
+                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Start</div>
+                      <div className="mt-1">{formatDate(jobVerifyRow.start_at)}</div>
+                    </div>
+                    <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
+                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Completed</div>
+                      <div className="mt-1">{formatDate(jobVerifyRow.complete_at)}</div>
+                    </div>
+                    <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 md:col-span-2">
+                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Car</div>
+                      <div className="mt-1 font-semibold">{jobVerifyRow.plate_number ?? "N/A"}</div>
+                      <div className="text-[10px] text-muted-foreground">{[jobVerifyRow.make, jobVerifyRow.model].filter(Boolean).join(" ")}</div>
+                    </div>
+                    <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
+                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Workshop</div>
+                      <div className="mt-1">{jobVerifyRow.branch_name ?? "Unassigned"}</div>
+                    </div>
+                    <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
+                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Quote Status</div>
+                      <div className="mt-1 uppercase">{jobVerifyRow.workshop_quote_status ?? "-"}</div>
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
+                    <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Line Items</div>
+                    {Array.isArray(jobVerifyDetails?.items) && jobVerifyDetails.items.length ? (
+                      <div className="overflow-auto rounded-md border border-white/10">
+                        <table className="min-w-full text-xs">
+                          <thead>
+                            <tr className="bg-white/[0.04] text-muted-foreground">
+                              <th className="px-2 py-2 text-left">Part</th>
+                              <th className="px-2 py-2 text-left">Qty</th>
+                              <th className="px-2 py-2 text-left">Order Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {jobVerifyDetails.items.map((item: any) => (
+                              <tr key={item.id} className="border-t border-white/10">
+                                <td className="px-2 py-2">{item.product_name ?? item.productName ?? "-"}</td>
+                                <td className="px-2 py-2">{item.quantity ?? "-"}</td>
+                                <td className="px-2 py-2 uppercase">{item.po_status ?? item.order_status ?? "-"}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className="text-xs text-muted-foreground">No line items found.</div>
+                    )}
+                  </div>
+                </>
+              ) : null}
+            </div>
+            <div className="flex items-center justify-end gap-2 border-t border-white/10 px-4 py-3">
+              <button
+                type="button"
+                onClick={closeJobVerifyModal}
+                className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={submitJobVerify}
+                disabled={
+                  !jobVerifyRow ||
+                  !canVerifyCompletedJob(jobVerifyRow) ||
+                  jobVerifyLoadingId === jobVerifyRow.id ||
+                  jobVerifyDetailsLoading
+                }
+                className="rounded-md bg-emerald-600 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-white disabled:opacity-60"
+              >
+                {jobVerifyRow && jobVerifyLoadingId === jobVerifyRow.id ? "Verifying..." : "Verify Job Card"}
+              </button>
+            </div>
+          </Card>
+        </div>
+      )}
+      {activeQuotesModalGroup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <Card className={`w-full max-w-4xl rounded-xl shadow-xl ${theme.cardBg} ${theme.cardBorder}`}>
+            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+              <div>
+                <div className="text-sm font-semibold">Quotes for {activeQuotesModalGroup.jobCardId ? `JC-${activeQuotesModalGroup.jobCardId.slice(0, 8)}...` : "Job"}</div>
+                <div className="text-xs text-muted-foreground">
+                  {activeQuotesModalGroup.carPlate} | {activeQuotesModalGroup.carModel} | {activeQuotesModalGroup.workshopName}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setQuotesModalGroupKey(null)}
+                className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+              >
+                Close
+              </button>
+            </div>
+            <div className="max-h-[70vh] overflow-auto p-4">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="bg-muted/40 text-xs text-muted-foreground">
+                    <th className="py-2 px-3 text-left">Quote</th>
+                    <th className="py-2 px-3 text-left">Status</th>
+                    <th className="py-2 px-3 text-left">Total</th>
+                    <th className="py-2 px-3 text-left">Updated</th>
+                    <th className="py-2 px-3 text-left">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {activeQuotesModalGroup.quotes.map((row) => {
+                    const quoteHref =
+                      row.quoteType === "branch_labor"
+                        ? `/company/${companyId}/quotes/branch/${row.id}`
+                        : `/company/${companyId}/quotes/vendor/${row.id}`;
+                    return (
+                      <tr key={row.id}>
+                        <td className="py-2 px-3 text-xs font-medium">{row.id.slice(0, 8)}...</td>
+                        <td className="py-2 px-3 text-xs capitalize">{row.status}</td>
+                        <td className="py-2 px-3 text-xs">
+                          {(row.currency ?? "AED")} {Number(row.totalAmount ?? 0).toFixed(2)}
+                        </td>
+                        <td className="py-2 px-3 text-xs text-muted-foreground">{formatDate(row.updatedAt)}</td>
+                        <td className="py-2 px-3 text-xs">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <a href={quoteHref} className="rounded-md border px-2 py-1">
+                              Open
+                            </a>
+                            {["pending", "quoted", "negotiation"].includes(String(row.status ?? "").toLowerCase()) ? (
+                              <>
+                                <button
+                                  type="button"
+                                  disabled={quoteWorkflowLoadingId === row.id}
+                                  onClick={() => applyQuoteWorkflowAction(row.id, "accepted")}
+                                  className="rounded-md bg-emerald-600 px-2 py-1 text-[10px] font-semibold uppercase text-white disabled:opacity-60"
+                                >
+                                  Accept
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={quoteWorkflowLoadingId === row.id}
+                                  onClick={() => applyQuoteWorkflowAction(row.id, "negotiation")}
+                                  className="rounded-md bg-amber-500 px-2 py-1 text-[10px] font-semibold uppercase text-slate-900 disabled:opacity-60"
+                                >
+                                  Negotiate
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={quoteWorkflowLoadingId === row.id}
+                                  onClick={() => applyQuoteWorkflowAction(row.id, "rejected")}
+                                  className="rounded-md bg-rose-600 px-2 py-1 text-[10px] font-semibold uppercase text-white disabled:opacity-60"
+                                >
+                                  Reject
+                                </button>
+                              </>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </div>
       )}
       {verifyOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 backdrop-blur-[2px] p-3 sm:p-5">

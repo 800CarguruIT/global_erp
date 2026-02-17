@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { WorkshopQuotes } from "@repo/ai-core";
+import { getSql } from "@repo/ai-core/db";
 
 type Params = { params: Promise<{ companyId: string }> };
 
@@ -10,10 +11,71 @@ export async function GET(req: NextRequest, { params }: Params) {
   const type = url.searchParams.get("type") ?? undefined;
   const status = url.searchParams.get("status") ?? undefined;
   try {
-    const data = await WorkshopQuotes.listQuotesForCompany(companyId, {
+    const vendorQuotes = await WorkshopQuotes.listQuotesForCompany(companyId, {
       type: type as any,
       status: status as any,
     });
+    const sql = getSql();
+    const workshopRows = await sql`
+      SELECT
+        wq.id,
+        wq.company_id,
+        'branch_labor'::text AS quote_type,
+        wq.status,
+        wq.estimate_id,
+        NULL::uuid AS work_order_id,
+        NULL::uuid AS vendor_id,
+        wq.branch_id,
+        wq.currency,
+        wq.total_amount,
+        NULL::date AS valid_until,
+        wq.created_by,
+        wq.approved_by,
+        wq.approved_at,
+        wq.meta,
+        wq.created_at,
+        wq.updated_at
+      FROM workshop_quotes wq
+      WHERE wq.company_id = ${companyId}
+    `;
+    const workshopQuotes = workshopRows.map((row: any) => ({
+      id: row.id,
+      companyId: row.company_id,
+      quoteType: row.quote_type,
+      status: row.status,
+      estimateId: row.estimate_id,
+      workOrderId: row.work_order_id,
+      vendorId: row.vendor_id,
+      branchId: row.branch_id,
+      currency: row.currency,
+      totalAmount: Number(row.total_amount ?? 0),
+      validUntil: row.valid_until,
+      createdBy: row.created_by,
+      approvedBy: row.approved_by,
+      approvedAt: row.approved_at,
+      meta: row.meta,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }));
+
+    const normalizedType = String(type ?? "").toLowerCase();
+    const normalizedStatus = String(status ?? "").toLowerCase();
+    const vendorFiltered =
+      normalizedType === "branch_labor"
+        ? []
+        : vendorQuotes.filter((quote) => {
+            const qt = String(quote.quoteType ?? "").toLowerCase();
+            if (qt !== "vendor_part") return false;
+            return normalizedType ? qt === normalizedType : true;
+          });
+    const workshopFiltered = workshopQuotes.filter((quote: any) => {
+      if (normalizedType && normalizedType !== "branch_labor") return false;
+      if (normalizedStatus && String(quote.status ?? "").toLowerCase() !== normalizedStatus) return false;
+      return true;
+    });
+    const data = [...vendorFiltered, ...workshopFiltered].sort(
+      (a: any, b: any) => new Date(b.updatedAt ?? 0).getTime() - new Date(a.updatedAt ?? 0).getTime()
+    );
     return NextResponse.json({ data });
   } catch (err) {
     console.error("GET quotes failed", err);
@@ -44,17 +106,69 @@ export async function POST(req: NextRequest, { params }: Params) {
       return NextResponse.json({ data }, { status: 201 });
     }
     if (mode === "branch_labor") {
-      if (!body.workOrderId || !body.branchId) {
+      if (!body.estimateId || !body.branchId) {
         return NextResponse.json(
-          { error: "workOrderId and branchId are required for branch_labor" },
+          { error: "estimateId and branchId are required for branch_labor" },
           { status: 400 },
         );
       }
-      const data = await WorkshopQuotes.createBranchLaborQuoteForWorkOrder(
-        companyId,
-        body.workOrderId,
-        body.branchId,
-      );
+      const sql = getSql();
+      const inserted = await sql`
+        INSERT INTO workshop_quotes (
+          company_id,
+          estimate_id,
+          job_card_id,
+          lead_id,
+          branch_id,
+          status,
+          currency,
+          total_amount,
+          eta_preset,
+          eta_hours,
+          remarks,
+          meta,
+          created_by
+        )
+        VALUES (
+          ${companyId},
+          ${body.estimateId},
+          ${body.jobCardId ?? null},
+          ${body.leadId ?? null},
+          ${body.branchId},
+          'pending',
+          ${body.currency ?? "AED"},
+          ${Number(body.totalAmount ?? 0)},
+          ${body.etaPreset ?? null},
+          ${body.etaHours ?? null},
+          ${body.remarks ?? null},
+          ${body.meta ?? null},
+          ${null}
+        )
+        RETURNING *
+      `;
+      const row = inserted[0];
+      const data = {
+        quote: {
+          id: row.id,
+          companyId: row.company_id,
+          quoteType: "branch_labor",
+          status: row.status,
+          estimateId: row.estimate_id,
+          workOrderId: null,
+          vendorId: null,
+          branchId: row.branch_id,
+          currency: row.currency,
+          totalAmount: Number(row.total_amount ?? 0),
+          validUntil: null,
+          createdBy: row.created_by,
+          approvedBy: row.approved_by,
+          approvedAt: row.approved_at,
+          meta: row.meta,
+          createdAt: row.created_at,
+          updatedAt: row.updated_at,
+        },
+        items: [],
+      };
       return NextResponse.json({ data }, { status: 201 });
     }
     return NextResponse.json(

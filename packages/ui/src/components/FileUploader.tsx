@@ -18,6 +18,8 @@ interface FileUploaderProps {
   buttonClassName?: string;
   containerClassName?: string;
   previewClassName?: string;
+  chooseLabel?: string;
+  replaceLabel?: string;
 }
 
 export function FileUploader({
@@ -33,6 +35,8 @@ export function FileUploader({
   buttonClassName,
   containerClassName,
   previewClassName,
+  chooseLabel,
+  replaceLabel,
 }: FileUploaderProps) {
   const { theme } = useTheme();
   const [isUploading, setUploading] = useState(false);
@@ -141,7 +145,7 @@ export function FileUploader({
             onClick={() => fileInputRef.current?.click()}
             className={buttonClasses}
           >
-            {isUploading ? "Uploading..." : hasValue ? "Replace file" : "Choose file"}
+            {isUploading ? "Uploading..." : hasValue ? (replaceLabel ?? "Replace file") : (chooseLabel ?? "Choose file")}
           </button>
         </div>
         {!buttonOnly && value && (

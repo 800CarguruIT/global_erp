@@ -135,6 +135,8 @@ export function BranchQuoteDetailMain({ companyId, quoteId }: { companyId: strin
                 value={status}
                 onChange={(e) => setStatus(e.target.value as QuoteStatus)}
               >
+                <option value="pending">Pending</option>
+                <option value="negotiation">Negotiation</option>
                 <option value="open">Open</option>
                 <option value="quoted">Quoted</option>
                 <option value="approved">Approved</option>

@@ -8,6 +8,7 @@ import { FileUploader } from "../components/FileUploader";
 type JobCardDetailMainProps = {
   companyId: string;
   jobCardId: string;
+  workshopBranchId?: string | null;
 };
 
 type LoadState<T> =
@@ -20,7 +21,7 @@ type JobCardPayload = {
   items: any[];
 };
 
-export function JobCardDetailMain({ companyId, jobCardId }: JobCardDetailMainProps) {
+export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = null }: JobCardDetailMainProps) {
   const { theme } = useTheme();
   const [state, setState] = useState<LoadState<JobCardPayload>>({
     status: "loading",
@@ -40,7 +41,7 @@ export function JobCardDetailMain({ companyId, jobCardId }: JobCardDetailMainPro
         const json = await res.json();
         if (!cancelled) {
           setState({ status: "loaded", data: json.data, error: null });
-          setRemarks(json.data?.jobCard?.remarks ?? "");
+          setRemarks("");
         }
       } catch (err) {
         if (!cancelled) {
@@ -54,8 +55,8 @@ export function JobCardDetailMain({ companyId, jobCardId }: JobCardDetailMainPro
     };
   }, [companyId, jobCardId]);
 
-  const jobCard = state.status === "loaded" ? state.data.jobCard : null;
-  const items = state.status === "loaded" ? state.data.items ?? [] : [];
+  const jobCard = useMemo(() => (state.status === "loaded" ? state.data.jobCard : null), [state]);
+  const items = useMemo(() => (state.status === "loaded" ? state.data.items ?? [] : []), [state]);
 
   const carLabel = useMemo(() => {
     if (!jobCard) return "";
@@ -65,6 +66,58 @@ export function JobCardDetailMain({ companyId, jobCardId }: JobCardDetailMainPro
   const startAtRaw = jobCard?.start_at ?? null;
   const startAt = startAtRaw ? new Date(startAtRaw).toLocaleString() : "";
   const completeAt = jobCard?.complete_at ? new Date(jobCard.complete_at).toLocaleString() : "";
+  const quoteRemarks = String(jobCard?.quote_remarks ?? "");
+  const workshopQuoteStatus = String(jobCard?.workshop_quote_status ?? "").toLowerCase();
+  const assignedBranchId = (jobCard?.lead_branch_id as string | null) ?? null;
+  const isAssignedWorkshop =
+    !workshopBranchId || !assignedBranchId ? true : workshopBranchId === assignedBranchId;
+  const canProgressByQuote = workshopQuoteStatus === "accepted";
+  const canProgressJobCard = canProgressByQuote && isAssignedWorkshop;
+  const allPartsReceived = useMemo(() => {
+    if (items.length === 0) return true;
+    return items.every((item) =>
+      String(item.po_status ?? item.order_status ?? "").toLowerCase() === "received"
+    );
+  }, [items]);
+  const quoteSummary = useMemo(() => {
+    const lines = quoteRemarks
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean);
+    const amountLine = lines.find((line) => line.toLowerCase().startsWith("quoted amount:")) ?? "";
+    const etaLine = lines.find((line) => line.toLowerCase().startsWith("estimated time:")) ?? "";
+    const amountValue = amountLine ? amountLine.replace(/quoted amount:/i, "").trim() : "N/A";
+    const etaValue = etaLine ? etaLine.replace(/estimated time:/i, "").trim() : "N/A";
+    const noteLines = lines.filter((line) => line !== amountLine && line !== etaLine);
+    return {
+      amount: amountValue,
+      eta: etaValue,
+      notes: noteLines.join(" "),
+    };
+  }, [quoteRemarks]);
+  const partPicMissingCount = useMemo(
+    () => items.filter((item) => !(item.part_pic ?? "")).length,
+    [items]
+  );
+  const scrapPicMissingCount = useMemo(
+    () => items.filter((item) => !(item.scrap_pic ?? "")).length,
+    [items]
+  );
+  const requiredUploadsPending = partPicMissingCount + scrapPicMissingCount;
+  const progressSteps = useMemo(
+    () => [
+      { key: "quote", label: "Quote Accepted", done: canProgressByQuote },
+      { key: "start", label: "Job Started", done: Boolean(jobCard?.start_at) },
+      { key: "part", label: "Part Pics", done: partPicMissingCount === 0 && items.length > 0 },
+      { key: "scrap", label: "Scrap Pics", done: scrapPicMissingCount === 0 && items.length > 0 },
+      { key: "complete", label: "Completed", done: Boolean(jobCard?.complete_at) },
+    ],
+    [canProgressByQuote, jobCard?.complete_at, jobCard?.start_at, partPicMissingCount, scrapPicMissingCount, items.length]
+  );
+  const currentProgressIndex = useMemo(() => {
+    const firstPending = progressSteps.findIndex((step) => !step.done);
+    return firstPending === -1 ? progressSteps.length - 1 : firstPending;
+  }, [progressSteps]);
 
   useEffect(() => {
     if (!toastMessage) return;
@@ -204,6 +257,28 @@ export function JobCardDetailMain({ companyId, jobCardId }: JobCardDetailMainPro
               <span className="text-base leading-none">-</span>
             </div>
             <div className="space-y-4 p-4 text-sm">
+              <div className="rounded-md border border-white/10 bg-white/[0.02] px-3 py-3">
+                <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Job Progress
+                </div>
+                <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
+                  {progressSteps.map((step, idx) => (
+                    <div
+                      key={step.key}
+                      className={`rounded-md border px-2 py-2 text-[11px] ${
+                        step.done
+                          ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-200"
+                          : idx === currentProgressIndex
+                          ? "border-amber-400/40 bg-amber-500/10 text-amber-200"
+                          : "border-white/10 bg-white/[0.02] text-white/70"
+                      }`}
+                    >
+                      <div className="font-semibold">{step.label}</div>
+                      <div className="mt-0.5 text-[10px] uppercase">{step.done ? "Done" : "Pending"}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
               <div className="grid gap-4 lg:grid-cols-2">
                 <div className="space-y-1">
                   <div className="text-xs font-semibold">Customer Complain</div>
@@ -220,6 +295,23 @@ export function JobCardDetailMain({ companyId, jobCardId }: JobCardDetailMainPro
                     value={jobCard?.inspector_remark ?? ""}
                     readOnly
                   />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <div className="text-xs font-semibold">Quote Remarks</div>
+                <div className="grid gap-2 rounded-md border border-cyan-500/20 bg-cyan-500/5 p-3 md:grid-cols-3">
+                  <div>
+                    <div className="text-[10px] uppercase tracking-wide text-cyan-200/80">Quoted Amount</div>
+                    <div className="mt-1 text-sm font-semibold text-cyan-100">{quoteSummary.amount}</div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] uppercase tracking-wide text-cyan-200/80">ETA</div>
+                    <div className="mt-1 text-sm font-semibold text-cyan-100">{quoteSummary.eta}</div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] uppercase tracking-wide text-cyan-200/80">Notes</div>
+                    <div className="mt-1 text-sm font-semibold text-cyan-100">{quoteSummary.notes || "N/A"}</div>
+                  </div>
                 </div>
               </div>
               <div className="space-y-1">
@@ -251,7 +343,7 @@ export function JobCardDetailMain({ companyId, jobCardId }: JobCardDetailMainPro
                 </div>
               </div>
               <div className={`overflow-x-auto rounded-md ${theme.cardBorder}`}>
-                <table className="min-w-full text-xs">
+                <table className="hidden min-w-full text-xs md:table">
                   <thead className={`${theme.surfaceSubtle} ${theme.appText}`}>
                     <tr>
                       <th className="px-2 py-1 text-left">#</th>
@@ -280,17 +372,30 @@ export function JobCardDetailMain({ companyId, jobCardId }: JobCardDetailMainPro
                           <td className="px-2 py-1">{item.description ?? "-"}</td>
                           <td className="px-2 py-1">{item.quantity ?? 0}</td>
                           <td className="px-2 py-1">
+                            {(() => {
+                              const partStatus = String(item.po_status ?? item.order_status ?? "Ordered");
+                              const partStatusLower = partStatus.toLowerCase();
+                              return (
+                                <>
                             <span
                               className={`rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase ${
-                                (item.order_status ?? "Ordered").toLowerCase() === "received"
+                                partStatusLower === "received"
                                   ? "bg-emerald-500 text-white"
-                                  : (item.order_status ?? "Ordered").toLowerCase() === "returned"
+                                  : partStatusLower === "returned"
                                   ? "bg-sky-500 text-white"
                                   : "bg-amber-400 text-slate-900"
                               }`}
                             >
-                              {item.order_status ?? "Ordered"}
+                              {partStatus}
                             </span>
+                            {(!(item.part_pic ?? "") || !(item.scrap_pic ?? "")) && (
+                              <span className="ml-1 rounded-full bg-rose-500/15 px-2 py-0.5 text-[9px] font-semibold uppercase text-rose-300">
+                                Required
+                              </span>
+                            )}
+                                </>
+                              );
+                            })()}
                           </td>
                           <td className="px-2 py-1">
                             <FileUploader
@@ -303,7 +408,16 @@ export function JobCardDetailMain({ companyId, jobCardId }: JobCardDetailMainPro
                               buttonClassName="h-8 px-3 text-[10px]"
                               containerClassName="w-fit"
                               previewClassName="h-[100px] w-[100px]"
+                              chooseLabel="Upload Part Photo"
+                              replaceLabel="Replace Part Photo"
                             />
+                            <div className="mt-1 text-[10px]">
+                              {(item.part_pic ?? "") ? (
+                                <span className="text-emerald-300">Done</span>
+                              ) : (
+                                <span className="text-amber-300">Missing</span>
+                              )}
+                            </div>
                           </td>
                           <td className="px-2 py-1">
                             <FileUploader
@@ -316,33 +430,184 @@ export function JobCardDetailMain({ companyId, jobCardId }: JobCardDetailMainPro
                               buttonClassName="h-8 px-3 text-[10px]"
                               containerClassName="w-fit"
                               previewClassName="h-[100px] w-[100px]"
+                              chooseLabel="Upload Scrap Photo"
+                              replaceLabel="Replace Scrap Photo"
                             />
+                            <div className="mt-1 text-[10px]">
+                              {(item.scrap_pic ?? "") ? (
+                                <span className="text-emerald-300">Done</span>
+                              ) : (
+                                <span className="text-amber-300">Missing</span>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       ))
                     )}
                   </tbody>
+                  {items.length > 0 ? (
+                    <tfoot>
+                      <tr className="border-t border-border/70 bg-white/[0.02] text-[10px]">
+                        <td colSpan={3} className="px-2 py-2 font-semibold text-white/85">
+                          Totals
+                        </td>
+                        <td className="px-2 py-2 text-white/80">Items: {items.length}</td>
+                        <td className="px-2 py-2 text-white/80">
+                          Qty: {items.reduce((sum, item) => sum + Number(item.quantity ?? 0), 0)}
+                        </td>
+                        <td className="px-2 py-2 text-amber-300">Pending Uploads: {requiredUploadsPending}</td>
+                        <td className="px-2 py-2 text-amber-300">Part Missing: {partPicMissingCount}</td>
+                        <td className="px-2 py-2 text-amber-300">Scrap Missing: {scrapPicMissingCount}</td>
+                      </tr>
+                    </tfoot>
+                  ) : null}
                 </table>
+                <div className="space-y-2 p-2 md:hidden">
+                  {items.length === 0 ? (
+                    <div className="rounded-md border border-white/10 bg-white/[0.02] px-3 py-3 text-xs text-muted-foreground">
+                      No parts assigned yet.
+                    </div>
+                  ) : (
+                    items.map((item, idx) => (
+                      <div key={item.id ?? idx} className="rounded-md border border-white/10 bg-white/[0.02] p-3 text-xs">
+                        <div className="mb-2 flex items-center justify-between gap-2">
+                          <div className="font-semibold">{item.product_name ?? item.productName ?? "-"}</div>
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase ${
+                              String(item.po_status ?? item.order_status ?? "Ordered").toLowerCase() === "received"
+                                ? "bg-emerald-500 text-white"
+                                : String(item.po_status ?? item.order_status ?? "Ordered").toLowerCase() === "returned"
+                                ? "bg-sky-500 text-white"
+                                : "bg-amber-400 text-slate-900"
+                            }`}
+                          >
+                            {String(item.po_status ?? item.order_status ?? "Ordered")}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-[11px]">
+                          <div>
+                            <div className="text-white/60">Qty</div>
+                            <div>{item.quantity ?? 0}</div>
+                          </div>
+                          <div>
+                            <div className="text-white/60">Type</div>
+                            <div>{item.type ?? item.product_type ?? "-"}</div>
+                          </div>
+                          <div className="col-span-2">
+                            <div className="text-white/60">Description</div>
+                            <div>{item.description ?? "-"}</div>
+                          </div>
+                        </div>
+                        <div className="mt-3 grid gap-3">
+                          <div>
+                            <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-white/70">Part Pic</div>
+                            <FileUploader
+                              label=""
+                              kind="image"
+                              value={item.part_pic ?? ""}
+                              onChange={(id) => updateItemPic(item.id, "partPic", id ?? null)}
+                              buttonOnly
+                              showPreview
+                              buttonClassName="h-9 w-full px-3 text-[10px]"
+                              containerClassName="w-full"
+                              previewClassName="h-[100px] w-[100px]"
+                              chooseLabel="Upload Part Photo"
+                              replaceLabel="Replace Part Photo"
+                            />
+                            <div className="mt-1 text-[10px]">
+                              {(item.part_pic ?? "") ? (
+                                <span className="text-emerald-300">Done</span>
+                              ) : (
+                                <span className="text-amber-300">Missing</span>
+                              )}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-white/70">Scrap Pic</div>
+                            <FileUploader
+                              label=""
+                              kind="image"
+                              value={item.scrap_pic ?? ""}
+                              onChange={(id) => updateItemPic(item.id, "scrapPic", id ?? null)}
+                              buttonOnly
+                              showPreview
+                              buttonClassName="h-9 w-full px-3 text-[10px]"
+                              containerClassName="w-full"
+                              previewClassName="h-[100px] w-[100px]"
+                              chooseLabel="Upload Scrap Photo"
+                              replaceLabel="Replace Scrap Photo"
+                            />
+                            <div className="mt-1 text-[10px]">
+                              {(item.scrap_pic ?? "") ? (
+                                <span className="text-emerald-300">Done</span>
+                              ) : (
+                                <span className="text-amber-300">Missing</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                  {items.length > 0 ? (
+                    <div className="rounded-md border border-white/10 bg-white/[0.02] px-3 py-2 text-[11px]">
+                      <div className="flex items-center justify-between">
+                        <span>Items</span>
+                        <span>{items.length}</span>
+                      </div>
+                      <div className="mt-1 flex items-center justify-between">
+                        <span>Total Qty</span>
+                        <span>{items.reduce((sum, item) => sum + Number(item.quantity ?? 0), 0)}</span>
+                      </div>
+                      <div className="mt-1 flex items-center justify-between text-amber-300">
+                        <span>Pending Uploads</span>
+                        <span>{requiredUploadsPending}</span>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
               </div>
-              <div className="flex items-center justify-end gap-2">
-                {!jobCard?.start_at && !jobCard?.complete_at && (
+              <div className="sticky bottom-0 z-10 flex flex-col gap-2 rounded-md border border-white/10 bg-slate-950/90 px-3 py-2 backdrop-blur md:flex-row md:items-center md:justify-between">
+                <div className="text-[11px] text-white/80 md:text-left">
+                  {requiredUploadsPending > 0
+                    ? `${requiredUploadsPending} required upload${requiredUploadsPending > 1 ? "s" : ""} pending`
+                    : "All required uploads completed"}
+                </div>
+                <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row md:items-center md:justify-end">
+                {!isAssignedWorkshop ? (
+                  <div className="rounded-md border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-[11px] font-medium text-rose-200">
+                    Only assigned workshop can perform actions on this job card.
+                  </div>
+                ) : null}
+                {isAssignedWorkshop && !canProgressByQuote && (
+                  <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[11px] font-medium text-amber-200">
+                    Quote must be accepted before starting/completing this job card.
+                  </div>
+                )}
+                {canProgressJobCard && !jobCard?.start_at && !jobCard?.complete_at && !allPartsReceived && (
+                  <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[11px] font-medium text-amber-200">
+                    All parts must be received before starting the job card.
+                  </div>
+                )}
+                {canProgressJobCard && !jobCard?.start_at && !jobCard?.complete_at && allPartsReceived && (
                   <button
                     type="button"
-                    className="rounded-md bg-sky-600 px-5 py-2 text-xs font-semibold text-white"
+                    className="rounded-md bg-sky-600 px-5 py-2 text-xs font-semibold text-white md:min-w-[130px]"
                     onClick={startJobCard}
                   >
                     Start Job
                   </button>
                 )}
-                {jobCard?.start_at && !jobCard?.complete_at && (
+                {canProgressJobCard && jobCard?.start_at && !jobCard?.complete_at && (
                   <button
                     type="button"
-                    className="rounded-md bg-amber-400 px-5 py-2 text-xs font-semibold text-slate-900"
+                    className="rounded-md bg-amber-400 px-5 py-2 text-xs font-semibold text-slate-900 md:min-w-[130px]"
                     onClick={completeJobCard}
                   >
                     Complete Job
                   </button>
                 )}
+                </div>
               </div>
             </div>
           </section>

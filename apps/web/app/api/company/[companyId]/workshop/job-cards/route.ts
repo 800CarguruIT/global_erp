@@ -27,6 +27,12 @@ export async function GET(req: NextRequest, { params }: Params) {
           jc.*,
           e.inspection_id,
           l.branch_id,
+          wq.id AS workshop_quote_id,
+          wq.status AS workshop_quote_status,
+          wq.total_amount AS workshop_quote_total_amount,
+          wq.currency AS workshop_quote_currency,
+          wq.verified_at AS workshop_quote_verified_at,
+          wq.verified_by AS workshop_quote_verified_by,
           COALESCE(b.display_name, b.name, b.code) AS branch_name,
           c.name AS customer_name,
           c.phone AS customer_phone,
@@ -36,6 +42,29 @@ export async function GET(req: NextRequest, { params }: Params) {
         FROM job_cards jc
         LEFT JOIN estimates e ON e.id = jc.estimate_id
         LEFT JOIN leads l ON l.id = jc.lead_id
+        LEFT JOIN LATERAL (
+          SELECT id, status, total_amount, currency, verified_at, verified_by, approved_at, updated_at
+          FROM workshop_quotes
+          WHERE company_id = ${companyId}
+            AND (
+              job_card_id = jc.id
+              OR (
+                job_card_id IS NULL
+                AND estimate_id = jc.estimate_id
+                AND branch_id IS NOT DISTINCT FROM l.branch_id
+              )
+            )
+          ORDER BY
+            CASE
+              WHEN status = 'verified' THEN 3
+              WHEN status = 'accepted' THEN 2
+              WHEN status = 'pending' THEN 1
+              ELSE 0
+            END DESC,
+            approved_at DESC NULLS LAST,
+            updated_at DESC NULLS LAST
+          LIMIT 1
+        ) wq ON TRUE
         LEFT JOIN branches b ON b.id = l.branch_id
         LEFT JOIN inspections i ON i.id = e.inspection_id
         LEFT JOIN customers c ON c.id = i.customer_id

@@ -1,5 +1,7 @@
 export type QuoteType = "vendor_part" | "branch_labor";
 export type QuoteStatus =
+  | "pending"
+  | "negotiation"
   | "open"
   | "quoted"
   | "approved"

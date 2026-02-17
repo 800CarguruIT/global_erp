@@ -47,6 +47,18 @@ type LeadRow = {
   id: string;
   branchId?: string | null;
 };
+type QuoteRow = {
+  id: string;
+  quoteType?: string | null;
+  status?: string | null;
+  estimateId?: string | null;
+  branchId?: string | null;
+  totalAmount?: number | null;
+  currency?: string | null;
+  updatedAt?: string | null;
+  etaPreset?: string | null;
+  etaHours?: number | null;
+};
 
 const formatDate = (value?: string | null) => {
   if (!value) return "-";
@@ -84,6 +96,7 @@ export function BranchWorkshopDashboard({
   const [jobCards, setJobCards] = useState<JobCardRow[]>([]);
   const [inspections, setInspections] = useState<InspectionRow[]>([]);
   const [leads, setLeads] = useState<LeadRow[]>([]);
+  const [quotes, setQuotes] = useState<QuoteRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState(WORKSHOP_TABS[0].id);
@@ -101,6 +114,13 @@ export function BranchWorkshopDashboard({
   });
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
+  const [quoteModalRow, setQuoteModalRow] = useState<JobCardRow | null>(null);
+  const [quoteAmount, setQuoteAmount] = useState("");
+  const [quoteRemarks, setQuoteRemarks] = useState("");
+  const [quoteEtaPreset, setQuoteEtaPreset] = useState("");
+  const [quoteEtaHours, setQuoteEtaHours] = useState("");
+  const [isSubmittingQuote, setIsSubmittingQuote] = useState(false);
+  const [quoteModalError, setQuoteModalError] = useState<string | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -110,24 +130,28 @@ export function BranchWorkshopDashboard({
       setLoading(true);
       setError(null);
       try {
-        const [jobCardsRes, inspectionsRes, leadsRes] = await Promise.all([
+        const [jobCardsRes, inspectionsRes, leadsRes, quotesRes] = await Promise.all([
           fetch(`/api/company/${companyId}/workshop/job-cards`, { signal: controller.signal }),
           fetch(`/api/company/${companyId}/workshop/inspections`, { signal: controller.signal }),
           fetch(`/api/company/${companyId}/sales/leads`, { signal: controller.signal }),
+          fetch(`/api/company/${companyId}/workshop/quotes`, { signal: controller.signal }),
         ]);
         if (!jobCardsRes.ok) throw new Error(`Job cards HTTP ${jobCardsRes.status}`);
         if (!inspectionsRes.ok) throw new Error(`Inspections HTTP ${inspectionsRes.status}`);
         if (!leadsRes.ok) throw new Error(`Leads HTTP ${leadsRes.status}`);
+        if (!quotesRes.ok) throw new Error(`Quotes HTTP ${quotesRes.status}`);
 
-        const [jobCardsJson, inspectionsJson, leadsJson] = await Promise.all([
+        const [jobCardsJson, inspectionsJson, leadsJson, quotesJson] = await Promise.all([
           jobCardsRes.json(),
           inspectionsRes.json(),
           leadsRes.json(),
+          quotesRes.json(),
         ]);
 
         const jobCardRows = (jobCardsJson.data ?? []) as Array<Record<string, unknown>>;
         const inspectionRows = (inspectionsJson.data ?? []) as Array<Record<string, unknown>>;
         const leadRows = (leadsJson.data ?? []) as Array<Record<string, unknown>>;
+        const quoteRows = (quotesJson.data ?? []) as Array<Record<string, unknown>>;
 
         const normalizedJobCards: JobCardRow[] = jobCardRows.map((row) => ({
           id: typeof row.id === "string" ? row.id : "",
@@ -225,10 +249,58 @@ export function BranchWorkshopDashboard({
               : null,
         }));
 
+        const normalizedQuotes: QuoteRow[] = quoteRows.map((row) => {
+          const meta = row.meta as Record<string, unknown> | null;
+          return {
+            id: typeof row.id === "string" ? row.id : "",
+            quoteType:
+              typeof row.quoteType === "string"
+                ? row.quoteType
+                : typeof row.quote_type === "string"
+                ? row.quote_type
+                : null,
+            status: typeof row.status === "string" ? row.status : null,
+            estimateId:
+              typeof row.estimateId === "string"
+                ? row.estimateId
+                : typeof row.estimate_id === "string"
+                ? row.estimate_id
+                : null,
+            branchId:
+              typeof row.branchId === "string"
+                ? row.branchId
+                : typeof row.branch_id === "string"
+                ? row.branch_id
+                : null,
+            totalAmount:
+              typeof row.totalAmount === "number"
+                ? row.totalAmount
+                : typeof row.total_amount === "number"
+                ? row.total_amount
+                : null,
+            currency:
+              typeof row.currency === "string" ? row.currency : null,
+            updatedAt:
+              typeof row.updatedAt === "string"
+                ? row.updatedAt
+                : typeof row.updated_at === "string"
+                ? row.updated_at
+                : null,
+            etaPreset: typeof meta?.estimatedTimePreset === "string" ? meta.estimatedTimePreset : null,
+            etaHours:
+              typeof meta?.estimatedHours === "number"
+                ? meta.estimatedHours
+                : typeof meta?.estimatedHours === "string"
+                ? Number(meta.estimatedHours)
+                : null,
+          };
+        });
+
         if (!cancelled) {
           setJobCards(normalizedJobCards.filter((row) => row.id));
           setInspections(normalizedInspections.filter((row) => row.id));
           setLeads(normalizedLeads.filter((row) => row.id));
+          setQuotes(normalizedQuotes.filter((row) => row.id));
         }
       } catch {
         if (!cancelled) {
@@ -275,15 +347,52 @@ export function BranchWorkshopDashboard({
     });
   }, [inspections, leadBranchByLeadId, branchId]);
 
+  const latestQuoteByEstimateId = useMemo(() => {
+    const map = new Map<string, QuoteRow>();
+    const scopedQuotes = quotes
+      .filter((quote) => (quote.quoteType ?? "").toLowerCase() === "branch_labor")
+      .filter((quote) => !branchId || quote.branchId === branchId)
+      .sort((a, b) => {
+        const ad = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+        const bd = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+        return bd - ad;
+      });
+    for (const quote of scopedQuotes) {
+      const estimateId = String(quote.estimateId ?? "").trim();
+      if (!estimateId || map.has(estimateId)) continue;
+      map.set(estimateId, quote);
+    }
+    return map;
+  }, [branchId, quotes]);
+
+  const getInquiryQuoteState = (row: JobCardRow) => {
+    const quote = row.estimateId ? latestQuoteByEstimateId.get(row.estimateId) : null;
+    const status = (quote?.status ?? "").toLowerCase();
+    const isLocked = !!quote && status !== "rejected";
+    const label = !quote ? "Add Quote" : status === "rejected" ? "Resubmit Quote" : "Quote Submitted";
+    return { quote, isLocked, label };
+  };
+
+  const getJobCardHref = (id: string) =>
+    `/company/${companyId}/workshop/job-cards/${id}?view=workshop${branchId ? `&branchId=${branchId}` : ""}`;
+
   const activeRows = useMemo(() => {
     const scopedJobCards = !branchId ? jobCards : jobCards.filter((row) => row.branchId === branchId);
     const normalizedStatus = (value?: string | null) => (value ?? "").toLowerCase();
+    const latestQuoteStatus = (row: JobCardRow) =>
+      (row.estimateId ? latestQuoteByEstimateId.get(row.estimateId)?.status : null)?.toLowerCase() ?? "";
 
     switch (activeTab as WorkshopTabId) {
       case "inquiries":
         return scopedJobCards.filter((row) => ["pending", "re-assigned"].includes(normalizedStatus(row.status)));
       case "quotes":
-        return scopedJobCards.filter((row) => normalizedStatus(row.status).includes("quote"));
+        return scopedJobCards.filter((row) => {
+          if (!row.estimateId) return false;
+          const quote = latestQuoteByEstimateId.get(row.estimateId);
+          if (!quote) return false;
+          const qStatus = (quote.status ?? "").toLowerCase();
+          return ["pending", "quoted", "negotiation"].includes(qStatus);
+        });
       case "inspections":
         return scopedInspections;
       case "completed-inspections":
@@ -291,39 +400,53 @@ export function BranchWorkshopDashboard({
       case "jobs":
         return scopedJobCards.filter((row) => {
           const value = normalizedStatus(row.status);
-          return value.includes("progress") || value.includes("start");
+          const completedByTime = Boolean(row.completeAt);
+          const completedByStatus = value.includes("complete") || value.includes("done");
+          if (completedByTime || completedByStatus) return false;
+          return value.includes("progress") || value.includes("start") || latestQuoteStatus(row) === "accepted";
         });
       case "completed":
         return scopedJobCards.filter((row) => {
           const value = normalizedStatus(row.status);
-          return value.includes("complete") || value.includes("done");
+          return value.includes("complete") || value.includes("done") || Boolean(row.completeAt);
         });
       case "cancelled":
         return scopedJobCards.filter((row) => normalizedStatus(row.status).includes("cancel"));
       default:
         return scopedJobCards;
     }
-  }, [activeTab, branchId, jobCards, scopedCompletedInspections, scopedInspections]);
+  }, [activeTab, branchId, jobCards, scopedCompletedInspections, scopedInspections, latestQuoteByEstimateId]);
 
   const tabCounts = useMemo(() => {
     const scopedJobCards = !branchId ? jobCards : jobCards.filter((row) => row.branchId === branchId);
     const normalizedStatus = (value?: string | null) => (value ?? "").toLowerCase();
+    const latestQuoteStatus = (row: JobCardRow) =>
+      (row.estimateId ? latestQuoteByEstimateId.get(row.estimateId)?.status : null)?.toLowerCase() ?? "";
     return {
       inquiries: scopedJobCards.filter((row) => ["pending", "re-assigned"].includes(normalizedStatus(row.status))).length,
-      quotes: scopedJobCards.filter((row) => normalizedStatus(row.status).includes("quote")).length,
+      quotes: scopedJobCards.filter((row) => {
+        if (!row.estimateId) return false;
+        const quote = latestQuoteByEstimateId.get(row.estimateId);
+        if (!quote) return false;
+        const qStatus = (quote.status ?? "").toLowerCase();
+        return ["pending", "quoted", "negotiation"].includes(qStatus);
+      }).length,
       inspections: scopedInspections.length,
       "completed-inspections": scopedCompletedInspections.length,
       jobs: scopedJobCards.filter((row) => {
         const value = normalizedStatus(row.status);
-        return value.includes("progress") || value.includes("start");
+        const completedByTime = Boolean(row.completeAt);
+        const completedByStatus = value.includes("complete") || value.includes("done");
+        if (completedByTime || completedByStatus) return false;
+        return value.includes("progress") || value.includes("start") || latestQuoteStatus(row) === "accepted";
       }).length,
       completed: scopedJobCards.filter((row) => {
         const value = normalizedStatus(row.status);
-        return value.includes("complete") || value.includes("done");
+        return value.includes("complete") || value.includes("done") || Boolean(row.completeAt);
       }).length,
       cancelled: scopedJobCards.filter((row) => normalizedStatus(row.status).includes("cancel")).length,
     } as Record<WorkshopTabId, number>;
-  }, [branchId, jobCards, scopedCompletedInspections, scopedInspections]);
+  }, [branchId, jobCards, scopedCompletedInspections, scopedInspections, latestQuoteByEstimateId]);
 
   const isInspectionTab = activeTab === "inspections" || activeTab === "completed-inspections";
 
@@ -397,6 +520,101 @@ export function BranchWorkshopDashboard({
   const canPrevious = currentPage > 1;
   const canNext = currentPage < totalPages;
   const searchPlaceholder = isInspectionTab ? "Search inspections" : "Search job cards";
+
+  const openQuoteModal = (row: JobCardRow) => {
+    setQuoteModalRow(row);
+    setQuoteAmount("");
+    setQuoteRemarks("");
+    setQuoteEtaPreset("");
+    setQuoteEtaHours("");
+    setQuoteModalError(null);
+  };
+
+  const closeQuoteModal = () => {
+    if (isSubmittingQuote) return;
+    setQuoteModalRow(null);
+    setQuoteAmount("");
+    setQuoteRemarks("");
+    setQuoteEtaPreset("");
+    setQuoteEtaHours("");
+    setQuoteModalError(null);
+  };
+
+  const submitQuote = async () => {
+    if (!quoteModalRow?.id) return;
+    const amount = Number(quoteAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setQuoteModalError("Enter a valid quoted amount.");
+      return;
+    }
+    if (quoteEtaPreset === "same_day") {
+      const hours = Number(quoteEtaHours);
+      if (!Number.isFinite(hours) || hours <= 0) {
+        setQuoteModalError("Enter estimated hours for same-day delivery.");
+        return;
+      }
+    }
+    if (!quoteEtaPreset) {
+      setQuoteModalError("Select estimated time.");
+      return;
+    }
+    setIsSubmittingQuote(true);
+    setQuoteModalError(null);
+    try {
+      const res = await fetch(`/api/company/${companyId}/workshop/job-cards/${quoteModalRow.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "quote",
+          quotedAmount: amount,
+          remarks: quoteRemarks.trim() || null,
+          estimatedTimePreset: quoteEtaPreset,
+          estimatedHours: quoteEtaPreset === "same_day" ? Number(quoteEtaHours) : null,
+          branchId: branchId ?? null,
+          currency: "AED",
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setQuoteModalError(json?.error ?? "Failed to submit quote.");
+        return;
+      }
+      if (quoteModalRow.estimateId) {
+        setQuotes((prev) => {
+          const next = [...prev];
+          const currentIdx = next.findIndex(
+            (item) =>
+              item.estimateId === quoteModalRow.estimateId &&
+              ((!branchId && !item.branchId) || item.branchId === branchId) &&
+              (item.quoteType ?? "").toLowerCase() === "branch_labor"
+          );
+          const updatedQuote: QuoteRow = {
+            id: currentIdx >= 0 ? next[currentIdx].id : `local-${quoteModalRow.id}`,
+            quoteType: "branch_labor",
+            status: "pending",
+            estimateId: quoteModalRow.estimateId,
+            branchId: branchId ?? null,
+            totalAmount: amount,
+            currency: "AED",
+            updatedAt: new Date().toISOString(),
+            etaPreset: quoteEtaPreset || null,
+            etaHours: quoteEtaPreset === "same_day" ? Number(quoteEtaHours) : null,
+          };
+          if (currentIdx >= 0) next[currentIdx] = updatedQuote;
+          else next.push(updatedQuote);
+          return next;
+        });
+      }
+      setJobCards((prev) =>
+        prev.map((row) => (row.id === quoteModalRow.id ? { ...row, status: "Quoted" } : row))
+      );
+      closeQuoteModal();
+    } catch {
+      setQuoteModalError("Failed to submit quote.");
+    } finally {
+      setIsSubmittingQuote(false);
+    }
+  };
 
   return (
     <div className="space-y-4 py-4">
@@ -581,36 +799,76 @@ export function BranchWorkshopDashboard({
               ) : (
                 (displayRows as JobCardRow[]).map((row) => (
                   <div key={row.id} className="rounded-xl bg-card/50 p-3 shadow-sm">
+                    {(() => {
+                      const quote = row.estimateId ? latestQuoteByEstimateId.get(row.estimateId) : null;
+                      const inquiryQuoteState = getInquiryQuoteState(row);
+                      return (
+                        <>
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="text-sm font-semibold text-primary">{row.id}</div>
                         <div className="text-xs text-foreground/70">{getCarLabel(row) || "-"}</div>
                       </div>
-                      <span className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold ${getStatusTone(row.status)}`}>
-                        {row.status ?? "Pending"}
+                      <span
+                        className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold ${getStatusTone(
+                          activeTab === "quotes" ? quote?.status : row.status
+                        )}`}
+                      >
+                        {activeTab === "quotes" ? quote?.status ?? "Pending" : row.status ?? "Pending"}
                       </span>
                     </div>
 
-                    <div className="mt-3 text-xs text-foreground/70">{formatDate(row.createdAt)}</div>
+                    <div className="mt-3 text-xs text-foreground/70">
+                      {formatDate(activeTab === "quotes" ? quote?.updatedAt ?? row.createdAt : row.createdAt)}
+                    </div>
+
+                    {activeTab === "quotes" && quote ? (
+                      <div className="mt-2 rounded-md border border-white/10 bg-white/5 p-2 text-xs text-foreground/80">
+                        <div>Quote: {quote.id.slice(0, 8)}...</div>
+                        <div>
+                          Amount: {(quote.currency ?? "AED")} {Number(quote.totalAmount ?? 0).toFixed(2)}
+                        </div>
+                        <div>
+                          ETA: {quote.etaPreset ? quote.etaPreset.replace(/_/g, " ") : "-"}
+                          {quote.etaPreset === "same_day" && quote.etaHours ? ` (${quote.etaHours}h)` : ""}
+                        </div>
+                      </div>
+                    ) : null}
 
                     <div className="mt-3 flex flex-wrap gap-2">
                       <a
-                        href={`/company/${companyId}/workshop/job-cards/${row.id}`}
-                        className="inline-flex items-center rounded-md bg-background px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-foreground shadow-sm transition hover:bg-muted/30"
+                        href={getJobCardHref(row.id)}
+                        className="inline-flex items-center rounded-md border border-primary/45 bg-primary/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary shadow-sm transition hover:bg-primary/20"
                       >
-                        View Jobcard
+                        Open Job Card
                       </a>
-                      <a
-                        href={
-                          row.estimateId
-                            ? `/company/${companyId}/estimates/${row.estimateId}`
-                            : `/company/${companyId}/workshop/job-cards/${row.id}`
-                        }
-                        className="inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary-foreground shadow-sm transition hover:opacity-90 hover:shadow-md"
-                      >
-                        Add Quote
-                      </a>
+                      {activeTab === "inquiries" ? (
+                        <button
+                          type="button"
+                          onClick={() => openQuoteModal(row)}
+                          disabled={inquiryQuoteState.isLocked}
+                          className="inline-flex items-center rounded-md border border-primary/50 bg-transparent px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary shadow-sm transition hover:bg-primary/10 disabled:cursor-not-allowed disabled:border-white/20 disabled:text-white/55 disabled:hover:bg-transparent"
+                        >
+                          {inquiryQuoteState.label}
+                        </button>
+                      ) : activeTab === "quotes" ? null : (
+                        activeTab === "jobs" ? null : (
+                        <a
+                          href={
+                            row.estimateId
+                              ? `/company/${companyId}/estimates/${row.estimateId}`
+                              : getJobCardHref(row.id)
+                          }
+                          className="inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary-foreground shadow-sm transition hover:opacity-90 hover:shadow-md"
+                        >
+                          Add Quote
+                        </a>
+                        )
+                      )}
                     </div>
+                        </>
+                      );
+                    })()}
                   </div>
                 ))
               )}
@@ -689,7 +947,7 @@ export function BranchWorkshopDashboard({
                         Job ID
                       </th>
                       <th className="px-4 py-3 sticky top-0 bg-white/5 backdrop-blur text-xs font-semibold text-foreground/85">
-                        Make
+                        {activeTab === "quotes" ? "Quote" : "Make"}
                       </th>
                       <th className="px-4 py-3 sticky top-0 bg-white/5 backdrop-blur text-xs font-semibold text-foreground/85">
                         Job Card
@@ -721,34 +979,80 @@ export function BranchWorkshopDashboard({
                     ) : (
                       (displayRows as JobCardRow[]).map((row) => (
                         <tr key={row.id} className="hover:bg-muted/20">
+                          {(() => {
+                            const quote = row.estimateId ? latestQuoteByEstimateId.get(row.estimateId) : null;
+                            const inquiryQuoteState = getInquiryQuoteState(row);
+                            return (
+                              <>
                           <td className="px-4 py-3  font-semibold">{row.id}</td>
-                          <td className="px-4 py-3 ">{getCarLabel(row) || "-"}</td>
+                          <td className="px-4 py-3 ">
+                            {activeTab === "quotes" && quote ? (
+                              <div className="space-y-0.5 text-xs">
+                                <div>{quote.id.slice(0, 8)}...</div>
+                                <div>
+                                  {(quote.currency ?? "AED")} {Number(quote.totalAmount ?? 0).toFixed(2)}
+                                </div>
+                                <div className="text-[10px] text-foreground/70">
+                                  ETA: {quote.etaPreset ? quote.etaPreset.replace(/_/g, " ") : "-"}
+                                  {quote.etaPreset === "same_day" && quote.etaHours ? ` (${quote.etaHours}h)` : ""}
+                                </div>
+                              </div>
+                            ) : (
+                              getCarLabel(row) || "-"
+                            )}
+                          </td>
                           <td className="px-4 py-3 ">
                             <a
-                              href={`/company/${companyId}/workshop/job-cards/${row.id}`}
-                              className="inline-flex items-center rounded-md bg-background px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-foreground shadow-sm transition hover:bg-muted/30"
+                              href={getJobCardHref(row.id)}
+                              className="inline-flex items-center rounded-md border border-primary/45 bg-primary/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary shadow-sm transition hover:bg-primary/20"
                             >
-                              View Jobcard
+                              Open Job Card
                             </a>
                           </td>
                           <td className="px-4 py-3 ">
-                            <span className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold ${getStatusTone(row.status)}`}>
-                              {row.status ?? "Pending"}
+                            <span
+                              className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold ${getStatusTone(
+                                activeTab === "quotes" ? quote?.status : row.status
+                              )}`}
+                            >
+                              {activeTab === "quotes" ? quote?.status ?? "Pending" : row.status ?? "Pending"}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-foreground/70">{formatDate(row.createdAt)}</td>
-                          <td className="px-4 py-3  text-right">
-                            <a
-                              href={
-                                row.estimateId
-                                  ? `/company/${companyId}/estimates/${row.estimateId}`
-                                  : `/company/${companyId}/workshop/job-cards/${row.id}`
-                              }
-                              className="inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary-foreground shadow-sm transition hover:opacity-90 hover:shadow-md"
-                            >
-                              Add Quote
-                            </a>
+                          <td className="px-4 py-3 text-foreground/70">
+                            {formatDate(activeTab === "quotes" ? quote?.updatedAt ?? row.createdAt : row.createdAt)}
                           </td>
+                          <td className="px-4 py-3  text-right">
+                            {activeTab === "inquiries" ? (
+                              <button
+                                type="button"
+                                onClick={() => openQuoteModal(row)}
+                                disabled={inquiryQuoteState.isLocked}
+                                className="inline-flex items-center rounded-md border border-primary/50 bg-transparent px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary shadow-sm transition hover:bg-primary/10 disabled:cursor-not-allowed disabled:border-white/20 disabled:text-white/55 disabled:hover:bg-transparent"
+                              >
+                                {inquiryQuoteState.label}
+                              </button>
+                            ) : activeTab === "quotes" ? (
+                              <span className="text-xs text-foreground/55">-</span>
+                            ) : (
+                              activeTab === "jobs" ? (
+                                <span className="text-xs text-foreground/55">-</span>
+                              ) : (
+                                <a
+                                  href={
+                                    row.estimateId
+                                      ? `/company/${companyId}/estimates/${row.estimateId}`
+                                      : getJobCardHref(row.id)
+                                  }
+                                  className="inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary-foreground shadow-sm transition hover:opacity-90 hover:shadow-md"
+                                >
+                                  Add Quote
+                                </a>
+                              )
+                            )}
+                          </td>
+                              </>
+                            );
+                          })()}
                         </tr>
                       ))
                     )}
@@ -786,6 +1090,117 @@ export function BranchWorkshopDashboard({
           </div>
         </div>
       </div>
+      {quoteModalRow && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className={`${theme.cardBg} w-full max-w-md rounded-xl p-4 shadow-2xl`}>
+            <div className="mb-3 flex items-start justify-between">
+              <div>
+                <h3 className="text-base font-semibold">Submit Quote</h3>
+                <p className="text-xs text-muted-foreground">Job {quoteModalRow.id}</p>
+              </div>
+              <button
+                type="button"
+                onClick={closeQuoteModal}
+                disabled={isSubmittingQuote}
+                className="rounded-md border border-white/20 px-2 py-1 text-xs text-white/80 hover:bg-white/10"
+              >
+                Close
+              </button>
+            </div>
+            <div className="space-y-3">
+              <label className="block">
+                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-white/80">
+                  Quoted Amount
+                </span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={quoteAmount}
+                  onChange={(event) => setQuoteAmount(event.target.value)}
+                  className="w-full rounded-md border border-white/20 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-primary"
+                  placeholder="Enter amount"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-white/80">
+                  Remarks (optional)
+                </span>
+                <textarea
+                  value={quoteRemarks}
+                  onChange={(event) => setQuoteRemarks(event.target.value)}
+                  rows={3}
+                  className="w-full rounded-md border border-white/20 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-primary"
+                  placeholder="Any quote notes"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-white/80">
+                  Estimated Time
+                </span>
+                <select
+                  value={quoteEtaPreset}
+                  onChange={(event) => setQuoteEtaPreset(event.target.value)}
+                  className="w-full rounded-md border border-white/20 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-primary"
+                >
+                  <option className="bg-white text-slate-900" value="">
+                    Select estimated time
+                  </option>
+                  <option className="bg-white text-slate-900" value="same_day">Same Day</option>
+                  <option className="bg-white text-slate-900" value="1_day">1 Day</option>
+                  <option className="bg-white text-slate-900" value="2_days">2 Days</option>
+                  <option className="bg-white text-slate-900" value="3_days">3 Days</option>
+                  <option className="bg-white text-slate-900" value="1_week">1 Week</option>
+                  <option className="bg-white text-slate-900" value="2_weeks">2 Weeks</option>
+                </select>
+              </label>
+              {quoteEtaPreset === "same_day" && (
+                <label className="block">
+                  <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-white/80">
+                    Estimated Hours
+                  </span>
+                  <select
+                    value={quoteEtaHours}
+                    onChange={(event) => setQuoteEtaHours(event.target.value)}
+                    className="w-full rounded-md border border-white/20 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-primary"
+                  >
+                    <option className="bg-white text-slate-900" value="">
+                      Select hours
+                    </option>
+                    <option className="bg-white text-slate-900" value="1">1 hour</option>
+                    <option className="bg-white text-slate-900" value="2">2 hours</option>
+                    <option className="bg-white text-slate-900" value="3">3 hours</option>
+                    <option className="bg-white text-slate-900" value="4">4 hours</option>
+                    <option className="bg-white text-slate-900" value="5">5 hours</option>
+                    <option className="bg-white text-slate-900" value="6">6 hours</option>
+                    <option className="bg-white text-slate-900" value="7">7 hours</option>
+                    <option className="bg-white text-slate-900" value="8">8 hours</option>
+                  </select>
+                </label>
+              )}
+              {quoteModalError && <div className="text-xs text-rose-400">{quoteModalError}</div>}
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={closeQuoteModal}
+                  disabled={isSubmittingQuote}
+                  className="rounded-md border border-white/20 px-3 py-1.5 text-xs font-semibold text-white/85 hover:bg-white/10 disabled:opacity-60"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={submitQuote}
+                  disabled={isSubmittingQuote}
+                  className="rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-60"
+                >
+                  {isSubmittingQuote ? "Submitting..." : "Submit Quote"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
