@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { createAccessToken, createRefreshToken, verifyToken } from "../../../../../lib/auth/mobile-jwt";
+import { buildMobileUserProfile } from "../../../../../lib/auth/mobile-user-profile";
 import { createMobileErrorResponse, createMobileSuccessResponse } from "../../utils";
 
 export async function POST(req: NextRequest) {
@@ -17,6 +18,7 @@ export async function POST(req: NextRequest) {
 
     const { token: accessToken, expiresIn } = createAccessToken(payload.sub);
     const { token: newRefreshToken, expiresIn: refreshExpiresIn } = createRefreshToken(payload.sub);
+    const user = await buildMobileUserProfile(payload.sub);
 
     return createMobileSuccessResponse({
       tokenType: "Bearer",
@@ -24,6 +26,8 @@ export async function POST(req: NextRequest) {
       refreshToken: newRefreshToken,
       expiresIn,
       refreshExpiresIn,
+      user,
+      redirect: user?.dashboard?.path ?? null,
     });
   } catch (error: any) {
     console.error("POST /api/mobile/auth/refresh error:", error);

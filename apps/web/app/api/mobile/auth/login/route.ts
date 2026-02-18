@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
 import bcrypt from "bcryptjs";
-import { getSql, UserRepository } from "@repo/ai-core";
+import { getSql } from "@repo/ai-core";
 import { createAccessToken, createRefreshToken } from "../../../../../lib/auth/mobile-jwt";
-import { getUserContext } from "../../../../../lib/auth/user-context";
+import { buildMobileUserProfile } from "../../../../../lib/auth/mobile-user-profile";
 import { createMobileErrorResponse, createMobileSuccessResponse } from "../../utils";
 
 type UserRow = {
@@ -40,9 +40,8 @@ export async function POST(req: NextRequest) {
 
     const { token: accessToken, expiresIn } = createAccessToken(user.id);
     const { token: refreshToken, expiresIn: refreshExpiresIn } = createRefreshToken(user.id);
-    const context = await getUserContext(user.id);
-    const fullUser = await UserRepository.getUserById(user.id);
-    if (!fullUser) {
+    const profile = await buildMobileUserProfile(user.id);
+    if (!profile) {
       return createMobileErrorResponse("User profile missing", 500);
     }
 
@@ -52,14 +51,8 @@ export async function POST(req: NextRequest) {
       refreshToken,
       expiresIn,
       refreshExpiresIn,
-      user: {
-        id: fullUser.id,
-        fullName: fullUser.full_name ?? null,
-        email: fullUser.email ?? user.email ?? null,
-        isGlobal: context.isGlobal,
-        scope: context.scope,
-        companies: context.companies[0],
-      },
+      user: profile,
+      redirect: profile.dashboard.path,
     });
   } catch (error: any) {
     console.error("POST /api/mobile/auth/login error:", error);
