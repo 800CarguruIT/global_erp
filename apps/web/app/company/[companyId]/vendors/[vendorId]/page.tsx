@@ -5,7 +5,6 @@ import { DropzoneFileInput } from "@repo/ui/components/common/DropzoneFileInput"
 import { useParams } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
 
-type Props = { params: { companyId: string; vendorId: string } };
 type QuoteTypeKey = "oem" | "oe" | "aftm" | "used";
 type PartFormData = {
   partNumber: string;
@@ -91,9 +90,9 @@ function TableShell({
 }) {
   return (
     <div className="overflow-hidden rounded-2xl bg-slate-950/85 shadow-[0_30px_70px_-40px_rgba(8,15,30,0.9)] ring-1 ring-white/5">
-      <div className="flex items-center justify-between border-b border-white/5 bg-gradient-to-r from-slate-950/70 via-slate-900/60 to-slate-950/80 px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/5 bg-gradient-to-r from-slate-950/70 via-slate-900/60 to-slate-950/80 px-3 py-3 sm:px-4">
         <div>
-          <div className="text-sm font-semibold">{title}</div>
+          <div className="text-sm font-semibold sm:text-base">{title}</div>
           <div className="text-xs text-muted-foreground">{subtitle}</div>
         </div>
         <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] uppercase tracking-[0.2em] text-white/60">
@@ -101,11 +100,11 @@ function TableShell({
         </span>
       </div>
       <div className="overflow-x-auto">
-        <table className="min-w-full text-sm">
+        <table className="min-w-[920px] text-xs sm:min-w-full sm:text-sm">
           <thead className="bg-slate-900/70 text-xs uppercase tracking-wide text-slate-300">
             <tr>
               {columns.map((col) => (
-                <th key={col} className="px-3 py-2 text-left font-medium">
+                <th key={col} className="px-2 py-2 text-left font-medium sm:px-3">
                   {col}
                 </th>
               ))}
@@ -126,14 +125,12 @@ function TableShell({
   );
 }
 
-export default function VendorDashboardPage({ params }: Props) {
+export default function VendorDashboardPage() {
   const routeParams = useParams();
   const companyId =
-    params?.companyId ??
     (typeof routeParams?.companyId === "string" ? routeParams.companyId : routeParams?.companyId?.[0]) ??
     "";
   const vendorId =
-    params?.vendorId ??
     (typeof routeParams?.vendorId === "string" ? routeParams.vendorId : routeParams?.vendorId?.[0]) ??
     "";
   const [activeTab, setActiveTab] = useState<TabId>("inquiries");
@@ -242,6 +239,7 @@ export default function VendorDashboardPage({ params }: Props) {
     }),
     [inquiries.length, bids.length, orders.length, completed.length, returns.length]
   );
+  const activeTabCount = tabCounts[activeTab] ?? 0;
 
   useEffect(() => {
     if (!partsRows.length) return;
@@ -836,7 +834,7 @@ export default function VendorDashboardPage({ params }: Props) {
   return (
     <AppLayout>
       <div className="mx-auto w-full max-w-[1600px] space-y-6 px-3 py-4 sm:px-6">
-        <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-slate-950/90 via-slate-900/80 to-slate-950/90 p-6 shadow-[0_35px_80px_-45px_rgba(8,15,30,0.9)]">
+        <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-slate-950/90 via-slate-900/80 to-slate-950/90 p-4 shadow-[0_35px_80px_-45px_rgba(8,15,30,0.9)] sm:p-6">
           <div className="pointer-events-none absolute inset-0">
             <div className="absolute -left-24 -top-24 h-56 w-56 rounded-full bg-emerald-400/15 blur-3xl" />
             <div className="absolute -right-16 top-6 h-48 w-48 rounded-full bg-sky-400/10 blur-3xl" />
@@ -849,7 +847,7 @@ export default function VendorDashboardPage({ params }: Props) {
                 <span className="h-1 w-1 rounded-full bg-white/30" />
                 <span>Live Operations</span>
               </div>
-              <h1 className="text-2xl font-semibold text-white">800CarGuru Parts Portal</h1>
+              <h1 className="text-xl font-semibold text-white sm:text-2xl">800CarGuru Parts Portal</h1>
               <p className="text-sm text-white/60">Vendor workspace for parts inquiries, bids, and deliveries.</p>
               <div className="flex flex-wrap gap-2 text-xs text-white/60">
                 <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1">
@@ -860,7 +858,7 @@ export default function VendorDashboardPage({ params }: Props) {
                 </span>
               </div>
             </div>
-            <div className="grid w-full max-w-sm gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 text-slate-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+            <div className="grid w-full gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 text-slate-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] sm:max-w-sm">
               <div className="flex items-center justify-between">
                 <div className="text-xs font-semibold uppercase tracking-wide text-slate-300">Car Make Filter</div>
                 <button
@@ -873,7 +871,7 @@ export default function VendorDashboardPage({ params }: Props) {
               </div>
               <select
                 multiple
-                className="min-h-[92px] rounded-xl bg-slate-900/80 px-2 py-2 text-sm text-slate-100 shadow-inner outline-none ring-1 ring-white/10 focus:ring-2 focus:ring-emerald-400/60"
+                className="min-h-[84px] rounded-xl bg-slate-900/80 px-2 py-2 text-sm text-slate-100 shadow-inner outline-none ring-1 ring-white/10 focus:ring-2 focus:ring-emerald-400/60 sm:min-h-[92px]"
                 value={selectedMakes}
                 onChange={(e) =>
                   setSelectedMakes(Array.from(e.target.selectedOptions).map((opt) => opt.value))
@@ -905,57 +903,45 @@ export default function VendorDashboardPage({ params }: Props) {
           ))}
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-[240px,1fr]">
-          <aside className="relative overflow-hidden rounded-2xl bg-gradient-to-b from-slate-950/85 via-slate-900/70 to-slate-950/85 p-4 text-sm text-slate-100 shadow-[0_24px_60px_-32px_rgba(15,23,42,0.85)]">
-            <div className="pointer-events-none absolute inset-0">
-              <div className="absolute -right-12 -top-16 h-40 w-40 rounded-full bg-emerald-400/20 blur-3xl" />
-              <div className="absolute -left-20 -bottom-20 h-44 w-44 rounded-full bg-amber-400/15 blur-3xl" />
-              <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-white/5 to-transparent" />
-            </div>
-            <div className="relative mb-3 flex items-center justify-between">
-              <span className="text-[10px] uppercase tracking-[0.2em] text-white/50">Section</span>
-              <span className="rounded-full border border-white/15 bg-white/10 px-2.5 py-0.5 text-[10px] uppercase tracking-[0.2em] text-white/80">
-                Main
-              </span>
-            </div>
-            <div className="relative space-y-2">
-              {TAB_CONFIG.map((tab) => {
-                const isActive = tab.id === activeTab;
-                const count = tabCounts[tab.id] ?? 0;
-                return (
-                  <div key={tab.id} className="rounded-xl bg-white/[0.02]">
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab(tab.id)}
-                      className={`group relative flex w-full items-center justify-between rounded-xl px-4 py-2.5 pl-6 text-left text-sm font-medium transition ${
-                        isActive
-                          ? "bg-white/12 text-white"
-                          : "text-white/80 hover:bg-white/6"
-                      }`}
-                    >
-                      <span
-                        className={`absolute left-2 top-1/2 h-5 w-1 -translate-y-1/2 rounded-full transition ${
-                          isActive
-                            ? "bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.9)]"
-                            : "bg-white/10 group-hover:bg-white/30"
-                        }`}
-                      />
-                      <span className="truncate">{tab.label}</span>
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                          isActive
-                            ? "bg-emerald-500/20 text-emerald-200"
-                            : "bg-white/10 text-white/50"
-                        }`}
-                      >
-                        {count}
-                      </span>
-                    </button>
+        <div className="space-y-4">
+          <div className="rounded-2xl bg-slate-950/80 p-3 shadow-[0_18px_40px_-28px_rgba(15,23,42,0.9)]">
+            <div className="space-y-3">
+              <div className="rounded-2xl bg-white/[0.03] shadow-sm backdrop-blur">
+                <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+                  <div className="w-full overflow-x-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/20">
+                    <div className="inline-flex min-w-max flex-nowrap gap-2 text-xs">
+                      {TAB_CONFIG.map((tab) => {
+                        const isActive = activeTab === tab.id;
+                        return (
+                          <button
+                            key={tab.id}
+                            type="button"
+                            onClick={() => setActiveTab(tab.id)}
+                            className={`min-w-[120px] shrink-0 inline-flex items-center justify-between gap-2 rounded-full px-4 py-1.5 text-[11px] font-medium transition ${
+                              isActive
+                                ? "bg-gradient-to-b from-emerald-500/30 to-emerald-500/10 text-emerald-100 shadow-[0_0_8px_rgba(16,185,129,0.35)] border border-emerald-400/40"
+                                : "bg-white/5 text-white/70 border border-white/10 hover:text-white hover:border-white/30"
+                            }`}
+                          >
+                            <span>{tab.label}</span>
+                            <span
+                              className={`inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
+                                isActive ? "bg-emerald-200/20 text-emerald-100" : "bg-white/15 text-white/90"
+                              }`}
+                            >
+                              {tabCounts[tab.id] ?? 0}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                );
-              })}
+                  <div className="text-xs text-white/70">{activeTabCount} entries</div>
+                </div>
+                <div className="px-4 pb-3 text-xs text-white/70">{currentTab.subtitle}</div>
+              </div>
             </div>
-          </aside>
+          </div>
 
           <section className="space-y-4">
             {currentTab.id === "inquiries" && (

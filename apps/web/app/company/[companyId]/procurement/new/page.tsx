@@ -285,16 +285,6 @@ export default function CreatePurchaseOrderPage() {
       setError("Please select supplier and add at least one item.");
       return;
     }
-    const missingStatus = items.filter(
-      (item) =>
-        (item.partId || item.inventoryRequestItemId || item.partLabel) &&
-        (item.quantity > 0 || item.unitPrice > 0) &&
-        !item.lineStatus
-    );
-    if (missingStatus.length) {
-      setError("Select line status (Received/Return) for all items before creating the PO.");
-      return;
-    }
     setSaving(true);
     setError(null);
     try {
@@ -309,7 +299,6 @@ export default function CreatePurchaseOrderPage() {
           name: item.partLabel || "Part",
           description: [
             `Unit: ${item.unit}`,
-            item.lineStatus ? `Status: ${item.lineStatus}` : null,
             item.approvedType ? `Type: ${item.approvedType}` : null,
           ]
             .filter(Boolean)
@@ -319,7 +308,6 @@ export default function CreatePurchaseOrderPage() {
           partsCatalogId: item.partId ?? null,
           inventoryRequestItemId: item.inventoryRequestItemId ?? null,
           quoteId: item.quoteId ?? null,
-          lineStatus: item.lineStatus ?? null,
         }));
       const notesPieces = [
         notes.trim(),
@@ -544,7 +532,6 @@ export default function CreatePurchaseOrderPage() {
               <th className="py-2 px-3 text-left">Part</th>
               <th className="py-2 px-3 text-left">Qty Ordered</th>
               <th className="py-2 px-3 text-left">Type</th>
-              <th className="py-2 px-3 text-left">Status</th>
               <th className="py-2 px-3 text-left">Unit price</th>
               <th className="py-2 px-3 text-left">Discount %</th>
               <th className="py-2 px-3 text-left">VAT (%)</th>
@@ -555,7 +542,7 @@ export default function CreatePurchaseOrderPage() {
               <tbody>
                 {items.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="py-4 text-center text-xs text-slate-500">
+                    <td colSpan={8} className="py-4 text-center text-xs text-slate-500">
                       No line items yet.
                     </td>
                   </tr>
@@ -588,25 +575,6 @@ export default function CreatePurchaseOrderPage() {
                         </td>
                         <td className="py-2 px-3 text-xs">
                           <div className="text-xs font-semibold text-slate-100">{item.unit}</div>
-                          {item.lineStatus && (
-                            <div className="text-[11px] text-slate-400">Status: {item.lineStatus}</div>
-                          )}
-                         
-                        </td>
-                        <td className="py-2 px-3">
-                          <select
-                            className="w-28 rounded border border-slate-800 bg-slate-900 px-2 py-1 text-xs text-slate-100"
-                            value={item.lineStatus ?? ""}
-                            onChange={(event) =>
-                              updateItem(index, {
-                                lineStatus: (event.target.value as "Received" | "Return" | "") || null,
-                              })
-                            }
-                          >
-                            <option value="">Select</option>
-                            <option value="Received">Received</option>
-                            <option value="Return">Return</option>
-                          </select>
                         </td>
                         <td className="py-2 px-3">
                           <input

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Accounting } from "@repo/ai-core";
+import { getSql } from "@repo/ai-core/db";
 import { buildScopeContextFromRoute, requirePermission } from "@/lib/auth/permissions";
 
 type Params = { params: { companyId: string } };
@@ -13,9 +14,24 @@ type AccountDto = {
   normalBalance: string;
   standardId?: string | null;
   isActive: boolean;
+  isLeaf: boolean;
 };
 
-function mapAccount(a: any): AccountDto {
+type AccountRowLike = {
+  id: string;
+  code: string;
+  name: string;
+  type: string;
+  sub_type?: string | null;
+  normal_balance?: string | null;
+  standard_id?: string | null;
+  is_active?: boolean | null;
+  is_leaf?: boolean | null;
+  parent_id?: string | null;
+  company_id?: string | null;
+};
+
+function mapAccount(a: AccountRowLike): AccountDto {
   return {
     id: a.id,
     code: a.code,
@@ -25,6 +41,7 @@ function mapAccount(a: any): AccountDto {
     normalBalance: a.normal_balance ?? "debit",
     standardId: a.standard_id ?? null,
     isActive: a.is_active ?? true,
+    isLeaf: a.is_leaf ?? true,
   };
 }
 
@@ -34,8 +51,44 @@ export async function GET(req: NextRequest, { params }: Params) {
   if (perm) return perm;
 
   try {
-    const accounts = await Accounting.createOrImportEntityChart("company", companyId);
-    return NextResponse.json({ data: accounts.map(mapAccount) });
+    const sql = getSql();
+    const leafOnly = req.nextUrl.searchParams.get("leafOnly") === "1";
+    const activeOnly = req.nextUrl.searchParams.get("activeOnly") === "1";
+    const all = await sql<AccountRowLike[]>`
+      SELECT
+        id,
+        COALESCE(NULLIF(code, ''), NULLIF(account_code, ''), '') AS code,
+        COALESCE(NULLIF(name, ''), NULLIF(account_name, ''), '') AS name,
+        COALESCE(type, 'asset') AS type,
+        sub_type,
+        normal_balance,
+        standard_id,
+        is_active,
+        is_leaf,
+        parent_id,
+        company_id
+      FROM accounting_accounts
+      WHERE company_id IS NULL OR company_id = ${companyId}
+      ORDER BY COALESCE(NULLIF(code, ''), NULLIF(account_code, ''), ''), COALESCE(NULLIF(name, ''), NULLIF(account_name, ''), '')
+    `;
+    const active = all.filter((a) => (activeOnly ? a?.is_active !== false : true));
+
+    let filtered = active;
+    if (leafOnly) {
+      const parentIds = new Set(active.map((a) => a.parent_id).filter((id): id is string => Boolean(id)));
+      filtered = active.filter((account) => {
+        const normalizedCode = String(account.code ?? "").replace(/[^0-9A-Za-z]/g, "");
+        const isSummaryCode = normalizedCode.length <= 4;
+        const hasChildByParent = parentIds.has(account.id);
+        const hasChildByCodePrefix = active.some(
+          (other) => other.id !== account.id && typeof other.code === "string" && other.code.startsWith(account.code)
+            && other.code.length > account.code.length
+        );
+        return !isSummaryCode && !hasChildByParent && !hasChildByCodePrefix;
+      });
+    }
+
+    return NextResponse.json({ data: filtered.map(mapAccount) });
   } catch (error) {
     console.error("GET /api/company/[companyId]/accounting/accounts error", error);
     return NextResponse.json({ error: "Failed to load accounts" }, { status: 500 });

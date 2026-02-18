@@ -65,7 +65,8 @@ export async function GET(req: NextRequest, { params }: Params) {
       car.plate_number AS car_plate,
       car.vin AS car_vin,
       ior.request_number,
-      v.id AS vendor_id
+      v.id AS vendor_id,
+      direct_grn.grn_number AS direct_grn_number
     FROM part_quotes pq
     LEFT JOIN line_items li ON li.id = pq.line_item_id
     LEFT JOIN estimates est ON est.id = pq.estimate_id
@@ -74,6 +75,20 @@ export async function GET(req: NextRequest, { params }: Params) {
     LEFT JOIN inventory_order_requests ior ON ior.id = pq.inventory_request_id
     LEFT JOIN vendors v ON v.id = pq.vendor_id
     LEFT JOIN cars car ON car.id = COALESCE(est.car_id, li_inspection.car_id)
+    LEFT JOIN LATERAL (
+      SELECT im.grn_number
+      FROM inventory_movements im
+      WHERE im.direction = 'in'
+        AND im.source_type = 'receipt'
+        AND im.grn_number IS NOT NULL
+        AND (
+          (pq.inventory_request_item_id IS NOT NULL AND im.source_id = pq.inventory_request_item_id)
+          OR (pq.estimate_item_id IS NOT NULL AND im.source_id = pq.estimate_item_id)
+          OR (pq.line_item_id IS NOT NULL AND im.source_id = pq.line_item_id)
+        )
+      ORDER BY im.created_at DESC
+      LIMIT 1
+    ) direct_grn ON TRUE
     WHERE pq.company_id = ${companyId}
       ${statusFilter}
     ORDER BY pq.updated_at DESC
@@ -96,6 +111,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     estimateItemId: row.estimate_item_id ?? null,
     lineItemId: row.line_item_id ?? null,
     vendorId: row.vendor_id ?? null,
+    grnNumber: row.direct_grn_number ?? null,
     oem: row.oem != null ? Number(row.oem) : null,
     oe: row.oe != null ? Number(row.oe) : null,
     aftm: row.aftm != null ? Number(row.aftm) : null,

@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { AppLayout } from "@repo/ui";
 import { toast } from "sonner";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 
 type TabId = "quoted" | "ordered" | "rejected" | "received" | "returns";
 
@@ -46,6 +46,7 @@ type QuoteRow = {
   updatedAt?: string | null;
   vendorId?: string | null;
   estimateItemId?: string | null;
+  grnNumber?: string | null;
 };
 
 const pickQuote = (row: QuoteRow) => {
@@ -64,11 +65,8 @@ const normalizeApprovedType = (value?: string | null): "oem" | "oe" | "aftm" | "
   return null;
 };
 
-const ORDERED_QUOTE_PO_KEY = "orderedQuotesPoDraft";
-
 export default function PartsQuotesPage() {
   const params = useParams();
-  const router = useRouter();
   const companyId =
     typeof params?.companyId === "string" ? params.companyId : params?.companyId?.[0] ?? "";
   const [activeTab, setActiveTab] = useState<TabId>("quoted");
@@ -77,6 +75,7 @@ export default function PartsQuotesPage() {
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [orderingQuoteId, setOrderingQuoteId] = useState<string | null>(null);
+  const [creatingPo, setCreatingPo] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedOrderedIds, setSelectedOrderedIds] = useState<string[]>([]);
   const [quotesModalOpen, setQuotesModalOpen] = useState(false);
@@ -132,34 +131,54 @@ export default function PartsQuotesPage() {
     );
   };
 
-  const handleCreatePurchaseOrder = () => {
-    if (!selectedOrderedIds.length) return;
+  const handleCreatePurchaseOrder = async () => {
+    if (!selectedOrderedIds.length || !companyId || creatingPo) return;
     const rowsToSend = rows.filter((row) => selectedOrderedIds.includes(row.id));
     if (!rowsToSend.length) return;
     const firstRow = rowsToSend[0];
-    const payload = {
-      vendorId: firstRow.vendorId ?? null,
-      vendorName: firstRow.vendorName ?? null,
-      lines: rowsToSend.map((row) => {
+    const mixedVendors = rowsToSend.some((row) => (row.vendorId ?? "") !== (firstRow.vendorId ?? ""));
+    if (mixedVendors) {
+      toast.error("Please create purchase orders per vendor.");
+      return;
+    }
+    setCreatingPo(true);
+    try {
+      const payloadItems = rowsToSend.map((row) => {
         const quoteInfo = pickQuote(row);
         return {
           quoteId: row.id,
-          partLabel: row.partName ?? "Part",
-          quantity: quoteInfo.qty ?? 1,
-          unitPrice: quoteInfo.amount ?? 0,
-          unit: quoteInfo.type ?? "EA",
-          partsCatalogId: (row as any).partsCatalogId ?? null,
-          approvedType: row.approvedType ?? null,
+          estimateItemId: row.estimateItemId ?? null,
           inventoryRequestItemId: row.inventoryRequestItemId ?? null,
+          name: row.partName ?? "Part",
+          description: row.remarks ?? null,
+          quantity: Number(quoteInfo.qty ?? 1) || 1,
+          unitCost: Number(quoteInfo.amount ?? 0) || 0,
+          unit: quoteInfo.type ?? "EA",
         };
-      }),
-    };
-    try {
-      sessionStorage.setItem(ORDERED_QUOTE_PO_KEY, JSON.stringify(payload));
-    } catch {
-      // ignore
+      });
+      const res = await fetch(`/api/company/${companyId}/workshop/procurement`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          poType: "po",
+          vendorId: firstRow.vendorId ?? null,
+          vendorName: firstRow.vendorName ?? null,
+          items: payloadItems,
+        }),
+      });
+      if (!res.ok) {
+        throw new Error(`Failed to create PO (${res.status})`);
+      }
+      const json = await res.json();
+      const poId = json?.data?.po?.id ?? json?.data?.id;
+      if (!poId) throw new Error("PO created but id is missing");
+      toast.success("Purchase order created");
+      window.location.href = `/company/${companyId}/workshop/procurement/${poId}`;
+    } catch (err: any) {
+      toast.error(err?.message ?? "Unable to create purchase order");
+    } finally {
+      setCreatingPo(false);
     }
-    router.push(`/company/${companyId}/procurement/new`);
   };
 
   const openQuotesModal = (row: QuoteRow) => {
@@ -279,6 +298,7 @@ export default function PartsQuotesPage() {
         .filter(Boolean)
         .join(" · ");
       const orderedOn = row.updatedAt ? new Date(row.updatedAt).toLocaleDateString() : "-";
+      const showGrn = activeTab === "received" && row.grnNumber;
       return (
         <tr key={row.id} className="border-t border-white/5">
           <td className="px-3 py-3 text-xs text-slate-300/80">{index + 1}</td>
@@ -298,7 +318,10 @@ export default function PartsQuotesPage() {
           </td>
           <td className="px-3 py-3 text-xs uppercase">{statusLabel}</td>
           <td className="px-3 py-3 text-xs uppercase">{row.status ?? "Requested"}</td>
-          <td className="px-3 py-3 text-xs">{orderedOn}</td>
+          <td className="px-3 py-3 text-xs">
+            <div>{orderedOn}</div>
+            {showGrn ? <div className="text-[10px] font-semibold text-emerald-300">{row.grnNumber}</div> : null}
+          </td>
           {isOrderedTab ? (
             <td className="px-3 py-3 text-center">
               <input
@@ -525,9 +548,10 @@ export default function PartsQuotesPage() {
                 <button
                   type="button"
                   onClick={() => handleCreatePurchaseOrder()}
+                  disabled={creatingPo}
                   className="rounded-md bg-emerald-500 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white shadow-lg shadow-emerald-500/40 transition hover:bg-emerald-400"
                 >
-                  Create Purchase Order
+                  {creatingPo ? "Creating..." : "Create Purchase Order"}
                 </button>
                 <div className="text-[11px] font-semibold uppercase text-slate-300">Selected parts</div>
                 <div className="flex flex-wrap gap-2 text-[11px] text-slate-200">
@@ -558,7 +582,7 @@ export default function PartsQuotesPage() {
                   <th className="px-3 py-2 text-left">Quote</th>
                   <th className="px-3 py-2 text-left">Status</th>
                   <th className="px-3 py-2 text-left">Quote status</th>
-                  <th className="px-3 py-2 text-left">Ordered On</th>
+                  <th className="px-3 py-2 text-left">Date / GRN</th>
                   {isOrderedTab ? (
                     <th className="px-3 py-2 text-center">Select</th>
                   ) : (

@@ -205,14 +205,24 @@ export async function getEstimateWithItems(
   const items = await getEstimateItems(estimateId);
   const costRows = await sql`
     SELECT
-      estimate_item_id,
-      MIN(oem) AS oem,
-      MIN(oe) AS oe,
-      MIN(aftm) AS aftm,
-      MIN(used) AS used
-    FROM part_quotes
-    WHERE company_id = ${companyId} AND estimate_id = ${estimateId}
-    GROUP BY estimate_item_id
+      ei.id AS estimate_item_id,
+      MIN(pq.oem) AS oem,
+      MIN(pq.oe) AS oe,
+      MIN(pq.aftm) AS aftm,
+      MIN(pq.used) AS used
+    FROM estimate_items ei
+    LEFT JOIN part_quotes pq
+      ON pq.company_id = ${companyId}
+      AND (
+        pq.estimate_item_id = ei.id
+        OR (ei.inspection_item_id IS NOT NULL AND pq.line_item_id = ei.inspection_item_id)
+      )
+      AND (
+        pq.estimate_id IS NULL
+        OR pq.estimate_id = ${estimateId}
+      )
+    WHERE ei.estimate_id = ${estimateId}
+    GROUP BY ei.id
   `;
   const quoteCostMap: Record<string, EstimateItemQuoteCosts | undefined> = {};
   for (const row of costRows) {
@@ -223,7 +233,7 @@ export async function getEstimateWithItems(
         costs[column] = Number(value);
       }
     }
-    if (Object.keys(costs).length > 0) {
+    if (Object.keys(costs).length > 0 && row.estimate_item_id) {
       quoteCostMap[row.estimate_item_id] = costs;
     }
   }

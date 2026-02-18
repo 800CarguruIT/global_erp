@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { MainPageShell } from "./MainPageShell";
 import type {
   PurchaseOrder,
+  PurchaseOrderGrnEntry,
   PurchaseOrderItem,
   PurchaseOrderStatus,
   PurchaseOrderType,
@@ -28,6 +29,7 @@ type ItemDraft = {
   description?: string | null;
   quantity: number;
   unitCost: number;
+  receivedQty?: number;
   status?: PurchaseOrderItem["status"];
   partsCatalogId?: string | null;
   inventoryRequestItemId?: string | null;
@@ -46,7 +48,13 @@ type ItemDraft = {
 };
 
 export function ProcurementDetailMain({ companyId, poId }: { companyId: string; poId: string }) {
-  const [state, setState] = useState<LoadState<{ po: PurchaseOrder; items: PurchaseOrderItem[] }>>({
+  const errorMessage = (err: unknown, fallback: string) => {
+    if (err instanceof Error && err.message) return err.message;
+    return fallback;
+  };
+  const [state, setState] = useState<
+    LoadState<{ po: PurchaseOrder; items: PurchaseOrderItem[]; grns: PurchaseOrderGrnEntry[] }>
+  >({
     status: "loading",
     data: null,
     error: null,
@@ -70,6 +78,14 @@ export function ProcurementDetailMain({ companyId, poId }: { companyId: string; 
   }>({});
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [receiveStatus, setReceiveStatus] = useState<
+    Record<string, { loading: boolean; error?: string | null }>
+  >({});
+  const [reconcileStatus, setReconcileStatus] = useState<{
+    loading: boolean;
+    error?: string | null;
+    message?: string | null;
+  }>({ loading: false, error: null, message: null });
   const [moveStatus, setMoveStatus] = useState<Record<string, { loading: boolean; error?: string | null }>>({});
   const [moveModal, setMoveModal] = useState<{ open: boolean; itemId: string; itemName: string }>({
     open: false,
@@ -90,61 +106,68 @@ export function ProcurementDetailMain({ companyId, poId }: { companyId: string; 
     brand: "",
   });
 
+  const loadPurchaseOrder = useCallback(async (opts?: { keepLoading?: boolean }) => {
+    const keepLoading = opts?.keepLoading ?? false;
+    if (!keepLoading) {
+      setState({ status: "loading", data: null, error: null });
+    }
+    const res = await fetch(`/api/company/${companyId}/workshop/procurement/${poId}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+    const po: PurchaseOrder =
+      json.data?.po ?? json.data?.purchaseOrder ?? json.data?.data ?? json.data?.po ?? json.data;
+    const list: PurchaseOrderItem[] = json.data?.items ?? [];
+    const grns: PurchaseOrderGrnEntry[] = json.data?.grns ?? [];
+    setState({ status: "loaded", data: { po, items: list, grns }, error: null });
+    setItems(
+      list.map((i) => ({
+        id: i.id,
+        lineNo: i.lineNo,
+        name: i.name ?? "",
+        description: i.description ?? "",
+        quantity: i.quantity ?? 0,
+        unitCost: i.unitCost ?? 0,
+        receivedQty: i.receivedQty ?? 0,
+        status: i.status,
+        partsCatalogId: i.partsCatalogId ?? null,
+        inventoryRequestItemId: i.inventoryRequestItemId ?? null,
+        movedToInventory: i.movedToInventory ?? false,
+        inventoryTypeId: i.inventoryTypeId ?? null,
+        categoryId: i.categoryId ?? null,
+        subcategoryId: i.subcategoryId ?? null,
+        makeId: i.makeId ?? null,
+        modelId: i.modelId ?? null,
+        yearId: i.yearId ?? null,
+        partType: i.partType ?? null,
+        unit: i.unit ?? null,
+        partBrand: i.partBrand ?? null,
+        category: i.category ?? null,
+        subcategory: i.subcategory ?? null,
+      }))
+    );
+    setHeader({
+      status: po.status,
+      poType: po.poType,
+      expectedDate: po.expectedDate ?? "",
+      notes: po.notes ?? "",
+      vendorName: po.vendorName ?? "",
+      vendorContact: po.vendorContact ?? "",
+    });
+  }, [companyId, poId]);
+
   useEffect(() => {
     let cancelled = false;
-    async function load() {
-      setState({ status: "loading", data: null, error: null });
+    (async () => {
       try {
-        const res = await fetch(`/api/company/${companyId}/workshop/procurement/${poId}`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const json = await res.json();
-        const po: PurchaseOrder = json.data?.po ?? json.data?.purchaseOrder ?? json.data?.data ?? json.data?.po ?? json.data;
-        const list: PurchaseOrderItem[] = json.data?.items ?? [];
-        if (!cancelled) {
-          setState({ status: "loaded", data: { po, items: list }, error: null });
-          setItems(
-            list.map((i) => ({
-              id: i.id,
-              lineNo: i.lineNo,
-              name: i.name ?? "",
-              description: i.description ?? "",
-              quantity: i.quantity ?? 0,
-              unitCost: i.unitCost ?? 0,
-              status: i.status,
-              partsCatalogId: i.partsCatalogId ?? null,
-              inventoryRequestItemId: i.inventoryRequestItemId ?? null,
-              movedToInventory: i.movedToInventory ?? false,
-              inventoryTypeId: i.inventoryTypeId ?? null,
-              categoryId: i.categoryId ?? null,
-              subcategoryId: i.subcategoryId ?? null,
-              makeId: i.makeId ?? null,
-              modelId: i.modelId ?? null,
-              yearId: i.yearId ?? null,
-              partType: i.partType ?? null,
-              unit: i.unit ?? null,
-              partBrand: i.partBrand ?? null,
-              category: i.category ?? null,
-              subcategory: i.subcategory ?? null,
-            }))
-          );
-          setHeader({
-            status: po.status,
-            poType: po.poType,
-            expectedDate: po.expectedDate ?? "",
-            notes: po.notes ?? "",
-            vendorName: po.vendorName ?? "",
-            vendorContact: po.vendorContact ?? "",
-          });
-        }
-      } catch (err) {
+        await loadPurchaseOrder();
+      } catch {
         if (!cancelled) setState({ status: "error", data: null, error: "Failed to load purchase order." });
       }
-    }
-    load();
+    })();
     return () => {
       cancelled = true;
     };
-  }, [companyId, poId]);
+  }, [loadPurchaseOrder]);
 
   useEffect(() => {
     let active = true;
@@ -471,7 +494,7 @@ export function ProcurementDetailMain({ companyId, poId }: { companyId: string; 
               <tbody>
                 {items.length === 0 ? (
                   <tr>
-                      <td colSpan={6} className="py-2 text-center text-xs text-slate-400">
+                      <td colSpan={8} className="py-2 text-center text-xs text-slate-400">
                         No items.
                       </td>
                     </tr>
@@ -480,6 +503,15 @@ export function ProcurementDetailMain({ companyId, poId }: { companyId: string; 
                     const lineTotal = (item.quantity ?? 0) * (item.unitCost ?? 0);
                     const lineVat = lineTotal * totals.vatRate;
                     const lineWithVat = lineTotal + lineVat;
+                    const remainingQty = Math.max(
+                      Number(item.quantity ?? 0) - Number(item.receivedQty ?? 0),
+                      0
+                    );
+                    const canReceiveLine =
+                      !editable &&
+                      remainingQty > 0 &&
+                      item.status?.toLowerCase() !== "cancelled" &&
+                      item.status?.toLowerCase() !== "received";
                     return (
                       <tr key={item.id ?? idx} className="border-t border-white/5">
                       <td className="py-1 pl-2 pr-3 align-top">
@@ -528,6 +560,9 @@ export function ProcurementDetailMain({ companyId, poId }: { companyId: string; 
                         <span className="rounded-full bg-white/5 px-2 py-0.5 text-[11px] text-slate-200 capitalize">
                           {item.status ?? "pending"}
                         </span>
+                        <div className="mt-1 text-[10px] text-slate-400">
+                          Received {Number(item.receivedQty ?? 0)} / {Number(item.quantity ?? 0)}
+                        </div>
                       </td>
                         <td className="px-2 py-1 align-top">
                           {item.inventoryRequestItemId &&
@@ -550,6 +585,24 @@ export function ProcurementDetailMain({ companyId, poId }: { companyId: string; 
                               {moveStatus[item.id ?? ""]?.error && (
                                 <span className="text-[11px] text-rose-300">
                                   {moveStatus[item.id ?? ""]?.error}
+                                </span>
+                              )}
+                            </div>
+                          ) : canReceiveLine ? (
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => receiveRemaining(item.id ?? "", remainingQty)}
+                                disabled={!item.id || receiveStatus[item.id ?? ""]?.loading}
+                                className="rounded-md bg-emerald-500/20 px-2 py-1 text-[11px] text-emerald-200 hover:bg-emerald-500/30 disabled:opacity-60"
+                              >
+                                {receiveStatus[item.id ?? ""]?.loading
+                                  ? "Receiving..."
+                                  : `Receive ${remainingQty}`}
+                              </button>
+                              {receiveStatus[item.id ?? ""]?.error && (
+                                <span className="text-[11px] text-rose-300">
+                                  {receiveStatus[item.id ?? ""]?.error}
                                 </span>
                               )}
                             </div>
@@ -590,6 +643,81 @@ export function ProcurementDetailMain({ companyId, poId }: { companyId: string; 
                 <span className="text-base font-semibold text-emerald-200">{totals.totalWithVat.toFixed(2)}</span>
               </div>
             </div>
+          </div>
+        </section>
+        <section className="space-y-3 rounded-2xl border border-white/5 bg-slate-950/60 p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-xs uppercase tracking-[0.2em] text-slate-400">GRN</div>
+              <div className="text-sm font-semibold text-slate-100">Goods receipt notes</div>
+            </div>
+            <div className="flex flex-col items-end gap-1">
+              <div className="flex items-center gap-2">
+                <a
+                  href={`/company/${companyId}/workshop/procurement/${poId}/grn`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-md border border-slate-400/30 bg-slate-500/10 px-3 py-1 text-xs font-medium text-slate-200 hover:bg-slate-500/20"
+                >
+                  View GRN
+                </a>
+                <a
+                  href={`/api/company/${companyId}/workshop/procurement/${poId}/grn/pdf`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-md border border-indigo-400/40 bg-indigo-500/10 px-3 py-1 text-xs font-medium text-indigo-200 hover:bg-indigo-500/20"
+                >
+                  GRN PDF
+                </a>
+                <button
+                  type="button"
+                  onClick={reconcileGrn}
+                  disabled={reconcileStatus.loading}
+                  className="rounded-md border border-cyan-400/40 bg-cyan-500/10 px-3 py-1 text-xs font-medium text-cyan-200 hover:bg-cyan-500/20 disabled:opacity-60"
+                >
+                  {reconcileStatus.loading ? "Reconciling..." : "Reconcile GRN"}
+                </button>
+              </div>
+              {reconcileStatus.error ? (
+                <span className="text-[11px] text-rose-300">{reconcileStatus.error}</span>
+              ) : reconcileStatus.message ? (
+                <span className="text-[11px] text-emerald-300">{reconcileStatus.message}</span>
+              ) : null}
+            </div>
+          </div>
+          <div className="overflow-x-auto rounded-xl border border-white/5 bg-slate-950/70">
+            <table className="min-w-full text-xs">
+              <thead>
+                <tr className="bg-slate-900/70 text-[11px] uppercase tracking-wide text-slate-300">
+                  <th className="py-2 pl-3 pr-4 text-left">GRN Number</th>
+                  <th className="px-4 py-2 text-left">Part</th>
+                  <th className="px-4 py-2 text-left">Qty</th>
+                  <th className="px-4 py-2 text-left">Received At</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(state.data?.grns ?? []).length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="py-3 text-center text-xs text-slate-400">
+                      No GRN entries yet.
+                    </td>
+                  </tr>
+                ) : (
+                  (state.data?.grns ?? []).map((grn) => (
+                    <tr key={grn.id} className="border-t border-white/5">
+                      <td className="py-2 pl-3 pr-4 font-semibold text-emerald-300">{grn.grnNumber}</td>
+                      <td className="px-4 py-2 text-slate-100">
+                        {grn.partName}
+                      </td>
+                      <td className="px-4 py-2 text-slate-100">{grn.quantity}</td>
+                      <td className="px-4 py-2 text-slate-300">
+                        {grn.createdAt ? new Date(grn.createdAt).toLocaleString() : "-"}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </section>
       </div>
@@ -916,11 +1044,64 @@ function updateItem(index: number, patch: Partial<ItemDraft>) {
       setItems((prev) =>
         prev.map((item) => (item.id === itemId ? { ...item, movedToInventory: true } : item))
       );
-    } catch (err: any) {
+    } catch (err: unknown) {
       setMoveStatus((prev) => ({
         ...prev,
-        [itemId]: { loading: false, error: err?.message ?? "Failed to move" },
+        [itemId]: { loading: false, error: errorMessage(err, "Failed to move") },
       }));
+    }
+  }
+
+  async function receiveRemaining(itemId: string, quantity: number) {
+    if (!itemId || quantity <= 0) return;
+    setReceiveStatus((prev) => ({ ...prev, [itemId]: { loading: true, error: null } }));
+    try {
+      const res = await fetch(`/api/company/${companyId}/workshop/procurement/${poId}/receive`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items: [{ itemId, quantity }] }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      await loadPurchaseOrder({ keepLoading: true });
+      setReceiveStatus((prev) => ({ ...prev, [itemId]: { loading: false, error: null } }));
+    } catch (err: unknown) {
+      setReceiveStatus((prev) => ({
+        ...prev,
+        [itemId]: { loading: false, error: errorMessage(err, "Failed to receive parts") },
+      }));
+    }
+  }
+
+  async function reconcileGrn() {
+    setReconcileStatus({ loading: true, error: null, message: null });
+    try {
+      const res = await fetch(`/api/company/${companyId}/workshop/procurement/${poId}/reconcile-grn`, {
+        method: "POST",
+      });
+      const raw = await res.text();
+      let json: { error?: string; message?: string; data?: { reconciledItems?: number; reconciledQty?: number } } = {};
+      try {
+        json = raw ? JSON.parse(raw) : {};
+      } catch {
+        json = {};
+      }
+      if (!res.ok) {
+        throw new Error(json?.error ?? json?.message ?? raw ?? "Failed to reconcile GRN");
+      }
+      const reconciledItems = Number(json?.data?.reconciledItems ?? 0);
+      const reconciledQty = Number(json?.data?.reconciledQty ?? 0);
+      setReconcileStatus({
+        loading: false,
+        error: null,
+        message: `Reconciled ${reconciledItems} item(s), qty ${reconciledQty.toFixed(2)}.`,
+      });
+      await loadPurchaseOrder({ keepLoading: true });
+    } catch (err: unknown) {
+      setReconcileStatus({
+        loading: false,
+        error: errorMessage(err, "Failed to reconcile GRN"),
+        message: null,
+      });
     }
   }
 

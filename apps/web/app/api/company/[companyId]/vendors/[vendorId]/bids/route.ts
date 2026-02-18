@@ -11,14 +11,17 @@ export async function GET(req: NextRequest, { params }: Params) {
 
   const sql = getSql();
   const statusParam = req.nextUrl.searchParams.get("status")?.trim() ?? "";
+  const normalizedStatusParam = statusParam.toLowerCase();
   const statusFilter = (() => {
     if (!statusParam) return sql``;
-    const normalized = statusParam.toLowerCase();
-    if (normalized === "completed") {
+    if (normalizedStatusParam === "completed") {
       return sql`AND pq.status IN ('Received', 'Completed')`;
     }
-    if (normalized === "returns") {
+    if (normalizedStatusParam === "returns") {
       return sql`AND pq.status IN ('Return', 'Returned')`;
+    }
+    if (normalizedStatusParam === "ordered") {
+      return sql`AND (pq.status = ${statusParam} OR LOWER(COALESCE(li.status, '')) = 'approved')`;
     }
     return sql`AND pq.status = ${statusParam}`;
   })();
@@ -40,6 +43,7 @@ export async function GET(req: NextRequest, { params }: Params) {
       pq.remarks,
       pq.updated_at,
       pq.status,
+      li.status AS line_item_status,
       COALESCE(li.product_name, iori.part_name) AS part_name,
       car.make AS car_make,
       car.model AS car_model,
@@ -79,6 +83,10 @@ export async function GET(req: NextRequest, { params }: Params) {
     remarks: row.remarks,
     status: row.status,
     updatedAt: row.updated_at,
+    status:
+      normalizedStatusParam === "ordered" && String(row.line_item_status ?? "").toLowerCase() === "approved"
+        ? "Approved"
+        : row.status,
   }));
 
   return NextResponse.json({ data });

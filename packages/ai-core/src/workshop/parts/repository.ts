@@ -2,6 +2,43 @@ import { getSql } from "../../db";
 import { getEstimateWithItems, recalculateEstimateTotals } from "../estimates/repository";
 import type { PartCatalogItem, PartsRequirementRow, ProcurementStatus } from "./types";
 
+let inventoryMovementTriggerPresentCache: boolean | null = null;
+
+async function hasInventoryMovementTrigger(sql: ReturnType<typeof getSql>): Promise<boolean> {
+  if (inventoryMovementTriggerPresentCache != null) return inventoryMovementTriggerPresentCache;
+  const rows = await sql<{ exists: boolean }[]>`
+    SELECT EXISTS (
+      SELECT 1
+      FROM pg_trigger t
+      JOIN pg_class c ON c.oid = t.tgrelid
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE n.nspname = 'public'
+        AND c.relname = 'inventory_movements'
+        AND t.tgname = 'trg_apply_inventory_movement'
+        AND NOT t.tgisinternal
+    ) AS exists
+  `;
+  inventoryMovementTriggerPresentCache = Boolean(rows[0]?.exists);
+  return inventoryMovementTriggerPresentCache;
+}
+
+async function upsertInventoryStockFallback(params: {
+  sql: ReturnType<typeof getSql>;
+  companyId: string;
+  partId: string;
+  locationCode: string;
+  quantity: number;
+}) {
+  const hasTrigger = await hasInventoryMovementTrigger(params.sql);
+  if (hasTrigger) return;
+  await params.sql`
+    INSERT INTO inventory_stock (company_id, part_id, location_code, on_hand)
+    VALUES (${params.companyId}, ${params.partId}, ${params.locationCode}, ${params.quantity})
+    ON CONFLICT (company_id, part_id, location_code)
+    DO UPDATE SET on_hand = inventory_stock.on_hand + ${params.quantity}, updated_at = now()
+  `;
+}
+
 function mapCatalogRow(row: any): PartCatalogItem {
   return {
     id: row.id,
@@ -131,6 +168,7 @@ export async function receivePartsForEstimateItem(
     description?: string;
     quantity: number;
     costPerUnit?: number;
+    purchaseOrderId?: string | null;
   }
 ): Promise<{ grnNumber: string; part: PartCatalogItem }> {
   const sql = getSql();
@@ -149,7 +187,8 @@ export async function receivePartsForEstimateItem(
       source_type,
       source_id,
       grn_number,
-      note
+      note,
+      purchase_order_id
     ) VALUES (
       ${companyId},
       ${part.id},
@@ -159,9 +198,17 @@ export async function receivePartsForEstimateItem(
       ${"receipt"},
       ${estimateItemId},
       ${grnNumber},
-      ${description ?? null}
+      ${description ?? null},
+      ${payload.purchaseOrderId ?? null}
     )
   `;
+  await upsertInventoryStockFallback({
+    sql,
+    companyId,
+    partId: part.id,
+    locationCode: "MAIN",
+    quantity,
+  });
 
   await sql`
     UPDATE estimate_items
@@ -256,12 +303,13 @@ export async function receivePartsForInventoryRequestItem(
   `;
 
   // Fallback: ensure stock row exists even if trigger is missing.
-  await sql`
-    INSERT INTO inventory_stock (company_id, part_id, location_code, on_hand)
-    VALUES (${companyId}, ${part.id}, ${"MAIN"}, ${payload.quantity})
-    ON CONFLICT (company_id, part_id, location_code)
-    DO UPDATE SET on_hand = inventory_stock.on_hand + ${payload.quantity}, updated_at = now()
-  `;
+  await upsertInventoryStockFallback({
+    sql,
+    companyId,
+    partId: part.id,
+    locationCode: "MAIN",
+    quantity: payload.quantity,
+  });
 
   const newReceived = Number(item.received_qty ?? 0) + Number(payload.quantity ?? 0);
   const newStatus = newReceived >= Number(item.quantity ?? 0) ? "received" : item.status ?? "pending";

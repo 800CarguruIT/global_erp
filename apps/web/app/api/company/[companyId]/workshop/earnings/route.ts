@@ -79,7 +79,6 @@ export async function GET(_req: NextRequest, { params }: Params) {
       FROM workshops_earnings we
       LEFT JOIN job_cards jc
         ON jc.id = we.job_card_id
-        AND jc.company_id = we.company_id
       LEFT JOIN leads l
         ON l.id = COALESCE(we.lead_id, jc.lead_id)
         AND l.company_id = we.company_id

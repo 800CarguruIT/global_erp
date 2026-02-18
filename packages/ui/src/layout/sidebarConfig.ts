@@ -177,7 +177,7 @@ export const SIDEBAR_TREE: Partial<Record<NavScope, SidebarItem[]>> = {
       href: "/company/[companyId]/workshop/earnings",
       children: [
         { label: "Workshops", href: "/company/[companyId]/workshop/earnings", exactMatch: true },
-        { label: "Vendors", href: "/company/[companyId]/workshop/earnings" },
+        { label: "Vendors", href: "/company/[companyId]/vendors", exactMatch: true },
       ],
     },
     {
@@ -219,6 +219,7 @@ export const SIDEBAR_TREE: Partial<Record<NavScope, SidebarItem[]>> = {
       children: [
         { label: "Create", href: "/company/[companyId]/procurement/new", disabled: true, permissionKeys: ["procurement.create"] },
         { label: "List", href: "/company/[companyId]/procurement", exactMatch: true, permissionKeys: ["procurement.view"] },
+        { label: "GRN", href: "/company/[companyId]/procurement/grn", permissionKeys: ["procurement.view"] },
       ],
     },
     {
@@ -316,6 +317,7 @@ export const SIDEBAR_TREE: Partial<Record<NavScope, SidebarItem[]>> = {
       children: [
         { label: "Charts of Accounts", href: "/company/[companyId]/accounting/chart-of-accounts", permissionKeys: ["accounting.manage_chart"] },
         { label: "Accounts", href: "/company/[companyId]/accounting/accounts", permissionKeys: ["accounting.manage_chart"] },
+        { label: "Accounting Config", href: "/company/[companyId]/accounting/config", permissionKeys: ["accounting.post"] },
         { label: "Journals", href: "/company/[companyId]/accounting/journals", permissionKeys: ["accounting.post"] },
         { label: "Trial Balance", href: "/company/[companyId]/accounting/trial-balance", permissionKeys: ["accounting.view"] },
         { label: "Profit & Loss", href: "/company/[companyId]/accounting/reports/pnl", permissionKeys: ["accounting.view"] },

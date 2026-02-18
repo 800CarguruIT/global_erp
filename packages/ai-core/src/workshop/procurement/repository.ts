@@ -1,12 +1,19 @@
 import { getSql } from "../../db";
+import { getCompanySettings, upsertCompanySettings } from "../../accounting/configRepository";
+import { postJournal, resolveEntityId } from "../../accounting/service";
 import { getQuoteWithItems } from "../quotes/repository";
 import type {
   PurchaseOrder,
+  PurchaseOrderGrnEntry,
   PurchaseOrderItem,
   PurchaseOrderStatus,
   PurchaseOrderType,
 } from "./types";
-import { receivePartsForEstimateItem, receivePartsForInventoryRequestItem } from "../parts/repository";
+import {
+  ensurePartCatalogItem,
+  receivePartsForEstimateItem,
+  receivePartsForInventoryRequestItem,
+} from "../parts/repository";
 
 function mapPoRow(row: any): PurchaseOrder {
   return {
@@ -36,6 +43,7 @@ function mapItemRow(row: any): PurchaseOrderItem {
   return {
     id: row.id,
     purchaseOrderId: row.purchase_order_id,
+    quoteId: row.quote_id,
     lineNo: row.line_no,
     estimateItemId: row.estimate_item_id,
     inventoryRequestItemId: row.inventory_request_item_id,
@@ -62,6 +70,18 @@ function mapItemRow(row: any): PurchaseOrderItem {
   };
 }
 
+function mapGrnRow(row: any): PurchaseOrderGrnEntry {
+  return {
+    id: row.id,
+    grnNumber: row.grn_number,
+    quantity: Number(row.quantity ?? 0),
+    partName: row.part_name ?? "Part",
+    partSku: row.part_sku ?? null,
+    sourceId: row.source_id ?? null,
+    createdAt: row.created_at,
+  };
+}
+
 async function getPoItems(poId: string): Promise<PurchaseOrderItem[]> {
   const sql = getSql();
   const rows = await sql/* sql */ `
@@ -70,8 +90,7 @@ async function getPoItems(poId: string): Promise<PurchaseOrderItem[]> {
       EXISTS (
         SELECT 1
         FROM inventory_movements im
-        WHERE im.purchase_order_id = poi.purchase_order_id
-          AND im.source_id = poi.inventory_request_item_id
+        WHERE im.source_id = poi.inventory_request_item_id
           AND im.source_type = 'receipt'
           AND im.direction = 'in'
       ) AS has_movement,
@@ -96,6 +115,44 @@ async function getPoItems(poId: string): Promise<PurchaseOrderItem[]> {
     ...mapItemRow(row),
     movedToInventory: Boolean(row.moved_to_inventory) || Boolean(row.has_movement),
   }));
+}
+
+async function getPoGrnEntries(poId: string): Promise<PurchaseOrderGrnEntry[]> {
+  const sql = getSql();
+  const hasPoColumn = await hasInventoryMovementPurchaseOrderIdColumn();
+  const poPredicate = hasPoColumn ? sql`im.purchase_order_id = ${poId}` : sql`FALSE`;
+  const rows = await sql/* sql */ `
+    SELECT
+      im.id,
+      im.grn_number,
+      im.quantity,
+      im.source_id,
+      im.created_at,
+      COALESCE(
+        NULLIF(poi.name, ''),
+        NULLIF(im.note, ''),
+        NULLIF(pc.description, ''),
+        NULLIF(pc.part_number, ''),
+        'Part'
+      ) AS part_name,
+      pc.sku AS part_sku
+    FROM inventory_movements im
+    LEFT JOIN parts_catalog pc ON pc.id = im.part_id
+    LEFT JOIN purchase_order_items poi ON poi.purchase_order_id = ${poId}
+      AND (
+        (poi.estimate_item_id IS NOT NULL AND poi.estimate_item_id = im.source_id)
+        OR (poi.inventory_request_item_id IS NOT NULL AND poi.inventory_request_item_id = im.source_id)
+      )
+    WHERE (
+      ${poPredicate}
+      OR poi.id IS NOT NULL
+    )
+      AND im.direction = 'in'
+      AND im.source_type = 'receipt'
+      AND im.grn_number IS NOT NULL
+    ORDER BY im.created_at DESC
+  `;
+  return rows.map(mapGrnRow);
 }
 
 async function recalcTotals(poId: string): Promise<void> {
@@ -131,6 +188,282 @@ export async function nextPoNumberPreview(companyId: string): Promise<string> {
 
 async function nextPoNumber(companyId: string): Promise<string> {
   return nextPoNumberPreview(companyId);
+}
+
+async function hasPoItemQuoteIdColumn(): Promise<boolean> {
+  const sql = getSql();
+  const rows = await sql/* sql */ `
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'purchase_order_items'
+      AND column_name = 'quote_id'
+    LIMIT 1
+  `;
+  return rows.length > 0;
+}
+
+async function hasInventoryMovementPurchaseOrderIdColumn(): Promise<boolean> {
+  const sql = getSql();
+  const rows = await sql/* sql */ `
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'inventory_movements'
+      AND column_name = 'purchase_order_id'
+    LIMIT 1
+  `;
+  return rows.length > 0;
+}
+
+let inventoryMovementTriggerPresentCache: boolean | null = null;
+
+async function hasInventoryMovementTrigger(): Promise<boolean> {
+  if (inventoryMovementTriggerPresentCache != null) return inventoryMovementTriggerPresentCache;
+  const sql = getSql();
+  const rows = await sql<{ exists: boolean }[]>`
+    SELECT EXISTS (
+      SELECT 1
+      FROM pg_trigger t
+      JOIN pg_class c ON c.oid = t.tgrelid
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE n.nspname = 'public'
+        AND c.relname = 'inventory_movements'
+        AND t.tgname = 'trg_apply_inventory_movement'
+        AND NOT t.tgisinternal
+    ) AS exists
+  `;
+  inventoryMovementTriggerPresentCache = Boolean(rows[0]?.exists);
+  return inventoryMovementTriggerPresentCache;
+}
+
+async function upsertInventoryStockFallback(params: {
+  companyId: string;
+  partId: string;
+  locationCode: string;
+  quantity: number;
+}) {
+  const hasTrigger = await hasInventoryMovementTrigger();
+  if (hasTrigger) return;
+  const sql = getSql();
+  await sql/* sql */ `
+    INSERT INTO inventory_stock (company_id, part_id, location_code, on_hand)
+    VALUES (${params.companyId}, ${params.partId}, ${params.locationCode}, ${params.quantity})
+    ON CONFLICT (company_id, part_id, location_code)
+    DO UPDATE SET on_hand = inventory_stock.on_hand + ${params.quantity}, updated_at = now()
+  `;
+}
+
+async function ensureEntityAccountByCode(params: {
+  entityId: string;
+  code: string;
+  name: string;
+  type: string;
+  normalBalance: "debit" | "credit";
+}): Promise<string> {
+  const sql = getSql();
+  const found = await sql/* sql */ `
+    SELECT id
+    FROM accounting_accounts
+    WHERE entity_id = ${params.entityId}
+      AND code = ${params.code}
+    LIMIT 1
+  `;
+  if (found.length) return found[0].id as string;
+  const created = await sql/* sql */ `
+    INSERT INTO accounting_accounts (
+      entity_id,
+      code,
+      name,
+      type,
+      normal_balance,
+      is_leaf,
+      is_active
+    ) VALUES (
+      ${params.entityId},
+      ${params.code},
+      ${params.name},
+      ${params.type},
+      ${params.normalBalance},
+      TRUE,
+      TRUE
+    )
+    RETURNING id
+  `;
+  return created[0].id as string;
+}
+
+async function resolveAccountInEntity(params: {
+  entityId: string;
+  accountId?: string | null;
+  fallbackCode: string;
+  fallbackName: string;
+  fallbackType: string;
+  fallbackNormalBalance: "debit" | "credit";
+}): Promise<string> {
+  const sql = getSql();
+
+  if (params.accountId) {
+    const sameEntity = await sql/* sql */ `
+      SELECT id
+      FROM accounting_accounts
+      WHERE id = ${params.accountId}
+        AND entity_id = ${params.entityId}
+      LIMIT 1
+    `;
+    if (sameEntity.length) return sameEntity[0].id as string;
+
+    const srcRows = await sql/* sql */ `
+      SELECT code, name, type, normal_balance
+      FROM accounting_accounts
+      WHERE id = ${params.accountId}
+      LIMIT 1
+    `;
+    const src = srcRows[0] as
+      | { code?: string | null; name?: string | null; type?: string | null; normal_balance?: "debit" | "credit" | null }
+      | undefined;
+    if (src?.code) {
+      return ensureEntityAccountByCode({
+        entityId: params.entityId,
+        code: src.code,
+        name: src.name ?? params.fallbackName,
+        type: src.type ?? params.fallbackType,
+        normalBalance: (src.normal_balance ?? params.fallbackNormalBalance) as "debit" | "credit",
+      });
+    }
+  }
+
+  return ensureEntityAccountByCode({
+    entityId: params.entityId,
+    code: params.fallbackCode,
+    name: params.fallbackName,
+    type: params.fallbackType,
+    normalBalance: params.fallbackNormalBalance,
+  });
+}
+
+async function ensureGrnAccounts(companyId: string): Promise<{
+  entityId: string;
+  inventoryAccountId: string;
+  apControlAccountId: string;
+}> {
+  const entityId = await resolveEntityId("company", companyId);
+  const settings = await getCompanySettings(companyId);
+
+  const inventoryAccountId = await resolveAccountInEntity({
+    entityId,
+    accountId: settings?.inventoryAccountId ?? null,
+    fallbackCode: "1300",
+    fallbackName: "Inventory",
+    fallbackType: "asset",
+    fallbackNormalBalance: "debit",
+  });
+
+  const apControlAccountId = await resolveAccountInEntity({
+    entityId,
+    accountId: settings?.apControlAccountId ?? null,
+    fallbackCode: "2000",
+    fallbackName: "Accounts Payable",
+    fallbackType: "liability",
+    fallbackNormalBalance: "credit",
+  });
+
+  if (
+    !settings?.inventoryAccountId ||
+    !settings?.apControlAccountId ||
+    settings.inventoryAccountId !== inventoryAccountId ||
+    settings.apControlAccountId !== apControlAccountId
+  ) {
+    await upsertCompanySettings(companyId, {
+      inventoryAccountId,
+      apControlAccountId,
+    });
+  }
+
+  return { entityId, inventoryAccountId, apControlAccountId };
+}
+
+async function postGrnAccountingEntry(params: {
+  companyId: string;
+  poId: string;
+  poNumber: string;
+  vendorId?: string | null;
+  itemId: string;
+  itemName: string;
+  unitCost: number;
+  quantity: number;
+}) {
+  const amount = Number(params.unitCost ?? 0) * Number(params.quantity ?? 0);
+  if (!Number.isFinite(amount) || amount <= 0) return;
+
+  const { entityId, inventoryAccountId, apControlAccountId } = await ensureGrnAccounts(params.companyId);
+  const today = new Date().toISOString().slice(0, 10);
+  const lineDesc = `PO ${params.poNumber} - ${params.itemName}`;
+
+  await postJournal({
+    entityId,
+    journalType: "grn_receipt",
+    date: today,
+    description: `GRN receipt for ${params.poNumber}`,
+    reference: `GRN-${params.poId}-${params.itemId}-${Date.now()}`,
+    lines: [
+      {
+        accountId: inventoryAccountId,
+        description: `${lineDesc} (Dr Inventory)`,
+        debit: amount,
+        credit: 0,
+        dimensions: {
+          companyId: params.companyId,
+          vendorId: params.vendorId ?? null,
+        },
+      },
+      {
+        accountId: apControlAccountId,
+        description: `${lineDesc} (Cr AP Control)`,
+        debit: 0,
+        credit: amount,
+        dimensions: {
+          companyId: params.companyId,
+          vendorId: params.vendorId ?? null,
+        },
+      },
+    ],
+    skipAccountValidation: false,
+  });
+}
+
+async function getPostedGrnAmountForItem(params: {
+  companyId: string;
+  entityId: string;
+  inventoryAccountId: string;
+  poId: string;
+  itemId: string;
+}): Promise<number> {
+  const sql = getSql();
+  const rows = await sql/* sql */ `
+    SELECT COALESCE(SUM(jl.debit), 0) AS amount
+    FROM accounting_journals j
+    INNER JOIN accounting_journal_lines jl ON jl.journal_id = j.id
+    WHERE j.entity_id = ${params.entityId}
+      AND j.company_id = ${params.companyId}
+      AND j.journal_type = 'grn_receipt'
+      AND j.journal_no LIKE ${`GRN-${params.poId}-${params.itemId}-%`}
+      AND jl.account_id = ${params.inventoryAccountId}
+  `;
+  return Number(rows[0]?.amount ?? 0);
+}
+
+function buildFallbackPartNumber(itemId: string, name?: string | null): string {
+  const fromName = String(name ?? "")
+    .replace(/[^A-Za-z0-9]/g, "")
+    .toUpperCase()
+    .slice(0, 10);
+  const suffix = itemId.replace(/-/g, "").slice(-6).toUpperCase();
+  return `PO${fromName || "PART"}${suffix}`;
+}
+
+function nextGrnNumber(): string {
+  return `GRN-${new Date().toISOString().slice(0, 10)}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 }
 
 export async function createPoFromVendorQuote(
@@ -219,6 +552,7 @@ export async function createManualPo(args: {
     description?: string | null;
     quantity?: number;
     unitCost?: number;
+    estimateItemId?: string | null;
     partsCatalogId?: string | null;
     inventoryRequestItemId?: string | null;
     quoteId?: string | null;
@@ -226,6 +560,7 @@ export async function createManualPo(args: {
   }>;
 }): Promise<{ po: PurchaseOrder; items: PurchaseOrderItem[] }> {
   const sql = getSql();
+  const quoteIdColumnExists = await hasPoItemQuoteIdColumn();
   const poNumber = await nextPoNumber(args.companyId);
   const poRows = await sql/* sql */ `
     INSERT INTO purchase_orders (
@@ -263,33 +598,69 @@ export async function createManualPo(args: {
     const poItemStatus =
       lineStatus === "received" ? "received" : lineStatus === "return" ? "cancelled" : "pending";
     const receivedQty = poItemStatus === "received" ? qty : 0;
-    await sql/* sql */ `
-      INSERT INTO purchase_order_items (
-        purchase_order_id,
-        line_no,
-        parts_catalog_id,
-        inventory_request_item_id,
-        name,
-        description,
-        quantity,
-        unit_cost,
-        total_cost,
-        status,
-        received_qty
-      ) VALUES (
-        ${po.id},
-        ${idx + 1},
-        ${item.partsCatalogId ?? null},
-        ${item.inventoryRequestItemId ?? null},
-        ${item.name},
-        ${item.description ?? null},
-        ${qty},
-        ${unit},
-        ${qty * unit},
-        ${poItemStatus},
-        ${receivedQty}
-      )
-    `;
+    if (quoteIdColumnExists) {
+      await sql/* sql */ `
+        INSERT INTO purchase_order_items (
+          purchase_order_id,
+          line_no,
+          quote_id,
+          estimate_item_id,
+          parts_catalog_id,
+          inventory_request_item_id,
+          name,
+          description,
+          quantity,
+          unit_cost,
+          total_cost,
+          status,
+          received_qty
+        ) VALUES (
+          ${po.id},
+          ${idx + 1},
+          ${item.quoteId ?? null},
+          ${item.estimateItemId ?? null},
+          ${item.partsCatalogId ?? null},
+          ${item.inventoryRequestItemId ?? null},
+          ${item.name},
+          ${item.description ?? null},
+          ${qty},
+          ${unit},
+          ${qty * unit},
+          ${poItemStatus},
+          ${receivedQty}
+        )
+      `;
+    } else {
+      await sql/* sql */ `
+        INSERT INTO purchase_order_items (
+          purchase_order_id,
+          line_no,
+          estimate_item_id,
+          parts_catalog_id,
+          inventory_request_item_id,
+          name,
+          description,
+          quantity,
+          unit_cost,
+          total_cost,
+          status,
+          received_qty
+        ) VALUES (
+          ${po.id},
+          ${idx + 1},
+          ${item.estimateItemId ?? null},
+          ${item.partsCatalogId ?? null},
+          ${item.inventoryRequestItemId ?? null},
+          ${item.name},
+          ${item.description ?? null},
+          ${qty},
+          ${unit},
+          ${qty * unit},
+          ${poItemStatus},
+          ${receivedQty}
+        )
+      `;
+    }
     if (item.quoteId && (lineStatus === "received" || lineStatus === "return")) {
       const quoteStatus = lineStatus === "received" ? "Received" : "Return";
       await sql/* sql */ `
@@ -331,14 +702,15 @@ export async function listPurchaseOrders(
 export async function getPurchaseOrderWithItems(
   companyId: string,
   poId: string
-): Promise<{ po: PurchaseOrder; items: PurchaseOrderItem[] } | null> {
+): Promise<{ po: PurchaseOrder; items: PurchaseOrderItem[]; grns: PurchaseOrderGrnEntry[] } | null> {
   const sql = getSql();
   const rows =
     await sql/* sql */ `SELECT * FROM purchase_orders WHERE company_id = ${companyId} AND id = ${poId} LIMIT 1`;
   if (!rows.length) return null;
   const po = mapPoRow(rows[0]);
   const items = await getPoItems(poId);
-  return { po, items };
+  const grns = await getPoGrnEntries(poId);
+  return { po, items, grns };
 }
 
 export async function updatePurchaseOrderHeader(
@@ -374,6 +746,8 @@ export async function replacePurchaseOrderItems(
   items: Array<{
     id?: string;
     lineNo?: number;
+    quoteId?: string | null;
+    estimateItemId?: string | null;
     name: string;
     description?: string | null;
     quantity?: number;
@@ -383,35 +757,70 @@ export async function replacePurchaseOrderItems(
   }>
 ): Promise<void> {
   const sql = getSql();
+  const quoteIdColumnExists = await hasPoItemQuoteIdColumn();
   await sql/* sql */ `DELETE FROM purchase_order_items WHERE purchase_order_id = ${poId}`;
   for (const [idx, item] of items.entries()) {
     const qty = item.quantity ?? 0;
     const unit = item.unitCost ?? 0;
-    await sql/* sql */ `
-      INSERT INTO purchase_order_items (
-        purchase_order_id,
-        line_no,
-        parts_catalog_id,
-        inventory_request_item_id,
-        name,
-        description,
-        quantity,
-        unit_cost,
-        total_cost,
-        status
-      ) VALUES (
-        ${poId},
-        ${item.lineNo ?? idx + 1},
-        ${item.partsCatalogId ?? null},
-        ${item.inventoryRequestItemId ?? null},
-        ${item.name},
-        ${item.description ?? null},
-        ${qty},
-        ${unit},
-        ${qty * unit},
-        ${"pending"}
-      )
-    `;
+    if (quoteIdColumnExists) {
+      await sql/* sql */ `
+        INSERT INTO purchase_order_items (
+          purchase_order_id,
+          line_no,
+          quote_id,
+          estimate_item_id,
+          parts_catalog_id,
+          inventory_request_item_id,
+          name,
+          description,
+          quantity,
+          unit_cost,
+          total_cost,
+          status
+        ) VALUES (
+          ${poId},
+          ${item.lineNo ?? idx + 1},
+          ${item.quoteId ?? null},
+          ${item.estimateItemId ?? null},
+          ${item.partsCatalogId ?? null},
+          ${item.inventoryRequestItemId ?? null},
+          ${item.name},
+          ${item.description ?? null},
+          ${qty},
+          ${unit},
+          ${qty * unit},
+          ${"pending"}
+        )
+      `;
+    } else {
+      await sql/* sql */ `
+        INSERT INTO purchase_order_items (
+          purchase_order_id,
+          line_no,
+          estimate_item_id,
+          parts_catalog_id,
+          inventory_request_item_id,
+          name,
+          description,
+          quantity,
+          unit_cost,
+          total_cost,
+          status
+        ) VALUES (
+          ${poId},
+          ${item.lineNo ?? idx + 1},
+          ${item.estimateItemId ?? null},
+          ${item.partsCatalogId ?? null},
+          ${item.inventoryRequestItemId ?? null},
+          ${item.name},
+          ${item.description ?? null},
+          ${qty},
+          ${unit},
+          ${qty * unit},
+          ${"pending"}
+        )
+      `;
+    }
   }
   await recalcTotals(poId);
 }
@@ -420,14 +829,55 @@ export async function receivePoItems(
   companyId: string,
   poId: string,
   items: Array<{ itemId: string; quantity: number }>
-): Promise<{ po: PurchaseOrder; items: PurchaseOrderItem[] }> {
+): Promise<{ po: PurchaseOrder; items: PurchaseOrderItem[]; grns: PurchaseOrderGrnEntry[] }> {
   const sql = getSql();
+  const poMetaRows = await sql/* sql */ `
+    SELECT vendor_id, po_number
+    FROM purchase_orders
+    WHERE id = ${poId}
+    LIMIT 1
+  `;
+  const poVendorId = (poMetaRows[0]?.vendor_id as string | undefined) ?? null;
+  const poNumber = (poMetaRows[0]?.po_number as string | undefined) ?? "PO";
+
+  function normalizePartNumber(raw?: string | null, fallback?: string | null): string {
+    const base = (raw ?? fallback ?? "").trim();
+    const cleaned = base.replace(/[^A-Za-z0-9-]/g, "").slice(0, 24);
+    return cleaned || `PO-${poId.slice(0, 8).toUpperCase()}`;
+  }
+
   for (const entry of items) {
     const rows = await sql/* sql */ `
       SELECT * FROM purchase_order_items WHERE id = ${entry.itemId} AND purchase_order_id = ${poId} LIMIT 1
     `;
     if (!rows.length) continue;
     const current = mapItemRow(rows[0]);
+    let resolvedEstimateItemId = current.estimateItemId;
+    if (!resolvedEstimateItemId && current.quoteId) {
+      try {
+        const quoteRows = await sql/* sql */ `
+          SELECT
+            pq.estimate_item_id,
+            COALESCE(
+              pq.estimate_item_id,
+              (
+                SELECT ei.id
+                FROM estimate_items ei
+                WHERE ei.inspection_item_id = pq.line_item_id
+                ORDER BY ei.updated_at DESC
+                LIMIT 1
+              )
+            ) AS resolved_estimate_item_id
+          FROM part_quotes pq
+          WHERE pq.company_id = ${companyId}
+            AND pq.id = ${current.quoteId}
+          LIMIT 1
+        `;
+        resolvedEstimateItemId = (quoteRows[0]?.resolved_estimate_item_id as string | undefined) ?? null;
+      } catch {
+        // ignore fallback lookup errors
+      }
+    }
     const newReceived = Number(current.receivedQty ?? 0) + Number(entry.quantity ?? 0);
     const status =
       newReceived <= 0
@@ -443,14 +893,17 @@ export async function receivePoItems(
     `;
 
     // push to inventory based on linked estimate item
-    if (current.estimateItemId) {
+    if (resolvedEstimateItemId) {
       try {
-        await receivePartsForEstimateItem(companyId, current.estimateItemId, {
-          partNumber: (current as any).partNumber ?? null,
-          brand: (current as any).brand ?? null,
+        const partNumber = normalizePartNumber((current as any).partNumber ?? null, current.name);
+        const brand = String((current as any).brand ?? (current as any).partBrand ?? "Generic").trim() || "Generic";
+        await receivePartsForEstimateItem(companyId, resolvedEstimateItemId, {
+          partNumber,
+          brand,
           description: current.description ?? null,
           quantity: entry.quantity,
           costPerUnit: current.unitCost,
+          purchaseOrderId: poId,
         } as any);
       } catch {
         // ignore inventory errors to not block PO receive
@@ -459,7 +912,7 @@ export async function receivePoItems(
         const estimateItemRows = await sql/* sql */ `
           SELECT inspection_item_id
           FROM estimate_items
-          WHERE id = ${current.estimateItemId}
+          WHERE id = ${resolvedEstimateItemId}
           LIMIT 1
         `;
         const inspectionItemId = estimateItemRows[0]?.inspection_item_id as string | undefined;
@@ -477,6 +930,36 @@ export async function receivePoItems(
       } catch {
         // ignore line-item sync errors to avoid blocking PO receive
       }
+      const quoteIdToUpdate = current.quoteId
+        ? current.quoteId
+        : (
+            await sql/* sql */ `
+              SELECT id
+              FROM part_quotes
+              WHERE company_id = ${companyId}
+                AND (${poVendorId}::uuid IS NULL OR vendor_id = ${poVendorId})
+                AND (
+                  (${resolvedEstimateItemId}::uuid IS NOT NULL AND estimate_item_id = ${resolvedEstimateItemId})
+                  OR (${current.inventoryRequestItemId ?? null}::uuid IS NOT NULL AND inventory_request_item_id = ${current.inventoryRequestItemId ?? null})
+                )
+              ORDER BY updated_at DESC
+              LIMIT 1
+            `
+          )[0]?.id;
+      if (quoteIdToUpdate) {
+        try {
+          const nextQuoteStatus = status === "received" ? "Received" : "Ordered";
+          await sql/* sql */ `
+            UPDATE part_quotes
+            SET status = ${nextQuoteStatus},
+                updated_at = NOW()
+            WHERE company_id = ${companyId}
+              AND id = ${quoteIdToUpdate}
+          `;
+        } catch {
+          // ignore quote sync errors to avoid blocking PO receive
+        }
+      }
     } else if (current.inventoryRequestItemId) {
       try {
         await receivePartsForInventoryRequestItem(companyId, current.inventoryRequestItemId, {
@@ -486,6 +969,53 @@ export async function receivePoItems(
       } catch {
         // ignore inventory errors to not block PO receive
       }
+      const quoteIdToUpdate = current.quoteId
+        ? current.quoteId
+        : (
+            await sql/* sql */ `
+              SELECT id
+              FROM part_quotes
+              WHERE company_id = ${companyId}
+                AND (${poVendorId}::uuid IS NULL OR vendor_id = ${poVendorId})
+                AND (${current.inventoryRequestItemId ?? null}::uuid IS NOT NULL AND inventory_request_item_id = ${current.inventoryRequestItemId ?? null})
+              ORDER BY updated_at DESC
+              LIMIT 1
+            `
+          )[0]?.id;
+      if (quoteIdToUpdate) {
+        try {
+          const nextQuoteStatus = status === "received" ? "Received" : "Ordered";
+          await sql/* sql */ `
+            UPDATE part_quotes
+            SET status = ${nextQuoteStatus},
+                updated_at = NOW()
+            WHERE company_id = ${companyId}
+              AND id = ${quoteIdToUpdate}
+          `;
+        } catch {
+          // ignore quote sync errors to avoid blocking PO receive
+        }
+      }
+    }
+
+    try {
+      await postGrnAccountingEntry({
+        companyId,
+        poId,
+        poNumber,
+        vendorId: poVendorId,
+        itemId: current.id,
+        itemName: current.name,
+        unitCost: Number(current.unitCost ?? 0),
+        quantity: Number(entry.quantity ?? 0),
+      });
+    } catch (err) {
+      console.error("Failed to post GRN accounting entry", {
+        companyId,
+        poId,
+        itemId: current.id,
+        error: (err as Error)?.message ?? err,
+      });
     }
   }
 
@@ -501,7 +1031,8 @@ export async function receivePoItems(
   `;
 
   const poRow = await sql/* sql */ `SELECT * FROM purchase_orders WHERE id = ${poId} LIMIT 1`;
-  return { po: mapPoRow(poRow[0]), items: poItems };
+  const grns = await getPoGrnEntries(poId);
+  return { po: mapPoRow(poRow[0]), items: poItems, grns };
 }
 
 export async function movePoItemToInventory(args: {
@@ -588,4 +1119,259 @@ export async function movePoItemToInventory(args: {
     WHERE id = ${args.itemId}
   `;
   return { movedQty: moveQty, grnNumber: result?.grnNumber ?? null };
+}
+
+export async function reconcilePoGrn(
+  companyId: string,
+  poId: string
+): Promise<{
+  po: PurchaseOrder;
+  items: PurchaseOrderItem[];
+  grns: PurchaseOrderGrnEntry[];
+  reconciledItems: number;
+  reconciledQty: number;
+  reconciledAmount: number;
+}> {
+  const sql = getSql();
+  const poRows = await sql/* sql */ `
+    SELECT *
+    FROM purchase_orders
+    WHERE company_id = ${companyId} AND id = ${poId}
+    LIMIT 1
+  `;
+  if (!poRows.length) {
+    throw new Error("Purchase order not found");
+  }
+
+  const po = mapPoRow(poRows[0]);
+  const itemRows = await getPoItems(poId);
+  const accountContext = await ensureGrnAccounts(companyId);
+  const hasMovementPoColumn = await hasInventoryMovementPurchaseOrderIdColumn();
+
+  let reconciledItems = 0;
+  let reconciledQty = 0;
+  let reconciledAmount = 0;
+
+  for (const item of itemRows) {
+    const receivedQty = Math.max(Number(item.receivedQty ?? 0), 0);
+    if (receivedQty <= 0) continue;
+
+    let resolvedEstimateItemId = item.estimateItemId ?? null;
+    if (!resolvedEstimateItemId && item.quoteId) {
+      try {
+        const quoteRows = await sql/* sql */ `
+          SELECT
+            COALESCE(
+              pq.estimate_item_id,
+              (
+                SELECT ei.id
+                FROM estimate_items ei
+                WHERE ei.inspection_item_id = pq.line_item_id
+                ORDER BY ei.updated_at DESC
+                LIMIT 1
+              )
+            ) AS resolved_estimate_item_id
+          FROM part_quotes pq
+          WHERE pq.company_id = ${companyId}
+            AND pq.id = ${item.quoteId}
+          LIMIT 1
+        `;
+        resolvedEstimateItemId = (quoteRows[0]?.resolved_estimate_item_id as string | undefined) ?? null;
+      } catch {
+        resolvedEstimateItemId = null;
+      }
+    }
+
+    const movementPoPredicate = hasMovementPoColumn ? sql`im.purchase_order_id = ${poId}` : sql`FALSE`;
+    const reconcileNotePrefix = `GRN reconcile for ${po.poNumber} - ${item.name}`;
+    const movementSumRows = await sql/* sql */ `
+      SELECT COALESCE(SUM(im.quantity), 0) AS qty
+      FROM inventory_movements im
+      WHERE im.direction = 'in'
+        AND im.source_type = 'receipt'
+        AND (
+          (${resolvedEstimateItemId ?? null}::uuid IS NOT NULL AND im.source_id = ${resolvedEstimateItemId ?? null})
+          OR (${item.inventoryRequestItemId ?? null}::uuid IS NOT NULL AND im.source_id = ${item.inventoryRequestItemId ?? null})
+          OR (${movementPoPredicate} AND COALESCE(im.note, '') ILIKE ${`${reconcileNotePrefix}%`})
+        )
+    `;
+    const movedQty = Number(movementSumRows[0]?.qty ?? 0);
+    const missingQty = Math.max(receivedQty - movedQty, 0);
+
+    const existingPostedAmount = await getPostedGrnAmountForItem({
+      companyId,
+      entityId: accountContext.entityId,
+      inventoryAccountId: accountContext.inventoryAccountId,
+      poId,
+      itemId: item.id,
+    });
+
+    let postedByQtyBackfill = 0;
+
+    if (missingQty > 0) {
+      let sourceId: string | null = resolvedEstimateItemId ?? item.inventoryRequestItemId ?? null;
+      let partNumber = "";
+      let brand = "";
+      let description = item.description ?? item.name ?? "PO receipt reconcile";
+
+      if (resolvedEstimateItemId) {
+        const estRows = await sql/* sql */ `
+          SELECT part_number, part_brand, part_name, part_sku
+          FROM estimate_items
+          WHERE id = ${resolvedEstimateItemId}
+          LIMIT 1
+        `;
+        const est = estRows[0];
+        partNumber = String(est?.part_number ?? est?.part_sku ?? "").trim();
+        brand = String(est?.part_brand ?? "").trim();
+        description = String(est?.part_name ?? description);
+      } else if (item.inventoryRequestItemId) {
+        const reqRows = await sql/* sql */ `
+          SELECT part_number, part_brand, part_name, description
+          FROM inventory_order_request_items
+          WHERE id = ${item.inventoryRequestItemId}
+          LIMIT 1
+        `;
+        const req = reqRows[0];
+        partNumber = String(req?.part_number ?? "").trim();
+        brand = String(req?.part_brand ?? "").trim();
+        description = String(req?.description ?? req?.part_name ?? description);
+      }
+
+      const catalog = await ensurePartCatalogItem(
+        companyId,
+        partNumber || buildFallbackPartNumber(item.id, item.name),
+        brand || "Generic",
+        description
+      );
+
+      if (hasMovementPoColumn) {
+        await sql/* sql */ `
+          INSERT INTO inventory_movements (
+            company_id,
+            part_id,
+            location_code,
+            direction,
+            quantity,
+            source_type,
+            source_id,
+            grn_number,
+            note,
+            purchase_order_id
+          ) VALUES (
+            ${companyId},
+            ${catalog.id},
+            ${"MAIN"},
+            ${"in"},
+            ${missingQty},
+            ${"receipt"},
+            ${sourceId},
+            ${nextGrnNumber()},
+            ${reconcileNotePrefix},
+            ${poId}
+          )
+        `;
+      } else {
+        await sql/* sql */ `
+          INSERT INTO inventory_movements (
+            company_id,
+            part_id,
+            location_code,
+            direction,
+            quantity,
+            source_type,
+            source_id,
+            grn_number,
+            note
+          ) VALUES (
+            ${companyId},
+            ${catalog.id},
+            ${"MAIN"},
+            ${"in"},
+            ${missingQty},
+            ${"receipt"},
+            ${sourceId},
+            ${nextGrnNumber()},
+            ${reconcileNotePrefix}
+          )
+        `;
+      }
+      await upsertInventoryStockFallback({
+        companyId,
+        partId: catalog.id,
+        locationCode: "MAIN",
+        quantity: missingQty,
+      });
+
+      if (Number(item.unitCost ?? 0) > 0) {
+        try {
+          await postGrnAccountingEntry({
+            companyId,
+            poId,
+            poNumber: po.poNumber,
+            vendorId: po.vendorId ?? null,
+            itemId: item.id,
+            itemName: `${item.name} (Reconcile)`,
+            unitCost: Number(item.unitCost ?? 0),
+            quantity: missingQty,
+          });
+          postedByQtyBackfill = missingQty * Number(item.unitCost ?? 0);
+        } catch (err) {
+          console.error("GRN reconcile accounting backfill failed", {
+            companyId,
+            poId,
+            itemId: item.id,
+            error: (err as Error)?.message ?? err,
+          });
+        }
+      }
+
+      reconciledItems += 1;
+      reconciledQty += missingQty;
+      reconciledAmount += postedByQtyBackfill;
+    }
+
+    const expectedAmount = receivedQty * Number(item.unitCost ?? 0);
+    const missingAccountingAmount = Math.max(expectedAmount - existingPostedAmount - postedByQtyBackfill, 0);
+
+    if (missingAccountingAmount > 0.0001 && Number(item.unitCost ?? 0) > 0) {
+      const qtyForAccounting = missingAccountingAmount / Number(item.unitCost ?? 0);
+      try {
+        await postGrnAccountingEntry({
+          companyId,
+          poId,
+          poNumber: po.poNumber,
+          vendorId: po.vendorId ?? null,
+          itemId: item.id,
+          itemName: `${item.name} (Accounting Reconcile)`,
+          unitCost: Number(item.unitCost ?? 0),
+          quantity: qtyForAccounting,
+        });
+      } catch (err) {
+        console.error("GRN reconcile accounting-only backfill failed", {
+          companyId,
+          poId,
+          itemId: item.id,
+          error: (err as Error)?.message ?? err,
+        });
+      }
+      if (missingQty <= 0) {
+        reconciledItems += 1;
+      }
+      reconciledAmount += missingAccountingAmount;
+    }
+  }
+
+  const refreshedPoRows = await sql/* sql */ `SELECT * FROM purchase_orders WHERE id = ${poId} LIMIT 1`;
+  const refreshedItems = await getPoItems(poId);
+  const refreshedGrns = await getPoGrnEntries(poId);
+
+  return {
+    po: mapPoRow(refreshedPoRows[0]),
+    items: refreshedItems,
+    grns: refreshedGrns,
+    reconciledItems,
+    reconciledQty,
+    reconciledAmount,
+  };
 }

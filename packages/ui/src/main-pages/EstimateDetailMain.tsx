@@ -1319,43 +1319,9 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
     car?.plate_number ?? car?.plateNumber ?? meta.carPlate ?? "";
   const carModel =
     [car?.make, car?.model].filter(Boolean).join(" ") || meta.carModel || "";
-  const normalizeProductType = (value?: string | null) =>
-    (value ?? "")
-      .trim()
-      .toLowerCase()
-      .replace(/[_-]+/g, " ")
-      .replace(/\s+/g, " ");
-  const resolveProductType = (item: ItemDraft) => {
-    if (item.productType) return item.productType;
-    const match = productTypeByName.get(item.partName.trim().toLowerCase());
-    return match ?? "";
-  };
-  const hasApprovedSpareParts =
-    draft.items.some((item) => {
-      if (item.status !== "approved") return false;
-      const productType = normalizeProductType(resolveProductType(item));
-      if (productType.includes("spare") && productType.includes("part")) return true;
-      const lineType = normalizeProductType(item.type as any);
-      return lineType !== "repair";
-    }) ?? false;
   const hasApprovedItems = draft.items.some((item) => item.status === "approved");
   const hasAnyItems = draft.items.length > 0;
-  const sparePartsApproved = draft.items.filter((item) => {
-    if (item.status !== "approved") return false;
-    const productType = normalizeProductType(resolveProductType(item));
-    if (productType.includes("spare") && productType.includes("part")) return true;
-    const lineType = normalizeProductType(item.type as any);
-    return lineType !== "repair";
-  });
-  const allApprovedSparePartsOrdered =
-    sparePartsApproved.length === 0
-      ? false
-      : sparePartsApproved.every((item) => {
-          const status = (item.orderStatus ?? "").toLowerCase();
-          return item.partOrdered === 1 || status === "ordered" || status === "received" || status === "returned";
-        });
-  const canStartJobCard =
-    hasAnyItems && ((hasApprovedSpareParts && allApprovedSparePartsOrdered) || (!hasApprovedSpareParts && hasApprovedItems));
+  const canStartJobCard = hasAnyItems && hasApprovedItems;
   const approvedItemsCount = draft.items.filter((item) => item.status === "approved").length;
   const pendingItemsCount = draft.items.filter((item) => item.status === "pending" || item.status === "inquiry").length;
   const estimateStatusTone =

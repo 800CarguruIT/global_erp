@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { receivePoItems, getPurchaseOrderWithItems } from "@repo/ai-core/workshop/procurement/repository";
+import { receivePoItems } from "@repo/ai-core/workshop/procurement/repository";
 
 type Params = { params: Promise<{ companyId: string; poId: string }> };
 
