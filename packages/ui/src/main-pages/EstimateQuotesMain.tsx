@@ -439,14 +439,23 @@ export function EstimateQuotesMain({
       const lineItems = Array.isArray(json?.data?.lineItems) ? json.data.lineItems : [];
       const existingFines = Array.isArray(json?.data?.fines) ? json.data.fines : [];
       const existingEarning = json?.data?.earnings ?? null;
-      const draftParts = Array.isArray(inspection?.draftPayload?.parts) ? inspection.draftPayload.parts : [];
       const lead = row.leadId ? leadById.get(row.leadId) : null;
-      const leadVideo = (lead as any)?.carInVideo ?? (lead as any)?.carin_video ?? null;
+      const leadCarInVideo = (lead as any)?.carInVideo ?? (lead as any)?.carin_video ?? null;
+      const leadCarOutVideo = (lead as any)?.carOutVideo ?? (lead as any)?.carout_video ?? null;
+      const inspectionCarInVideo =
+        (inspection as any)?.carInVideo ?? (inspection as any)?.carin_video ?? null;
+      const inspectionCarOutVideo =
+        (inspection as any)?.carOutVideo ?? (inspection as any)?.carout_video ?? null;
+
+      // Show only dedicated inspection videos (car in/out), not line-item media (which can be images).
       const videoRefs = [
-        ...lineItems.map((item: any) => item?.mediaFileId ?? item?.media_file_id).filter(Boolean),
-        ...draftParts.map((item: any) => item?.mediaFileId).filter(Boolean),
-        leadVideo,
-      ].filter(Boolean) as string[];
+        leadCarInVideo,
+        leadCarOutVideo,
+        inspectionCarInVideo,
+        inspectionCarOutVideo,
+      ]
+        .map((value) => String(value ?? "").trim())
+        .filter((value) => value.length > 0 && value.toLowerCase() !== "null");
       setVerifyInspection(inspection);
       setVerifyEarning(existingEarning);
       setVerifyLineItems(lineItems);

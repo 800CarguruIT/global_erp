@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { AppLayout, Card, FileUploader, useTheme } from "@repo/ui";
 import { toast } from "sonner";
+import { useDropzone } from "react-dropzone";
 
 type Params =
   | { params: { companyId: string; inspectionId: string } }
@@ -49,11 +50,18 @@ export function InspectionDetailPageClient({
   const [inspection, setInspection] = useState<any | null>(null);
   const [customer, setCustomer] = useState<any | null>(null);
   const [car, setCar] = useState<any | null>(null);
+  const [leadPlate, setLeadPlate] = useState("");
   const [leadId, setLeadId] = useState<string | null>(null);
   const [carInVideoId, setCarInVideoId] = useState("");
+  const [carOutVideoId, setCarOutVideoId] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [videoUploading, setVideoUploading] = useState<"in" | "out" | null>(null);
+  const [videoUploadProgress, setVideoUploadProgress] = useState<Record<"in" | "out", number>>({
+    in: 0,
+    out: 0,
+  });
   const [actorName, setActorName] = useState("System");
   const [inspectionLogs, setInspectionLogs] = useState<InspectionLogEntry[]>([]);
   const [advisorApproved, setAdvisorApproved] = useState(false);
@@ -65,6 +73,7 @@ export function InspectionDetailPageClient({
   const initialRemarksRef = useRef("");
   const initialStatusRef = useRef("pending");
   const initialPartsSignatureRef = useRef("[]");
+  const initialChecksSignatureRef = useRef("{}");
   const [form, setForm] = useState({
     advisorName: "",
     inspectorName: "",
@@ -129,6 +138,7 @@ export function InspectionDetailPageClient({
         initialRemarksRef.current = draft.inspectorRemarks ?? "";
         initialStatusRef.current = String(payload?.status ?? "pending").toLowerCase();
         setChecks(draft.checks ?? {});
+        initialChecksSignatureRef.current = JSON.stringify(draft.checks ?? {});
         setInspectionLogs(Array.isArray(draft.activityLogs) ? draft.activityLogs : []);
         setAdvisorApproved(Boolean(draft.advisorApproved));
         setAdvisorApprovedAt(draft.advisorApprovedAt ?? null);
@@ -162,6 +172,16 @@ export function InspectionDetailPageClient({
             const leadJson = await leadRes.json().catch(() => ({}));
             const lead = leadJson?.data?.lead ?? leadJson?.data?.data ?? leadJson?.data ?? {};
             setCarInVideoId(lead?.carInVideo ?? lead?.carin_video ?? "");
+            setCarOutVideoId(lead?.carOutVideo ?? lead?.carout_video ?? "");
+            setLeadPlate(
+              lead?.plateNumber ??
+                lead?.plate_number ??
+                lead?.carPlateNumber ??
+                lead?.car_plate_number ??
+                lead?.car?.plateNumber ??
+                lead?.car?.plate_number ??
+                ""
+            );
             setForm((prev) => ({
               ...prev,
               advisorName: lead?.branchName ?? lead?.branch_name ?? prev.advisorName,
@@ -267,8 +287,19 @@ export function InspectionDetailPageClient({
   }, [productOpenIndex, parts]);
 
   const plateLabel = useMemo(() => {
-    return car?.plate_number || car?.plateNumber || "Plate";
-  }, [car]);
+    const direct =
+      car?.plate_number ||
+      car?.plateNumber ||
+      inspection?.plate_number ||
+      inspection?.plateNumber ||
+      inspection?.car_plate_number ||
+      inspection?.carPlateNumber ||
+      inspection?.draftPayload?.plateNumber ||
+      inspection?.draftPayload?.plate_number ||
+      leadPlate ||
+      "";
+    return String(direct || "").trim() || "Plate";
+  }, [car, inspection, leadPlate]);
   const startedAt = inspection?.startAt ?? inspection?.start_at ?? null;
   const completedAt = inspection?.completeAt ?? inspection?.complete_at ?? null;
   const verifiedAt = inspection?.verifiedAt ?? inspection?.verified_at ?? null;
@@ -278,6 +309,7 @@ export function InspectionDetailPageClient({
   const isCancelled = String(inspection?.status ?? "").toLowerCase() === "cancelled" || Boolean(cancelledAt);
   const isVerified = Boolean(verifiedAt);
   const isReadOnly = isCancelled || isVerified;
+  const currentStatus = String(inspection?.status ?? "pending").toLowerCase();
   const isWorkshopView = forceWorkshopView || searchParams.get("view") === "workshop" || Boolean(workshopBranchIdProp);
   const workshopBranchId = workshopBranchIdProp ?? searchParams.get("branchId");
   const backHref =
@@ -321,6 +353,17 @@ export function InspectionDetailPageClient({
     setInspectionLogs(next);
     return next;
   };
+
+  const buildInspectionLogEntry = useCallback(
+    (action: InspectionLogEntry["action"], at: string, message?: string): InspectionLogEntry => ({
+      id: `${action}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      action,
+      by: actorName || form.inspectorName || "System",
+      at,
+      message,
+    }),
+    [actorName, form.inspectorName]
+  );
 
   const buildDraftPayload = (
     activityLogs: InspectionLogEntry[],
@@ -432,6 +475,157 @@ export function InspectionDetailPageClient({
     return { required: false, kind: "image" as const, label: "Media" };
   };
 
+  const serializeChecksForCompare = (value: Record<string, CheckValue>) => JSON.stringify(value ?? {});
+  const hasUnsavedLineItems = parts.some((p) => !p.isSaved);
+  const hasUnsavedChanges =
+    !isReadOnly &&
+    ((form.inspectorRemarks ?? "").trim() !== (initialRemarksRef.current ?? "").trim() ||
+      serializePartsForCompare(parts) !== initialPartsSignatureRef.current ||
+      serializeChecksForCompare(checks) !== initialChecksSignatureRef.current);
+  const requiredMediaMissing = parts.some((row) => getMediaRequirement(row).required && !row.mediaFileId);
+  const canCompleteInspection =
+    !saving &&
+    !isReadOnly &&
+    Boolean(companyId && inspectionId) &&
+    !hasUnsavedLineItems &&
+    !requiredMediaMissing &&
+    Boolean((form.inspectorRemarks ?? "").trim());
+  const progressStages = [
+    { key: "pending", label: "Draft", done: true },
+    { key: "started", label: "Started", done: Boolean(startedAt) },
+    { key: "advisor", label: "Advisor Approved", done: advisorApproved },
+    { key: "customer", label: "Customer Approved", done: customerApproved },
+    { key: "completed", label: "Completed", done: Boolean(completedAt) },
+    { key: "verified", label: "Verified", done: Boolean(verifiedAt) },
+  ];
+  const primaryStages = progressStages.filter((stage) => stage.key !== "advisor" && stage.key !== "customer");
+  const approvalStages = progressStages.filter((stage) => stage.key === "advisor" || stage.key === "customer");
+
+  const uploadFileWithProgress = (file: File, target: "in" | "out") =>
+    new Promise<string>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", "/api/files/upload");
+      xhr.responseType = "text";
+
+      xhr.upload.onprogress = (event) => {
+        if (!event.lengthComputable) return;
+        const percent = Math.max(0, Math.min(100, Math.round((event.loaded / event.total) * 100)));
+        setVideoUploadProgress((prev) => ({ ...prev, [target]: percent }));
+      };
+
+      xhr.onload = () => {
+        let body: any = {};
+        try {
+          body = xhr.responseText ? JSON.parse(xhr.responseText) : {};
+        } catch {
+          body = {};
+        }
+        if (xhr.status < 200 || xhr.status >= 300) {
+          reject(new Error(body?.error ?? "Failed to upload video"));
+          return;
+        }
+        const fileId = String(body?.fileId ?? "");
+        if (!fileId) {
+          reject(new Error("Invalid upload response"));
+          return;
+        }
+        setVideoUploadProgress((prev) => ({ ...prev, [target]: 100 }));
+        resolve(fileId);
+      };
+
+      xhr.onerror = () => reject(new Error("Network error while uploading video"));
+      xhr.onabort = () => reject(new Error("Video upload cancelled"));
+
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("kind", "video");
+      xhr.send(formData);
+    });
+
+  const uploadInspectionVideo = async (file: File, target: "in" | "out") => {
+    if (isReadOnly) {
+      toast.error("Verified/cancelled inspection is read-only.");
+      return;
+    }
+    if (!companyId || !inspectionId || !leadId) {
+      toast.error("Missing inspection context to save video.");
+      return;
+    }
+    const previousInVideoId = carInVideoId;
+    const previousOutVideoId = carOutVideoId;
+    try {
+      setVideoUploading(target);
+      setVideoUploadProgress((prev) => ({ ...prev, [target]: 0 }));
+      const fileId = await uploadFileWithProgress(file, target);
+      const nextCarInVideoId = target === "in" ? fileId : previousInVideoId || "";
+      const nextCarOutVideoId = target === "out" ? fileId : previousOutVideoId || "";
+      setCarInVideoId(nextCarInVideoId);
+      setCarOutVideoId(nextCarOutVideoId);
+
+      const leadRes = await fetch(`/api/company/${companyId}/crm/leads/${leadId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          carInVideo: nextCarInVideoId || null,
+          carOutVideo: nextCarOutVideoId || null,
+        }),
+      });
+      if (!leadRes.ok) throw new Error("Failed to save video URL to lead");
+
+      const actionAt = new Date().toISOString();
+      const actionMessage =
+        target === "in"
+          ? previousInVideoId
+            ? "Car in video replaced"
+            : "Car in video uploaded"
+          : previousOutVideoId
+          ? "Car out video replaced"
+          : "Car out video uploaded";
+      const videoLog = buildInspectionLogEntry("updated", actionAt, actionMessage);
+      const nextLogs = [videoLog, ...inspectionLogs];
+      const inspectionRes = await fetch(`/api/company/${companyId}/workshop/inspections/${inspectionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          draftPayload: buildDraftPayload(nextLogs),
+        }),
+      });
+      if (!inspectionRes.ok) throw new Error("Failed to save inspection video log");
+      setInspectionLogs(nextLogs);
+
+      toast.success(target === "in" ? "Car in video uploaded." : "Car out video uploaded.");
+    } catch (err: any) {
+      setCarInVideoId(previousInVideoId);
+      setCarOutVideoId(previousOutVideoId);
+      toast.error(err?.message ?? "Failed to upload video");
+    } finally {
+      setVideoUploading(null);
+      setVideoUploadProgress((prev) => ({ ...prev, [target]: 0 }));
+    }
+  };
+
+  const carInDropzone = useDropzone({
+    accept: { "video/*": [] },
+    multiple: false,
+    disabled: isReadOnly || videoUploading !== null,
+    onDrop: (acceptedFiles) => {
+      const file = acceptedFiles?.[0];
+      if (!file) return;
+      void uploadInspectionVideo(file, "in");
+    },
+  });
+
+  const carOutDropzone = useDropzone({
+    accept: { "video/*": [] },
+    multiple: false,
+    disabled: isReadOnly || videoUploading !== null,
+    onDrop: (acceptedFiles) => {
+      const file = acceptedFiles?.[0];
+      if (!file) return;
+      void uploadInspectionVideo(file, "out");
+    },
+  });
+
   const saveLineItem = async (index: number) => {
     if (!companyId || !inspectionId) return;
     if (isReadOnly) {
@@ -507,6 +701,7 @@ export function InspectionDetailPageClient({
         }),
       });
       initialPartsSignatureRef.current = serializePartsForCompare(nextParts);
+      initialChecksSignatureRef.current = serializeChecksForCompare(checks);
       toast.success("Line item saved successfully.");
       setLineItemErrors((prev) => ({ ...prev, [index]: {} }));
     } catch (err) {
@@ -568,6 +763,47 @@ export function InspectionDetailPageClient({
             {cancelledAt && <div className="text-rose-300">Cancelled: {new Date(cancelledAt).toLocaleString()}</div>}
           </div>
         )}
+        <div className={`sticky top-2 z-20 rounded-md border px-3 py-2 ${theme.cardBorder} ${theme.cardBg}`}>
+          <div className="flex flex-wrap items-center gap-2">
+            {primaryStages.map((stage) => (
+              <span
+                key={stage.key}
+                className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${
+                  stage.done ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-300" : "border-white/15 text-white/70"
+                }`}
+              >
+                {stage.label}
+              </span>
+            ))}
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+              {approvalStages.map((stage) => (
+                <span
+                  key={stage.key}
+                  className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${
+                    stage.done ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-300" : "border-white/15 text-white/70"
+                  }`}
+                >
+                  {stage.label}
+                </span>
+              ))}
+            </div>
+          </div>
+          <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-white/70">
+            <span className={hasUnsavedChanges ? "text-amber-300" : "text-emerald-300"}>
+              {hasUnsavedChanges ? "Unsaved changes" : "All changes saved"}
+            </span>
+            {!isReadOnly && (
+              <>
+              {hasUnsavedLineItems && <span className="text-amber-300">Save all line items before completion.</span>}
+              {requiredMediaMissing && <span className="text-amber-300">Required part media is missing.</span>}
+              {!form.inspectorRemarks?.trim() && <span className="text-amber-300">Inspector remarks are required.</span>}
+              {currentStatus === "completed" && !advisorApproved && !isWorkshopView && (
+                <span className="text-cyan-300">Advisor approval pending.</span>
+              )}
+              </>
+            )}
+          </div>
+        </div>
 
         {error && <div className="text-sm text-destructive">{error}</div>}
         {isCancelled && (
@@ -589,6 +825,24 @@ export function InspectionDetailPageClient({
               {loading && <div className="text-xs text-white/60">Loading...</div>}
             </div>
             <div className="grid gap-4 pt-4 lg:grid-cols-2">
+              <div className="lg:col-span-2 flex items-center justify-between">
+                <div className="text-xs font-semibold uppercase tracking-wide text-white/70">Checklist</div>
+                {!isReadOnly && (
+                  <button
+                    type="button"
+                    className="rounded-md border border-white/20 px-2.5 py-1 text-[11px] font-semibold text-white/80 hover:bg-white/10"
+                    onClick={() => {
+                      const next: Record<string, CheckValue> = {};
+                      checkItems.forEach((item) => {
+                        next[item.key] = "avg";
+                      });
+                      setChecks((prev) => ({ ...prev, ...next }));
+                    }}
+                  >
+                    Set all Avg
+                  </button>
+                )}
+              </div>
               {checkItems.map((item) => (
                 <div key={item.key} className="grid items-center gap-3 text-sm md:grid-cols-[140px_auto]">
                   <div className="font-semibold text-blue-400">{item.label}</div>
@@ -675,9 +929,117 @@ export function InspectionDetailPageClient({
             </div>
 
             <div className="mt-6">
-              <div className="text-sm font-semibold">Parts Needed</div>
+              <div className="text-sm font-semibold">Inspection Videos</div>
               <div className={`mt-2 rounded-md ${theme.cardBorder} ${theme.surfaceSubtle} p-3`}>
-                <div className="grid w-full gap-3 lg:grid-cols-[2fr_2fr_1fr_1fr_1.5fr] text-xs font-semibold text-white/70">
+                <div className="grid gap-3 lg:grid-cols-2">
+                  <div className="space-y-2">
+                    <div className="text-xs font-semibold text-white/70">Car In Video</div>
+                    <div
+                      {...carInDropzone.getRootProps()}
+                      className={`cursor-pointer rounded-md border border-dashed px-4 py-5 text-center text-xs transition ${
+                        carInDropzone.isDragActive ? "border-cyan-400 bg-cyan-500/10 text-cyan-200" : "border-white/20 text-white/70 hover:bg-white/5"
+                      }`}
+                    >
+                      <input {...carInDropzone.getInputProps()} />
+                      {videoUploading === "in"
+                        ? `Uploading... ${videoUploadProgress.in}%`
+                        : "Drop video here or click to upload"}
+                    </div>
+                    {videoUploading === "in" && (
+                      <div className="space-y-1">
+                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+                          <div
+                            className="h-full rounded-full bg-cyan-400 transition-all duration-150"
+                            style={{ width: `${videoUploadProgress.in}%` }}
+                          />
+                        </div>
+                        <div className="text-[10px] text-white/60">{videoUploadProgress.in}% uploaded</div>
+                      </div>
+                    )}
+                    {carInVideoId && (
+                      <div className="space-y-2">
+                        <video
+                          className="h-[200px] w-[200px] rounded-md border border-white/10 object-cover"
+                          controls
+                          preload="metadata"
+                          src={`/api/files/${carInVideoId}`}
+                        />
+                        <a
+                          href={`/api/files/${carInVideoId}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs text-primary hover:underline"
+                        >
+                          Open video
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <div className="text-xs font-semibold text-white/70">Car Out Video</div>
+                    <div
+                      {...carOutDropzone.getRootProps()}
+                      className={`cursor-pointer rounded-md border border-dashed px-4 py-5 text-center text-xs transition ${
+                        carOutDropzone.isDragActive ? "border-cyan-400 bg-cyan-500/10 text-cyan-200" : "border-white/20 text-white/70 hover:bg-white/5"
+                      }`}
+                    >
+                      <input {...carOutDropzone.getInputProps()} />
+                      {videoUploading === "out"
+                        ? `Uploading... ${videoUploadProgress.out}%`
+                        : "Drop video here or click to upload"}
+                    </div>
+                    {videoUploading === "out" && (
+                      <div className="space-y-1">
+                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+                          <div
+                            className="h-full rounded-full bg-cyan-400 transition-all duration-150"
+                            style={{ width: `${videoUploadProgress.out}%` }}
+                          />
+                        </div>
+                        <div className="text-[10px] text-white/60">{videoUploadProgress.out}% uploaded</div>
+                      </div>
+                    )}
+                    {carOutVideoId && (
+                      <div className="space-y-2">
+                        <video
+                          className="h-[200px] w-[200px] rounded-md border border-white/10 object-cover"
+                          controls
+                          preload="metadata"
+                          src={`/api/files/${carOutVideoId}`}
+                        />
+                        <a
+                          href={`/api/files/${carOutVideoId}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs text-primary hover:underline"
+                        >
+                          Open video
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6">
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-sm font-semibold">Findings / Parts Needed</div>
+                <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
+                  <span className="rounded-full border border-white/15 px-2 py-0.5 text-white/70">Total: {parts.length}</span>
+                  <span className="rounded-full border border-emerald-500/40 px-2 py-0.5 text-emerald-300">
+                    Received: {parts.filter((p) => (p.orderStatus ?? "").toLowerCase() === "received").length}
+                  </span>
+                  <span className="rounded-full border border-amber-500/40 px-2 py-0.5 text-amber-300">
+                    Ordered: {parts.filter((p) => (p.orderStatus ?? "").toLowerCase() === "ordered").length}
+                  </span>
+                  <span className="rounded-full border border-cyan-500/40 px-2 py-0.5 text-cyan-300">
+                    Draft: {parts.filter((p) => !p.isSaved).length}
+                  </span>
+                </div>
+              </div>
+              <div className={`mt-2 rounded-md ${theme.cardBorder} ${theme.surfaceSubtle} p-3`}>
+                <div className="hidden w-full gap-3 text-xs font-semibold text-white/70 lg:grid lg:grid-cols-[2fr_2fr_1fr_1fr_1.5fr]">
                   <div>Parts Needed</div>
                   <div>Description</div>
                   <div>Quantity</div>
@@ -689,8 +1051,12 @@ export function InspectionDetailPageClient({
                     const isLocked =
                       isReadOnly || row.partOrdered === 1 || row.orderStatus === "Ordered" || row.orderStatus === "Received";
                     return (
-                      <div key={index} className="grid w-full items-start gap-3 lg:grid-cols-[2fr_2fr_1fr_1fr_1.5fr]">
+                      <div
+                        key={index}
+                        className="grid w-full items-start gap-3 rounded-md border border-white/10 p-2 lg:rounded-none lg:border-0 lg:p-0 lg:grid-cols-[2fr_2fr_1fr_1fr_1.5fr]"
+                      >
                         <div className="space-y-1">
+                          <div className="text-[10px] font-semibold uppercase tracking-wide text-white/60 lg:hidden">Part</div>
                           <div className="relative">
                             <input
                               type="text"
@@ -737,15 +1103,19 @@ export function InspectionDetailPageClient({
                           <div className="text-xs text-destructive">{lineItemErrors[index]?.part}</div>
                         )}
                       </div>
-                      <input
-                        type="text"
-                        className={`${theme.input} h-10 w-full`}
-                        value={row.description}
-                        disabled={isLocked}
-                        onChange={(e) => updatePart(index, "description", e.target.value)}
-                        placeholder="do it"
-                      />
                       <div className="space-y-1">
+                        <div className="text-[10px] font-semibold uppercase tracking-wide text-white/60 lg:hidden">Description</div>
+                        <input
+                          type="text"
+                          className={`${theme.input} h-10 w-full`}
+                          value={row.description}
+                          disabled={isLocked}
+                          onChange={(e) => updatePart(index, "description", e.target.value)}
+                          placeholder="do it"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-[10px] font-semibold uppercase tracking-wide text-white/60 lg:hidden">Quantity</div>
                         <input
                           type="number"
                           min={1}
@@ -760,6 +1130,7 @@ export function InspectionDetailPageClient({
                         )}
                       </div>
                       <div className="space-y-1">
+                        <div className="text-[10px] font-semibold uppercase tracking-wide text-white/60 lg:hidden">Picture / Video</div>
                         {(() => {
                           const mediaRequirement = getMediaRequirement(row);
                           return (
@@ -781,6 +1152,7 @@ export function InspectionDetailPageClient({
                         )}
                       </div>
                       <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                        <div className="w-full text-[10px] uppercase tracking-wide text-white/60 lg:hidden">Actions</div>
                         {row.isSaved ? (
                           <button
                             type="button"
@@ -883,6 +1255,7 @@ export function InspectionDetailPageClient({
                             headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({
                               carInVideo: carInVideoId || null,
+                              carOutVideo: carOutVideoId || null,
                             }),
                           }
                         );
@@ -895,6 +1268,7 @@ export function InspectionDetailPageClient({
                       initialStatusRef.current = "pending";
                       initialRemarksRef.current = form.inspectorRemarks ?? "";
                       initialPartsSignatureRef.current = serializePartsForCompare(parts);
+                      initialChecksSignatureRef.current = serializeChecksForCompare(checks);
                     } catch (err) {
                       setInspectionLogs((prev) => prev.filter((log) => log.at !== actionAt || log.action !== "started"));
                       setError("Failed to start inspection");
@@ -948,6 +1322,7 @@ export function InspectionDetailPageClient({
                               headers: { "Content-Type": "application/json" },
                               body: JSON.stringify({
                                 carInVideo: carInVideoId || null,
+                                carOutVideo: carOutVideoId || null,
                               }),
                             }
                           );
@@ -955,6 +1330,7 @@ export function InspectionDetailPageClient({
                         }
                         initialRemarksRef.current = form.inspectorRemarks ?? "";
                         initialPartsSignatureRef.current = serializePartsForCompare(parts);
+                        initialChecksSignatureRef.current = serializeChecksForCompare(checks);
                       } catch (err) {
                         setInspectionLogs((prev) => prev.filter((log) => log.at !== actionAt || log.action !== "updated"));
                         setError("Failed to update inspection");
@@ -1052,9 +1428,13 @@ export function InspectionDetailPageClient({
                 <button
                   type="button"
                   className="rounded-md bg-primary px-6 py-2 text-xs font-semibold uppercase tracking-wide text-primary-foreground"
-                  disabled={saving || !companyId || !inspectionId}
+                  disabled={!canCompleteInspection}
                   onClick={async () => {
                     if (!companyId || !inspectionId) return;
+                    if (!canCompleteInspection) {
+                      toast.error("Complete required fields and save all line items before completion.");
+                      return;
+                    }
                     setSaving(true);
                     const actionAt = new Date().toISOString();
                     let nextLogs = appendInspectionLog("completed", actionAt, "Status changed to completed");
@@ -1089,6 +1469,7 @@ export function InspectionDetailPageClient({
                             headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({
                               carInVideo: carInVideoId || null,
+                              carOutVideo: carOutVideoId || null,
                             }),
                           }
                         );
@@ -1101,6 +1482,7 @@ export function InspectionDetailPageClient({
                       initialStatusRef.current = "completed";
                       initialRemarksRef.current = form.inspectorRemarks ?? "";
                       initialPartsSignatureRef.current = serializePartsForCompare(parts);
+                      initialChecksSignatureRef.current = serializeChecksForCompare(checks);
                     } catch (err) {
                       setInspectionLogs((prev) => prev.filter((log) => log.at !== actionAt));
                       setError("Failed to complete inspection");
@@ -1176,8 +1558,8 @@ export function InspectionDetailPageClient({
             </div>
           </Card>
 
-          {!isWorkshopView && <div className="space-y-4">
-            <Card className={`overflow-hidden ${theme.cardBg} ${theme.cardBorder}`}>
+          <div className="space-y-4">
+            {!isWorkshopView && <Card className={`overflow-hidden ${theme.cardBg} ${theme.cardBorder}`}>
               <div className={`px-4 py-2 text-sm font-semibold ${theme.surfaceSubtle} ${theme.cardBorder}`}>
                 Customer Details
               </div>
@@ -1193,9 +1575,9 @@ export function InspectionDetailPageClient({
                   <div className="font-semibold">{customer?.customer_type ?? "Regular"}</div>
                 </div>
               </div>
-            </Card>
+            </Card>}
 
-            <Card className={`overflow-hidden ${theme.cardBg} ${theme.cardBorder}`}>
+            {!isWorkshopView && <Card className={`overflow-hidden ${theme.cardBg} ${theme.cardBorder}`}>
               <div className={`px-4 py-2 text-sm font-semibold ${theme.surfaceSubtle} ${theme.cardBorder}`}>
                 Car Details
               </div>
@@ -1213,43 +1595,9 @@ export function InspectionDetailPageClient({
                   <div className="font-semibold">Not Eligible</div>
                 </div>
               </div>
-            </Card>
+            </Card>}
 
-            <Card className={`overflow-hidden ${theme.cardBg} ${theme.cardBorder}`}>
-              <div className={`px-4 py-2 text-sm font-semibold ${theme.surfaceSubtle} ${theme.cardBorder}`}>
-                Inspection Videos
-              </div>
-              <div className="p-3 text-xs">
-                <div className="space-y-3">
-                  <FileUploader
-                    label="Car In Video"
-                    kind="video"
-                    value={carInVideoId}
-                    onChange={(id) => setCarInVideoId(id ?? "")}
-                  />
-                  {carInVideoId && (
-                    <div className="space-y-2">
-                      <video
-                        className="w-full rounded-md border border-white/10"
-                        controls
-                        preload="metadata"
-                        src={`/api/files/${carInVideoId}`}
-                      />
-                      <a
-                        href={`/api/files/${carInVideoId}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-xs text-primary hover:underline"
-                      >
-                        Open video
-                      </a>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </Card>
-
-            <Card className={`overflow-hidden ${theme.cardBg} ${theme.cardBorder}`}>
+            {!isWorkshopView && <Card className={`overflow-hidden ${theme.cardBg} ${theme.cardBorder}`}>
               <div className={`px-4 py-2 text-sm font-semibold ${theme.surfaceSubtle} ${theme.cardBorder}`}>
                 Service History
               </div>
@@ -1259,9 +1607,9 @@ export function InspectionDetailPageClient({
                   <input type="text" className={theme.input} placeholder="Search" />
                 </div>
               </div>
-            </Card>
+            </Card>}
 
-          </div>}
+          </div>
         </div>
       </div>
     </AppLayout>

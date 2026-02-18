@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { DropzoneFileInput } from "@repo/ui/components/common/DropzoneFileInput";
 
 type RecoveryRequestData = {
   id: string;
@@ -366,10 +367,13 @@ export default function RecoveryProcessClient({ request, companyId }: Props) {
 
             <div className="rounded-lg border border-slate-200 bg-white p-4 space-y-3">
               <div className="text-sm font-semibold">Pickup Evidence</div>
-              <input
-                type="file"
-                accept="video/*"
-                onChange={(e) => setPickupFile(e.target.files?.[0] ?? null)}
+              <DropzoneFileInput
+                accept={{ "video/*": [] }}
+                onFileSelect={(file) => setPickupFile(file)}
+                selectedFileName={pickupFile?.name ?? undefined}
+                idleText="Drag and drop a video"
+                activeText="Drop video here"
+                buttonText="Browse"
               />
               <textarea
                 className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
@@ -462,10 +466,13 @@ export default function RecoveryProcessClient({ request, companyId }: Props) {
 
             <div className="rounded-lg border border-slate-200 bg-white p-4 space-y-3">
               <div className="text-sm font-semibold">Dropoff Evidence</div>
-              <input
-                type="file"
-                accept="video/*"
-                onChange={(e) => setDropoffFile(e.target.files?.[0] ?? null)}
+              <DropzoneFileInput
+                accept={{ "video/*": [] }}
+                onFileSelect={(file) => setDropoffFile(file)}
+                selectedFileName={dropoffFile?.name ?? undefined}
+                idleText="Drag and drop a video"
+                activeText="Drop video here"
+                buttonText="Browse"
               />
               <textarea
                 className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"

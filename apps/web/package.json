@@ -28,6 +28,7 @@
         "react-arborist": "^3.4.3",
         "react-date-range": "^2.0.1",
         "react-dom": "^19.2.0",
+        "react-dropzone": "^15.0.0",
         "react-email-editor": "^1.7.10",
         "react-hook-form": "^7.53.0",
         "react-select": "^5.8.3",

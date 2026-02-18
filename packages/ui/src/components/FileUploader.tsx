@@ -1,6 +1,7 @@
-﻿"use client";
+"use client";
 
-import React, { useRef, useState } from "react";
+import React, { useCallback, useState } from "react";
+import { DropzoneFileInput } from "./common/DropzoneFileInput";
 import { useTheme } from "../theme";
 
 export type FileKind = "image" | "audio" | "video" | "any";
@@ -41,44 +42,45 @@ export function FileUploader({
   const { theme } = useTheme();
   const [isUploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const accept =
     kind === "image"
-      ? "image/*"
+      ? { "image/*": [] }
       : kind === "audio"
-      ? "audio/*"
+      ? { "audio/*": [] }
       : kind === "video"
-      ? "video/*"
+      ? { "video/*": [] }
       : undefined;
 
-  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setError(null);
-    setUploading(true);
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("kind", kind === "any" ? inferKind(file.type) : kind);
+  const uploadFile = useCallback(
+    async (file: File | null) => {
+      if (!file) return;
+      setError(null);
+      setUploading(true);
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("kind", kind === "any" ? inferKind(file.type) : kind);
 
-      const res = await fetch("/api/files/upload", {
-        method: "POST",
-        body: formData,
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "Upload failed");
+        const res = await fetch("/api/files/upload", {
+          method: "POST",
+          body: formData,
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || "Upload failed");
+        }
+        const data = await res.json();
+        onChange(data.fileId ?? null);
+      } catch (err: any) {
+        console.error(err);
+        setError(err?.message ?? "Upload failed");
+      } finally {
+        setUploading(false);
       }
-      const data = await res.json();
-      onChange(data.fileId ?? null);
-    } catch (err: any) {
-      console.error(err);
-      setError(err?.message ?? "Upload failed");
-    } finally {
-      setUploading(false);
-    }
-  }
+    },
+    [kind, onChange]
+  );
 
   function inferKind(mime: string): FileKind {
     if (mime.startsWith("image/")) return "image";
@@ -91,12 +93,9 @@ export function FileUploader({
   const previewUrl = value ? `/api/files/${value}` : "";
   const showInlinePreview = showPreview && Boolean(value);
   const hasValue = Boolean(value);
-  const buttonClasses = `inline-flex items-center whitespace-nowrap rounded-md bg-slate-100 px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-700 shadow-md transition hover:bg-slate-200 hover:shadow-lg disabled:opacity-50${
-    buttonClassName ? ` ${buttonClassName}` : ""
-  }`;
 
   return (
-    <div className={`space-y-1${containerClassName ? ` ${containerClassName}` : ""}`}>
+    <div className={`space-y-2${containerClassName ? ` ${containerClassName}` : ""}`}>
       <div className="flex items-center gap-2">
         <label className="text-sm font-medium text-foreground/90 block">{label}</label>
         {helperContent && (
@@ -120,82 +119,61 @@ export function FileUploader({
           </button>
         )}
       </div>
-      <div className={`flex flex-col gap-2${buttonOnly ? "" : " md:flex-row md:items-stretch"}`}>
-        <div className={`flex w-full items-stretch gap-2${buttonOnly ? "" : " flex-1"}`}>
-          {!buttonOnly && (
-            <input
-              value={value ?? ""}
-              onChange={(e) => onChange(e.target.value || null)}
-              placeholder="File id will appear after upload"
-              className={`${theme.input} flex-1 min-w-0`}
-              readOnly
-            />
-          )}
+
+      {!buttonOnly && (
+        <div className="flex flex-col gap-2 md:flex-row md:items-stretch">
           <input
-            ref={fileInputRef}
-            type="file"
-            accept={accept}
-            disabled={disabled || isUploading}
-            onChange={handleFileChange}
-            className="hidden"
+            value={value ?? ""}
+            onChange={(e) => onChange(e.target.value || null)}
+            placeholder="File id will appear after upload"
+            className={`${theme.input} flex-1 min-w-0`}
+            readOnly
           />
-          <button
-            type="button"
-            disabled={disabled || isUploading}
-            onClick={() => fileInputRef.current?.click()}
-            className={buttonClasses}
-          >
-            {isUploading ? "Uploading..." : hasValue ? (replaceLabel ?? "Replace file") : (chooseLabel ?? "Choose file")}
-          </button>
+          {value && (
+            <div className="flex items-center gap-2 text-xs">
+              <span className="inline-flex rounded-full bg-muted/40 px-2 py-0.5 text-muted-foreground">
+                File attached
+              </span>
+              <a href={previewUrl} target="_blank" rel="noreferrer" className="text-primary hover:underline">
+                Open
+              </a>
+              <span className="max-w-[18rem] truncate text-muted-foreground" title={value}>
+                {value}
+              </span>
+            </div>
+          )}
         </div>
-        {!buttonOnly && value && (
-          <div className="flex items-center gap-2 text-xs">
-            <span className="inline-flex rounded-full bg-muted/40 px-2 py-0.5 text-muted-foreground">
-              File attached
-            </span>
-            <a
-              href={previewUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="text-primary hover:underline"
-            >
-              Open
-            </a>
-            <span className="max-w-[18rem] truncate text-muted-foreground" title={value}>
-              {value}
-            </span>
-          </div>
-        )}
-      </div>
+      )}
+
+      <DropzoneFileInput
+        accept={accept}
+        disabled={disabled || isUploading}
+        onFileSelect={uploadFile}
+        onReject={setError}
+        idleText="Drag and drop a file here"
+        activeText="Drop file to upload"
+        buttonText={isUploading ? "Uploading..." : hasValue ? (replaceLabel ?? "Replace file") : (chooseLabel ?? "Choose file")}
+        buttonClassName={buttonClassName}
+      />
+
       {showInlinePreview && kind === "image" && (
         <img
           src={previewUrl}
           alt={`${label} preview`}
-          className={`h-24 w-full rounded-md object-cover${
-            previewClassName ? ` ${previewClassName}` : ""
-          }`}
+          className={`h-24 w-full rounded-md object-cover${previewClassName ? ` ${previewClassName}` : ""}`}
         />
       )}
       {showInlinePreview && kind === "video" && (
         <video
-          className={`h-24 w-full rounded-md object-cover${
-            previewClassName ? ` ${previewClassName}` : ""
-          }`}
+          className={`h-24 w-full rounded-md object-cover${previewClassName ? ` ${previewClassName}` : ""}`}
           controls
           preload="metadata"
           src={previewUrl}
         />
       )}
-      {showInlinePreview && kind === "audio" && (
-        <audio className="w-full" controls preload="metadata" src={previewUrl} />
-      )}
+      {showInlinePreview && kind === "audio" && <audio className="w-full" controls preload="metadata" src={previewUrl} />}
       {showInlinePreview && kind === "any" && (
-        <a
-          href={previewUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="text-xs text-primary hover:underline"
-        >
+        <a href={previewUrl} target="_blank" rel="noreferrer" className="text-xs text-primary hover:underline">
           Open file
         </a>
       )}

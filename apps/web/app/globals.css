@@ -90,3 +90,34 @@ a {
     display: unset;
   }
 }
+
+.loading-top-track {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 60;
+  height: 2px;
+  width: 100%;
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.loading-top-bar {
+  height: 100%;
+  width: 35%;
+  background: linear-gradient(90deg, #22d3ee 0%, #06b6d4 100%);
+  animation: loading-slide 1.2s ease-in-out infinite;
+}
+
+.loading-pulse-bar {
+  width: 40%;
+  animation: loading-slide 1.2s ease-in-out infinite;
+}
+
+@keyframes loading-slide {
+  0% {
+    transform: translateX(-110%);
+  }
+  100% {
+    transform: translateX(280%);
+  }
+}

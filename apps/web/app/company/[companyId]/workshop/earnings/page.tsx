@@ -6,7 +6,9 @@ import { DateRange } from "react-date-range";
 
 type EarningsRow = {
   id: string;
-  inspection_id: string;
+  earning_source?: "inspection" | "job_card" | null;
+  inspection_id?: string | null;
+  job_card_id?: string | null;
   branch_id?: string | null;
   currency?: string | null;
   gross_amount?: number | null;
@@ -40,6 +42,8 @@ type DatePresetId =
   | "last_30_days"
   | "this_month"
   | "last_month";
+
+type EarningsSource = "all" | "inspection" | "job_card";
 
 const toMoney = (value?: number | null) => Number(value ?? 0).toFixed(2);
 
@@ -80,6 +84,7 @@ export default function CompanyWorkshopEarningsPage({
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [workshops, setWorkshops] = useState<WorkshopOption[]>([]);
   const [selectedWorkshopId, setSelectedWorkshopId] = useState("all");
+  const [selectedSource, setSelectedSource] = useState<EarningsSource>("all");
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedPreset, setSelectedPreset] = useState<DatePresetId | null>(null);
   const [dateRange, setDateRange] = useState<{
@@ -144,6 +149,7 @@ export default function CompanyWorkshopEarningsPage({
 
       const qs = new URLSearchParams();
       if (selectedWorkshopId !== "all") qs.set("branchId", selectedWorkshopId);
+      if (selectedSource !== "all") qs.set("source", selectedSource);
       qs.set("from", from.toISOString());
       qs.set("to", to.toISOString());
 
@@ -165,6 +171,8 @@ export default function CompanyWorkshopEarningsPage({
     return rows.filter((row) =>
       [
         row.inspection_id,
+        row.job_card_id,
+        row.earning_source,
         row.plate_number,
         row.make,
         row.model,
@@ -250,11 +258,11 @@ export default function CompanyWorkshopEarningsPage({
         <div className="rounded-2xl border border-cyan-500/20 bg-slate-950/45 p-4">
           <p className="text-[11px] uppercase tracking-[0.18em] text-cyan-300/80">Workshops / Vendors</p>
           <h1 className="mt-1 text-2xl font-semibold text-white">Workshop Earnings</h1>
-          <p className="mt-1 text-sm text-slate-300">Verified inspection earnings for third-party workshops.</p>
+          <p className="mt-1 text-sm text-slate-300">Verified earnings for third-party workshops (inspections and job cards).</p>
         </div>
 
         <div className="rounded-2xl border border-white/10 bg-slate-950/45 p-4">
-          <div className="mb-4 grid gap-3 lg:grid-cols-[280px_1fr_auto]">
+          <div className="mb-4 grid gap-3 lg:grid-cols-[240px_220px_1fr_auto]">
             <div className="space-y-1">
               <label className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-300">Workshop</label>
               <select
@@ -268,6 +276,19 @@ export default function CompanyWorkshopEarningsPage({
                     {w.label}
                   </option>
                 ))}
+              </select>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-300">Earning Source</label>
+              <select
+                value={selectedSource}
+                onChange={(e) => setSelectedSource(e.target.value as EarningsSource)}
+                className="h-10 w-full rounded-lg border border-cyan-400/30 bg-slate-900/60 px-3 text-sm text-slate-100 outline-none focus:ring-2 focus:ring-cyan-500/30"
+              >
+                <option value="all">All Sources</option>
+                <option value="inspection">Inspections</option>
+                <option value="job_card">Job Cards</option>
               </select>
             </div>
 
@@ -338,7 +359,7 @@ export default function CompanyWorkshopEarningsPage({
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search by plate, inspection or workshop"
+              placeholder="Search by plate, inspection/job card, source or workshop"
               className="w-full max-w-xs rounded-lg border border-cyan-400/30 bg-slate-900/60 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/30"
             />
           </div>
@@ -355,6 +376,8 @@ export default function CompanyWorkshopEarningsPage({
                 <table className="min-w-full text-sm">
                   <thead>
                     <tr className="bg-white/5 text-left text-xs uppercase tracking-wide text-slate-300">
+                      <th className="px-3 py-2">Source</th>
+                      <th className="px-3 py-2">Reference</th>
                       <th className="px-3 py-2">Car</th>
                       <th className="px-3 py-2">Workshop</th>
                       <th className="px-3 py-2">Inspection Start</th>
@@ -370,11 +393,20 @@ export default function CompanyWorkshopEarningsPage({
                       const currency = row.currency ?? "USD";
                       const workshop = row.branch_display_name ?? row.branch_name ?? row.branch_code ?? "-";
                       const carDetails = [row.plate_number, row.make, row.model, row.model_year].filter(Boolean).join(" ");
+                      const sourceLabel = row.earning_source === "job_card" ? "Job Card" : "Inspection";
+                      const referenceId = row.earning_source === "job_card" ? row.job_card_id : row.inspection_id;
                       return (
                         <tr key={row.id} className="border-t border-white/10">
                           <td className="px-3 py-2">
+                            <span className="rounded-full border border-cyan-400/30 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-cyan-200">
+                              {sourceLabel}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 text-slate-300">
+                            {referenceId ? `${referenceId.slice(0, 8)}...` : "-"}
+                          </td>
+                          <td className="px-3 py-2">
                             <div className="font-medium text-slate-100">{carDetails || "-"}</div>
-                            <div className="text-[11px] text-slate-400">Inspection: {row.inspection_id?.slice(0, 8)}...</div>
                           </td>
                           <td className="px-3 py-2 text-slate-200">{workshop}</td>
                           <td className="px-3 py-2 text-slate-300">{formatDate(row.start_at)}</td>
@@ -396,7 +428,7 @@ export default function CompanyWorkshopEarningsPage({
                     })}
                     {filtered.length === 0 && (
                       <tr>
-                        <td colSpan={8} className="px-3 py-8 text-center text-slate-400">
+                        <td colSpan={10} className="px-3 py-8 text-center text-slate-400">
                           No earnings found.
                         </td>
                       </tr>

@@ -75,6 +75,7 @@ export { CarMakeModelSelect } from "./components/common/CarMakeModelSelect";
 export { CarPlateInput } from "./components/common/CarPlateInput";
 export { PartBrandSelect } from "./components/common/PartBrandSelect";
 export { AttachmentField } from "./components/common/AttachmentField";
+export { DropzoneFileInput } from "./components/common/DropzoneFileInput";
 export { ModulePlaceholder } from "./components/ModulePlaceholder";
 export { GlowProgress } from "./components/GlowProgress";
 export { LeadListTable } from "./sales/LeadListTable";

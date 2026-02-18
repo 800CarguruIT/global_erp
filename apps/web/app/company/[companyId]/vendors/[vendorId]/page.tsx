@@ -1,6 +1,7 @@
 "use client";
 
 import { AppLayout } from "@repo/ui";
+import { DropzoneFileInput } from "@repo/ui/components/common/DropzoneFileInput";
 import { useParams } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
 
@@ -8,6 +9,7 @@ type Props = { params: { companyId: string; vendorId: string } };
 type QuoteTypeKey = "oem" | "oe" | "aftm" | "used";
 type PartFormData = {
   partNumber: string;
+  attachmentName: string;
   remarks: string;
   oemAmount: string;
   oeAmount: string;
@@ -54,6 +56,7 @@ const MAKES = [
 
 const createEmptyPartForm = (): PartFormData => ({
   partNumber: "",
+  attachmentName: "",
   remarks: "",
   oemAmount: "",
   oeAmount: "",
@@ -1160,7 +1163,19 @@ export default function VendorDashboardPage({ params }: Props) {
                               onChange={(e) => updatePartForm(row.id, "partNumber", e.target.value)}
                               onBlur={() => markDraftSaved(row.id)}
                             />
-                            <input type="file" className="w-full text-xs text-slate-300" />
+                            <DropzoneFileInput
+                              onFileSelect={(file) => {
+                                updatePartForm(row.id, "attachmentName", file?.name ?? "");
+                                markDraftSaved(row.id);
+                              }}
+                              selectedFileName={form?.attachmentName ?? ""}
+                              idleText="Drag and drop part file"
+                              activeText="Drop part file"
+                              buttonText="Browse"
+                              className="border-slate-700"
+                              textClassName="truncate text-slate-300"
+                              buttonClassName="border-slate-600 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-200"
+                            />
                             <textarea
                               className="h-20 w-full rounded border border-slate-700 bg-slate-950/80 px-2 py-1.5 text-xs text-slate-100 placeholder:text-slate-500"
                               placeholder="Remarks"
