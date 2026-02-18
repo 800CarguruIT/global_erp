@@ -25,14 +25,6 @@ export async function GET(_req: NextRequest, { params }: Params) {
         FROM line_items li
         INNER JOIN part_quotes pq ON pq.line_item_id = li.id
         WHERE li.company_id = ${companyId}
-        UNION ALL
-        SELECT
-          ei.inspection_item_id AS line_item_id,
-          pq.status
-        FROM estimate_items ei
-        INNER JOIN part_quotes pq ON pq.estimate_item_id = ei.id
-        INNER JOIN line_items li ON li.id = ei.inspection_item_id
-        WHERE li.company_id = ${companyId}
       ) source
       GROUP BY source.line_item_id
     ),

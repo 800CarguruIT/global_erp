@@ -19,8 +19,8 @@ export async function GET(req: NextRequest, { params }: Params) {
         LOWER(pq.status) IN ('pending', 'quoted', 'approved')
         OR (
           LOWER(pq.status) = 'pending'
-          AND LOWER(COALESCE(ei.status, li.status, iori.status)) IN ('approved', 'inquiry', 'pending')
-          AND COALESCE(ei.status, li.status, iori.status) IS NOT NULL
+          AND LOWER(COALESCE(li.status, iori.status)) IN ('approved', 'inquiry', 'pending')
+          AND COALESCE(li.status, iori.status) IS NOT NULL
         )
       )`;
     }
@@ -56,9 +56,9 @@ export async function GET(req: NextRequest, { params }: Params) {
       pq.estimate_item_id,
       pq.line_item_id,
       v.name AS vendor_name,
-      COALESCE(ei.part_name, li.product_name, iori.part_name) AS part_name,
-      LOWER(COALESCE(ei.status, li.status, iori.status)) AS item_status,
-      ei.approved_type,
+      COALESCE(li.product_name, iori.part_name) AS part_name,
+      LOWER(COALESCE(li.status, iori.status)) AS item_status,
+      li.approved_type,
       car.id AS car_id,
       car.make AS car_make,
       car.model AS car_model,
@@ -67,7 +67,6 @@ export async function GET(req: NextRequest, { params }: Params) {
       ior.request_number,
       v.id AS vendor_id
     FROM part_quotes pq
-    LEFT JOIN estimate_items ei ON ei.id = pq.estimate_item_id
     LEFT JOIN line_items li ON li.id = pq.line_item_id
     LEFT JOIN estimates est ON est.id = pq.estimate_id
     LEFT JOIN inspections li_inspection ON li_inspection.id = li.inspection_id
@@ -92,7 +91,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     carPlate: row.car_plate,
     carVin: row.car_vin,
     requestNumber: row.request_number ?? null,
-    sourceType: row.inventory_request_item_id ? "inventory" : "estimate",
+    sourceType: row.inventory_request_item_id ? "inventory" : "line_item",
     inventoryRequestItemId: row.inventory_request_item_id ?? null,
     estimateItemId: row.estimate_item_id ?? null,
     lineItemId: row.line_item_id ?? null,

@@ -213,11 +213,6 @@ export async function createInvoiceFromEstimate(
         SELECT li.id AS line_item_id, pq.status
         FROM li
         INNER JOIN part_quotes pq ON pq.line_item_id = li.id
-        UNION ALL
-        SELECT ei.inspection_item_id AS line_item_id, pq.status
-        FROM estimate_items ei
-        INNER JOIN part_quotes pq ON pq.estimate_item_id = ei.id
-        WHERE ei.inspection_item_id IN (SELECT id FROM li)
       ) source
       GROUP BY source.line_item_id
     )

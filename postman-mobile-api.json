@@ -22,8 +22,15 @@
         },
         "url": {
           "raw": "{{baseUrl}}/api/mobile/auth/login",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "mobile", "auth", "login"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "mobile",
+            "auth",
+            "login"
+          ]
         }
       }
     },
@@ -39,8 +46,15 @@
         ],
         "url": {
           "raw": "{{baseUrl}}/api/mobile/auth/me",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "mobile", "auth", "me"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "mobile",
+            "auth",
+            "me"
+          ]
         }
       }
     },
@@ -60,8 +74,15 @@
         },
         "url": {
           "raw": "{{baseUrl}}/api/mobile/auth/refresh",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "mobile", "auth", "refresh"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "mobile",
+            "auth",
+            "refresh"
+          ]
         }
       }
     },
@@ -77,8 +98,16 @@
         ],
         "url": {
           "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/inspections?status=pending",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "mobile", "company", "{{companyId}}", "inspections"],
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "mobile",
+            "company",
+            "{{companyId}}",
+            "inspections"
+          ],
           "query": [
             {
               "key": "status",
@@ -101,7 +130,9 @@
         ],
         "url": {
           "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/inspections/{{inspectionId}}",
-          "host": ["{{baseUrl}}"],
+          "host": [
+            "{{baseUrl}}"
+          ],
           "path": [
             "api",
             "mobile",
@@ -134,7 +165,9 @@
         },
         "url": {
           "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/inspections/{{inspectionId}}",
-          "host": ["{{baseUrl}}"],
+          "host": [
+            "{{baseUrl}}"
+          ],
           "path": [
             "api",
             "mobile",
@@ -265,7 +298,9 @@
         ],
         "url": {
           "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/selectors/products?search=Brake&type=Spare%20Parts",
-          "host": ["{{baseUrl}}"],
+          "host": [
+            "{{baseUrl}}"
+          ],
           "path": [
             "api",
             "mobile",
@@ -299,7 +334,9 @@
         ],
         "url": {
           "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/selectors/parts",
-          "host": ["{{baseUrl}}"],
+          "host": [
+            "{{baseUrl}}"
+          ],
           "path": [
             "api",
             "mobile",
@@ -323,7 +360,9 @@
         ],
         "url": {
           "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/selectors/cars/tyre-sizes",
-          "host": ["{{baseUrl}}"],
+          "host": [
+            "{{baseUrl}}"
+          ],
           "path": [
             "api",
             "mobile",
@@ -336,8 +375,8 @@
         }
       }
     },
-        {
-          "name": "Customers",
+    {
+      "name": "Customers",
       "description": "Customer-focused mobile endpoints: detail, wallets, cars, leads, inspections, and estimates.",
       "item": [
         {
@@ -352,7 +391,9 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/customers/{{customerId}}",
-              "host": ["{{baseUrl}}"],
+              "host": [
+                "{{baseUrl}}"
+              ],
               "path": [
                 "api",
                 "mobile",
@@ -377,7 +418,9 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/customers/{{customerId}}/wallet/summary",
-              "host": ["{{baseUrl}}"],
+              "host": [
+                "{{baseUrl}}"
+              ],
               "path": [
                 "api",
                 "mobile",
@@ -404,7 +447,9 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/customers/{{customerId}}/wallet/transactions?approvedOnly=false",
-              "host": ["{{baseUrl}}"],
+              "host": [
+                "{{baseUrl}}"
+              ],
               "path": [
                 "api",
                 "mobile",
@@ -445,7 +490,9 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/customers/{{customerId}}/wallet/transactions",
-              "host": ["{{baseUrl}}"],
+              "host": [
+                "{{baseUrl}}"
+              ],
               "path": [
                 "api",
                 "mobile",
@@ -472,7 +519,9 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/customers/{{customerId}}/cars",
-              "host": ["{{baseUrl}}"],
+              "host": [
+                "{{baseUrl}}"
+              ],
               "path": [
                 "api",
                 "mobile",
@@ -506,7 +555,9 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/customers/{{customerId}}/cars",
-              "host": ["{{baseUrl}}"],
+              "host": [
+                "{{baseUrl}}"
+              ],
               "path": [
                 "api",
                 "mobile",
@@ -540,7 +591,9 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/customers/{{customerId}}/cars?linkId={{linkId}}",
-              "host": ["{{baseUrl}}"],
+              "host": [
+                "{{baseUrl}}"
+              ],
               "path": [
                 "api",
                 "mobile",
@@ -572,7 +625,9 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/customers/{{customerId}}/cars?linkId={{linkId}}",
-              "host": ["{{baseUrl}}"],
+              "host": [
+                "{{baseUrl}}"
+              ],
               "path": [
                 "api",
                 "mobile",
@@ -612,7 +667,9 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/customers/{{customerId}}/cars/select",
-              "host": ["{{baseUrl}}"],
+              "host": [
+                "{{baseUrl}}"
+              ],
               "path": [
                 "api",
                 "mobile",
@@ -639,7 +696,9 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/customers/{{customerId}}/leads",
-              "host": ["{{baseUrl}}"],
+              "host": [
+                "{{baseUrl}}"
+              ],
               "path": [
                 "api",
                 "mobile",
@@ -664,7 +723,9 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/customers/{{customerId}}/inspections",
-              "host": ["{{baseUrl}}"],
+              "host": [
+                "{{baseUrl}}"
+              ],
               "path": [
                 "api",
                 "mobile",
@@ -689,7 +750,9 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/customers/{{customerId}}/estimates",
-              "host": ["{{baseUrl}}"],
+              "host": [
+                "{{baseUrl}}"
+              ],
               "path": [
                 "api",
                 "mobile",
@@ -703,41 +766,40 @@
           }
         }
       ]
-        }
-        ,
+    },
+    {
+      "name": "Cars",
+      "item": [
         {
-          "name": "Cars",
-          "item": [
-            {
-              "name": "Car - Detail",
-              "request": {
-                "method": "GET",
-                "header": [
-                  {
-                    "key": "Authorization",
-                    "value": "Bearer {{accessToken}}"
-                  }
-                ],
-                "url": {
-                  "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/cars/{{carId}}",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "mobile",
-                    "company",
-                    "{{companyId}}",
-                    "cars",
-                    "{{carId}}"
-                  ]
-                }
-              },
-              "description": "Fetches the car record with its active customer links."
+          "name": "Car - Detail",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/cars/{{carId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "mobile",
+                "company",
+                "{{companyId}}",
+                "cars",
+                "{{carId}}"
+              ]
             }
-          ]
-        },
-        {
+          },
+          "description": "Fetches the car record with its active customer links."
+        }
+      ]
+    },
+    {
       "name": "Leads",
       "description": "Mobile lead endpoints for lists, the car-in dashboard, and detailed updates.",
       "item": [
@@ -879,6 +941,40 @@
           "description": "Updates lead status, assignment, and recovery info."
         }
       ]
+    },
+    {
+      "name": "Branch Workshop Dashboard",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/branches/{{branchId}}/workshop?status=pending",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "mobile",
+            "company",
+            "{{companyId}}",
+            "branches",
+            "{{branchId}}",
+            "workshop"
+          ],
+          "query": [
+            {
+              "key": "status",
+              "value": "pending"
+            }
+          ]
+        }
+      },
+      "description": "Branch-scoped workshop dashboard payload (branch, leads, inspections, jobCards, quotes)."
     }
   ],
   "variable": [
@@ -913,8 +1009,7 @@
     {
       "key": "carId",
       "value": ""
-    }
-    ,
+    },
     {
       "key": "leadId",
       "value": ""

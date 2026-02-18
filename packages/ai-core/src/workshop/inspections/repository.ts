@@ -70,6 +70,7 @@ function mapLineItemRow(row: any): InspectionLineItem {
     quantity: row.quantity,
     reason: row.reason,
     status: row.status,
+    approvedType: row.approved_type,
     mediaFileId: row.media_file_id,
     partOrdered: row.part_ordered,
     orderStatus: row.order_status,
@@ -354,13 +355,6 @@ export async function listInspectionLineItems(
         FROM line_items li
         INNER JOIN part_quotes pq ON pq.line_item_id = li.id
         WHERE li.id = ANY(${lineItemIds})
-        UNION ALL
-        SELECT
-          ei.inspection_item_id AS line_item_id,
-          pq.status
-        FROM estimate_items ei
-        INNER JOIN part_quotes pq ON pq.estimate_item_id = ei.id
-        WHERE ei.inspection_item_id = ANY(${lineItemIds})
       ) source
       GROUP BY source.line_item_id
     `;
@@ -427,6 +421,7 @@ export async function createInspectionLineItem(args: {
   quantity?: number | null;
   reason?: string | null;
   status?: LineItemStatus;
+  approvedType?: "oe" | "oem" | "aftm" | "used" | null;
   mediaFileId?: string | null;
 }): Promise<InspectionLineItem> {
   const sql = getSql();
@@ -444,6 +439,7 @@ export async function createInspectionLineItem(args: {
       quantity,
       reason,
       status,
+      approved_type,
       media_file_id
     ) VALUES (
       ${args.companyId},
@@ -458,6 +454,7 @@ export async function createInspectionLineItem(args: {
       ${args.quantity ?? 1},
       ${args.reason ?? null},
       ${args.status ?? "Pending"},
+      ${args.approvedType ?? null},
       ${args.mediaFileId ?? null}
     )
     RETURNING *
@@ -476,6 +473,7 @@ export async function updateInspectionLineItem(args: {
     quantity?: number | null;
     reason?: string | null;
     status?: LineItemStatus;
+    approvedType?: "oe" | "oem" | "aftm" | "used" | null;
     mediaFileId?: string | null;
   }>;
 }): Promise<InspectionLineItem | null> {
@@ -488,6 +486,7 @@ export async function updateInspectionLineItem(args: {
     quantity: args.patch.quantity,
     reason: args.patch.reason,
     status: args.patch.status,
+    approved_type: args.patch.approvedType,
     media_file_id: args.patch.mediaFileId,
   };
   const cleaned = Object.fromEntries(

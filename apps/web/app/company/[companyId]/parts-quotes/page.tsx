@@ -25,7 +25,8 @@ type QuoteRow = {
   carPlate?: string | null;
   carVin?: string | null;
   requestNumber?: string | null;
-  sourceType?: "inventory" | "estimate";
+  sourceType?: "inventory" | "line_item";
+  lineItemId?: string | null;
   inventoryRequestItemId?: string | null;
   oem?: number | null;
   oe?: number | null;
@@ -57,6 +58,11 @@ const pickQuote = (row: QuoteRow) => {
 };
 const isApprovedType = (row: QuoteRow, type: "oem" | "oe" | "aftm" | "used") =>
   String(row.approvedType ?? "").trim().toLowerCase() === type;
+const normalizeApprovedType = (value?: string | null): "oem" | "oe" | "aftm" | "used" | null => {
+  const v = String(value ?? "").trim().toLowerCase();
+  if (v === "oem" || v === "oe" || v === "aftm" || v === "used") return v;
+  return null;
+};
 
 const ORDERED_QUOTE_PO_KEY = "orderedQuotesPoDraft";
 
@@ -76,6 +82,7 @@ export default function PartsQuotesPage() {
   const [quotesModalOpen, setQuotesModalOpen] = useState(false);
   const [quotesModalTitle, setQuotesModalTitle] = useState("");
   const [quotesModalRows, setQuotesModalRows] = useState<QuoteRow[]>([]);
+  const [quotesModalApprovedType, setQuotesModalApprovedType] = useState<"oem" | "oe" | "aftm" | "used" | null>(null);
   const [orderDrafts, setOrderDrafts] = useState<
     Record<string, { oemQty: string; oeQty: string; aftmQty: string; usedQty: string }>
   >({});
@@ -156,16 +163,22 @@ export default function PartsQuotesPage() {
   };
 
   const openQuotesModal = (row: QuoteRow) => {
-    const key = row.sourceType === "inventory" ? row.inventoryRequestItemId : row.estimateItemId;
+    const key = row.sourceType === "inventory" ? row.inventoryRequestItemId : row.lineItemId;
     const related = key
       ? rows.filter((r) =>
           (row.sourceType === "inventory"
             ? r.inventoryRequestItemId === key
-            : r.estimateItemId === key)
+            : r.lineItemId === key)
         )
       : [row];
     setQuotesModalTitle(row.partName ?? "Quotes");
     setQuotesModalRows(related);
+    const resolvedApprovedType =
+      related
+        .map((r) => normalizeApprovedType(r.approvedType))
+        .find((v): v is "oem" | "oe" | "aftm" | "used" => Boolean(v)) ??
+      normalizeApprovedType(row.approvedType);
+    setQuotesModalApprovedType(resolvedApprovedType);
     setQuotesModalOpen(true);
     setOrderDrafts((prev) => {
       const next = { ...prev };
@@ -248,16 +261,6 @@ export default function PartsQuotesPage() {
     }
     return filteredRows.map((row, index) => {
       const statusLabel = row.estimateItemStatus ?? row.status ?? "pending";
-      const derivedStatus = statusLabel.toLowerCase();
-      const isApproved = derivedStatus === "approved";
-      const types = [
-        { name: "OEM", value: row.oem, etd: row.oemEtd },
-        { name: "OE", value: row.oe, etd: row.oeEtd },
-        { name: "AFTM", value: row.aftm, etd: row.aftmEtd },
-        { name: "Used", value: row.used, etd: row.usedEtd },
-      ];
-      const approvedTypeKey = row.approvedType?.toLowerCase() ?? "";
-      const approvedTypeEntry = types.find((type) => type.name.toLowerCase() === approvedTypeKey);
       const carLabel =
         row.sourceType === "inventory"
           ? row.requestNumber
@@ -334,6 +337,11 @@ export default function PartsQuotesPage() {
                 <div className="text-[11px] text-slate-400">
                   Compare vendor pricing and submit the exact quantities to order.
                 </div>
+                {quotesModalApprovedType ? (
+                  <div className="mt-2 inline-flex rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase text-emerald-300">
+                    Approved Type: {quotesModalApprovedType.toUpperCase()}
+                  </div>
+                ) : null}
               </div>
               <button
                 type="button"
@@ -376,7 +384,7 @@ export default function PartsQuotesPage() {
                             <div>
                               <div className="flex items-center gap-2">
                                 <div className="text-sm font-semibold">{r.oem} AED</div>
-                                {isApprovedType(r, "oem") && (
+                                {(isApprovedType(r, "oem") || quotesModalApprovedType === "oem") && (
                                   <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase text-emerald-300">
                                     Approved
                                   </span>
@@ -393,7 +401,7 @@ export default function PartsQuotesPage() {
                             <div>
                               <div className="flex items-center gap-2">
                                 <div className="text-sm font-semibold">{r.oe} AED</div>
-                                {isApprovedType(r, "oe") && (
+                                {(isApprovedType(r, "oe") || quotesModalApprovedType === "oe") && (
                                   <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase text-emerald-300">
                                     Approved
                                   </span>
@@ -410,7 +418,7 @@ export default function PartsQuotesPage() {
                             <div>
                               <div className="flex items-center gap-2">
                                 <div className="text-sm font-semibold">{r.aftm} AED</div>
-                                {isApprovedType(r, "aftm") && (
+                                {(isApprovedType(r, "aftm") || quotesModalApprovedType === "aftm") && (
                                   <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase text-emerald-300">
                                     Approved
                                   </span>
@@ -427,7 +435,7 @@ export default function PartsQuotesPage() {
                             <div>
                               <div className="flex items-center gap-2">
                                 <div className="text-sm font-semibold">{r.used} AED</div>
-                                {isApprovedType(r, "used") && (
+                                {(isApprovedType(r, "used") || quotesModalApprovedType === "used") && (
                                   <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase text-emerald-300">
                                     Approved
                                   </span>

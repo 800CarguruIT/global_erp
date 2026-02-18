@@ -53,6 +53,7 @@ export type InspectionItem = {
 export type LineItemStatus = "Pending" | "Approved" | "Inquiry" | "Rejected";
 export type OrderStatus = "Pending" | "Ordered" | "Received" | "Returned";
 export type LineItemSource = "inspection" | "estimate";
+export type LineItemApprovedType = "oe" | "oem" | "aftm" | "used";
 
 export type InspectionLineItem = {
   id: string;
@@ -68,6 +69,7 @@ export type InspectionLineItem = {
   quantity: number;
   reason?: string | null;
   status: LineItemStatus;
+  approvedType?: LineItemApprovedType | null;
   mediaFileId?: string | null;
   partOrdered?: number | null;
   orderStatus?: OrderStatus | null;

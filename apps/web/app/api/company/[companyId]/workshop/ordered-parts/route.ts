@@ -25,14 +25,6 @@ export async function GET(_req: Request, { params }: Params) {
         FROM line_items li
         INNER JOIN part_quotes pq ON pq.line_item_id = li.id
         WHERE li.company_id = ${companyId}
-        UNION ALL
-        SELECT
-          ei.inspection_item_id AS line_item_id,
-          pq.status
-        FROM estimate_items ei
-        INNER JOIN part_quotes pq ON pq.estimate_item_id = ei.id
-        INNER JOIN line_items li ON li.id = ei.inspection_item_id
-        WHERE li.company_id = ${companyId}
       ) source
       GROUP BY source.line_item_id
     )
@@ -70,18 +62,10 @@ export async function GET(_req: Request, { params }: Params) {
         v.name AS vendor_name,
         pq.status AS quote_status
       FROM part_quotes pq
-      LEFT JOIN estimate_items ei ON ei.id = pq.estimate_item_id
-      LEFT JOIN estimates est ON est.id = ei.estimate_id
       INNER JOIN vendors v ON v.id = pq.vendor_id
       WHERE
         pq.company_id = ${companyId}
-        AND (
-          pq.line_item_id = li.id
-          OR (
-            est.inspection_id = li.inspection_id
-            AND LOWER(COALESCE(ei.part_name, '')) = LOWER(COALESCE(li.product_name, ''))
-          )
-        )
+        AND pq.line_item_id = li.id
       ORDER BY pq.updated_at DESC
       LIMIT 1
     ) vendor_info ON TRUE
@@ -134,12 +118,7 @@ export async function PATCH(req: Request, { params }: Params) {
     },
         updated_at = NOW()
     WHERE company_id = ${companyId}
-      AND (
-        line_item_id = ${lineItemId}
-        OR estimate_item_id IN (
-          SELECT id FROM estimate_items WHERE inspection_item_id = ${lineItemId}
-        )
-      )
+      AND line_item_id = ${lineItemId}
   `;
 
   if (!rows.length) {

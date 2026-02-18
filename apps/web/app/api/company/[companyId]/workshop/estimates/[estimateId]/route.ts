@@ -91,6 +91,13 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       if (status === "inquiry") return "Inquiry";
       return "Pending";
     };
+    const normalizeApprovedType = (
+      value?: EstimateItemCostType | null
+    ): "oe" | "oem" | "aftm" | "used" | null => {
+      const v = String(value ?? "").trim().toLowerCase();
+      if (v === "oe" || v === "oem" || v === "aftm" || v === "used") return v;
+      return null;
+    };
     const mappedItems = [];
     for (const [idx, item] of items.entries()) {
       let inspectionItemId = item.inspectionItemId ?? null;
@@ -104,6 +111,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
               description: item.description ?? null,
               quantity: item.quantity ?? 1,
               status: mapStatus(item.status),
+              approvedType: normalizeApprovedType(item.approvedType ?? null),
             },
           });
           usedLineItemIds.add(inspectionItemId);
@@ -119,6 +127,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
                 description: item.description ?? null,
                 quantity: item.quantity ?? 1,
                 status: mapStatus(item.status),
+                approvedType: normalizeApprovedType(item.approvedType ?? null),
               },
             });
             usedLineItemIds.add(inspectionItemId);
@@ -133,6 +142,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
               description: item.description ?? null,
               quantity: item.quantity ?? 1,
               status: mapStatus(item.status),
+              approvedType: normalizeApprovedType(item.approvedType ?? null),
             });
             inspectionItemId = created.id;
             usedLineItemIds.add(inspectionItemId);
