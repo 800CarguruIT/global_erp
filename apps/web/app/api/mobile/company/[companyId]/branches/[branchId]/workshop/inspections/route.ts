@@ -44,7 +44,6 @@ export async function GET(req: NextRequest, { params }: Params) {
       leadBranchById.set(lead.id, lead.branchId ?? null);
     }
 
-    const scopedLeads = leads.filter((lead) => lead.branchId === branchId);
     const scopedInspections = inspections.filter((inspection) => {
       const leadBranchId = inspection.leadId
         ? (leadBranchById.get(inspection.leadId) ?? null)
@@ -88,64 +87,13 @@ export async function GET(req: NextRequest, { params }: Params) {
       branch,
     }));
 
-    const jobCards = await sql`
-      SELECT
-        jc.*,
-        e.inspection_id,
-        l.branch_id,
-        COALESCE(b.display_name, b.name, b.code) AS branch_name,
-        c.name AS customer_name,
-        c.phone AS customer_phone,
-        car.plate_number,
-        car.make,
-        car.model
-      FROM job_cards jc
-      LEFT JOIN estimates e ON e.id = jc.estimate_id
-      LEFT JOIN leads l ON l.id = jc.lead_id
-      LEFT JOIN branches b ON b.id = l.branch_id
-      LEFT JOIN inspections i ON i.id = e.inspection_id
-      LEFT JOIN customers c ON c.id = i.customer_id
-      LEFT JOIN cars car ON car.id = i.car_id
-      WHERE e.company_id = ${companyId}
-        AND l.branch_id = ${branchId}
-      ORDER BY jc.created_at DESC
-    `;
-
-    const quotes = await sql`
-      SELECT
-        id,
-        company_id,
-        estimate_id,
-        lead_id,
-        branch_id,
-        quote_type,
-        status,
-        currency,
-        total_amount,
-        eta_preset,
-        eta_hours,
-        remarks,
-        meta,
-        created_at,
-        updated_at
-      FROM workshop_quotes
-      WHERE company_id = ${companyId}
-        AND branch_id = ${branchId}
-      ORDER BY updated_at DESC
-    `;
-
-    return createMobileSuccessResponse({
-      branch,
-      leads: scopedLeads,
-      inspections: enrichedInspections,
-      jobCards,
-      quotes,
-    });
+    return createMobileSuccessResponse({ inspections: enrichedInspections });
   } catch (error) {
     console.error(
-      "GET /api/mobile/company/[companyId]/branches/[branchId]/workshop error:",
+      "GET /api/mobile/company/[companyId]/branches/[branchId]/workshop/inspections error:",
       error,
     );
     return handleMobileError(error);
   }
 }
+
