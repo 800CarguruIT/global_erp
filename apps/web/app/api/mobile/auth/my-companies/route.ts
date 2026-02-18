@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { getMobileUserIdFromRequest } from "../../../../../lib/auth/mobile-auth";
-import { buildMobileUserProfile } from "../../../../../lib/auth/mobile-user-profile";
+import { getUserContext } from "../../../../../lib/auth/user-context";
 import { createMobileErrorResponse, createMobileSuccessResponse } from "../../utils";
 
 export async function GET(req: NextRequest) {
@@ -9,11 +9,11 @@ export async function GET(req: NextRequest) {
     return createMobileErrorResponse("Unauthorized", 401);
   }
 
-  const user = await buildMobileUserProfile(userId);
-
+  const context = await getUserContext(userId);
   return createMobileSuccessResponse({
-    userId,
-    user,
-    redirect: user?.dashboard?.path ?? null,
+    isGlobal: context.isGlobal,
+    scope: context.scope,
+    companies: context.companies,
+    primaryCompany: context.companies?.[0] ?? null,
   });
 }
