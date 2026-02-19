@@ -975,6 +975,344 @@
         }
       },
       "description": "Branch-scoped workshop dashboard payload (branch, leads, inspections, jobCards, quotes)."
+    },
+    {
+      "name": "Workshop - Dashboard (Mobile)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/workshop/dashboard?branchId={{branchId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "mobile",
+            "company",
+            "{{companyId}}",
+            "workshop",
+            "dashboard"
+          ],
+          "query": [
+            {
+              "key": "branchId",
+              "value": "{{branchId}}"
+            }
+          ]
+        }
+      },
+      "description": "Combined workshop payload for mobile: leads, inspections, jobCards, quotes (optional branch filter)."
+    },
+    {
+      "name": "Workshop - Quotes (Mobile)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/workshop/quotes?type=branch_labor&status=pending&branchId={{branchId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "mobile",
+            "company",
+            "{{companyId}}",
+            "workshop",
+            "quotes"
+          ],
+          "query": [
+            {
+              "key": "type",
+              "value": "branch_labor"
+            },
+            {
+              "key": "status",
+              "value": "pending"
+            },
+            {
+              "key": "branchId",
+              "value": "{{branchId}}"
+            }
+          ]
+        }
+      },
+      "description": "List workshop quotes for mobile. Supports type/status/branchId filters."
+    },
+    {
+      "name": "Workshop - Quote Detail (Mobile)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/workshop/quotes/{{quoteId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "mobile",
+            "company",
+            "{{companyId}}",
+            "workshop",
+            "quotes",
+            "{{quoteId}}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Workshop - Quote Update (Mobile)",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"workflowAction\": \"accepted\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/workshop/quotes/{{quoteId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "mobile",
+            "company",
+            "{{companyId}}",
+            "workshop",
+            "quotes",
+            "{{quoteId}}"
+          ]
+        }
+      },
+      "description": "Update workshop quote state (accepted/negotiation/rejected) or patch pricing payload."
+    },
+    {
+      "name": "Branch Workshop Dashboard v2 (Mobile)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/branches/{{branchId}}/workshop/dashboard?status=pending",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "mobile",
+            "company",
+            "{{companyId}}",
+            "branches",
+            "{{branchId}}",
+            "workshop",
+            "dashboard"
+          ],
+          "query": [
+            {
+              "key": "status",
+              "value": "pending"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Branch Workshop Quotes - Create (Mobile)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"type\": \"branch_labor\",\n  \"estimateId\": \"{{estimateId}}\",\n  \"totalAmount\": 250,\n  \"etaPreset\": \"same_day\",\n  \"etaHours\": 3,\n  \"remarks\": \"Branch labor quote\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/branches/{{branchId}}/workshop/quotes",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "mobile",
+            "company",
+            "{{companyId}}",
+            "branches",
+            "{{branchId}}",
+            "workshop",
+            "quotes"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Branch Workshop Quote - Detail (Mobile)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/branches/{{branchId}}/workshop/quotes/{{quoteId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "mobile",
+            "company",
+            "{{companyId}}",
+            "branches",
+            "{{branchId}}",
+            "workshop",
+            "quotes",
+            "{{quoteId}}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Branch Workshop Quote - Update (Mobile)",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"workflowAction\": \"accepted\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/branches/{{branchId}}/workshop/quotes/{{quoteId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "mobile",
+            "company",
+            "{{companyId}}",
+            "branches",
+            "{{branchId}}",
+            "workshop",
+            "quotes",
+            "{{quoteId}}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Branch Workshop Inspection - Detail (Mobile)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/branches/{{branchId}}/workshop/inspections/{{inspectionId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "mobile",
+            "company",
+            "{{companyId}}",
+            "branches",
+            "{{branchId}}",
+            "workshop",
+            "inspections",
+            "{{inspectionId}}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Branch Workshop Inspection - Line Items (Mobile)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/branches/{{branchId}}/workshop/inspections/{{inspectionId}}/line-items?source=inspection",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "mobile",
+            "company",
+            "{{companyId}}",
+            "branches",
+            "{{branchId}}",
+            "workshop",
+            "inspections",
+            "{{inspectionId}}",
+            "line-items"
+          ],
+          "query": [
+            {
+              "key": "source",
+              "value": "inspection"
+            }
+          ]
+        }
+      }
     }
   ],
   "variable": [

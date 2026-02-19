@@ -33,6 +33,7 @@ export async function GET(req: NextRequest, { params }: Params) {
 
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status") as InspectionStatus | null;
+    const q = searchParams.get("q")?.trim().toLowerCase() ?? "";
 
     const [leads, inspections] = await Promise.all([
       listLeadsForCompany(companyId),
@@ -87,7 +88,33 @@ export async function GET(req: NextRequest, { params }: Params) {
       branch,
     }));
 
-    return createMobileSuccessResponse({ inspections: enrichedInspections });
+    const filtered = !q
+      ? enrichedInspections
+      : enrichedInspections.filter((inspection) => {
+          const branchLabel = inspection?.branch
+            ? (inspection.branch.display_name ??
+              inspection.branch.name ??
+              inspection.branch.code ??
+              "")
+            : "";
+          const haystack = [
+            inspection.id,
+            inspection.status,
+            inspection.car?.plate_number,
+            inspection.car?.make,
+            inspection.car?.model,
+            inspection.customer?.name,
+            inspection.customer?.phone,
+            inspection.customer?.email,
+            branchLabel,
+          ]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase();
+          return haystack.includes(q);
+        });
+
+    return createMobileSuccessResponse({ inspections: filtered });
   } catch (error) {
     console.error(
       "GET /api/mobile/company/[companyId]/branches/[branchId]/workshop/inspections error:",
@@ -96,4 +123,3 @@ export async function GET(req: NextRequest, { params }: Params) {
     return handleMobileError(error);
   }
 }
-

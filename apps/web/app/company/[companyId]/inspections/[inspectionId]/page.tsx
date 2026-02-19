@@ -940,7 +940,7 @@ export function InspectionDetailPageClient({
                         carInDropzone.isDragActive ? "border-cyan-400 bg-cyan-500/10 text-cyan-200" : "border-white/20 text-white/70 hover:bg-white/5"
                       }`}
                     >
-                      <input {...carInDropzone.getInputProps()} />
+                      {/* <input {...carInDropzone.getInputProps()} /> */}
                       {videoUploading === "in"
                         ? `Uploading... ${videoUploadProgress.in}%`
                         : "Drop video here or click to upload"}

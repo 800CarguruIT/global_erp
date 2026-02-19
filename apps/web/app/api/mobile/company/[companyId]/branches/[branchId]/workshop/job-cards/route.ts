@@ -18,6 +18,7 @@ export async function GET(req: NextRequest, { params }: Params) {
 
     const { searchParams } = new URL(req.url);
     const estimateId = searchParams.get("estimateId");
+    const q = searchParams.get("q")?.trim().toLowerCase() ?? "";
     const includeAll =
       searchParams.get("all") === "1" || searchParams.get("all") === "true";
 
@@ -56,7 +57,26 @@ export async function GET(req: NextRequest, { params }: Params) {
         ORDER BY jc.created_at DESC
       `;
 
-      return createMobileSuccessResponse({ jobCards: rows });
+      const filtered = !q
+        ? rows
+        : rows.filter((row: any) => {
+            const haystack = [
+              row?.id,
+              row?.status,
+              row?.branch_name,
+              row?.customer_name,
+              row?.customer_phone,
+              row?.plate_number,
+              row?.make,
+              row?.model,
+            ]
+              .filter(Boolean)
+              .join(" ")
+              .toLowerCase();
+            return haystack.includes(q);
+          });
+
+      return createMobileSuccessResponse({ jobCards: filtered });
     }
 
     if (includeAll) {
@@ -95,4 +115,3 @@ export async function GET(req: NextRequest, { params }: Params) {
     return handleMobileError(error);
   }
 }
-
