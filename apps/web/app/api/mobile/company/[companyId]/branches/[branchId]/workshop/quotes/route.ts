@@ -30,6 +30,11 @@ export async function GET(req: NextRequest, { params }: Params) {
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status");
     const quoteType = searchParams.get("quoteType");
+    const normalizedQuoteType = (quoteType ?? "").trim().toLowerCase();
+
+    if (normalizedQuoteType && normalizedQuoteType !== "branch_labor") {
+      return createMobileSuccessResponse({ quotes: [] });
+    }
 
     const quotes = await sql`
       SELECT
@@ -38,7 +43,7 @@ export async function GET(req: NextRequest, { params }: Params) {
         estimate_id,
         lead_id,
         branch_id,
-        quote_type,
+        'branch_labor'::text AS quote_type,
         status,
         currency,
         total_amount,
@@ -52,7 +57,6 @@ export async function GET(req: NextRequest, { params }: Params) {
       WHERE company_id = ${companyId}
         AND branch_id = ${branchId}
         ${status ? sql`AND status = ${status}` : sql``}
-        ${quoteType ? sql`AND quote_type = ${quoteType}` : sql``}
       ORDER BY updated_at DESC
     `;
 
@@ -65,4 +69,3 @@ export async function GET(req: NextRequest, { params }: Params) {
     return handleMobileError(error);
   }
 }
-
