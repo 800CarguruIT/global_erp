@@ -109,6 +109,7 @@ export async function ensurePartCatalogItem(
   meta?: { category?: string | null; subcategory?: string | null; unit?: string | null }
 ): Promise<PartCatalogItem> {
   const sql = getSql();
+  const normalizedDescription = (description ?? "").trim() || null;
   const existing = await sql`
     SELECT * FROM parts_catalog
     WHERE company_id = ${companyId} AND part_number = ${partNumber} AND brand = ${brand}
@@ -122,11 +123,19 @@ export async function ensurePartCatalogItem(
         SET
           category = COALESCE(${meta.category ?? null}, category),
           subcategory = COALESCE(${meta.subcategory ?? null}, subcategory),
-          unit = COALESCE(${meta.unit ?? null}, unit)
+          unit = COALESCE(${meta.unit ?? null}, unit),
+          description = COALESCE(NULLIF(description, ''), ${normalizedDescription})
+        WHERE id = ${row.id}
+      `;
+    } else if (normalizedDescription) {
+      await sql`
+        UPDATE parts_catalog
+        SET description = COALESCE(NULLIF(description, ''), ${normalizedDescription})
         WHERE id = ${row.id}
       `;
     }
-    return mapCatalogRow(row);
+    const refreshed = await sql`SELECT * FROM parts_catalog WHERE id = ${row.id} LIMIT 1`;
+    return mapCatalogRow(refreshed[0] ?? row);
   }
 
   const sku = `P-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
@@ -148,7 +157,7 @@ export async function ensurePartCatalogItem(
       ${partNumber},
       ${brand},
       ${sku},
-      ${description ?? null},
+      ${normalizedDescription},
       ${qrCode},
       ${meta?.category ?? null},
       ${meta?.subcategory ?? null},
@@ -173,7 +182,8 @@ export async function receivePartsForEstimateItem(
 ): Promise<{ grnNumber: string; part: PartCatalogItem }> {
   const sql = getSql();
   const { partNumber, brand, description, quantity } = payload;
-  const part = await ensurePartCatalogItem(companyId, partNumber, brand, description);
+  const resolvedDescription = (description ?? "").trim() || `Received part ${partNumber}`;
+  const part = await ensurePartCatalogItem(companyId, partNumber, brand, resolvedDescription);
 
   const grnNumber = `GRN-${new Date().toISOString().slice(0, 10)}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 
@@ -198,7 +208,7 @@ export async function receivePartsForEstimateItem(
       ${"receipt"},
       ${estimateItemId},
       ${grnNumber},
-      ${description ?? null},
+      ${resolvedDescription},
       ${payload.purchaseOrderId ?? null}
     )
   `;
@@ -263,7 +273,7 @@ export async function receivePartsForInventoryRequestItem(
     companyId,
     partNumber,
     brand,
-    item.description ?? item.part_name ?? null,
+    (String(item.description ?? "").trim() || String(item.part_name ?? "").trim() || `Received part ${partNumber}`),
     {
       category: item.category ?? null,
       subcategory: item.subcategory ?? null,

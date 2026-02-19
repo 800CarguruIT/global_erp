@@ -403,7 +403,7 @@ export async function listStock(
         COALESCE(sc.name, sc_code.name, pc.subcategory) AS subcategory,
         COALESCE(cat.code, cat_code.code) AS category_code,
         COALESCE(sc.code, sc_code.code) AS subcategory_code,
-        COALESCE(it.code, NULLIF(split_part(pc.part_number, '-', 1), '')) AS part_type,
+        COALESCE(it.code, it_code.code, '-') AS part_type,
         loc.id AS location_id,
         st.location_code,
         loc.name AS location_name,

@@ -255,6 +255,7 @@ async function upsertInventoryStockFallback(params: {
 }
 
 async function ensureEntityAccountByCode(params: {
+  companyId: string;
   entityId: string;
   code: string;
   name: string;
@@ -262,38 +263,249 @@ async function ensureEntityAccountByCode(params: {
   normalBalance: "debit" | "credit";
 }): Promise<string> {
   const sql = getSql();
+  const resolveExisting = async () => {
+    const rows = await sql/* sql */ `
+      SELECT id
+      FROM accounting_accounts
+      WHERE
+        (
+          company_id = ${params.companyId}
+          AND (account_code = ${params.code} OR code = ${params.code})
+        )
+        OR (
+          entity_id = ${params.entityId}
+          AND (account_code = ${params.code} OR code = ${params.code})
+        )
+      ORDER BY
+        (company_id = ${params.companyId}) DESC,
+        (entity_id = ${params.entityId}) DESC,
+        updated_at DESC
+      LIMIT 1
+    `;
+    return (rows[0]?.id as string | undefined) ?? null;
+  };
+
+  const reportableInEntity = await sql/* sql */ `
+    SELECT id
+    FROM accounting_accounts
+    WHERE entity_id = ${params.entityId}
+      AND company_id = ${params.companyId}
+      AND (code = ${params.code} OR account_code = ${params.code})
+    LIMIT 1
+  `;
+  if (reportableInEntity.length) return reportableInEntity[0].id as string;
+
+  const templateByCompanyCode = await sql/* sql */ `
+    SELECT
+      heading_id,
+      subheading_id,
+      group_id,
+      COALESCE(NULLIF(account_code, ''), NULLIF(code, ''), ${params.code}) AS code,
+      COALESCE(NULLIF(account_name, ''), NULLIF(name, ''), ${params.name}) AS name,
+      COALESCE(type, ${params.type}) AS type,
+      COALESCE(normal_balance, ${params.normalBalance}) AS normal_balance
+    FROM accounting_accounts
+    WHERE company_id = ${params.companyId}
+      AND (account_code = ${params.code} OR code = ${params.code})
+    ORDER BY (entity_id = ${params.entityId}) DESC, updated_at DESC
+    LIMIT 1
+  `;
+
+  const templateFromGroupCode = templateByCompanyCode.length
+    ? null
+    : await sql/* sql */ `
+      SELECT
+        g.heading_id,
+        g.subheading_id,
+        g.id AS group_id
+      FROM accounting_groups g
+      WHERE g.company_id = ${params.companyId}
+        AND g.group_code = ${params.code.slice(0, 4)}
+      LIMIT 1
+    `;
+
+  const headingId =
+    (templateByCompanyCode[0]?.heading_id as string | undefined) ??
+    (templateFromGroupCode?.[0]?.heading_id as string | undefined) ??
+    null;
+  const subheadingId =
+    (templateByCompanyCode[0]?.subheading_id as string | undefined) ??
+    (templateFromGroupCode?.[0]?.subheading_id as string | undefined) ??
+    null;
+  const groupId =
+    (templateByCompanyCode[0]?.group_id as string | undefined) ??
+    (templateFromGroupCode?.[0]?.group_id as string | undefined) ??
+    null;
+  const resolvedCode = (templateByCompanyCode[0]?.code as string | undefined) ?? params.code;
+  const resolvedName = (templateByCompanyCode[0]?.name as string | undefined) ?? params.name;
+  const resolvedType = (templateByCompanyCode[0]?.type as string | undefined) ?? params.type;
+  const resolvedNormalBalance =
+    ((templateByCompanyCode[0]?.normal_balance as "debit" | "credit" | undefined) ?? params.normalBalance);
+
   const found = await sql/* sql */ `
     SELECT id
     FROM accounting_accounts
     WHERE entity_id = ${params.entityId}
-      AND code = ${params.code}
+      AND (code = ${resolvedCode} OR account_code = ${resolvedCode})
     LIMIT 1
   `;
-  if (found.length) return found[0].id as string;
-  const created = await sql/* sql */ `
-    INSERT INTO accounting_accounts (
-      entity_id,
-      code,
-      name,
-      type,
-      normal_balance,
-      is_leaf,
-      is_active
-    ) VALUES (
-      ${params.entityId},
-      ${params.code},
-      ${params.name},
-      ${params.type},
-      ${params.normalBalance},
-      TRUE,
-      TRUE
-    )
-    RETURNING id
+  if (found.length && headingId && subheadingId && groupId) {
+    try {
+      const promoted = await sql/* sql */ `
+        UPDATE accounting_accounts
+        SET
+          company_id = COALESCE(company_id, ${params.companyId}),
+          heading_id = COALESCE(heading_id, ${headingId}),
+          subheading_id = COALESCE(subheading_id, ${subheadingId}),
+          group_id = COALESCE(group_id, ${groupId}),
+          account_code = COALESCE(NULLIF(account_code, ''), ${resolvedCode}),
+          account_name = COALESCE(NULLIF(account_name, ''), ${resolvedName}),
+          code = COALESCE(NULLIF(code, ''), ${resolvedCode}),
+          name = COALESCE(NULLIF(name, ''), ${resolvedName}),
+          type = COALESCE(type, ${resolvedType}),
+          normal_balance = COALESCE(normal_balance, ${resolvedNormalBalance}),
+          is_leaf = TRUE,
+          is_active = TRUE
+        WHERE id = ${found[0].id}
+        RETURNING id
+      `;
+      if (promoted.length) return promoted[0].id as string;
+    } catch (error: any) {
+      if (String(error?.code) === "23505") {
+        const existing = await resolveExisting();
+        if (existing) return existing;
+      }
+      throw error;
+    }
+  } else if (found.length) {
+    return found[0].id as string;
+  }
+
+  const existingByCompany = await sql/* sql */ `
+    SELECT id
+    FROM accounting_accounts
+    WHERE company_id = ${params.companyId}
+      AND (account_code = ${resolvedCode} OR code = ${resolvedCode})
+    ORDER BY (entity_id = ${params.entityId}) DESC, updated_at DESC
+    LIMIT 1
   `;
-  return created[0].id as string;
+  if (existingByCompany.length) {
+    return existingByCompany[0].id as string;
+  }
+
+  if (groupId) {
+    const existingByGroup = await sql/* sql */ `
+      SELECT id
+      FROM accounting_accounts
+      WHERE group_id = ${groupId}
+        AND (account_code = ${resolvedCode} OR code = ${resolvedCode})
+      ORDER BY updated_at DESC
+      LIMIT 1
+    `;
+    if (existingByGroup.length) {
+      try {
+        const normalized = await sql/* sql */ `
+          UPDATE accounting_accounts
+          SET
+            company_id = COALESCE(company_id, ${params.companyId}),
+            heading_id = COALESCE(heading_id, ${headingId}),
+            subheading_id = COALESCE(subheading_id, ${subheadingId}),
+            group_id = COALESCE(group_id, ${groupId}),
+            account_code = COALESCE(NULLIF(account_code, ''), ${resolvedCode}),
+            account_name = COALESCE(NULLIF(account_name, ''), ${resolvedName}),
+            code = COALESCE(NULLIF(code, ''), ${resolvedCode}),
+            name = COALESCE(NULLIF(name, ''), ${resolvedName}),
+            type = COALESCE(type, ${resolvedType}),
+            normal_balance = COALESCE(normal_balance, ${resolvedNormalBalance}),
+            is_leaf = TRUE,
+            is_active = TRUE
+          WHERE id = ${existingByGroup[0].id}
+          RETURNING id
+        `;
+        if (normalized.length) return normalized[0].id as string;
+      } catch (error: any) {
+        if (String(error?.code) === "23505") {
+          const existing = await resolveExisting();
+          if (existing) return existing;
+        }
+        throw error;
+      }
+    }
+  }
+
+  let created: any[] = [];
+  try {
+    created = await sql/* sql */ `
+      INSERT INTO accounting_accounts (
+        entity_id,
+        heading_id,
+        subheading_id,
+        group_id,
+        company_id,
+        account_code,
+        account_name,
+        code,
+        name,
+        type,
+        normal_balance,
+        is_leaf,
+        is_active
+      ) VALUES (
+        ${params.entityId},
+        ${headingId},
+        ${subheadingId},
+        ${groupId},
+        ${params.companyId},
+        ${resolvedCode},
+        ${resolvedName},
+        ${resolvedCode},
+        ${resolvedName},
+        ${resolvedType},
+        ${resolvedNormalBalance},
+        TRUE,
+        TRUE
+      )
+      ON CONFLICT DO NOTHING
+      RETURNING id
+    `;
+  } catch (error: any) {
+    if (String(error?.code) === "23505") {
+      const existing = await resolveExisting();
+      if (existing) return existing;
+    }
+    throw error;
+  }
+  if (created.length) return created[0].id as string;
+
+  const afterConflict = await sql/* sql */ `
+    SELECT id
+    FROM accounting_accounts
+    WHERE
+      (
+        company_id = ${params.companyId}
+        AND (account_code = ${resolvedCode} OR code = ${resolvedCode})
+      )
+      OR (
+        group_id = ${groupId}
+        AND (account_code = ${resolvedCode} OR code = ${resolvedCode})
+      )
+      OR (
+        entity_id = ${params.entityId}
+        AND (account_code = ${resolvedCode} OR code = ${resolvedCode})
+      )
+    ORDER BY
+      (company_id = ${params.companyId}) DESC,
+      (entity_id = ${params.entityId}) DESC,
+      updated_at DESC
+    LIMIT 1
+  `;
+  if (afterConflict.length) return afterConflict[0].id as string;
+
+  throw new Error(`Unable to resolve accounting account for code ${resolvedCode}`);
 }
 
 async function resolveAccountInEntity(params: {
+  companyId: string;
   entityId: string;
   accountId?: string | null;
   fallbackCode: string;
@@ -311,10 +523,29 @@ async function resolveAccountInEntity(params: {
         AND entity_id = ${params.entityId}
       LIMIT 1
     `;
-    if (sameEntity.length) return sameEntity[0].id as string;
+    if (sameEntity.length) {
+      const normalized = await sql/* sql */ `
+        SELECT COALESCE(NULLIF(account_code, ''), NULLIF(code, ''), ${params.fallbackCode}) AS code
+        FROM accounting_accounts
+        WHERE id = ${sameEntity[0].id}
+        LIMIT 1
+      `;
+      return ensureEntityAccountByCode({
+        companyId: params.companyId,
+        entityId: params.entityId,
+        code: (normalized[0]?.code as string | undefined) ?? params.fallbackCode,
+        name: params.fallbackName,
+        type: params.fallbackType,
+        normalBalance: params.fallbackNormalBalance,
+      });
+    }
 
     const srcRows = await sql/* sql */ `
-      SELECT code, name, type, normal_balance
+      SELECT
+        COALESCE(NULLIF(account_code, ''), NULLIF(code, ''), ${params.fallbackCode}) AS code,
+        COALESCE(NULLIF(account_name, ''), NULLIF(name, ''), ${params.fallbackName}) AS name,
+        type,
+        normal_balance
       FROM accounting_accounts
       WHERE id = ${params.accountId}
       LIMIT 1
@@ -324,6 +555,7 @@ async function resolveAccountInEntity(params: {
       | undefined;
     if (src?.code) {
       return ensureEntityAccountByCode({
+        companyId: params.companyId,
         entityId: params.entityId,
         code: src.code,
         name: src.name ?? params.fallbackName,
@@ -334,6 +566,7 @@ async function resolveAccountInEntity(params: {
   }
 
   return ensureEntityAccountByCode({
+    companyId: params.companyId,
     entityId: params.entityId,
     code: params.fallbackCode,
     name: params.fallbackName,
@@ -347,10 +580,55 @@ async function ensureGrnAccounts(companyId: string): Promise<{
   inventoryAccountId: string;
   apControlAccountId: string;
 }> {
+  async function remapGrnAccountToCompanyScoped(params: {
+    companyId: string;
+    entityId: string;
+    accountId: string;
+  }): Promise<string> {
+    const sql = getSql();
+    const currentRows = await sql/* sql */ `
+      SELECT
+        id,
+        COALESCE(NULLIF(account_code, ''), NULLIF(code, '')) AS code
+      FROM accounting_accounts
+      WHERE id = ${params.accountId}
+      LIMIT 1
+    `;
+    const current = currentRows[0] as { id?: string; code?: string | null } | undefined;
+    const currentCode = (current?.code ?? "").trim();
+    if (!current?.id || !currentCode) return params.accountId;
+
+    const companyRows = await sql/* sql */ `
+      SELECT id
+      FROM accounting_accounts
+      WHERE company_id = ${params.companyId}
+        AND (account_code = ${currentCode} OR code = ${currentCode})
+      ORDER BY (entity_id = ${params.entityId}) DESC, updated_at DESC
+      LIMIT 1
+    `;
+    const companyAccountId = (companyRows[0]?.id as string | undefined) ?? null;
+    if (!companyAccountId || companyAccountId === params.accountId) return params.accountId;
+
+    await sql/* sql */ `
+      UPDATE accounting_journal_lines jl
+      SET account_id = ${companyAccountId}
+      FROM accounting_journals j
+      WHERE jl.journal_id = j.id
+        AND jl.account_id = ${params.accountId}
+        AND jl.entity_id = ${params.entityId}
+        AND j.entity_id = ${params.entityId}
+        AND j.company_id = ${params.companyId}
+        AND j.journal_type = 'grn_receipt'
+    `;
+
+    return companyAccountId;
+  }
+
   const entityId = await resolveEntityId("company", companyId);
   const settings = await getCompanySettings(companyId);
 
-  const inventoryAccountId = await resolveAccountInEntity({
+  let inventoryAccountId = await resolveAccountInEntity({
+    companyId,
     entityId,
     accountId: settings?.inventoryAccountId ?? null,
     fallbackCode: "1300",
@@ -359,13 +637,25 @@ async function ensureGrnAccounts(companyId: string): Promise<{
     fallbackNormalBalance: "debit",
   });
 
-  const apControlAccountId = await resolveAccountInEntity({
+  let apControlAccountId = await resolveAccountInEntity({
+    companyId,
     entityId,
     accountId: settings?.apControlAccountId ?? null,
     fallbackCode: "2000",
     fallbackName: "Accounts Payable",
     fallbackType: "liability",
     fallbackNormalBalance: "credit",
+  });
+
+  inventoryAccountId = await remapGrnAccountToCompanyScoped({
+    companyId,
+    entityId,
+    accountId: inventoryAccountId,
+  });
+  apControlAccountId = await remapGrnAccountToCompanyScoped({
+    companyId,
+    entityId,
+    accountId: apControlAccountId,
   });
 
   if (
@@ -1212,7 +1502,7 @@ export async function reconcilePoGrn(
       let sourceId: string | null = resolvedEstimateItemId ?? item.inventoryRequestItemId ?? null;
       let partNumber = "";
       let brand = "";
-      let description = item.description ?? item.name ?? "PO receipt reconcile";
+      let description = (item.description ?? "").trim() || item.name || "PO receipt reconcile";
 
       if (resolvedEstimateItemId) {
         const estRows = await sql/* sql */ `
@@ -1224,7 +1514,7 @@ export async function reconcilePoGrn(
         const est = estRows[0];
         partNumber = String(est?.part_number ?? est?.part_sku ?? "").trim();
         brand = String(est?.part_brand ?? "").trim();
-        description = String(est?.part_name ?? description);
+        description = String(est?.part_name ?? "").trim() || description;
       } else if (item.inventoryRequestItemId) {
         const reqRows = await sql/* sql */ `
           SELECT part_number, part_brand, part_name, description
@@ -1235,7 +1525,7 @@ export async function reconcilePoGrn(
         const req = reqRows[0];
         partNumber = String(req?.part_number ?? "").trim();
         brand = String(req?.part_brand ?? "").trim();
-        description = String(req?.description ?? req?.part_name ?? description);
+        description = String(req?.description ?? "").trim() || String(req?.part_name ?? "").trim() || description;
       }
 
       const catalog = await ensurePartCatalogItem(

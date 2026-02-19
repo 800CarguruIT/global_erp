@@ -121,39 +121,16 @@ export function BranchWorkshopDashboard({
   const [quoteEtaHours, setQuoteEtaHours] = useState("");
   const [isSubmittingQuote, setIsSubmittingQuote] = useState(false);
   const [quoteModalError, setQuoteModalError] = useState<string | null>(null);
+  const [loadedResources, setLoadedResources] = useState({
+    jobCards: false,
+    inspections: false,
+    leads: false,
+    quotes: false,
+  });
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    const controller = new AbortController();
-    let cancelled = false;
-
-    (async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const [jobCardsRes, inspectionsRes, leadsRes, quotesRes] = await Promise.all([
-          fetch(`/api/company/${companyId}/workshop/job-cards`, { signal: controller.signal }),
-          fetch(`/api/company/${companyId}/workshop/inspections`, { signal: controller.signal }),
-          fetch(`/api/company/${companyId}/sales/leads`, { signal: controller.signal }),
-          fetch(`/api/company/${companyId}/workshop/quotes`, { signal: controller.signal }),
-        ]);
-        if (!jobCardsRes.ok) throw new Error(`Job cards HTTP ${jobCardsRes.status}`);
-        if (!inspectionsRes.ok) throw new Error(`Inspections HTTP ${inspectionsRes.status}`);
-        if (!leadsRes.ok) throw new Error(`Leads HTTP ${leadsRes.status}`);
-        if (!quotesRes.ok) throw new Error(`Quotes HTTP ${quotesRes.status}`);
-
-        const [jobCardsJson, inspectionsJson, leadsJson, quotesJson] = await Promise.all([
-          jobCardsRes.json(),
-          inspectionsRes.json(),
-          leadsRes.json(),
-          quotesRes.json(),
-        ]);
-
-        const jobCardRows = (jobCardsJson.data ?? []) as Array<Record<string, unknown>>;
-        const inspectionRows = (inspectionsJson.data ?? []) as Array<Record<string, unknown>>;
-        const leadRows = (leadsJson.data ?? []) as Array<Record<string, unknown>>;
-        const quoteRows = (quotesJson.data ?? []) as Array<Record<string, unknown>>;
-
-        const normalizedJobCards: JobCardRow[] = jobCardRows.map((row) => ({
+  const normalizeJobCards = (jobCardRows: Array<Record<string, unknown>>): JobCardRow[] =>
+    jobCardRows.map((row) => ({
           id: typeof row.id === "string" ? row.id : "",
           make: typeof row.make === "string" ? row.make : null,
           model: typeof row.model === "string" ? row.model : null,
@@ -196,7 +173,8 @@ export function BranchWorkshopDashboard({
               : null,
         }));
 
-        const normalizedInspections: InspectionRow[] = inspectionRows.map((row) => ({
+  const normalizeInspections = (inspectionRows: Array<Record<string, unknown>>): InspectionRow[] =>
+    inspectionRows.map((row) => ({
           id: typeof row.id === "string" ? row.id : "",
           leadId:
             typeof row.leadId === "string"
@@ -239,7 +217,8 @@ export function BranchWorkshopDashboard({
           customer: (row.customer as InspectionRow["customer"]) ?? null,
         }));
 
-        const normalizedLeads: LeadRow[] = leadRows.map((row) => ({
+  const normalizeLeads = (leadRows: Array<Record<string, unknown>>): LeadRow[] =>
+    leadRows.map((row) => ({
           id: typeof row.id === "string" ? row.id : "",
           branchId:
             typeof row.branchId === "string"
@@ -249,9 +228,10 @@ export function BranchWorkshopDashboard({
               : null,
         }));
 
-        const normalizedQuotes: QuoteRow[] = quoteRows.map((row) => {
-          const meta = row.meta as Record<string, unknown> | null;
-          return {
+  const normalizeQuotes = (quoteRows: Array<Record<string, unknown>>): QuoteRow[] =>
+    quoteRows.map((row) => {
+      const meta = row.meta as Record<string, unknown> | null;
+      return {
             id: typeof row.id === "string" ? row.id : "",
             quoteType:
               typeof row.quoteType === "string"
@@ -294,30 +274,93 @@ export function BranchWorkshopDashboard({
                 ? Number(meta.estimatedHours)
                 : null,
           };
-        });
+    });
 
-        if (!cancelled) {
-          setJobCards(normalizedJobCards.filter((row) => row.id));
-          setInspections(normalizedInspections.filter((row) => row.id));
-          setLeads(normalizedLeads.filter((row) => row.id));
-          setQuotes(normalizedQuotes.filter((row) => row.id));
-        }
-      } catch {
-        if (!cancelled) {
-          setError("Failed to load workshop data.");
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    })();
+  const fetchJobCards = async () => {
+    const res = await fetch(`/api/company/${companyId}/workshop/job-cards`);
+    if (!res.ok) throw new Error(`Job cards HTTP ${res.status}`);
+    const json = await res.json();
+    const rows = (json.data ?? []) as Array<Record<string, unknown>>;
+    setJobCards(normalizeJobCards(rows).filter((row) => row.id));
+  };
 
-    return () => {
-      cancelled = true;
-      controller.abort();
-    };
+  const fetchInspections = async () => {
+    const res = await fetch(`/api/company/${companyId}/workshop/inspections`);
+    if (!res.ok) throw new Error(`Inspections HTTP ${res.status}`);
+    const json = await res.json();
+    const rows = (json.data ?? []) as Array<Record<string, unknown>>;
+    setInspections(normalizeInspections(rows).filter((row) => row.id));
+  };
+
+  const fetchLeads = async () => {
+    const res = await fetch(`/api/company/${companyId}/sales/leads`);
+    if (!res.ok) throw new Error(`Leads HTTP ${res.status}`);
+    const json = await res.json();
+    const rows = (json.data ?? []) as Array<Record<string, unknown>>;
+    setLeads(normalizeLeads(rows).filter((row) => row.id));
+  };
+
+  const fetchQuotes = async () => {
+    const res = await fetch(`/api/company/${companyId}/workshop/quotes`);
+    if (!res.ok) throw new Error(`Quotes HTTP ${res.status}`);
+    const json = await res.json();
+    const rows = (json.data ?? []) as Array<Record<string, unknown>>;
+    setQuotes(normalizeQuotes(rows).filter((row) => row.id));
+  };
+
+  const getResourcesForTab = (tabId: WorkshopTabId) => {
+    if (tabId === "inspections" || tabId === "completed-inspections") {
+      return ["inspections", "leads"] as const;
+    }
+    return ["jobCards", "quotes"] as const;
+  };
+
+  const loadTabData = async (tabId: WorkshopTabId, force = false) => {
+    const needed = getResourcesForTab(tabId);
+    const tasks: Array<Promise<void>> = [];
+    if (needed.includes("jobCards") && (force || !loadedResources.jobCards)) tasks.push(fetchJobCards());
+    if (needed.includes("quotes") && (force || !loadedResources.quotes)) tasks.push(fetchQuotes());
+    if (needed.includes("inspections") && (force || !loadedResources.inspections)) tasks.push(fetchInspections());
+    if (needed.includes("leads") && (force || !loadedResources.leads)) tasks.push(fetchLeads());
+
+    if (tasks.length === 0) return;
+    setError(null);
+    setLoading(!force);
+    setRefreshing(force);
+    try {
+      await Promise.all(tasks);
+      setLoadedResources((prev) => ({
+        ...prev,
+        ...(needed.includes("jobCards") ? { jobCards: true } : {}),
+        ...(needed.includes("quotes") ? { quotes: true } : {}),
+        ...(needed.includes("inspections") ? { inspections: true } : {}),
+        ...(needed.includes("leads") ? { leads: true } : {}),
+      }));
+    } catch {
+      setError("Failed to load workshop data.");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    setJobCards([]);
+    setInspections([]);
+    setLeads([]);
+    setQuotes([]);
+    setLoadedResources({
+      jobCards: false,
+      inspections: false,
+      leads: false,
+      quotes: false,
+    });
   }, [companyId]);
+
+  useEffect(() => {
+    void loadTabData(activeTab as WorkshopTabId, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, companyId]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -674,6 +717,16 @@ export function BranchWorkshopDashboard({
 
             <div className="flex flex-wrap items-center justify-between gap-3  px-4 py-3">
               <div className="flex items-center gap-2 text-sm">
+                <button
+                  type="button"
+                  onClick={() => {
+                    void loadTabData(activeTab as WorkshopTabId, true);
+                  }}
+                  disabled={refreshing}
+                  className="rounded-md bg-white/10 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-white shadow-sm transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {refreshing ? "Refreshing..." : "Refresh"}
+                </button>
                 <span className="text-foreground/80">Show</span>
                 <select
                   value={entriesPerPage}
