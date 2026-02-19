@@ -57,6 +57,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
       ownerId,
       agentRemark,
       customerRemark,
+      carInVideo,
+      carOutVideo,
       branchId,
       assignedUserId,
       serviceType,
@@ -96,6 +98,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
       assignedAt: nextAssignedUserId ? new Date().toISOString() : null,
       agentRemark: agentRemark ?? lead.agentRemark,
       customerRemark: customerRemark ?? lead.customerRemark,
+      carInVideo: carInVideo ?? (lead as any).carInVideo ?? null,
+      carOutVideo: carOutVideo ?? (lead as any).carOutVideo ?? null,
       customerFeedback: lead.customerFeedback,
       sentimentScore: lead.sentimentScore,
     });

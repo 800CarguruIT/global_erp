@@ -22,18 +22,62 @@ export async function GET(req: NextRequest, { params }: Params) {
 
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status") as InspectionStatus | null;
+    const branchId = searchParams.get("branchId");
+    const q = searchParams.get("q")?.trim().toLowerCase() ?? "";
 
-    const inspections = await listInspectionsForCompany(companyId, {
+    let inspections = await listInspectionsForCompany(companyId, {
       status: status ?? undefined,
     });
 
     const sql = getSql();
+    const leadIds = inspections.map((i) => i.leadId).filter(Boolean) as string[];
+    const leadById = new Map<
+      string,
+      {
+        id: string;
+        branchId: string | null;
+        customerRemark: string | null;
+        carInVideo: string | null;
+        carOutVideo: string | null;
+        source: string | null;
+      }
+    >();
+    if (leadIds.length) {
+      const leadRows = await sql`
+        SELECT id, branch_id, customer_remark, carin_video, carout_video, source
+        FROM leads
+        WHERE company_id = ${companyId}
+          AND id IN ${sql(leadIds)}
+      `;
+      leadRows.forEach((row: any) => {
+        leadById.set(row.id, {
+          id: row.id,
+          branchId: row.branch_id ?? null,
+          customerRemark: row.customer_remark ?? null,
+          carInVideo: row.carin_video ?? null,
+          carOutVideo: row.carout_video ?? null,
+          source: row.source ?? null,
+        });
+      });
+    }
+
+    if (branchId) {
+      inspections = inspections.filter((inspection) => {
+        const lead = inspection.leadId ? leadById.get(inspection.leadId) ?? null : null;
+        const effectiveBranchId = inspection.branchId ?? lead?.branchId ?? null;
+        return effectiveBranchId === branchId;
+      });
+    }
+
     const carIds = inspections.map((i) => i.carId).filter(Boolean) as string[];
     const customerIds = inspections
       .map((i) => i.customerId)
       .filter(Boolean) as string[];
     const branchIds = inspections
-      .map((i) => i.branchId)
+      .map((i) => {
+        const lead = i.leadId ? leadById.get(i.leadId) ?? null : null;
+        return i.branchId ?? lead?.branchId ?? null;
+      })
       .filter(Boolean) as string[];
     const carsById = new Map<string, any>();
     const customersById = new Map<string, any>();
@@ -70,12 +114,46 @@ export async function GET(req: NextRequest, { params }: Params) {
       customer: inspection.customerId
         ? customersById.get(inspection.customerId) ?? null
         : null,
-      branch: inspection.branchId
-        ? branchesById.get(inspection.branchId) ?? null
+      branch: (() => {
+        const lead = inspection.leadId
+          ? leadById.get(inspection.leadId) ?? null
+          : null;
+        const effectiveBranchId = inspection.branchId ?? lead?.branchId ?? null;
+        return effectiveBranchId ? branchesById.get(effectiveBranchId) ?? null : null;
+      })(),
+      lead: inspection.leadId
+        ? leadById.get(inspection.leadId) ?? null
         : null,
     }));
 
-    return createMobileSuccessResponse({ inspections: enriched });
+    const filtered = !q
+      ? enriched
+      : enriched.filter((inspection) => {
+          const branchLabel = inspection?.branch
+            ? (inspection.branch.display_name ??
+              inspection.branch.name ??
+              inspection.branch.code ??
+              "")
+            : "";
+          const haystack = [
+            inspection.id,
+            inspection.status,
+            inspection.car?.plate_number,
+            inspection.car?.make,
+            inspection.car?.model,
+            inspection.customer?.name,
+            inspection.customer?.phone,
+            inspection.customer?.email,
+            inspection.lead?.source,
+            branchLabel,
+          ]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase();
+          return haystack.includes(q);
+        });
+
+    return createMobileSuccessResponse({ inspections: filtered });
   } catch (error) {
     console.error("GET /api/mobile/company/[companyId]/inspections error:", error);
     return handleMobileError(error);
@@ -89,14 +167,30 @@ export async function POST(req: NextRequest, { params }: Params) {
     await ensureCompanyAccess(userId, companyId);
 
     const body = await req.json().catch(() => ({}));
+    let resolvedBranchId = body.branchId ?? null;
+    if (!resolvedBranchId && body.leadId) {
+      const sql = getSql();
+      const leadRows = await sql`
+        SELECT branch_id
+        FROM leads
+        WHERE id = ${body.leadId}
+          AND company_id = ${companyId}
+        LIMIT 1
+      `;
+      resolvedBranchId = leadRows[0]?.branch_id ?? null;
+    }
+
     const inspection = await createInspection({
       companyId,
       leadId: body.leadId ?? null,
       carId: body.carId ?? null,
       customerId: body.customerId ?? null,
+      branchId: resolvedBranchId,
       inspectorEmployeeId: body.inspectorEmployeeId ?? null,
       advisorEmployeeId: body.advisorEmployeeId ?? null,
       status: body.status ?? "pending",
+      startAt: body.startAt ?? body.start_at ?? null,
+      completeAt: body.completeAt ?? body.complete_at ?? null,
       customerRemark: body.customerRemark ?? null,
       agentRemark: body.agentRemark ?? null,
       draftPayload: body.draftPayload ?? null,
