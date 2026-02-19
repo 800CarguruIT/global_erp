@@ -24,6 +24,9 @@ export type Quote = {
   branchId?: string | null;
   currency?: string | null;
   totalAmount: number;
+  quotedAmount?: number | null;
+  acceptedAmount?: number | null;
+  additionalAmount?: number | null;
   validUntil?: string | null;
   createdBy?: string | null;
   approvedBy?: string | null;

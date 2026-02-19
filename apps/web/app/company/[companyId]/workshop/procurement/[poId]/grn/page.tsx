@@ -82,13 +82,14 @@ export default async function ProcurementGrnPage({ params }: Props) {
                 <th className="py-2 pl-3 pr-4 text-left">GRN Number</th>
                 <th className="px-4 py-2 text-left">Part</th>
                 <th className="px-4 py-2 text-left">Qty</th>
+                <th className="px-4 py-2 text-left">Received By</th>
                 <th className="px-4 py-2 text-left">Received At</th>
               </tr>
             </thead>
             <tbody>
               {(data.grns ?? []).length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="py-3 text-center text-xs text-slate-400">
+                  <td colSpan={5} className="py-3 text-center text-xs text-slate-400">
                     No GRN entries found.
                   </td>
                 </tr>
@@ -100,6 +101,7 @@ export default async function ProcurementGrnPage({ params }: Props) {
                       {grn.partName}
                     </td>
                     <td className="px-4 py-2 text-slate-100">{grn.quantity}</td>
+                    <td className="px-4 py-2 text-slate-200">{grn.receivedBy || "-"}</td>
                     <td className="px-4 py-2 text-slate-300">
                       {grn.createdAt ? new Date(grn.createdAt).toLocaleString() : "-"}
                     </td>

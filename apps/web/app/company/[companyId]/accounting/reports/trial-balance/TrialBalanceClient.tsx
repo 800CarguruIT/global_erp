@@ -24,6 +24,7 @@ export default function TrialBalanceClient({ companyId }: { companyId: string })
   const [error, setError] = useState<string | null>(null);
   const today = useMemo(() => dayjs(), []);
   const [rangePreset, setRangePreset] = useState("today");
+  const [dateFrom, setDateFrom] = useState<string | null>(() => today.format("YYYY-MM-DD"));
   const [dateTo, setDateTo] = useState(() => today.format("YYYY-MM-DD"));
   const [companyName, setCompanyName] = useState<string | null>(null);
   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
@@ -34,6 +35,7 @@ export default function TrialBalanceClient({ companyId }: { companyId: string })
     setError(null);
     try {
       const params = new URLSearchParams({ dateTo });
+      if (dateFrom) params.set("dateFrom", dateFrom);
       if (journalScope === "all") params.set("includeDrafts", "true");
       const res = await fetch(`/api/company/${companyId}/accounting/trial-balance?${params.toString()}`, {
         cache: "no-store",
@@ -58,24 +60,32 @@ export default function TrialBalanceClient({ companyId }: { companyId: string })
     const now = dayjs();
     switch (rangePreset) {
       case "today":
+        setDateFrom(now.format("YYYY-MM-DD"));
         setDateTo(now.format("YYYY-MM-DD"));
         break;
       case "yesterday":
+        setDateFrom(now.subtract(1, "day").format("YYYY-MM-DD"));
         setDateTo(now.subtract(1, "day").format("YYYY-MM-DD"));
         break;
       case "last7":
+        setDateFrom(now.subtract(6, "day").format("YYYY-MM-DD"));
         setDateTo(now.format("YYYY-MM-DD"));
         break;
       case "last30":
+        setDateFrom(now.subtract(29, "day").format("YYYY-MM-DD"));
         setDateTo(now.format("YYYY-MM-DD"));
         break;
       case "thisMonth":
-        setDateTo(now.endOf("month").format("YYYY-MM-DD"));
+        setDateFrom(now.startOf("month").format("YYYY-MM-DD"));
+        setDateTo(now.format("YYYY-MM-DD"));
         break;
       case "lastMonth":
+        setDateFrom(now.subtract(1, "month").startOf("month").format("YYYY-MM-DD"));
         setDateTo(now.subtract(1, "month").endOf("month").format("YYYY-MM-DD"));
         break;
       case "custom":
+        setDateFrom(null);
+        break;
       default:
         break;
     }

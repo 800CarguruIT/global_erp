@@ -83,6 +83,24 @@ function mapLineItemRow(row: any): InspectionLineItem {
   };
 }
 
+const orderStatusRank = (status: string | null | undefined): number => {
+  const normalized = String(status ?? "").trim().toLowerCase();
+  if (normalized === "received" || normalized === "completed") return 3;
+  if (normalized === "returned" || normalized === "return") return 2;
+  if (normalized === "ordered") return 1;
+  return 0;
+};
+
+const mergeOrderStatus = (
+  current: string | null | undefined,
+  derived: string | null | undefined
+): string | null | undefined => {
+  const currentRank = orderStatusRank(current);
+  const derivedRank = orderStatusRank(derived);
+  if (derivedRank > currentRank) return derived;
+  return current;
+};
+
 export async function listInspectionsForCompany(
   companyId: string,
   opts: { status?: InspectionStatus; limit?: number } = {}
@@ -394,12 +412,13 @@ export async function listInspectionLineItems(
     const derivedStatus = quoteStatusByLineItemId.get(String(row.id));
     const quoteCosts = quoteCostsByLineItemId.get(String(row.id));
     if (!derivedStatus && !quoteCosts) return row;
+    const mergedStatus = mergeOrderStatus(row.order_status, derivedStatus);
     const next: any = {
       ...row,
-      ...(derivedStatus
+      ...(mergedStatus
         ? {
             part_ordered: row.part_ordered ?? 1,
-            order_status: derivedStatus,
+            order_status: mergedStatus,
           }
         : {}),
       ...(quoteCosts ? { quote_costs: quoteCosts } : {}),

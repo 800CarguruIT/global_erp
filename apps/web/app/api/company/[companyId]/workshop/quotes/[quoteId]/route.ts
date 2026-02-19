@@ -16,6 +16,10 @@ function mapWorkshopQuote(row: any) {
     branchId: row.branch_id,
     currency: row.currency,
     totalAmount: Number(row.total_amount ?? 0),
+    negotiatedAmount: row.negotiated_amount != null ? Number(row.negotiated_amount) : null,
+    quotedAmount: row.quoted_amount != null ? Number(row.quoted_amount) : null,
+    acceptedAmount: row.accepted_amount != null ? Number(row.accepted_amount) : null,
+    additionalAmount: row.additional_amount != null ? Number(row.additional_amount) : 0,
     validUntil: null,
     createdBy: row.created_by,
     approvedBy: row.approved_by,
@@ -75,6 +79,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
           if (!Number.isFinite(negotiatedAmount) || negotiatedAmount <= 0) {
             return NextResponse.json({ error: "Valid negotiatedAmount is required." }, { status: 400 });
           }
+          (nextMeta as any).negotiationPreviousAmount = Number(row.total_amount ?? 0);
+          (nextMeta as any).negotiatedAmount = negotiatedAmount;
           (nextMeta as any).negotiationNote =
             typeof body.negotiationNote === "string" ? body.negotiationNote.trim() || null : null;
           await sql`
@@ -89,9 +95,14 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         }
 
         if (workflowAction === "accepted") {
+          const acceptedAmount = Number(
+            row.negotiated_amount ?? row.quoted_amount ?? row.total_amount ?? 0
+          );
           await sql`
             UPDATE workshop_quotes
             SET status = 'accepted',
+                accepted_amount = ${acceptedAmount},
+                total_amount = ${acceptedAmount},
                 approved_at = NOW(),
                 updated_at = NOW()
             WHERE id = ${quoteId} AND company_id = ${companyId}
@@ -155,12 +166,21 @@ export async function PATCH(req: NextRequest, { params }: Params) {
           Number.isFinite(laborHours) && Number.isFinite(laborRate) && laborHours > 0 && laborRate >= 0
             ? laborHours * laborRate
             : null;
+        const acceptedFromComputed = Number.isFinite(computedTotal)
+          ? Number(computedTotal)
+          : null;
 
         if (["pending", "accepted", "negotiation", "rejected", "cancelled", "verified"].includes(nextStatus)) {
           await sql`
             UPDATE workshop_quotes
             SET status = ${nextStatus},
                 total_amount = COALESCE(${computedTotal}, total_amount),
+                quoted_amount = COALESCE(${computedTotal}, quoted_amount),
+                accepted_amount = CASE
+                  WHEN ${nextStatus} = 'accepted'
+                    THEN COALESCE(${acceptedFromComputed}, negotiated_amount, quoted_amount, total_amount)
+                  ELSE accepted_amount
+                END,
                 eta_hours = COALESCE(${Number.isFinite(laborHours) ? laborHours : null}, eta_hours),
                 meta = CASE
                   WHEN ${Number.isFinite(laborRate)} THEN COALESCE(meta, '{}'::jsonb) || jsonb_build_object('laborRate', ${laborRate})
@@ -173,6 +193,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
           await sql`
             UPDATE workshop_quotes
             SET total_amount = COALESCE(${computedTotal}, total_amount),
+                quoted_amount = COALESCE(${computedTotal}, quoted_amount),
                 eta_hours = COALESCE(${Number.isFinite(laborHours) ? laborHours : null}, eta_hours),
                 meta = CASE
                   WHEN ${Number.isFinite(laborRate)} THEN COALESCE(meta, '{}'::jsonb) || jsonb_build_object('laborRate', ${laborRate})

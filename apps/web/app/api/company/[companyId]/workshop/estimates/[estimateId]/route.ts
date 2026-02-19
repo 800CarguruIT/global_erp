@@ -70,6 +70,37 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     if (estimate?.inspectionId) {
       inspectionItems = await listInspectionLineItems(estimate.inspectionId, { isAdd: 0 });
     }
+    const existingEstimateItems = estimateData?.items ?? [];
+    const existingById = new Map(existingEstimateItems.map((row) => [String(row.id), row]));
+    const existingByInspectionItemId = new Map(
+      existingEstimateItems
+        .filter((row) => row.inspectionItemId)
+        .map((row) => [String(row.inspectionItemId), row])
+    );
+    const inspectionItemById = new Map(inspectionItems.map((row) => [String(row.id), row]));
+    const isReceivedLineItem = (lineItem: any | null | undefined) =>
+      String(lineItem?.orderStatus ?? lineItem?.order_status ?? "").trim().toLowerCase() === "received";
+    const normalizeText = (value?: string | null) => String(value ?? "").trim();
+    const normalizeStatus = (value?: string | null) => String(value ?? "pending").trim().toLowerCase();
+    const normalizeCostType = (value?: string | null) => String(value ?? "").trim().toLowerCase();
+    const normalizeNum = (value: unknown) => Number(value ?? 0);
+    const hasEstimateItemChanged = (
+      existing: (typeof existingEstimateItems)[number],
+      incoming: (typeof items)[number]
+    ) => {
+      return (
+        normalizeText(existing.partName) !== normalizeText(incoming.partName) ||
+        normalizeText(existing.description) !== normalizeText(incoming.description ?? null) ||
+        normalizeText(existing.type) !== normalizeText(incoming.type) ||
+        normalizeNum(existing.quantity) !== normalizeNum(incoming.quantity ?? 1) ||
+        normalizeNum(existing.cost) !== normalizeNum(incoming.cost ?? 0) ||
+        normalizeStatus(existing.status) !== normalizeStatus(incoming.status ?? "pending") ||
+        normalizeCostType((existing as any).approvedType ?? null) !==
+          normalizeCostType((incoming as any).approvedType ?? null) ||
+        normalizeNum((existing as any).approvedCost ?? null) !==
+          normalizeNum((incoming as any).approvedCost ?? null)
+      );
+    };
     const usedLineItemIds = new Set<string>();
     const findMatchingLineItem = (name: string, description?: string | null) => {
       const normalizedName = (name ?? "").trim().toLowerCase();
@@ -101,7 +132,19 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const mappedItems = [];
     for (const [idx, item] of items.entries()) {
       let inspectionItemId = item.inspectionItemId ?? null;
+      const existingEstimateItem =
+        (item.id ? existingById.get(String(item.id)) : null) ??
+        (inspectionItemId ? existingByInspectionItemId.get(String(inspectionItemId)) : null) ??
+        null;
       if (estimate?.inspectionId) {
+        const directInspectionItem =
+          inspectionItemId ? inspectionItemById.get(String(inspectionItemId)) ?? null : null;
+        if (isReceivedLineItem(directInspectionItem) && existingEstimateItem && hasEstimateItemChanged(existingEstimateItem, item)) {
+          return NextResponse.json(
+            { error: `Received part "${existingEstimateItem.partName}" is locked and cannot be updated.` },
+            { status: 400 }
+          );
+        }
         if (inspectionItemId) {
           await updateInspectionLineItem({
             companyId,
@@ -118,6 +161,12 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         } else {
           const match = findMatchingLineItem(item.partName, item.description ?? null);
           if (match) {
+            if (isReceivedLineItem(match) && existingEstimateItem && hasEstimateItemChanged(existingEstimateItem, item)) {
+              return NextResponse.json(
+                { error: `Received part "${existingEstimateItem.partName}" is locked and cannot be updated.` },
+                { status: 400 }
+              );
+            }
             inspectionItemId = match.id;
             await updateInspectionLineItem({
               companyId,
@@ -165,6 +214,29 @@ export async function PATCH(req: NextRequest, { params }: Params) {
           approvedCost: (item as any).approvedCost ?? null,
         });
       }
+
+    const receivedInspectionIds = new Set(
+      inspectionItems
+        .filter((li) => String(li?.orderStatus ?? li?.order_status ?? "").trim().toLowerCase() === "received")
+        .map((li) => String(li.id))
+    );
+    const mappedInspectionIds = new Set(
+      mappedItems
+        .map((row: any) => String(row.inspectionItemId ?? "").trim())
+        .filter(Boolean)
+    );
+    const removedReceivedEstimateItem = existingEstimateItems.find((row) => {
+      const inspectionItemId = String(row.inspectionItemId ?? "").trim();
+      if (!inspectionItemId) return false;
+      if (!receivedInspectionIds.has(inspectionItemId)) return false;
+      return !mappedInspectionIds.has(inspectionItemId);
+    });
+    if (removedReceivedEstimateItem) {
+      return NextResponse.json(
+        { error: `Received part "${removedReceivedEstimateItem.partName}" cannot be removed from estimate.` },
+        { status: 400 }
+      );
+    }
 
     await replaceEstimateItems(estimateId, mappedItems);
   }

@@ -308,7 +308,7 @@ export function EstimateQuotesMain({
   }, [load]);
 
   useEffect(() => {
-    if (activeTab !== "completed-insp") {
+    if (activeTab !== "completed-insp" && activeTab !== "verified-insp") {
       setShowCompletedDatePicker(false);
     }
   }, [activeTab]);
@@ -696,7 +696,23 @@ export function EstimateQuotesMain({
         label: "Completed Insp.",
         kind: "inspections",
         group: "inspection",
-        filter: () => latestInspectionRows.filter((row) => String(row.status ?? "").toLowerCase() === "completed"),
+        filter: () =>
+          latestInspectionRows.filter((row) => {
+            const completed = String(row.status ?? "").toLowerCase() === "completed";
+            const verified = Boolean((row as any).verifiedAt ?? (row as any).verified_at ?? (row as any).verifiedBy ?? (row as any).verified_by);
+            return completed && !verified;
+          }),
+      },
+      {
+        id: "verified-insp",
+        label: "Verified Insp.",
+        kind: "inspections",
+        group: "inspection",
+        filter: () =>
+          latestInspectionRows.filter((row) => {
+            const verified = Boolean((row as any).verifiedAt ?? (row as any).verified_at ?? (row as any).verifiedBy ?? (row as any).verified_by);
+            return verified;
+          }),
       },
       {
         id: "service-pending",
@@ -823,7 +839,7 @@ export function EstimateQuotesMain({
     }
   }
   const rangeFilteredRows = useMemo(() => {
-    if (activeTab !== "completed-insp" || activeConfig.kind !== "inspections") return activeRows;
+    if ((activeTab !== "completed-insp" && activeTab !== "verified-insp") || activeConfig.kind !== "inspections") return activeRows;
     if (!completedDateFilterEnabled) return activeRows;
     const from = new Date(completedDateRange.startDate);
     from.setHours(0, 0, 0, 0);
@@ -1044,7 +1060,7 @@ export function EstimateQuotesMain({
                   Refresh
                 </button>
                 <span className="text-xs text-muted-foreground">{visibleRecordsCount} records</span>
-                {activeTab === "completed-insp" && (
+                {(activeTab === "completed-insp" || activeTab === "verified-insp") && (
                   <div className="relative ml-2">
                     <button
                       type="button"
@@ -1451,7 +1467,18 @@ export function EstimateQuotesMain({
                             </div>
                           </div>
                           <div className="mt-3 flex flex-wrap gap-2">
-                            {!isInspectionVerified(row) ? (
+                            {activeTab === "verified-insp" ? (
+                              actionHref && hasInspection ? (
+                                <a
+                                  href={actionHref}
+                                  className="inline-flex items-center rounded-md border border-cyan-400/40 bg-cyan-500/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-cyan-200 shadow-sm transition hover:bg-cyan-500/20"
+                                >
+                                  View Report
+                                </a>
+                              ) : (
+                                <span className="text-[11px] text-muted-foreground">No actions</span>
+                              )
+                            ) : !isInspectionVerified(row) ? (
                               <>
                                 {actionHref && hasInspection ? (
                                   <a
@@ -1790,7 +1817,18 @@ export function EstimateQuotesMain({
                         <td className="py-2 px-4 text-xs text-muted-foreground">{formatDate(row.updatedAt)}</td>
                         <td className="py-2 px-4 text-xs">
                           <div className="flex flex-row flex-wrap items-center gap-2">
-                            {!isInspectionVerified(row) ? (
+                            {activeTab === "verified-insp" ? (
+                              actionHref && hasInspection ? (
+                                <a
+                                  href={actionHref}
+                                  className="rounded-md border border-cyan-400/40 bg-cyan-500/10 px-2 py-1 text-center text-cyan-200 transition hover:bg-cyan-500/20"
+                                >
+                                  View Report
+                                </a>
+                              ) : (
+                                <span className="text-muted-foreground">No actions</span>
+                              )
+                            ) : !isInspectionVerified(row) ? (
                               <>
                                 {actionHref && hasInspection ? (
                                   <a

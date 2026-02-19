@@ -25,6 +25,8 @@ type LoadState<T> =
 type ItemDraft = {
   id?: string;
   lineNo?: number;
+  quoteId?: string | null;
+  estimateItemId?: string | null;
   name: string;
   description?: string | null;
   quantity: number;
@@ -87,6 +89,19 @@ export function ProcurementDetailMain({ companyId, poId }: { companyId: string; 
     message?: string | null;
   }>({ loading: false, error: null, message: null });
   const [moveStatus, setMoveStatus] = useState<Record<string, { loading: boolean; error?: string | null }>>({});
+  const [receiveModal, setReceiveModal] = useState<{
+    open: boolean;
+    itemId: string;
+    itemName: string;
+    maxQty: number;
+  }>({
+    open: false,
+    itemId: "",
+    itemName: "",
+    maxQty: 0,
+  });
+  const [receiveQtyInput, setReceiveQtyInput] = useState("1");
+  const [receiveModalError, setReceiveModalError] = useState<string | null>(null);
   const [moveModal, setMoveModal] = useState<{ open: boolean; itemId: string; itemName: string }>({
     open: false,
     itemId: "",
@@ -123,6 +138,8 @@ export function ProcurementDetailMain({ companyId, poId }: { companyId: string; 
       list.map((i) => ({
         id: i.id,
         lineNo: i.lineNo,
+        quoteId: i.quoteId ?? null,
+        estimateItemId: i.estimateItemId ?? null,
         name: i.name ?? "",
         description: i.description ?? "",
         quantity: i.quantity ?? 0,
@@ -299,12 +316,28 @@ export function ProcurementDetailMain({ companyId, poId }: { companyId: string; 
     return { subtotal, vat, totalWithVat, vatRate };
   }, [items]);
 
-  async function save() {
+  const grnsByItem = useMemo(() => {
+    const groups = new Map<string, PurchaseOrderGrnEntry[]>();
+    const allGrns = state.status === "loaded" ? state.data.grns ?? [] : [];
+    for (const item of items) {
+      if (!item.id) continue;
+      const list = allGrns.filter((grn) => String(grn.sourceId ?? "") === String(item.id));
+      groups.set(item.id, list);
+    }
+    return groups;
+  }, [items, state]);
+
+  async function save(nextStatus?: PurchaseOrderStatus) {
     setIsSaving(true);
     setSaveError(null);
     try {
+      const statusToSave =
+        typeof nextStatus === "string" &&
+        ["draft", "issued", "partially_received", "received", "cancelled"].includes(nextStatus)
+          ? nextStatus
+          : header.status;
       const body = {
-        status: header.status,
+        status: statusToSave,
         poType: header.poType,
         expectedDate: header.expectedDate ?? null,
         notes: header.notes ?? null,
@@ -313,6 +346,8 @@ export function ProcurementDetailMain({ companyId, poId }: { companyId: string; 
         items: items.map((i, idx) => ({
           id: i.id,
           lineNo: i.lineNo ?? idx + 1,
+          quoteId: i.quoteId ?? null,
+          estimateItemId: i.estimateItemId ?? null,
           name: i.name ?? "",
           description: i.description ?? null,
           quantity: i.quantity ?? 0,
@@ -327,6 +362,10 @@ export function ProcurementDetailMain({ companyId, poId }: { companyId: string; 
         body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      await loadPurchaseOrder({ keepLoading: true });
+      if (statusToSave !== header.status) {
+        setHeader((prev) => ({ ...prev, status: statusToSave }));
+      }
     } catch (err) {
       console.error(err);
       setSaveError("Failed to save");
@@ -385,7 +424,10 @@ export function ProcurementDetailMain({ companyId, poId }: { companyId: string; 
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={save}
+            onClick={() => {
+              void save();
+            }}
+            disabled={isSaving}
             className="rounded-md bg-slate-800/80 px-3 py-1 text-sm font-medium text-slate-100 hover:bg-slate-700/80"
           >
             Save
@@ -393,10 +435,22 @@ export function ProcurementDetailMain({ companyId, poId }: { companyId: string; 
           {editable ? (
             <button
               type="button"
-              onClick={() => setHeader((p) => ({ ...p, status: "issued" as PurchaseOrderStatus }))}
+              onClick={async () => {
+                if (!items.length) {
+                  setSaveError("Add at least one line item before issuing PO.");
+                  return;
+                }
+                const hasInvalidQty = items.some((item) => Number(item.quantity ?? 0) <= 0);
+                if (hasInvalidQty) {
+                  setSaveError("All line quantities must be greater than zero before issuing PO.");
+                  return;
+                }
+                await save("issued");
+              }}
+              disabled={isSaving}
               className="rounded-md bg-emerald-600/80 px-3 py-1 text-sm font-medium text-white hover:bg-emerald-600"
             >
-              Issue PO
+              {isSaving ? "Issuing..." : "Issue PO"}
             </button>
           ) : null}
           {saveError && <span className="text-xs text-destructive">{saveError}</span>}
@@ -405,6 +459,25 @@ export function ProcurementDetailMain({ companyId, poId }: { companyId: string; 
     >
       <div className="rounded-2xl bg-slate-950/70 p-5 shadow-[0_25px_80px_-50px_rgba(15,23,42,0.9)]">
       <div className="space-y-6">
+        <section className="rounded-2xl border border-white/5 bg-slate-950/60 p-4">
+          <div className="grid gap-2 md:grid-cols-3">
+            <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+              <div className="text-[10px] uppercase tracking-wide text-slate-400">Step 1</div>
+              <div className="text-sm font-semibold text-slate-100">Review PO</div>
+              <div className="text-[11px] text-slate-400">Check supplier and ordered quantities.</div>
+            </div>
+            <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+              <div className="text-[10px] uppercase tracking-wide text-slate-400">Step 2</div>
+              <div className="text-sm font-semibold text-slate-100">Receive Items</div>
+              <div className="text-[11px] text-slate-400">Use line-item receive to create GRN entries.</div>
+            </div>
+            <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+              <div className="text-[10px] uppercase tracking-wide text-slate-400">Step 3</div>
+              <div className="text-sm font-semibold text-slate-100">Close PO</div>
+              <div className="text-[11px] text-slate-400">Close only when all lines are received/cancelled.</div>
+            </div>
+          </div>
+        </section>
         <section className="space-y-4 rounded-2xl border border-white/5 bg-slate-950/60 p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -592,13 +665,22 @@ export function ProcurementDetailMain({ companyId, poId }: { companyId: string; 
                             <div className="flex items-center gap-2">
                               <button
                                 type="button"
-                                onClick={() => receiveRemaining(item.id ?? "", remainingQty)}
+                                onClick={() => {
+                                  setReceiveModal({
+                                    open: true,
+                                    itemId: item.id ?? "",
+                                    itemName: item.name ?? "Part",
+                                    maxQty: remainingQty,
+                                  });
+                                  setReceiveQtyInput(String(remainingQty));
+                                  setReceiveModalError(null);
+                                }}
                                 disabled={!item.id || receiveStatus[item.id ?? ""]?.loading}
                                 className="rounded-md bg-emerald-500/20 px-2 py-1 text-[11px] text-emerald-200 hover:bg-emerald-500/30 disabled:opacity-60"
                               >
                                 {receiveStatus[item.id ?? ""]?.loading
                                   ? "Receiving..."
-                                  : `Receive ${remainingQty}`}
+                                  : "Receive"}
                               </button>
                               {receiveStatus[item.id ?? ""]?.error && (
                                 <span className="text-[11px] text-rose-300">
@@ -618,6 +700,47 @@ export function ProcurementDetailMain({ companyId, poId }: { companyId: string; 
                             <span className="text-[11px] text-slate-400">
                               {item.status ?? "Pending"}
                             </span>
+                          )}
+                          {item.id && (
+                            <div className="mt-2 rounded-md border border-white/10 bg-white/[0.02] p-2">
+                              <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-400">Line GRNs</div>
+                              {(grnsByItem.get(item.id) ?? []).length === 0 ? (
+                                <div className="text-[11px] text-slate-500">No GRN for this line yet.</div>
+                              ) : (
+                                <div className="space-y-1.5">
+                                  {(grnsByItem.get(item.id) ?? []).map((grn) => (
+                                    <div
+                                      key={grn.id}
+                                      className="flex flex-wrap items-center justify-between gap-2 rounded border border-white/5 bg-slate-900/50 px-2 py-1.5"
+                                    >
+                                      <div className="text-[11px] text-slate-200">
+                                        <span className="font-semibold text-emerald-300">{grn.grnNumber}</span>{" "}
+                                        · Qty {grn.quantity}
+                                        {grn.receivedBy ? ` · By ${grn.receivedBy}` : ""}
+                                      </div>
+                                      <div className="flex items-center gap-1.5">
+                                        <a
+                                          href={`/company/${companyId}/workshop/procurement/${poId}/grn`}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          className="rounded border border-cyan-400/40 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-cyan-200 hover:bg-cyan-500/20"
+                                        >
+                                          View
+                                        </a>
+                                        <a
+                                          href={`/api/company/${companyId}/workshop/procurement/${poId}/grn/pdf`}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          className="rounded border border-indigo-400/40 bg-indigo-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-indigo-200 hover:bg-indigo-500/20"
+                                        >
+                                          Print
+                                        </a>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
                           )}
                         </td>
                       </tr>
@@ -692,13 +815,14 @@ export function ProcurementDetailMain({ companyId, poId }: { companyId: string; 
                   <th className="py-2 pl-3 pr-4 text-left">GRN Number</th>
                   <th className="px-4 py-2 text-left">Part</th>
                   <th className="px-4 py-2 text-left">Qty</th>
+                  <th className="px-4 py-2 text-left">Received By</th>
                   <th className="px-4 py-2 text-left">Received At</th>
                 </tr>
               </thead>
               <tbody>
                 {(state.data?.grns ?? []).length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="py-3 text-center text-xs text-slate-400">
+                    <td colSpan={5} className="py-3 text-center text-xs text-slate-400">
                       No GRN entries yet.
                     </td>
                   </tr>
@@ -710,6 +834,7 @@ export function ProcurementDetailMain({ companyId, poId }: { companyId: string; 
                         {grn.partName}
                       </td>
                       <td className="px-4 py-2 text-slate-100">{grn.quantity}</td>
+                      <td className="px-4 py-2 text-slate-200">{grn.receivedBy || "-"}</td>
                       <td className="px-4 py-2 text-slate-300">
                         {grn.createdAt ? new Date(grn.createdAt).toLocaleString() : "-"}
                       </td>
@@ -946,6 +1071,63 @@ export function ProcurementDetailMain({ companyId, poId }: { companyId: string; 
                 className="rounded-md bg-emerald-600 px-3 py-1 text-sm font-semibold text-white hover:bg-emerald-500"
               >
                 Move to inventory
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {receiveModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl bg-slate-100 p-6 text-slate-900 shadow-[0_30px_80px_-40px_rgba(15,23,42,0.45)]">
+            <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Create GRN</div>
+            <div className="mt-2 text-lg font-semibold text-slate-900">Receive Line Item</div>
+            <div className="mt-2 rounded-lg bg-slate-200/80 p-3 text-sm">
+              <div className="text-xs text-slate-500">Item</div>
+              <div className="font-semibold text-slate-900">{receiveModal.itemName}</div>
+              <div className="mt-1 text-xs text-slate-600">Pending Qty: {receiveModal.maxQty}</div>
+            </div>
+            <label className="mt-4 block space-y-1">
+              <div className="text-xs text-slate-500">Receive Qty</div>
+              <input
+                type="number"
+                min={1}
+                max={Math.max(receiveModal.maxQty, 1)}
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+                value={receiveQtyInput}
+                onChange={(e) => setReceiveQtyInput(e.target.value)}
+              />
+            </label>
+            {receiveModalError && <div className="mt-2 text-xs text-rose-600">{receiveModalError}</div>}
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setReceiveModal({ open: false, itemId: "", itemName: "", maxQty: 0 });
+                  setReceiveModalError(null);
+                }}
+                className="rounded-md bg-slate-200 px-3 py-1 text-sm text-slate-700 hover:bg-slate-300"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const qty = Number(receiveQtyInput);
+                  if (!Number.isFinite(qty) || qty <= 0) {
+                    setReceiveModalError("Enter a valid quantity.");
+                    return;
+                  }
+                  if (qty > receiveModal.maxQty) {
+                    setReceiveModalError("Quantity cannot exceed pending quantity.");
+                    return;
+                  }
+                  await receiveRemaining(receiveModal.itemId, qty);
+                  setReceiveModal({ open: false, itemId: "", itemName: "", maxQty: 0 });
+                  setReceiveModalError(null);
+                }}
+                className="rounded-md bg-emerald-600 px-3 py-1 text-sm font-semibold text-white hover:bg-emerald-500"
+              >
+                Save GRN
               </button>
             </div>
           </div>

@@ -187,6 +187,15 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
       normalizedOrderStatus === "returned"
     );
   };
+  const isReceivedOrderLocked = (item: Pick<ItemDraft, "orderStatus">) =>
+    String(item.orderStatus ?? "").trim().toLowerCase() === "received";
+  const isLineItemLocked = (item: Pick<ItemDraft, "status" | "orderStatus" | "partOrdered">) =>
+    isApprovedOrderLocked(item) || isReceivedOrderLocked(item);
+  const isAllowedLockedFinancialPatch = (patch: Partial<ItemDraft>) => {
+    const keys = Object.keys(patch);
+    if (!keys.length) return false;
+    return keys.every((key) => key === "approvedSale" || key === "discount");
+  };
 
   const mapAdditionalLineItemsToDraft = (
     value: any[],
@@ -684,7 +693,10 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        throw new Error(json?.error ?? `HTTP ${res.status}`);
+      }
       setLoadState((prev) =>
         prev.status === "loaded"
           ? {
@@ -701,7 +713,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
       return savedNewJobItems;
     } catch (err) {
       console.error(err);
-      setSaveError("Save failed");
+      setSaveError(err instanceof Error ? err.message : "Save failed");
       return null;
     } finally {
       setIsSaving(false);
@@ -907,7 +919,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
       const next = [...prev.items];
       const current = next[index];
       if (!current) return prev;
-      if (current.partOrdered === 1 && current.status === "approved") {
+      if (isLineItemLocked(current) && !isAllowedLockedFinancialPatch(patch)) {
         return prev;
       }
         const updated: ItemDraft = {
@@ -967,7 +979,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
       if (!prev) return prev;
       const current = prev.items[index];
       if (!current) return prev;
-      if (current.source === "inspection" || current.inspectionItemId || current.partOrdered === 1) {
+      if (current.source === "inspection" || current.inspectionItemId || current.partOrdered === 1 || isLineItemLocked(current)) {
         return prev;
       }
       const next = prev.items.filter((_, i) => i !== index);
@@ -1146,7 +1158,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
     setNewJobItems((prev) =>
       prev.map((item, idx) => {
         if (idx !== index) return item;
-        if (isApprovedOrderLocked(item)) return item;
+        if (isLineItemLocked(item) && !isAllowedLockedFinancialPatch(patch)) return item;
         return {
           ...item,
           ...patch,
@@ -1251,7 +1263,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
     setDraft((prev) => {
       if (!prev) return prev;
       const nextItems = prev.items.map((item) => {
-        const isLocked = isApprovedOrderLocked(item);
+        const isLocked = isLineItemLocked(item);
         if (isLocked) return item;
         if (!checked) {
           if (item.approvedType !== type) return item;
@@ -1278,7 +1290,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
   function applyApprovedTypeToAllNewJob(type: EstimateItemCostType, checked: boolean) {
     setNewJobItems((prev) =>
       prev.map((item) => {
-        const isLocked = isApprovedOrderLocked(item);
+        const isLocked = isLineItemLocked(item);
         if (isLocked) return item;
         if (!checked) {
           if (item.approvedType !== type) return item;
@@ -1378,7 +1390,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
     }
     return summary;
   })();
-  const newJobEditableItems = newJobItems.filter((item) => !isApprovedOrderLocked(item));
+  const newJobEditableItems = newJobItems.filter((item) => !isLineItemLocked(item));
   const newJobTypeSelectable = {
     oe: newJobEditableItems.some((item) => item.quoteCosts?.oe != null),
     oem: newJobEditableItems.some((item) => item.quoteCosts?.oem != null),
@@ -1783,7 +1795,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                                   step="0.01"
                                   className={`${theme.input} h-8 w-24 text-xs`}
                                   value={item.approvedSale}
-                                  disabled={isLocked}
+                                  disabled={false}
                                   onChange={(e) => {
                                     const approvedSale = Number(e.target.value) || 0;
                                     updateItem(idx, {
@@ -1799,7 +1811,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                                 step="0.01"
                                 className={`${theme.input} h-8 w-20 text-xs`}
                                 value={item.discount}
-                                disabled={isLocked}
+                                disabled={false}
                                 onChange={(e) => updateItem(idx, { discount: Number(e.target.value) || 0 })}
                               />
                             </td>
@@ -2098,7 +2110,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                         const lineCost = approvedCostValue;
                         const gpPercent = subTotal > 0 ? ((subTotal - lineCost) / subTotal) * 100 : 0;
                         const selectedApprovedType = item.approvedType ?? null;
-                        const isLocked = isApprovedOrderLocked(item);
+                        const isLocked = isLineItemLocked(item);
 
                         return (
                           <tr key={`new-job-${idx}`} className="border-b border-slate-600/60 transition-colors odd:bg-slate-900/15 hover:bg-slate-800/25 last:border-0">
@@ -2205,7 +2217,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                                 type="number"
                                 className={`${theme.input} h-8 w-24 text-xs`}
                                 value={item.approvedSale}
-                                disabled={isLocked}
+                                disabled={false}
                                 onChange={(e) => updateNewJobItem(idx, { approvedSale: Number(e.target.value) || 0 })}
                               />
                             </td>
@@ -2214,7 +2226,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                                 type="number"
                                 className={`${theme.input} h-8 w-20 text-xs`}
                                 value={item.discount}
-                                disabled={isLocked}
+                                disabled={false}
                                 onChange={(e) => updateNewJobItem(idx, { discount: Number(e.target.value) || 0 })}
                               />
                             </td>

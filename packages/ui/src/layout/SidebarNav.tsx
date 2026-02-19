@@ -8,6 +8,14 @@ import { isModuleVisibleForScope, CURRENT_MODULE_PHASE } from "@repo/ai-core/sha
 import { useI18n } from "../i18n";
 import { DOCUMENTATION_STRUCTURE } from "../docs/docsStructure";
 
+const GLOBAL_SUBTITLES = [
+  { label: "Overview", href: "/global/docs" },
+  ...(DOCUMENTATION_STRUCTURE.find((chapter) => chapter.key === "global")?.sessions ?? []).map((session) => ({
+    label: session.title,
+    href: `/global/docs/${session.slug}`,
+  })),
+];
+
 function getCookieValue(name: string): string | null {
   if (typeof document === "undefined") return null;
   const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));

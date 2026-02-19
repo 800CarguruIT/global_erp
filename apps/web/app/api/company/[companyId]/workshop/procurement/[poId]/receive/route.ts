@@ -5,6 +5,7 @@ type Params = { params: Promise<{ companyId: string; poId: string }> };
 
 export async function POST(req: NextRequest, { params }: Params) {
   const { companyId, poId } = await params;
+  const userId = req.headers.get("x-user-id") || null;
   const body = await req.json().catch(() => ({}));
   if (!Array.isArray(body.items)) {
     return new NextResponse("items required", { status: 400 });
@@ -12,7 +13,8 @@ export async function POST(req: NextRequest, { params }: Params) {
   const result = await receivePoItems(
     companyId,
     poId,
-    body.items.map((i: any) => ({ itemId: i.itemId, quantity: i.quantity ?? 0 }))
+    body.items.map((i: any) => ({ itemId: i.itemId, quantity: i.quantity ?? 0 })),
+    userId
   );
   return NextResponse.json({ data: result });
 }

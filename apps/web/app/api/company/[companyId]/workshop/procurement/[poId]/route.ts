@@ -19,18 +19,36 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const { companyId, poId } = await params;
   const body = await req.json().catch(() => ({}));
 
+  const current = await getPurchaseOrderWithItems(companyId, poId);
+  if (!current) return new NextResponse("Not found", { status: 404 });
+
+  const isDraft = String(current.po.status ?? "").toLowerCase() === "draft";
+  if (Array.isArray(body.items) && isDraft) {
+    await replacePurchaseOrderItems(companyId, poId, body.items);
+  }
+
+  const requestedStatus = body.status as PurchaseOrderStatus | undefined;
+  if (requestedStatus === "received") {
+    const latest = await getPurchaseOrderWithItems(companyId, poId);
+    const items = latest?.items ?? [];
+    const allItemsReceived =
+      items.length > 0 && items.every((item) => String(item.status ?? "").toLowerCase() === "received");
+    if (!allItemsReceived) {
+      return NextResponse.json(
+        { error: "Cannot mark PO as received until all line items are fully received." },
+        { status: 400 }
+      );
+    }
+  }
+
   await updatePurchaseOrderHeader(companyId, poId, {
-    status: body.status as PurchaseOrderStatus | undefined,
+    status: requestedStatus,
     expectedDate: body.expectedDate ?? null,
     notes: body.notes ?? null,
     poType: body.poType as PurchaseOrderType | undefined,
     vendorName: body.vendorName ?? null,
     vendorContact: body.vendorContact ?? null,
   });
-
-  if (Array.isArray(body.items)) {
-    await replacePurchaseOrderItems(companyId, poId, body.items);
-  }
 
   const refreshed = await getPurchaseOrderWithItems(companyId, poId);
   return NextResponse.json({ data: refreshed });

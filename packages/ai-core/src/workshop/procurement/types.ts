@@ -60,5 +60,7 @@ export type PurchaseOrderGrnEntry = {
   partName: string;
   partSku?: string | null;
   sourceId?: string | null;
+  receivedBy?: string | null;
+  receivedById?: string | null;
   createdAt: string;
 };

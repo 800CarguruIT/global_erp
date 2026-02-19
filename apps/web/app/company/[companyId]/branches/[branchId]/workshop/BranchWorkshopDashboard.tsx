@@ -54,6 +54,9 @@ type QuoteRow = {
   estimateId?: string | null;
   branchId?: string | null;
   totalAmount?: number | null;
+  negotiatedAmount?: number | null;
+  negotiationPreviousAmount?: number | null;
+  negotiationNote?: string | null;
   currency?: string | null;
   updatedAt?: string | null;
   etaPreset?: string | null;
@@ -121,6 +124,7 @@ export function BranchWorkshopDashboard({
   const [quoteEtaHours, setQuoteEtaHours] = useState("");
   const [isSubmittingQuote, setIsSubmittingQuote] = useState(false);
   const [quoteModalError, setQuoteModalError] = useState<string | null>(null);
+  const [quoteActionBusyId, setQuoteActionBusyId] = useState<string | null>(null);
   const [loadedResources, setLoadedResources] = useState({
     jobCards: false,
     inspections: false,
@@ -258,6 +262,24 @@ export function BranchWorkshopDashboard({
                 : typeof row.total_amount === "number"
                 ? row.total_amount
                 : null,
+            negotiatedAmount:
+              typeof row.negotiatedAmount === "number"
+                ? row.negotiatedAmount
+                : typeof row.negotiated_amount === "number"
+                ? row.negotiated_amount
+                : typeof meta?.negotiatedAmount === "number"
+                ? meta.negotiatedAmount
+                : typeof meta?.negotiatedAmount === "string"
+                ? Number(meta.negotiatedAmount)
+                : null,
+            negotiationPreviousAmount:
+              typeof meta?.negotiationPreviousAmount === "number"
+                ? meta.negotiationPreviousAmount
+                : typeof meta?.negotiationPreviousAmount === "string"
+                ? Number(meta.negotiationPreviousAmount)
+                : null,
+            negotiationNote:
+              typeof meta?.negotiationNote === "string" ? meta.negotiationNote : null,
             currency:
               typeof row.currency === "string" ? row.currency : null,
             updatedAt:
@@ -659,6 +681,29 @@ export function BranchWorkshopDashboard({
     }
   };
 
+  const applyNegotiationDecision = async (quoteId: string, action: "accepted" | "rejected") => {
+    if (!quoteId) return;
+    setQuoteActionBusyId(quoteId);
+    setError(null);
+    try {
+      const res = await fetch(`/api/company/${companyId}/workshop/quotes/${quoteId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workflowAction: action }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(json?.error ?? `Failed to ${action} quote.`);
+        return;
+      }
+      await loadTabData(activeTab as WorkshopTabId, true);
+    } catch {
+      setError(`Failed to ${action} quote.`);
+    } finally {
+      setQuoteActionBusyId(null);
+    }
+  };
+
   return (
     <div className="space-y-4 py-4">
       <div className={`${theme.cardBg} rounded-2xl p-4 sm:p-5`}>
@@ -881,6 +926,12 @@ export function BranchWorkshopDashboard({
                         <div>
                           Amount: {(quote.currency ?? "AED")} {Number(quote.totalAmount ?? 0).toFixed(2)}
                         </div>
+                        {(quote.status ?? "").toLowerCase() === "negotiation" && (
+                          <div className="text-amber-300">
+                            New Amount: {(quote.currency ?? "AED")}{" "}
+                            {Number(quote.negotiatedAmount ?? quote.totalAmount ?? 0).toFixed(2)}
+                          </div>
+                        )}
                         <div>
                           ETA: {quote.etaPreset ? quote.etaPreset.replace(/_/g, " ") : "-"}
                           {quote.etaPreset === "same_day" && quote.etaHours ? ` (${quote.etaHours}h)` : ""}
@@ -904,7 +955,28 @@ export function BranchWorkshopDashboard({
                         >
                           {inquiryQuoteState.label}
                         </button>
-                      ) : activeTab === "quotes" ? null : (
+                      ) : activeTab === "quotes" ? (
+                        quote && (quote.status ?? "").toLowerCase() === "negotiation" ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => void applyNegotiationDecision(quote.id, "accepted")}
+                              disabled={quoteActionBusyId === quote.id}
+                              className="inline-flex items-center rounded-md bg-emerald-600 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-white shadow-sm transition hover:bg-emerald-500 disabled:opacity-60"
+                            >
+                              {quoteActionBusyId === quote.id ? "Working..." : "Accept"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void applyNegotiationDecision(quote.id, "rejected")}
+                              disabled={quoteActionBusyId === quote.id}
+                              className="inline-flex items-center rounded-md bg-rose-600 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-white shadow-sm transition hover:bg-rose-500 disabled:opacity-60"
+                            >
+                              {quoteActionBusyId === quote.id ? "Working..." : "Reject"}
+                            </button>
+                          </>
+                        ) : null
+                      ) : (
                         activeTab === "jobs" ? null : (
                         <a
                           href={
@@ -1045,6 +1117,12 @@ export function BranchWorkshopDashboard({
                                 <div>
                                   {(quote.currency ?? "AED")} {Number(quote.totalAmount ?? 0).toFixed(2)}
                                 </div>
+                                {(quote.status ?? "").toLowerCase() === "negotiation" ? (
+                                  <div className="text-[10px] text-amber-300">
+                                    New: {(quote.currency ?? "AED")}{" "}
+                                    {Number(quote.negotiatedAmount ?? quote.totalAmount ?? 0).toFixed(2)}
+                                  </div>
+                                ) : null}
                                 <div className="text-[10px] text-foreground/70">
                                   ETA: {quote.etaPreset ? quote.etaPreset.replace(/_/g, " ") : "-"}
                                   {quote.etaPreset === "same_day" && quote.etaHours ? ` (${quote.etaHours}h)` : ""}
@@ -1085,7 +1163,28 @@ export function BranchWorkshopDashboard({
                                 {inquiryQuoteState.label}
                               </button>
                             ) : activeTab === "quotes" ? (
-                              <span className="text-xs text-foreground/55">-</span>
+                              quote && (quote.status ?? "").toLowerCase() === "negotiation" ? (
+                                <div className="inline-flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => void applyNegotiationDecision(quote.id, "accepted")}
+                                    disabled={quoteActionBusyId === quote.id}
+                                    className="inline-flex items-center rounded-md bg-emerald-600 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-white shadow-sm transition hover:bg-emerald-500 disabled:opacity-60"
+                                  >
+                                    {quoteActionBusyId === quote.id ? "Working..." : "Accept"}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => void applyNegotiationDecision(quote.id, "rejected")}
+                                    disabled={quoteActionBusyId === quote.id}
+                                    className="inline-flex items-center rounded-md bg-rose-600 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-white shadow-sm transition hover:bg-rose-500 disabled:opacity-60"
+                                  >
+                                    {quoteActionBusyId === quote.id ? "Working..." : "Reject"}
+                                  </button>
+                                </div>
+                              ) : (
+                                <span className="text-xs text-foreground/55">-</span>
+                              )
                             ) : (
                               activeTab === "jobs" ? (
                                 <span className="text-xs text-foreground/55">-</span>

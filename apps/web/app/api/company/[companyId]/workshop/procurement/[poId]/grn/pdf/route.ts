@@ -20,7 +20,7 @@ function buildHtml(payload: {
   poNumber: string;
   status: string;
   createdAt: string;
-  rows: Array<{ grnNumber: string; partName: string; quantity: number; createdAt: string }>;
+  rows: Array<{ grnNumber: string; partName: string; quantity: number; receivedBy?: string | null; createdAt: string }>;
 }) {
   const rowsHtml = payload.rows
     .map(
@@ -29,6 +29,7 @@ function buildHtml(payload: {
         <td>${escapeHtml(row.grnNumber)}</td>
         <td>${escapeHtml(row.partName || "-")}</td>
         <td class="num">${Number(row.quantity ?? 0).toFixed(2)}</td>
+        <td>${escapeHtml(row.receivedBy || "-")}</td>
         <td>${escapeHtml(new Date(row.createdAt).toLocaleString())}</td>
       </tr>
     `
@@ -72,6 +73,7 @@ function buildHtml(payload: {
               <th>GRN Number</th>
               <th>Part</th>
               <th>Qty</th>
+              <th>Received By</th>
               <th>Received At</th>
             </tr>
           </thead>
@@ -108,6 +110,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
       grnNumber: g.grnNumber,
       partName: g.partName,
       quantity: g.quantity,
+      receivedBy: g.receivedBy ?? null,
       createdAt: g.createdAt,
     })),
   });
@@ -126,4 +129,3 @@ export async function GET(_req: NextRequest, { params }: Params) {
     },
   });
 }
-
