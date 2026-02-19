@@ -118,7 +118,7 @@ export async function GET(req: NextRequest, { params }: Params) {
         estimate_id,
         lead_id,
         branch_id,
-        quote_type,
+        'branch_labor'::text AS quote_type,
         status,
         currency,
         total_amount,
