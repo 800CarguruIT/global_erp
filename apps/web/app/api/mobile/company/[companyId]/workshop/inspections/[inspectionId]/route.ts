@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { getLeadById } from "@repo/ai-core/crm/leads/repository";
 import { getCarById, getCustomerById } from "@repo/ai-core/crm/repository";
+import { getSql } from "@repo/ai-core/db";
 import {
   getInspectionById,
   listInspectionItems,
@@ -43,6 +44,23 @@ export async function GET(req: NextRequest, { params }: Params) {
     const customer =
       customerRaw && customerRaw.company_id === companyId ? customerRaw : null;
     const car = carRaw && carRaw.company_id === companyId ? carRaw : null;
+    const effectiveBranchId =
+      inspection.branchId ??
+      (lead as any)?.branchId ??
+      (lead as any)?.branch_id ??
+      null;
+    let branch: any = null;
+    if (effectiveBranchId) {
+      const sql = getSql();
+      const branchRows = await sql`
+        SELECT id, display_name, name, code
+        FROM branches
+        WHERE id = ${effectiveBranchId}
+          AND company_id = ${companyId}
+        LIMIT 1
+      `;
+      branch = branchRows[0] ?? null;
+    }
 
     return createMobileSuccessResponse({
       inspection,
@@ -50,6 +68,7 @@ export async function GET(req: NextRequest, { params }: Params) {
       customer,
       car,
       lead,
+      branch,
       carInVideoId: lead?.carInVideo ?? null,
     });
   } catch (error) {
