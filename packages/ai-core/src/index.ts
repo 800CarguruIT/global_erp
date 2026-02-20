@@ -69,8 +69,6 @@ export * as WorkshopInvoices from "./workshop/invoices/repository";
 export type { Invoice, InvoiceItem, InvoiceStatus } from "./workshop/invoices/types";
 export * as WorkshopGatepass from "./workshop/gatepass/repository";
 export type { Gatepass, GatepassStatus, GatepassHandoverType } from "./workshop/gatepass/types";
-export * as WorkshopQuotes from "./workshop/quotes/repository";
-export type { Quote, QuoteItem, QuoteStatus, QuoteType } from "./workshop/quotes/types";
 export * as WorkshopProcurement from "./workshop/procurement/repository";
 export type { PurchaseOrder, PurchaseOrderItem, PurchaseOrderStatus, PurchaseOrderType } from "./workshop/procurement/types";
 export * as WorkshopInventory from "./workshop/inventory/repository";

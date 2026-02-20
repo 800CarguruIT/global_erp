@@ -287,6 +287,8 @@ export async function listLeadEvents(
 }
 
 function mapLeadRow(row: any): Lead {
+  const leadType = row.lead_type as Lead["leadType"];
+  const normalizedStatus = normalizeLeadStatusForView(leadType, row.lead_status);
   return {
     id: row.id,
     companyId: row.company_id,
@@ -305,8 +307,8 @@ function mapLeadRow(row: any): Lead {
     pickupGoogleLocation: row.pickup_google_location ?? null,
     dropoffGoogleLocation: row.dropoff_google_location ?? null,
     agentEmployeeId: row.agent_employee_id,
-    leadType: row.lead_type,
-    leadStatus: row.lead_status,
+    leadType,
+    leadStatus: normalizedStatus,
     leadStage: row.lead_stage,
     source: row.source,
     slaMinutes: row.sla_minutes,
@@ -334,6 +336,26 @@ function mapLeadRow(row: any): Lead {
     customerDetailsRequested: row.customer_details_requested ?? false,
     customerDetailsApproved: row.customer_details_approved ?? false,
   };
+}
+
+function normalizeLeadStatusForView(leadType: Lead["leadType"], status: string | null): LeadStatus {
+  const raw = String(status ?? "").trim().toLowerCase();
+  if (leadType === "rsa") {
+    if (["lost", "cancelled", "canceled"].includes(raw)) return "lost";
+    if (["closed_won", "closed", "done", "completed"].includes(raw)) return "done";
+    return "pending";
+  }
+  return (raw || "open") as LeadStatus;
+}
+
+function normalizeLeadStatusForStorage(leadType: Lead["leadType"], status: LeadStatus): LeadStatus {
+  const raw = String(status ?? "").trim().toLowerCase();
+  if (leadType === "rsa") {
+    if (["lost", "cancelled", "canceled"].includes(raw)) return "lost";
+    if (["done", "completed", "closed", "closed_won"].includes(raw)) return "closed_won";
+    return "open";
+  }
+  return status;
 }
 
 function mapLeadEventRow(row: any): LeadEvent {
@@ -430,8 +452,8 @@ export async function releaseExpiredAssignments(
       SET branch_id = NULL, assigned_user_id = NULL, assigned_at = NULL
       WHERE company_id = ${companyId}
         AND lead_type = 'rsa'
-        AND lead_status = 'open'
-        AND lead_stage IN ('new', 'assigned')
+        AND lead_status IN ('open', 'pending')
+        AND lead_stage IN ('new', 'assigned', 'dispatched')
         AND assigned_at IS NOT NULL
         AND assigned_at < now() - (${timeoutMinutes} || ' minutes')::interval
     `;
@@ -485,6 +507,7 @@ export async function updateLeadPartial(
   const newStatus = patch.isArchived
     ? "closed"
     : (patch.leadStatus ?? current.leadStatus);
+  const storedStatus = normalizeLeadStatusForStorage(current.leadType, newStatus);
   const newStage = archiveStage ?? patch.leadStage ?? current.leadStage;
   const newAgentRemark =
     patch.agentRemark !== undefined
@@ -587,7 +610,7 @@ export async function updateLeadPartial(
       : ((current as any).carOutVideo ?? null);
 
   const newClosedAt =
-    newStatus === "closed_won" || newStatus === "lost"
+    storedStatus === "closed_won" || storedStatus === "lost"
       ? (current.closedAt ?? new Date().toISOString())
       : current.closedAt;
 
@@ -603,7 +626,7 @@ export async function updateLeadPartial(
     await sql /* sql */ `
       UPDATE leads
       SET
-        lead_status = ${newStatus},
+        lead_status = ${storedStatus},
         lead_stage = ${newStage},
         branch_id = ${newBranchId},
         assigned_user_id = ${newAssignedUserId},
@@ -633,7 +656,7 @@ export async function updateLeadPartial(
     await sql /* sql */ `
       UPDATE leads
       SET
-        lead_status = ${newStatus},
+        lead_status = ${storedStatus},
         lead_stage = ${newStage},
         agent_remark = ${newAgentRemark},
         customer_remark = ${newCustomerRemark},

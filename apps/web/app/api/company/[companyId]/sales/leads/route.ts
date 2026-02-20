@@ -7,12 +7,13 @@ import {
   releaseExpiredAssignments,
   deleteLead,
 } from "@repo/ai-core/crm/leads/repository";
-import type { LeadType } from "@repo/ai-core/crm/leads/types";
+import type { LeadStatus, LeadType } from "@repo/ai-core/crm/leads/types";
 import { createCustomer, createCar, linkCustomerToCar } from "@repo/ai-core/crm/service";
 import { createInspection } from "@repo/ai-core/workshop/inspections/repository";
 import { createEstimateForLead } from "@repo/ai-core/workshop/estimates/repository";
 import { createWorkOrderFromEstimate, createWorkOrderForInspection } from "@repo/ai-core/workshop/workorders/repository";
 import { getSql } from "@repo/ai-core/db";
+import { normalizeRsaStatus } from "@/lib/leads/rsa-flow";
 
 type Params = { params: Promise<{ companyId: string }> };
 
@@ -144,6 +145,12 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   const leadType: LeadType = (leadTypeInput as LeadType) ?? "rsa";
   const isWorkshop = leadType === "workshop";
+  const normalizedRequestedStatus: LeadStatus | undefined =
+    status === undefined || status === null || status === ""
+      ? undefined
+      : leadType === "rsa"
+        ? normalizeRsaStatus(status)
+        : (status as LeadStatus);
   const workshopFlow =
     (rawWorkshopFlow ??
       body?.workshopWorkflow ??
@@ -290,9 +297,9 @@ export async function POST(req: NextRequest, { params }: Params) {
     meta.pickupRecoveryLeadLink = mapUrl;
   }
 
-  if ((status && status !== lead.leadStatus) || agentRemark || customerRemark) {
+  if ((normalizedRequestedStatus && normalizedRequestedStatus !== lead.leadStatus) || agentRemark || customerRemark) {
     await updateLeadPartial(companyId, lead.id, {
-      leadStatus: status ?? undefined,
+      leadStatus: normalizedRequestedStatus,
       agentRemark: agentRemark ?? undefined,
       customerRemark: customerRemark ?? undefined,
       branchId: requestedBranchId ?? undefined,

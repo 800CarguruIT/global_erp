@@ -3,6 +3,7 @@ import { appendLeadEvent, deleteLead, getLeadById, updateLeadPartial } from "@re
 import { getSql } from "@repo/ai-core/db";
 import { createInspection, getLatestInspectionForLead } from "@repo/ai-core/workshop/inspections/repository";
 import { getCurrentUserIdFromRequest } from "@/lib/auth/current-user";
+import { normalizeRsaStatus } from "@/lib/leads/rsa-flow";
 
 type Params = { params: Promise<{ companyId: string; id: string }> };
 
@@ -37,7 +38,13 @@ export async function PUT(req: NextRequest, { params }: Params) {
   const branchIdFromBody = branchId === null ? null : branchId ?? lead.branchId ?? null;
   const branchChanged = branchIdFromBody !== lead.branchId;
   const nextAssignedUserId = assignedUserId ?? lead.assignedUserId ?? null;
-  const nextLeadStatus = status ?? lead.leadStatus;
+  const normalizedStatusForUpdate =
+    status === undefined || status === null || status === ""
+      ? lead.leadStatus
+      : lead.leadType === "rsa"
+        ? normalizeRsaStatus(status)
+        : status;
+  const nextLeadStatus = normalizedStatusForUpdate ?? lead.leadStatus;
   const assignmentRequested =
     lead.leadType === "workshop" &&
     nextLeadStatus === "car_in" &&
@@ -56,7 +63,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
   }
 
   await updateLeadPartial(companyId, id, {
-    leadStatus: status ?? lead.leadStatus,
+    leadStatus: normalizedStatusForUpdate ?? lead.leadStatus,
     leadStage: leadStage ?? lead.leadStage,
     branchId: branchIdFromBody,
     assignedUserId: nextAssignedUserId,

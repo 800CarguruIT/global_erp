@@ -9,6 +9,9 @@ CREATE TABLE IF NOT EXISTS accounting_entities (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS idx_accounting_entities_scope_company
+ON accounting_entities (scope, company_id);
+
 CREATE TABLE IF NOT EXISTS accounting_journals (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   entity_id uuid NOT NULL REFERENCES accounting_entities(id) ON DELETE CASCADE,

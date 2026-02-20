@@ -3,7 +3,8 @@
 type MarkdownBlock =
     | { type: "heading"; level: number; text: string }
     | { type: "paragraph"; text: string }
-    | { type: "list"; ordered: boolean; items: string[] };
+    | { type: "list"; ordered: boolean; items: string[] }
+    | { type: "code"; language: string; content: string };
 
 interface MarkdownRendererProps {
     text: string;
@@ -43,6 +44,17 @@ export function MarkdownRenderer({ text }: MarkdownRendererProps) {
                     );
                 }
 
+                if (block.type === "code") {
+                    return (
+                        <pre
+                            key={`code-${idx}`}
+                            className="overflow-x-auto rounded-xl border border-white/10 bg-black/40 p-4 text-xs leading-relaxed text-white"
+                        >
+                            <code data-language={block.language || undefined}>{block.content}</code>
+                        </pre>
+                    );
+                }
+
                 return (
                     <p key={`paragraph-${idx}`} className="text-sm leading-relaxed text-foreground">
                         {renderInlineNodes(block.text)}
@@ -59,6 +71,7 @@ function parseMarkdown(text: string): MarkdownBlock[] {
     const blocks: MarkdownBlock[] = [];
     let paragraphBuffer: string[] = [];
     let listBuffer: { ordered: boolean; items: string[] } | null = null;
+    let codeBuffer: { language: string; lines: string[] } | null = null;
 
     const flushParagraph = () => {
         if (paragraphBuffer.length === 0) {
@@ -78,8 +91,40 @@ function parseMarkdown(text: string): MarkdownBlock[] {
         listBuffer = null;
     };
 
+    const flushCode = () => {
+        if (!codeBuffer) {
+            return;
+        }
+        blocks.push({
+            type: "code",
+            language: codeBuffer.language,
+            content: codeBuffer.lines.join("\n"),
+        });
+        codeBuffer = null;
+    };
+
     for (const raw of lines) {
         const trimmed = raw.trim();
+
+        const fenceMatch = trimmed.match(/^```(.*)$/);
+        if (fenceMatch) {
+            flushParagraph();
+            flushList();
+            if (codeBuffer) {
+                flushCode();
+            } else {
+                codeBuffer = {
+                    language: (fenceMatch[1] || "").trim().toLowerCase(),
+                    lines: [],
+                };
+            }
+            continue;
+        }
+
+        if (codeBuffer) {
+            codeBuffer.lines.push(raw);
+            continue;
+        }
 
         if (trimmed === "") {
             flushParagraph();
@@ -115,6 +160,7 @@ function parseMarkdown(text: string): MarkdownBlock[] {
 
     flushParagraph();
     flushList();
+    flushCode();
 
     return blocks;
 }

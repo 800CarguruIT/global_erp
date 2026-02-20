@@ -1,8 +1,11 @@
-﻿import fs from "node:fs";
+import fs from "node:fs";
 import { promises as fsPromises } from "node:fs";
 import path from "node:path";
 
 const DOCS_ROOT_CANDIDATES = [
+    path.resolve(process.cwd(), "global", "docs"),
+    path.resolve(process.cwd(), "../global", "docs"),
+    path.resolve(process.cwd(), "../../global", "docs"),
     path.resolve(process.cwd(), "docs"),
     path.resolve(process.cwd(), "../docs"),
     path.resolve(process.cwd(), "../../docs"),
@@ -14,7 +17,7 @@ function resolveDocsRoot(): string | null {
             if (fs.existsSync(candidate) && fs.statSync(candidate).isDirectory()) {
                 return candidate;
             }
-        } catch (error) {
+        } catch {
             continue;
         }
     }
@@ -26,6 +29,8 @@ export interface DocSummary {
     title: string;
     excerpt: string;
     updatedAt: string;
+    relativePath: string;
+    section: string;
 }
 
 export interface DocDetail extends DocSummary {
@@ -38,14 +43,8 @@ export async function listDocs(): Promise<DocSummary[]> {
         return [];
     }
 
-    const dirents = await fsPromises.readdir(root, { withFileTypes: true });
-    const markdownFiles = dirents.filter(
-        (entry) => entry.isFile() && entry.name.toLowerCase().endsWith(".md")
-    );
-
-    const summaries = await Promise.all(
-        markdownFiles.map((entry) => buildDocEntry(root, entry.name))
-    );
+    const markdownFiles = await collectMarkdownFiles(root, "");
+    const summaries = await Promise.all(markdownFiles.map((relativePath) => buildDocEntry(root, relativePath)));
 
     return summaries
         .filter((entry): entry is DocSummary => Boolean(entry))
@@ -58,39 +57,36 @@ export async function getDocBySlug(slug: string): Promise<DocDetail | null> {
         return null;
     }
 
-    const dirents = await fsPromises.readdir(root, { withFileTypes: true });
-
-    for (const entry of dirents) {
-        if (!entry.isFile() || !entry.name.toLowerCase().endsWith(".md")) {
-            continue;
-        }
-
-        const baseName = path.parse(entry.name).name;
-        if (slugify(baseName) === slug) {
-            return buildDocEntry(root, entry.name, true);
+    const markdownFiles = await collectMarkdownFiles(root, "");
+    for (const relativePath of markdownFiles) {
+        if (makeDocSlug(relativePath) === slug) {
+            return buildDocEntry(root, relativePath, true);
         }
     }
 
     return null;
 }
 
-async function buildDocEntry(root: string, fileName: string): Promise<DocSummary>;
-async function buildDocEntry(root: string, fileName: string, includeContent: true): Promise<DocDetail>;
+async function buildDocEntry(root: string, relativePath: string): Promise<DocSummary>;
+async function buildDocEntry(root: string, relativePath: string, includeContent: true): Promise<DocDetail>;
 async function buildDocEntry(
     root: string,
-    fileName: string,
+    relativePath: string,
     includeContent = false
 ): Promise<DocSummary | DocDetail> {
-    const filePath = path.join(root, fileName);
+    const filePath = path.join(root, relativePath);
     const { content, stats } = await readDocFile(filePath);
-    const baseName = path.parse(fileName).name;
-    const slug = slugify(baseName);
+    const baseName = path.parse(relativePath).name;
+    const normalizedPath = relativePath.replace(/\\/g, "/");
+    const section = normalizedPath.includes("/") ? normalizedPath.split("/")[0] || "root" : "root";
 
     const summary: DocSummary = {
-        slug,
+        slug: makeDocSlug(relativePath),
         title: extractTitle(content, toTitleCase(baseName)),
         excerpt: extractExcerpt(content),
         updatedAt: stats.mtime.toISOString(),
+        relativePath: normalizedPath,
+        section,
     };
 
     if (includeContent) {
@@ -107,6 +103,38 @@ async function readDocFile(filePath: string) {
     ]);
 
     return { content, stats };
+}
+
+async function collectMarkdownFiles(root: string, relativeDir: string): Promise<string[]> {
+    const currentDir = path.join(root, relativeDir);
+    const dirents = await fsPromises.readdir(currentDir, { withFileTypes: true });
+    const results: string[] = [];
+
+    for (const entry of dirents) {
+        const nextRelative = relativeDir ? path.join(relativeDir, entry.name) : entry.name;
+        if (entry.isDirectory()) {
+            const nested = await collectMarkdownFiles(root, nextRelative);
+            results.push(...nested);
+            continue;
+        }
+
+        if (!entry.isFile() || !entry.name.toLowerCase().endsWith(".md")) {
+            continue;
+        }
+        results.push(nextRelative);
+    }
+
+    return results;
+}
+
+function makeDocSlug(relativePath: string): string {
+    const normalized = relativePath.replace(/\\/g, "/").replace(/\.md$/i, "");
+    const slug = normalized
+        .split("/")
+        .filter(Boolean)
+        .map((segment) => slugify(segment))
+        .join("--");
+    return slug || "doc";
 }
 
 function slugify(value: string): string {
@@ -181,6 +209,5 @@ function extractExcerpt(content: string): string {
         return candidate;
     }
 
-    return `${candidate.slice(0, max).trim()}…`;
+    return `${candidate.slice(0, max).trim()}...`;
 }
-

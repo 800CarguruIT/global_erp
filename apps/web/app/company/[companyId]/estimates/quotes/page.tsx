@@ -1,26 +1,16 @@
-"use client";
+import { AppLayout } from "@repo/ui";
 
-import { useEffect, useState } from "react";
-import { AppLayout, EstimateQuotesMain } from "@repo/ui";
-
-export default function CompanyEstimateQuotesPage({
+export default async function CompanyEstimateQuotesPage({
   params,
 }: {
   params: { companyId: string } | Promise<{ companyId: string }>;
 }) {
-  const [companyId, setCompanyId] = useState<string | null>(null);
-
-  useEffect(() => {
-    Promise.resolve(params).then((p) => setCompanyId(p?.companyId ?? null));
-  }, [params]);
-
+  await params;
   return (
     <AppLayout>
-      {companyId ? (
-        <EstimateQuotesMain companyId={companyId} />
-      ) : (
-        <div className="py-4 text-sm text-muted-foreground">Loading...</div>
-      )}
+      <div className="p-4 text-sm text-muted-foreground">
+        Quotes have been removed from the system.
+      </div>
     </AppLayout>
   );
 }

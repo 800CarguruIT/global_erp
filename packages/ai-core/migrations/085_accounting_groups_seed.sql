@@ -13,7 +13,12 @@ INSERT INTO accounting_groups (heading_id, subheading_id, company_id, name, grou
 SELECT
   h.id,
   s.id,
-  'edbab966-f85e-4bb1-a2b2-7d2a644f5638'::uuid,
+  (
+    SELECT c.id
+    FROM companies c
+    ORDER BY c.created_at
+    LIMIT 1
+  ),
   v.name,
   v.group_code
 FROM (
