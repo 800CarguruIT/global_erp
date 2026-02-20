@@ -20,6 +20,11 @@ type JobCardPayload = {
   jobCard: any;
   items: any[];
 };
+type ProductOption = {
+  id: number | string;
+  name: string;
+  type?: string | null;
+};
 
 export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = null }: JobCardDetailMainProps) {
   const { theme } = useTheme();
@@ -36,6 +41,23 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
   const [isSavingCollectCar, setIsSavingCollectCar] = useState(false);
   const [preWorkNote, setPreWorkNote] = useState("");
   const [isSavingPreWork, setIsSavingPreWork] = useState(false);
+  const [workingVideoId, setWorkingVideoId] = useState("");
+  const [isSavingWorkingVideo, setIsSavingWorkingVideo] = useState(false);
+  const [finalInspectionChecks, setFinalInspectionChecks] = useState({
+    testDrive: false,
+    clusterWarning: false,
+    carWash: false,
+    tyreCheck: false,
+    computerReset: false,
+    protectiveShields: false,
+  });
+  const [finalInspectionCarOutVideoId, setFinalInspectionCarOutVideoId] = useState("");
+  const [isSavingFinalInspection, setIsSavingFinalInspection] = useState(false);
+  const [additionalItemName, setAdditionalItemName] = useState("");
+  const [additionalItemMode, setAdditionalItemMode] = useState("recommended");
+  const [additionalItemImageId, setAdditionalItemImageId] = useState("");
+  const [isSavingAdditionalItem, setIsSavingAdditionalItem] = useState(false);
+  const [productOptions, setProductOptions] = useState<ProductOption[]>([]);
   const [activeWizardStep, setActiveWizardStep] = useState("quote");
 
   useEffect(() => {
@@ -56,6 +78,16 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
           );
           setCollectCarMileageImageId(String(card?.collect_car_mileage_image_id ?? ""));
           setPreWorkNote(String(card?.pre_work_note ?? ""));
+          setWorkingVideoId(String(card?.working_video_id ?? ""));
+          setFinalInspectionChecks({
+            testDrive: Boolean(card?.final_inspection_test_drive),
+            clusterWarning: Boolean(card?.final_inspection_cluster_warning),
+            carWash: Boolean(card?.final_inspection_car_wash),
+            tyreCheck: Boolean(card?.final_inspection_tyre_check),
+            computerReset: Boolean(card?.final_inspection_computer_reset),
+            protectiveShields: Boolean(card?.final_inspection_protective_shields),
+          });
+          setFinalInspectionCarOutVideoId(String(card?.final_inspection_car_out_video_id ?? ""));
         }
       } catch (err) {
         if (!cancelled) {
@@ -69,8 +101,39 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
     };
   }, [companyId, jobCardId]);
 
+  useEffect(() => {
+    let cancelled = false;
+    async function loadProducts() {
+      try {
+        const res = await fetch("/api/products");
+        if (!res.ok) return;
+        const json = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        const rows = Array.isArray(json?.data) ? json.data : [];
+        const mapped = rows
+          .map((row: any) => ({
+            id: row?.id ?? row?.name ?? "",
+            name: String(row?.name ?? "").trim(),
+            type: row?.type ?? null,
+          }))
+          .filter((row: ProductOption) => row.name.length > 0);
+        setProductOptions(mapped);
+      } catch {
+        if (!cancelled) setProductOptions([]);
+      }
+    }
+    loadProducts();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const jobCard = useMemo(() => (state.status === "loaded" ? state.data.jobCard : null), [state]);
   const items = useMemo(() => (state.status === "loaded" ? state.data.items ?? [] : []), [state]);
+  const primaryItems = useMemo(
+    () => items.filter((item) => Number(item.is_add ?? 0) !== 1),
+    [items]
+  );
 
   const carLabel = useMemo(() => {
     if (!jobCard) return "";
@@ -90,6 +153,9 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
   const isPreWorkDone = Boolean(jobCard?.pre_work_checked_at);
   const isJobStarted = Boolean(jobCard?.start_at);
   const isJobCompleted = Boolean(jobCard?.complete_at);
+  const hasWorkingVideo = workingVideoId.trim().length > 0;
+  const hasSavedWorkingVideo = String(jobCard?.working_video_id ?? "").trim().length > 0;
+  const isFinalInspectionDone = Boolean(jobCard?.final_inspection_at);
   const isCollectCarDone = useMemo(() => {
     const mileage = Number(collectCarMileage);
     return (
@@ -99,12 +165,32 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
       collectCarMileageImageId.trim().length > 0
     );
   }, [collectCarMileage, collectCarMileageImageId, collectCarVideoId]);
+  const itemsForReceivedChecks = useMemo(
+    () =>
+      primaryItems.filter((item) => {
+        const isAdditional = Number(item.is_add ?? 0) === 1;
+        const itemStatus = String(item.po_status ?? item.order_status ?? "").toLowerCase();
+        return !(isAdditional && itemStatus === "pending");
+      }),
+    [primaryItems]
+  );
   const allPartsReceived = useMemo(() => {
-    if (items.length === 0) return true;
-    return items.every((item) =>
-      String(item.po_status ?? item.order_status ?? "").toLowerCase() === "received"
+    if (itemsForReceivedChecks.length === 0) return true;
+    return itemsForReceivedChecks.every(
+      (item) => String(item.po_status ?? item.order_status ?? "").toLowerCase() === "received"
     );
-  }, [items]);
+  }, [itemsForReceivedChecks]);
+  const receivedItems = useMemo(
+    () =>
+      itemsForReceivedChecks.filter(
+        (item) => String(item.po_status ?? item.order_status ?? "").toLowerCase() === "received"
+      ),
+    [itemsForReceivedChecks]
+  );
+  const additionalItems = useMemo(
+    () => items.filter((item) => Number(item.is_add ?? 0) === 1),
+    [items]
+  );
   const quoteSummary = useMemo(() => {
     const lines = quoteRemarks
       .split("\n")
@@ -122,22 +208,46 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
     };
   }, [quoteRemarks]);
   const partPicMissingCount = useMemo(
-    () => items.filter((item) => !(item.part_pic ?? "")).length,
-    [items]
+    () => primaryItems.filter((item) => !(item.part_pic ?? "")).length,
+    [primaryItems]
   );
   const scrapPicMissingCount = useMemo(
-    () => items.filter((item) => !(item.scrap_pic ?? "")).length,
-    [items]
+    () => primaryItems.filter((item) => !(item.scrap_pic ?? "")).length,
+    [primaryItems]
   );
   const requiredUploadsPending = partPicMissingCount + scrapPicMissingCount;
-  const isEvidenceDone = partPicMissingCount === 0 && scrapPicMissingCount === 0 && items.length > 0;
+  const isEvidenceDone =
+    partPicMissingCount === 0 && scrapPicMissingCount === 0 && primaryItems.length > 0;
+  const receivedPartPicMissingCount = useMemo(
+    () => receivedItems.filter((item) => !(item.part_pic ?? "")).length,
+    [receivedItems]
+  );
+  const receivedScrapPicMissingCount = useMemo(
+    () => receivedItems.filter((item) => !(item.scrap_pic ?? "")).length,
+    [receivedItems]
+  );
+  const receivedRequiredUploadsPending = receivedPartPicMissingCount + receivedScrapPicMissingCount;
+  const hasAllReceivedPartPictures =
+    receivedItems.length === 0 || receivedRequiredUploadsPending === 0;
+  const receivedSparePartsMissingScrapCount = useMemo(
+    () =>
+      primaryItems.filter((item) => {
+        const status = String(item.po_status ?? item.order_status ?? "").toLowerCase();
+        const typeText = String(item.type ?? item.product_type ?? "").toLowerCase();
+        const isSparePart = typeText.includes("spare") && typeText.includes("part");
+        return status === "received" && isSparePart && !(item.scrap_pic ?? "");
+      }).length,
+    [primaryItems]
+  );
+  const hasAllReceivedSpareScrapPictures = receivedSparePartsMissingScrapCount === 0;
   const isQuoteStep = activeWizardStep === "quote";
   const isCollectCarStep = activeWizardStep === "collect_car";
   const isPreWorkStep = activeWizardStep === "pre_work";
   const isStartStep = activeWizardStep === "start";
   const isEvidenceStep = activeWizardStep === "evidence";
   const isCompleteStep = activeWizardStep === "complete";
-  const showPartsTable = isStartStep || isEvidenceStep || isCompleteStep;
+  const isFinalInspectionStep = activeWizardStep === "final_inspection";
+  const showPartsTable = isStartStep || isEvidenceStep || isCompleteStep || isFinalInspectionStep;
   const progressSteps = useMemo(
     () => [
       { key: "quote", label: "Quote Accepted", done: canProgressByQuote },
@@ -146,6 +256,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
       { key: "start", label: "Start Job", done: isJobStarted },
       { key: "evidence", label: "Evidence Upload", done: isEvidenceDone },
       { key: "complete", label: "Completed", done: isJobCompleted },
+      { key: "final_inspection", label: "Final Inspection", done: isFinalInspectionDone },
     ],
     [
       canProgressByQuote,
@@ -154,12 +265,58 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
       isJobStarted,
       isEvidenceDone,
       isJobCompleted,
+      isFinalInspectionDone,
     ]
   );
   const currentProgressIndex = useMemo(() => {
     const firstPending = progressSteps.findIndex((step) => !step.done);
     return firstPending === -1 ? progressSteps.length - 1 : firstPending;
   }, [progressSteps]);
+  const activeStageRequirements = useMemo(() => {
+    if (activeWizardStep === "quote") return [{ label: "Quote accepted", done: canProgressByQuote }];
+    if (activeWizardStep === "collect_car") return [{ label: "Quote accepted", done: canProgressByQuote }];
+    if (activeWizardStep === "pre_work") {
+      return [
+        { label: "Collect car saved", done: isCollectCarDone },
+        { label: "All parts received", done: allPartsReceived },
+      ];
+    }
+    if (activeWizardStep === "start") {
+      return [
+        { label: "Collect car saved", done: isCollectCarDone },
+        { label: "Pre-work check done", done: isPreWorkDone },
+        { label: "All parts received", done: allPartsReceived },
+        { label: "Received part photos uploaded", done: hasAllReceivedPartPictures },
+      ];
+    }
+    if (activeWizardStep === "evidence") return [{ label: "Job started", done: isJobStarted }];
+    if (activeWizardStep === "complete") {
+      return [
+        { label: "Job started", done: isJobStarted },
+        { label: "Received spare scrap photos uploaded", done: hasAllReceivedSpareScrapPictures },
+        { label: "Working video uploaded", done: hasSavedWorkingVideo },
+      ];
+    }
+    return [
+      { label: "Job completed", done: isJobCompleted },
+      { label: "Checklist all verified", done: Object.values(finalInspectionChecks).every(Boolean) },
+      { label: "Car out video uploaded", done: finalInspectionCarOutVideoId.trim().length > 0 },
+    ];
+  }, [
+    activeWizardStep,
+    allPartsReceived,
+    canProgressByQuote,
+    isCollectCarDone,
+    isJobStarted,
+    isPreWorkDone,
+    hasAllReceivedPartPictures,
+    hasAllReceivedSpareScrapPictures,
+    hasSavedWorkingVideo,
+    isJobCompleted,
+    finalInspectionChecks,
+    finalInspectionCarOutVideoId,
+  ]);
+  const unmetRequirementCount = activeStageRequirements.filter((req) => !req.done).length;
 
   useEffect(() => {
     const firstPending = progressSteps.find((step) => !step.done);
@@ -373,6 +530,153 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
     }
   }
 
+  async function saveWorkingVideo() {
+    if (!workingVideoId.trim()) {
+      setToastMessage({ type: "error", text: "Working video is required." });
+      return;
+    }
+    setIsSavingWorkingVideo(true);
+    try {
+      const res = await fetch(`/api/company/${companyId}/workshop/job-cards/${jobCardId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "working_video",
+          workingVideoId: workingVideoId.trim(),
+        }),
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        throw new Error(json?.error || "Failed to save working video.");
+      }
+      const json = await res.json().catch(() => ({}));
+      setState((prev) => {
+        if (prev.status !== "loaded") return prev;
+        return {
+          ...prev,
+          data: {
+            ...prev.data,
+            jobCard: {
+              ...prev.data.jobCard,
+              working_video_id: json?.data?.working_video_id ?? workingVideoId.trim(),
+            },
+          },
+        };
+      });
+      setToastMessage({ type: "success", text: "Working video saved." });
+    } catch (err: any) {
+      setToastMessage({ type: "error", text: err?.message ?? "Failed to save working video." });
+    } finally {
+      setIsSavingWorkingVideo(false);
+    }
+  }
+
+  async function addAdditionalLineItem() {
+    const itemName = additionalItemName.trim();
+    if (!itemName) {
+      setToastMessage({ type: "error", text: "Part name is required." });
+      return;
+    }
+    if (!additionalItemImageId.trim()) {
+      setToastMessage({ type: "error", text: "Item image is required." });
+      return;
+    }
+    setIsSavingAdditionalItem(true);
+    try {
+      const res = await fetch(`/api/company/${companyId}/workshop/job-cards/${jobCardId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "add_additional_item",
+          itemName,
+          addMode: additionalItemMode,
+          imageId: additionalItemImageId.trim(),
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(json?.error || "Failed to add additional item.");
+      }
+      setAdditionalItemName("");
+      setAdditionalItemMode("recommended");
+      setAdditionalItemImageId("");
+      const targetJobCardId = String(json?.data?.target_job_card_id ?? "").trim();
+      setToastMessage({
+        type: "success",
+        text: targetJobCardId
+          ? `Additional item added to separate job card (${targetJobCardId.slice(0, 8)}...).`
+          : "Additional item added to separate job card (pending customer approval).",
+      });
+    } catch (err: any) {
+      setToastMessage({ type: "error", text: err?.message ?? "Failed to add additional item." });
+    } finally {
+      setIsSavingAdditionalItem(false);
+    }
+  }
+
+  async function saveFinalInspection() {
+    if (!isJobCompleted) {
+      setToastMessage({ type: "error", text: "Complete the job before final inspection." });
+      return;
+    }
+    if (!Object.values(finalInspectionChecks).every(Boolean)) {
+      setToastMessage({ type: "error", text: "Verify all final inspection checklist items." });
+      return;
+    }
+    if (!finalInspectionCarOutVideoId.trim()) {
+      setToastMessage({ type: "error", text: "Car out video is required." });
+      return;
+    }
+    setIsSavingFinalInspection(true);
+    try {
+      const res = await fetch(`/api/company/${companyId}/workshop/job-cards/${jobCardId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "final_inspection",
+          checks: finalInspectionChecks,
+          carOutVideoId: finalInspectionCarOutVideoId.trim(),
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(json?.error || "Failed to save final inspection.");
+      }
+      setState((prev) => {
+        if (prev.status !== "loaded") return prev;
+        return {
+          ...prev,
+          data: {
+            ...prev.data,
+            jobCard: {
+              ...prev.data.jobCard,
+              final_inspection_test_drive:
+                json?.data?.final_inspection_test_drive ?? finalInspectionChecks.testDrive,
+              final_inspection_cluster_warning:
+                json?.data?.final_inspection_cluster_warning ?? finalInspectionChecks.clusterWarning,
+              final_inspection_car_wash:
+                json?.data?.final_inspection_car_wash ?? finalInspectionChecks.carWash,
+              final_inspection_tyre_check:
+                json?.data?.final_inspection_tyre_check ?? finalInspectionChecks.tyreCheck,
+              final_inspection_computer_reset:
+                json?.data?.final_inspection_computer_reset ?? finalInspectionChecks.computerReset,
+              final_inspection_protective_shields:
+                json?.data?.final_inspection_protective_shields ?? finalInspectionChecks.protectiveShields,
+              final_inspection_car_out_video_id:
+                json?.data?.final_inspection_car_out_video_id ?? finalInspectionCarOutVideoId.trim(),
+              final_inspection_at: json?.data?.final_inspection_at ?? new Date().toISOString(),
+            },
+          },
+        };
+      });
+      setToastMessage({ type: "success", text: "Final inspection saved." });
+    } catch (err: any) {
+      setToastMessage({ type: "error", text: err?.message ?? "Failed to save final inspection." });
+    } finally {
+      setIsSavingFinalInspection(false);
+    }
+  }
+
   return (
     <MainPageShell
       title="Job Card"
@@ -411,73 +715,29 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                 <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                   Job Progress
                 </div>
-                <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
+                <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-7">
                   {progressSteps.map((step, idx) => (
-                    <div
+                    <button
+                      type="button"
                       key={step.key}
+                      onClick={() => setActiveWizardStep(step.key)}
                       className={`rounded-md border px-2 py-2 text-[11px] ${
-                        step.done
+                        activeWizardStep === step.key
+                          ? "border-cyan-400/60 bg-cyan-500/10 text-cyan-100"
+                          : step.done
                           ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-200"
                           : idx === currentProgressIndex
                           ? "border-amber-400/40 bg-amber-500/10 text-amber-200"
                           : "border-white/10 bg-white/[0.02] text-white/70"
-                      }`}
+                      } text-left transition hover:border-cyan-400/50 hover:text-cyan-100`}
                     >
                       <div className="font-semibold">{step.label}</div>
                       <div className="mt-0.5 text-[10px] uppercase">{step.done ? "Done" : "Pending"}</div>
-                    </div>
+                    </button>
                   ))}
                 </div>
               </div>
-              <div className="rounded-md border border-primary/30 bg-primary/5 p-3">
-                <div className="mb-2 flex items-center justify-between">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-primary">Workflow Wizard</div>
-                  <div className="text-[11px] text-white/70">
-                    Step {Math.max(1, progressSteps.findIndex((s) => s.key === activeWizardStep) + 1)} / {progressSteps.length}
-                  </div>
-                </div>
-                <div className="mb-3 text-sm font-semibold text-white">
-                  {progressSteps.find((step) => step.key === activeWizardStep)?.label ?? "Step"}
-                </div>
-                <div className="rounded-md border border-white/10 bg-white/[0.02] px-3 py-2 text-[11px] text-white/80">
-                  {activeWizardStep === "quote" && "Quote must be accepted before workflow can proceed."}
-                  {activeWizardStep === "collect_car" &&
-                    "Upload collect-car video, enter mileage, and upload mileage image, then save stage."}
-                  {activeWizardStep === "pre_work" &&
-                    "Confirm parts received and complete pre-work check. Optional note can be added."}
-                  {activeWizardStep === "start" && "Start the job after pre-work check is done."}
-                  {activeWizardStep === "evidence" &&
-                    "Upload part and scrap photos for all spare part lines before completion."}
-                  {activeWizardStep === "complete" && "Add remarks and complete job."}
-                </div>
-                <div className="mt-3 flex items-center justify-between">
-                  <button
-                    type="button"
-                    className="rounded-md border border-white/20 px-3 py-1.5 text-xs font-semibold text-white/80 disabled:opacity-50"
-                    disabled={progressSteps.findIndex((step) => step.key === activeWizardStep) <= 0}
-                    onClick={() => {
-                      const idx = progressSteps.findIndex((step) => step.key === activeWizardStep);
-                      const prevStep = idx > 0 ? progressSteps[idx - 1] : null;
-                      if (prevStep) setActiveWizardStep(prevStep.key);
-                    }}
-                  >
-                    Previous
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded-md border border-white/20 px-3 py-1.5 text-xs font-semibold text-white/80 disabled:opacity-50"
-                    disabled={progressSteps.findIndex((step) => step.key === activeWizardStep) >= progressSteps.length - 1}
-                    onClick={() => {
-                      const idx = progressSteps.findIndex((step) => step.key === activeWizardStep);
-                      const nextStep = idx < progressSteps.length - 1 ? progressSteps[idx + 1] : null;
-                      if (nextStep) setActiveWizardStep(nextStep.key);
-                    }}
-                  >
-                    Next
-                  </button>
-                </div>
-              </div>
-              {(isQuoteStep || isPreWorkStep || isCompleteStep) && (
+              {(isQuoteStep || isPreWorkStep || isCompleteStep || isFinalInspectionStep) && (
                 <div className="grid gap-4 lg:grid-cols-2">
                   <div className="space-y-1">
                     <div className="text-xs font-semibold">Customer Complain</div>
@@ -607,17 +867,163 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
               </div>
               )}
               {isCompleteStep && (
-              <div className="space-y-1">
-                <div className="text-xs font-semibold">Job Remarks</div>
-                <textarea
-                  className={`${theme.input} h-20 resize-none`}
-                  value={remarks}
-                  onChange={(e) => setRemarks(e.target.value)}
-                  placeholder="Add remarks before completing the job"
-                />
-              </div>
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <div className="text-xs font-semibold">Job Remarks</div>
+                    <textarea
+                      className={`${theme.input} h-20 resize-none`}
+                      value={remarks}
+                      onChange={(e) => setRemarks(e.target.value)}
+                      placeholder="Add remarks before completing the job"
+                    />
+                  </div>
+                  <div className="space-y-2 rounded-md border border-cyan-500/30 bg-cyan-500/5 p-3">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-cyan-200">Working Video</div>
+                    <FileUploader
+                      label=""
+                      kind="video"
+                      value={workingVideoId}
+                      onChange={(id) => setWorkingVideoId(id ?? "")}
+                      buttonOnly
+                      showPreview
+                      buttonClassName="h-8 px-3 text-[10px]"
+                      containerClassName="w-fit"
+                      previewClassName="h-[120px] w-[180px]"
+                      chooseLabel="Upload Working Video"
+                      replaceLabel="Replace Working Video"
+                    />
+                    <div className="flex items-center justify-between">
+                      <div className="text-[11px] text-white/70">
+                        {hasSavedWorkingVideo
+                          ? "Working video uploaded and saved."
+                          : hasWorkingVideo
+                          ? "Click Save Working Video to persist it."
+                          : "Working video is mandatory before completion."}
+                      </div>
+                      <button
+                        type="button"
+                        className="rounded-md bg-cyan-500 px-3 py-1.5 text-xs font-semibold text-slate-900 disabled:opacity-60"
+                        onClick={saveWorkingVideo}
+                        disabled={isSavingWorkingVideo}
+                      >
+                        {isSavingWorkingVideo ? "Saving..." : "Save Working Video"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
               )}
-              {(isStartStep || isCompleteStep) && (
+              {isFinalInspectionStep && (
+                <div className="space-y-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-emerald-200">Final Inspection</div>
+                  <div className="grid gap-2 text-[11px] md:grid-cols-3">
+                    <label className="inline-flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={finalInspectionChecks.testDrive}
+                        onChange={(e) =>
+                          setFinalInspectionChecks((prev) => ({ ...prev, testDrive: e.target.checked }))
+                        }
+                      />
+                      <span>Test Drive</span>
+                    </label>
+                    <label className="inline-flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={finalInspectionChecks.clusterWarning}
+                        onChange={(e) =>
+                          setFinalInspectionChecks((prev) => ({
+                            ...prev,
+                            clusterWarning: e.target.checked,
+                          }))
+                        }
+                      />
+                      <span>Cluster Warning</span>
+                    </label>
+                    <label className="inline-flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={finalInspectionChecks.carWash}
+                        onChange={(e) =>
+                          setFinalInspectionChecks((prev) => ({ ...prev, carWash: e.target.checked }))
+                        }
+                      />
+                      <span>Car Wash</span>
+                    </label>
+                    <label className="inline-flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={finalInspectionChecks.tyreCheck}
+                        onChange={(e) =>
+                          setFinalInspectionChecks((prev) => ({ ...prev, tyreCheck: e.target.checked }))
+                        }
+                      />
+                      <span>Tyre Check</span>
+                    </label>
+                    <label className="inline-flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={finalInspectionChecks.computerReset}
+                        onChange={(e) =>
+                          setFinalInspectionChecks((prev) => ({
+                            ...prev,
+                            computerReset: e.target.checked,
+                          }))
+                        }
+                      />
+                      <span>Computer Reset</span>
+                    </label>
+                    <label className="inline-flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={finalInspectionChecks.protectiveShields}
+                        onChange={(e) =>
+                          setFinalInspectionChecks((prev) => ({
+                            ...prev,
+                            protectiveShields: e.target.checked,
+                          }))
+                        }
+                      />
+                      <span>Protective Shields</span>
+                    </label>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="text-[11px] font-semibold text-white/80">Car Out Video</div>
+                    <FileUploader
+                      label=""
+                      kind="video"
+                      value={finalInspectionCarOutVideoId}
+                      onChange={(id) => setFinalInspectionCarOutVideoId(id ?? "")}
+                      buttonOnly
+                      showPreview
+                      buttonClassName="h-8 px-3 text-[10px]"
+                      containerClassName="w-fit"
+                      previewClassName="h-[120px] w-[180px]"
+                      chooseLabel="Upload Car Out Video"
+                      replaceLabel="Replace Car Out Video"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="text-[11px] text-white/70">
+                      {isFinalInspectionDone
+                        ? `Completed at ${new Date(jobCard?.final_inspection_at).toLocaleString()}`
+                        : "All checks and car out video are required."}
+                    </div>
+                    <button
+                      type="button"
+                      className="rounded-md bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-slate-900 disabled:opacity-60"
+                      onClick={saveFinalInspection}
+                      disabled={isSavingFinalInspection || isFinalInspectionDone}
+                    >
+                      {isSavingFinalInspection
+                        ? "Saving..."
+                        : isFinalInspectionDone
+                        ? "Final Inspection Done"
+                        : "Save Final Inspection"}
+                    </button>
+                  </div>
+                </div>
+              )}
+              {(isStartStep || isCompleteStep || isFinalInspectionStep) && (
                 <div className="grid gap-3 lg:grid-cols-4">
                   <div className="space-y-1 lg:col-span-2">
                     <div className="text-xs font-semibold">Lead Advisor</div>
@@ -654,14 +1060,14 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                     </tr>
                   </thead>
                   <tbody>
-                    {items.length === 0 ? (
+                    {primaryItems.length === 0 ? (
                       <tr>
                         <td colSpan={8} className="px-3 py-3 text-xs text-muted-foreground">
                           No parts assigned yet.
                         </td>
                       </tr>
                     ) : (
-                      items.map((item, idx) => (
+                      primaryItems.map((item, idx) => (
                         <tr key={item.id ?? idx} className="border-b border-border/60 last:border-0">
                           <td className="px-2 py-1">{idx + 1}</td>
                           <td className="px-2 py-1 font-semibold">{item.product_name ?? item.productName ?? "-"}</td>
@@ -672,6 +1078,8 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                             {(() => {
                               const partStatus = String(item.po_status ?? item.order_status ?? "Ordered");
                               const partStatusLower = partStatus.toLowerCase();
+                              const isAdditionalPendingApproval =
+                                Number(item.is_add ?? 0) === 1 && partStatusLower === "pending";
                               return (
                                 <>
                             <span
@@ -688,6 +1096,11 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                             {(!(item.part_pic ?? "") || !(item.scrap_pic ?? "")) && (
                               <span className="ml-1 rounded-full bg-rose-500/15 px-2 py-0.5 text-[9px] font-semibold uppercase text-rose-300">
                                 Required
+                              </span>
+                            )}
+                            {isAdditionalPendingApproval && (
+                              <span className="ml-1 rounded-full bg-sky-500/15 px-2 py-0.5 text-[9px] font-semibold uppercase text-sky-300">
+                                Pending Customer Approval
                               </span>
                             )}
                                 </>
@@ -742,15 +1155,15 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                       ))
                     )}
                   </tbody>
-                  {items.length > 0 ? (
+                  {primaryItems.length > 0 ? (
                     <tfoot>
                       <tr className="border-t border-border/70 bg-white/[0.02] text-[10px]">
                         <td colSpan={3} className="px-2 py-2 font-semibold text-white/85">
                           Totals
                         </td>
-                        <td className="px-2 py-2 text-white/80">Items: {items.length}</td>
+                        <td className="px-2 py-2 text-white/80">Items: {primaryItems.length}</td>
                         <td className="px-2 py-2 text-white/80">
-                          Qty: {items.reduce((sum, item) => sum + Number(item.quantity ?? 0), 0)}
+                          Qty: {primaryItems.reduce((sum, item) => sum + Number(item.quantity ?? 0), 0)}
                         </td>
                         <td className="px-2 py-2 text-amber-300">Pending Uploads: {requiredUploadsPending}</td>
                         <td className="px-2 py-2 text-amber-300">Part Missing: {partPicMissingCount}</td>
@@ -760,12 +1173,12 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                   ) : null}
                 </table>
                 <div className="space-y-2 p-2 md:hidden">
-                  {items.length === 0 ? (
+                  {primaryItems.length === 0 ? (
                     <div className="rounded-md border border-white/10 bg-white/[0.02] px-3 py-3 text-xs text-muted-foreground">
                       No parts assigned yet.
                     </div>
                   ) : (
-                    items.map((item, idx) => (
+                    primaryItems.map((item, idx) => (
                       <div key={item.id ?? idx} className="rounded-md border border-white/10 bg-white/[0.02] p-3 text-xs">
                         <div className="mb-2 flex items-center justify-between gap-2">
                           <div className="font-semibold">{item.product_name ?? item.productName ?? "-"}</div>
@@ -846,15 +1259,15 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                       </div>
                     ))
                   )}
-                  {items.length > 0 ? (
+                  {primaryItems.length > 0 ? (
                     <div className="rounded-md border border-white/10 bg-white/[0.02] px-3 py-2 text-[11px]">
                       <div className="flex items-center justify-between">
                         <span>Items</span>
-                        <span>{items.length}</span>
+                        <span>{primaryItems.length}</span>
                       </div>
                       <div className="mt-1 flex items-center justify-between">
                         <span>Total Qty</span>
-                        <span>{items.reduce((sum, item) => sum + Number(item.quantity ?? 0), 0)}</span>
+                        <span>{primaryItems.reduce((sum, item) => sum + Number(item.quantity ?? 0), 0)}</span>
                       </div>
                       <div className="mt-1 flex items-center justify-between text-amber-300">
                         <span>Pending Uploads</span>
@@ -867,12 +1280,22 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
               )}
               <div className="sticky bottom-0 z-10 flex flex-col gap-2 rounded-md border border-white/10 bg-slate-950/90 px-3 py-2 backdrop-blur md:flex-row md:items-center md:justify-between">
                 <div className="text-[11px] text-white/80 md:text-left">
-                  {isEvidenceStep || isCompleteStep
+                  {unmetRequirementCount > 0
+                    ? `${unmetRequirementCount} stage requirement${unmetRequirementCount > 1 ? "s" : ""} pending`
+                    : isFinalInspectionStep
+                    ? isFinalInspectionDone
+                      ? "Final inspection completed"
+                      : "Complete final inspection checklist and remarks"
+                    : isEvidenceStep || isCompleteStep
                     ? requiredUploadsPending > 0
                     ? `${requiredUploadsPending} required upload${requiredUploadsPending > 1 ? "s" : ""} pending`
                     : "All required uploads completed"
                     : isStartStep
-                    ? "Ready-to-start checks"
+                    ? receivedRequiredUploadsPending > 0
+                      ? `${receivedRequiredUploadsPending} upload${
+                          receivedRequiredUploadsPending > 1 ? "s" : ""
+                        } pending for received parts`
+                      : "Ready-to-start checks"
                     : "Follow selected stage requirements"}
                 </div>
                 <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row md:items-center md:justify-end">
@@ -905,9 +1328,19 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                   canProgressJobCard &&
                   !jobCard?.start_at &&
                   !jobCard?.complete_at &&
+                  !hasAllReceivedPartPictures && (
+                  <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[11px] font-medium text-amber-200">
+                    Upload part and scrap pictures for all received spare parts before starting.
+                  </div>
+                )}
+                {isStartStep &&
+                  canProgressJobCard &&
+                  !jobCard?.start_at &&
+                  !jobCard?.complete_at &&
                   allPartsReceived &&
                   isCollectCarDone &&
-                  isPreWorkDone && (
+                  isPreWorkDone &&
+                  hasAllReceivedPartPictures && (
                   <button
                     type="button"
                     className="rounded-md bg-sky-600 px-5 py-2 text-xs font-semibold text-white md:min-w-[130px]"
@@ -916,13 +1349,49 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                     Start Job
                   </button>
                 )}
+                {isCompleteStep &&
+                  canProgressJobCard &&
+                  jobCard?.start_at &&
+                  !jobCard?.complete_at &&
+                  !hasAllReceivedSpareScrapPictures && (
+                  <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[11px] font-medium text-amber-200">
+                    Upload scrap pictures for all received spare parts before completing.
+                  </div>
+                )}
+                {isCompleteStep &&
+                  canProgressJobCard &&
+                  jobCard?.start_at &&
+                  !jobCard?.complete_at &&
+                  !hasSavedWorkingVideo && (
+                  <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[11px] font-medium text-amber-200">
+                    Upload and save working video before completing.
+                  </div>
+                )}
                 {isCompleteStep && canProgressJobCard && jobCard?.start_at && !jobCard?.complete_at && (
                   <button
                     type="button"
-                    className="rounded-md bg-amber-400 px-5 py-2 text-xs font-semibold text-slate-900 md:min-w-[130px]"
+                    className="rounded-md bg-amber-400 px-5 py-2 text-xs font-semibold text-slate-900 disabled:cursor-not-allowed disabled:opacity-60 md:min-w-[130px]"
                     onClick={completeJobCard}
+                    disabled={!hasAllReceivedSpareScrapPictures || !hasSavedWorkingVideo}
                   >
                     Complete Job
+                  </button>
+                )}
+                {isFinalInspectionStep &&
+                  canProgressJobCard &&
+                  jobCard?.complete_at &&
+                  !jobCard?.final_inspection_at && (
+                  <button
+                    type="button"
+                    className="rounded-md bg-emerald-500 px-5 py-2 text-xs font-semibold text-slate-900 disabled:cursor-not-allowed disabled:opacity-60 md:min-w-[160px]"
+                    onClick={saveFinalInspection}
+                    disabled={
+                      isSavingFinalInspection ||
+                      !Object.values(finalInspectionChecks).every(Boolean) ||
+                      !finalInspectionCarOutVideoId.trim()
+                    }
+                  >
+                    {isSavingFinalInspection ? "Saving..." : "Save Final Inspection"}
                   </button>
                 )}
                 </div>
@@ -966,6 +1435,114 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                 </div>
                 <div className="mt-3 rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold text-white">
                   {jobCard?.plate_number ?? "N/A"}
+                </div>
+              </div>
+            </section>
+            <section className={`rounded-md ${theme.cardBg} ${theme.cardBorder}`}>
+              <div
+                className={`rounded-t-md px-3 py-2 text-xs font-semibold ${theme.surfaceSubtle} ${theme.appText} border-b border-border/60`}
+              >
+                Additional Items
+              </div>
+              <div className="space-y-3 p-3 text-xs">
+                <div className="space-y-2 rounded-md border border-amber-500/25 bg-amber-500/5 p-2">
+                  <input
+                    className={`${theme.input} h-9`}
+                    value={additionalItemName}
+                    onChange={(e) => setAdditionalItemName(e.target.value)}
+                    placeholder="Search and select item name"
+                    list="additional-item-options"
+                  />
+                  <datalist id="additional-item-options">
+                    {productOptions.map((product) => (
+                      <option key={String(product.id)} value={product.name}>
+                        {product.name}
+                        {product.type ? ` (${product.type})` : ""}
+                      </option>
+                    ))}
+                  </datalist>
+                  <select
+                    className={`${theme.input} h-9`}
+                    value={additionalItemMode}
+                    onChange={(e) => setAdditionalItemMode(e.target.value)}
+                  >
+                    <option value="mandatory">Mandatory</option>
+                    <option value="recommended">Recommended</option>
+                  </select>
+                  <div>
+                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-white/70">
+                      Item Image
+                    </div>
+                    <FileUploader
+                      label=""
+                      kind="image"
+                      value={additionalItemImageId}
+                      onChange={(id) => setAdditionalItemImageId(id ?? "")}
+                      buttonOnly
+                      showPreview
+                      buttonClassName="h-8 px-3 text-[10px]"
+                      containerClassName="w-fit"
+                      previewClassName="h-[90px] w-[90px]"
+                      chooseLabel="Upload Image"
+                      replaceLabel="Replace Image"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    className="w-full rounded-md bg-amber-500 px-3 py-2 text-xs font-semibold text-slate-900 disabled:opacity-60"
+                    onClick={addAdditionalLineItem}
+                    disabled={isSavingAdditionalItem}
+                  >
+                    {isSavingAdditionalItem ? "Adding..." : "Add Item"}
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {additionalItems.length === 0 ? (
+                    <div className="rounded-md border border-white/10 bg-white/[0.02] px-2 py-2 text-muted-foreground">
+                      No additional items.
+                    </div>
+                  ) : (
+                    additionalItems.map((item) => {
+                      const approvalStatus = String(item.customer_approval_status ?? "pending").toLowerCase();
+                      const mode = String(item.additional_item_mode ?? "recommended");
+                      const imageId = String(item.additional_item_image_id ?? "").trim();
+                      return (
+                        <div key={item.id} className="rounded-md border border-white/10 bg-white/[0.02] p-2">
+                          <div className="font-semibold">{item.product_name ?? "-"}</div>
+                          <div className="mt-1 flex flex-wrap items-center gap-1">
+                            <span className="rounded-full bg-cyan-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase text-cyan-200">
+                              {mode}
+                            </span>
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${
+                                approvalStatus === "approved"
+                                  ? "bg-emerald-500/20 text-emerald-200"
+                                  : approvalStatus === "rejected"
+                                  ? "bg-rose-500/20 text-rose-200"
+                                  : "bg-amber-500/20 text-amber-200"
+                              }`}
+                            >
+                              {approvalStatus}
+                            </span>
+                          </div>
+                          {imageId ? (
+                            <a
+                              href={`/api/files/${imageId}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="mt-2 inline-flex rounded-md border border-white/15 bg-white/[0.04] p-1 hover:bg-white/[0.08]"
+                            >
+                              <img
+                                src={`/api/files/${imageId}`}
+                                alt="Additional item"
+                                className="h-16 w-16 rounded object-cover"
+                              />
+                            </a>
+                          ) : null}
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
               </div>
             </section>

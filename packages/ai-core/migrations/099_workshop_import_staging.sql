@@ -67,6 +67,10 @@ CREATE TABLE IF NOT EXISTS workshop_quotes (
     REFERENCES workshops(legacy_id)
 );
 
+-- If workshop_quotes already exists from newer ERP schema, ensure legacy import column exists.
+ALTER TABLE workshop_quotes
+  ADD COLUMN IF NOT EXISTS workshop_legacy_id integer;
+
 CREATE OR REPLACE FUNCTION carguru_touch_updated_at() RETURNS trigger AS $$
 BEGIN
   NEW.updated_at := now();

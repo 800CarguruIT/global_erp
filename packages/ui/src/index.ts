@@ -36,6 +36,7 @@ export { InspectionMain } from "./main-pages/InspectionMain";
 export { InspectionDetailMain } from "./main-pages/InspectionDetailMain";
 export { CarInDashboardMain } from "./main-pages/CarInDashboardMain";
 export { EstimatesMain } from "./main-pages/EstimatesMain";
+export { EstimateQuotesMain } from "./main-pages/EstimateQuotesMain";
 export { EstimateDetailMain } from "./main-pages/EstimateDetailMain";
 export { JobCardDetailMain } from "./main-pages/JobCardDetailMain";
 export { JobCardsMain } from "./main-pages/JobCardsMain";

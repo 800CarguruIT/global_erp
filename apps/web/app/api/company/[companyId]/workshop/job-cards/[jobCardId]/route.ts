@@ -19,9 +19,20 @@ export async function GET(_req: NextRequest, { params }: Params) {
            jc.collect_car_mileage,
            jc.collect_car_mileage_image_id,
            jc.collect_car_at,
+           jc.working_video_id,
            jc.pre_work_checked_at,
            jc.pre_work_checked_by,
            jc.pre_work_note,
+           jc.final_inspection_test_drive,
+           jc.final_inspection_cluster_warning,
+           jc.final_inspection_car_wash,
+           jc.final_inspection_tyre_check,
+           jc.final_inspection_computer_reset,
+           jc.final_inspection_protective_shields,
+           jc.final_inspection_remarks,
+           jc.final_inspection_car_out_video_id,
+           jc.final_inspection_at,
+           jc.final_inspection_by,
            jc.estimate_id,
            jc.lead_id,
            jc.status,
@@ -79,7 +90,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const jobCard = jobRows[0];
+  const jobCard = jobRows[0]!;
   if (jobCard && jobCard.estimate_id) {
     // ensure company scope by joining estimate
     const companyCheck = await sql`
@@ -154,7 +165,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     body?.action !== "quote" &&
     body?.action !== "verify" &&
     body?.action !== "collect_car" &&
-    body?.action !== "pre_work_check"
+    body?.action !== "pre_work_check" &&
+    body?.action !== "working_video" &&
+    body?.action !== "add_additional_item" &&
+    body?.action !== "final_inspection"
   ) {
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
   }
@@ -194,7 +208,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (!jobRows.length) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  const jobCard = jobRows[0];
+  const jobCard = jobRows[0]!;
   const currentUserId = await getCurrentUserIdFromRequest(req);
   if (!currentUserId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -209,7 +223,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     (body?.action === "start" ||
       body?.action === "complete" ||
       body?.action === "collect_car" ||
-      body?.action === "pre_work_check") &&
+      body?.action === "pre_work_check" ||
+      body?.action === "working_video" ||
+      body?.action === "add_additional_item" ||
+      body?.action === "final_inspection") &&
     isBranchScopedUser &&
     !isAssignedWorkshopUser
   ) {
@@ -273,6 +290,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         FROM line_items
         WHERE job_card_id = ${jobCardId}
           AND company_id = ${companyId}
+          AND NOT (
+            COALESCE(is_add, 0) = 1
+            AND LOWER(COALESCE(order_status, 'pending')) = 'pending'
+          )
       ),
       quote_rank AS (
         SELECT
@@ -312,6 +333,71 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     if (unreceivedParts.length) {
       return NextResponse.json(
         { error: "All parts must be received before starting the job card." },
+        { status: 400 }
+      );
+    }
+    const receivedPartsMissingPictures = await sql`
+      WITH li AS (
+        SELECT id, product_name, order_status, part_pic, scrap_pic
+        FROM line_items
+        WHERE job_card_id = ${jobCardId}
+          AND company_id = ${companyId}
+          AND NOT (
+            COALESCE(is_add, 0) = 1
+            AND LOWER(COALESCE(order_status, 'pending')) = 'pending'
+          )
+      ),
+      quote_rank AS (
+        SELECT
+          source.line_item_id,
+          MAX(
+            CASE
+              WHEN LOWER(COALESCE(source.status, '')) IN ('received', 'completed') THEN 3
+              WHEN LOWER(COALESCE(source.status, '')) IN ('return', 'returned') THEN 2
+              WHEN LOWER(COALESCE(source.status, '')) = 'ordered' THEN 1
+              ELSE 0
+            END
+          ) AS status_rank
+        FROM (
+          SELECT li.id AS line_item_id, pq.status
+          FROM li
+          INNER JOIN part_quotes pq ON pq.line_item_id = li.id
+        ) source
+        GROUP BY source.line_item_id
+      ),
+      status_view AS (
+        SELECT
+          li.id,
+          li.product_name,
+          li.part_pic,
+          li.scrap_pic,
+          LOWER(
+            COALESCE(
+              CASE
+                WHEN qr.status_rank >= 3 THEN 'received'
+                WHEN qr.status_rank = 2 THEN 'returned'
+                WHEN qr.status_rank = 1 THEN 'ordered'
+                ELSE NULL
+              END,
+              li.order_status,
+              'pending'
+            )
+          ) AS resolved_status
+        FROM li
+        LEFT JOIN quote_rank qr ON qr.line_item_id = li.id
+      )
+      SELECT id, product_name
+      FROM status_view
+      WHERE resolved_status = 'received'
+        AND (part_pic IS NULL OR part_pic = '' OR scrap_pic IS NULL OR scrap_pic = '')
+      LIMIT 1
+    `;
+    if (receivedPartsMissingPictures.length) {
+      return NextResponse.json(
+        {
+          error:
+            "Upload part and scrap pictures for all received spare parts before starting the job card.",
+        },
         { status: 400 }
       );
     }
@@ -373,6 +459,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         FROM line_items
         WHERE job_card_id = ${jobCardId}
           AND company_id = ${companyId}
+          AND NOT (
+            COALESCE(is_add, 0) = 1
+            AND LOWER(COALESCE(order_status, 'pending')) = 'pending'
+          )
       ),
       quote_rank AS (
         SELECT
@@ -428,6 +518,189 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     return NextResponse.json({ data: updated[0] ?? jobCard });
   }
 
+  if (body?.action === "working_video") {
+    const workingVideoId = String(body?.workingVideoId ?? "").trim();
+    if (!workingVideoId) {
+      return NextResponse.json({ error: "Working video is required." }, { status: 400 });
+    }
+    const updated = await sql`
+      UPDATE job_cards
+      SET working_video_id = ${workingVideoId}
+      WHERE id = ${jobCardId}
+      RETURNING *
+    `;
+    return NextResponse.json({ data: updated[0] ?? jobCard });
+  }
+
+  if (body?.action === "add_additional_item") {
+    if (!jobCard?.estimate_id || !jobCard?.inspection_id) {
+      return NextResponse.json(
+        { error: "Estimate or inspection not found for this job card." },
+        { status: 400 }
+      );
+    }
+    const partName = String(body?.partName ?? body?.itemName ?? "").trim();
+    const description = String(body?.description ?? "").trim() || null;
+    const qtyRaw = Number(body?.quantity ?? 1);
+    const quantity = Number.isFinite(qtyRaw) ? Math.max(1, Math.floor(qtyRaw)) : 1;
+    const normalizedType = String(body?.type ?? "aftermarket").trim().toLowerCase();
+    const estimateType =
+      normalizedType === "genuine" ||
+      normalizedType === "oem" ||
+      normalizedType === "aftermarket" ||
+      normalizedType === "used" ||
+      normalizedType === "repair"
+        ? normalizedType
+        : "aftermarket";
+    const additionalItemModeRaw = String(body?.additionalItemMode ?? body?.addMode ?? "").trim().toLowerCase();
+    const additionalItemMode =
+      additionalItemModeRaw === "mandatory" || additionalItemModeRaw === "recommended"
+        ? additionalItemModeRaw
+        : "recommended";
+    const additionalItemImageId = String(body?.additionalItemImageId ?? body?.imageId ?? "").trim();
+    if (!partName) {
+      return NextResponse.json({ error: "Part name is required." }, { status: 400 });
+    }
+    if (!additionalItemImageId) {
+      return NextResponse.json({ error: "Additional item image is required." }, { status: 400 });
+    }
+
+    const nextLineNoRows = await sql`
+      SELECT COALESCE(MAX(line_no), 0) + 1 AS next_line_no
+      FROM estimate_items
+      WHERE estimate_id = ${jobCard.estimate_id}
+    `;
+    const nextLineNo = Number(nextLineNoRows[0]?.next_line_no ?? 1);
+
+    const created = await sql.begin(async (trx) => {
+      const existingAdditionalJobCardRows = await trx`
+        SELECT jc.id
+        FROM job_cards jc
+        WHERE jc.estimate_id = ${jobCard.estimate_id}
+          AND jc.id <> ${jobCardId}
+          AND jc.status IN ('Pending', 'Re-Assigned')
+          AND EXISTS (
+            SELECT 1
+            FROM line_items li
+            WHERE li.job_card_id = jc.id
+              AND COALESCE(li.is_add, 0) = 1
+          )
+        ORDER BY jc.created_at DESC
+        LIMIT 1
+      `;
+      let targetJobCardId = String(existingAdditionalJobCardRows[0]?.id ?? "");
+      if (!targetJobCardId) {
+        const createdJobCardRows = await trx`
+          INSERT INTO job_cards (
+            done_by,
+            estimate_id,
+            lead_id,
+            status
+          ) VALUES (
+            ${currentUserId},
+            ${jobCard.estimate_id},
+            ${jobCard.lead_id ?? null},
+            'Pending'
+          )
+          RETURNING id
+        `;
+        targetJobCardId = String(createdJobCardRows[0]?.id ?? "");
+      }
+      if (!targetJobCardId) {
+        throw new Error("Failed to create additional job card.");
+      }
+      const createdLineItemRows = await trx`
+        INSERT INTO line_items (
+          company_id,
+          lead_id,
+          inspection_id,
+          product_name,
+          description,
+          quantity,
+          reason,
+          status,
+          source,
+          is_add,
+          order_status,
+          job_card_id,
+          additional_item_mode,
+          additional_item_image_id,
+          customer_approval_status
+        ) VALUES (
+          ${companyId},
+          ${jobCard.lead_id ?? null},
+          ${jobCard.inspection_id},
+          ${partName},
+          ${description},
+          ${quantity},
+          ${"Additional item from workshop"},
+          ${"Pending"},
+          ${"estimate"},
+          ${1},
+          ${"Pending"},
+          ${targetJobCardId},
+          ${additionalItemMode},
+          ${additionalItemImageId},
+          ${"pending"}
+        )
+        RETURNING *
+      `;
+      const createdLineItem = createdLineItemRows[0];
+      if (!createdLineItem) {
+        throw new Error("Failed to create additional line item.");
+      }
+      await trx`
+        INSERT INTO estimate_items (
+          estimate_id,
+          inspection_item_id,
+          line_no,
+          part_name,
+          description,
+          type,
+          quantity,
+          cost,
+          sale,
+          gp_percent,
+          status
+        ) VALUES (
+          ${jobCard.estimate_id},
+          ${createdLineItem.id},
+          ${nextLineNo},
+          ${partName},
+          ${description},
+          ${estimateType},
+          ${quantity},
+          ${0},
+          ${0},
+          ${null},
+          ${"pending"}
+        )
+      `;
+      await trx`
+        UPDATE estimates
+        SET status = ${"pending_approval"}
+        WHERE id = ${jobCard.estimate_id}
+          AND company_id = ${companyId}
+      `;
+      await trx`
+        UPDATE job_cards
+        SET updated_at = NOW()
+        WHERE id = ${targetJobCardId}
+      `;
+      return { createdLineItem, targetJobCardId };
+    });
+
+    return NextResponse.json({
+      data: {
+        ...created?.createdLineItem,
+        po_status: created?.createdLineItem?.order_status ?? "Pending",
+        order_status: created?.createdLineItem?.order_status ?? "Pending",
+        customer_approval_status: created?.createdLineItem?.customer_approval_status ?? "pending",
+        target_job_card_id: created?.targetJobCardId ?? null,
+      },
+    });
+  }
+
   if (body?.action === "quote") {
     if (!jobCard?.estimate_id) {
       return NextResponse.json({ error: "Estimate not found for this job card." }, { status: 400 });
@@ -476,6 +749,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       estimatedHours: preset === "same_day" ? Number(body?.estimatedHours) : null,
       remarks: userRemarks || null,
     };
+    const quoteMetaValue: any = quoteMeta;
 
     const existingQuoteRows = await sql`
       SELECT id, status
@@ -486,8 +760,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       ORDER BY updated_at DESC
       LIMIT 1
     `;
-    if (existingQuoteRows.length) {
-      const existingStatus = String(existingQuoteRows[0].status ?? "").toLowerCase();
+    const existingQuote = existingQuoteRows[0];
+    if (existingQuote) {
+      const existingStatus = String(existingQuote.status ?? "").toLowerCase();
       if (existingStatus && existingStatus !== "rejected") {
         return NextResponse.json(
           { error: "Quote already submitted. You can resubmit only after rejection." },
@@ -504,9 +779,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
             eta_preset = ${preset},
             eta_hours = ${preset === "same_day" ? Number(body?.estimatedHours) : null},
             remarks = ${remarks},
-            meta = ${quoteMeta},
+            meta = ${quoteMetaValue},
             updated_at = NOW()
-        WHERE id = ${existingQuoteRows[0].id}
+        WHERE id = ${existingQuote.id}
       `;
     } else {
       await sql`
@@ -543,7 +818,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
           ${preset},
           ${preset === "same_day" ? Number(body?.estimatedHours) : null},
           ${remarks},
-          ${quoteMeta},
+          ${quoteMetaValue},
           ${null}
         )
       `;
@@ -606,10 +881,22 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       );
     }
     const quote = quoteRows[0];
+    if (!quote) {
+      return NextResponse.json(
+        { error: "Accepted quote is required before verification." },
+        { status: 400 }
+      );
+    }
     if (String(quote.status ?? "").toLowerCase() === "verified" || quote.verified_at) {
       return NextResponse.json(
         { error: "Job card already verified." },
         { status: 409 }
+      );
+    }
+    if (!jobCard?.final_inspection_at) {
+      return NextResponse.json(
+        { error: "Final Inspection is required before verification." },
+        { status: 400 }
       );
     }
 
@@ -702,6 +989,54 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     });
   }
 
+  if (body?.action === "final_inspection") {
+    const isCompleted =
+      Boolean(jobCard?.complete_at) || String(jobCard?.status ?? "").toLowerCase() === "completed";
+    if (!isCompleted) {
+      return NextResponse.json(
+        { error: "Final Inspection can be completed only after job completion." },
+        { status: 400 }
+      );
+    }
+    const checks = {
+      testDrive: Boolean(body?.checks?.testDrive),
+      clusterWarning: Boolean(body?.checks?.clusterWarning),
+      carWash: Boolean(body?.checks?.carWash),
+      tyreCheck: Boolean(body?.checks?.tyreCheck),
+      computerReset: Boolean(body?.checks?.computerReset),
+      protectiveShields: Boolean(body?.checks?.protectiveShields),
+    };
+    const finalInspectionRemarks =
+      typeof body?.finalInspectionRemarks === "string" ? body.finalInspectionRemarks.trim() : "";
+    const finalInspectionCarOutVideoId = String(body?.carOutVideoId ?? body?.finalInspectionCarOutVideoId ?? "").trim();
+    if (!checks.testDrive || !checks.clusterWarning || !checks.carWash || !checks.tyreCheck || !checks.computerReset || !checks.protectiveShields) {
+      return NextResponse.json(
+        { error: "All final inspection checklist items must be verified." },
+        { status: 400 }
+      );
+    }
+    if (!finalInspectionCarOutVideoId) {
+      return NextResponse.json({ error: "Car out video is required." }, { status: 400 });
+    }
+    const updated = await sql`
+      UPDATE job_cards
+      SET
+        final_inspection_test_drive = ${checks.testDrive},
+        final_inspection_cluster_warning = ${checks.clusterWarning},
+        final_inspection_car_wash = ${checks.carWash},
+        final_inspection_tyre_check = ${checks.tyreCheck},
+        final_inspection_computer_reset = ${checks.computerReset},
+        final_inspection_protective_shields = ${checks.protectiveShields},
+        final_inspection_remarks = ${finalInspectionRemarks || null},
+        final_inspection_car_out_video_id = ${finalInspectionCarOutVideoId},
+        final_inspection_by = ${currentUserId},
+        final_inspection_at = NOW()
+      WHERE id = ${jobCardId}
+      RETURNING *
+    `;
+    return NextResponse.json({ data: updated[0] ?? jobCard });
+  }
+
   const remarks = typeof body?.remarks === "string" ? body.remarks.trim() : "";
   if (!remarks) {
     return NextResponse.json({ error: "Remarks are required before completing." }, { status: 400 });
@@ -715,12 +1050,53 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   }
 
   const missingEvidence = await sql`
+    WITH li AS (
+      SELECT
+        li.id,
+        li.product_id,
+        li.product_name,
+        li.order_status,
+        li.scrap_pic
+      FROM line_items li
+      WHERE li.job_card_id = ${jobCardId}
+        AND li.company_id = ${companyId}
+    ),
+    quote_rank AS (
+      SELECT
+        source.line_item_id,
+        MAX(
+          CASE
+            WHEN LOWER(COALESCE(source.status, '')) IN ('received', 'completed') THEN 3
+            WHEN LOWER(COALESCE(source.status, '')) IN ('return', 'returned') THEN 2
+            WHEN LOWER(COALESCE(source.status, '')) = 'ordered' THEN 1
+            ELSE 0
+          END
+        ) AS status_rank
+      FROM (
+        SELECT li.id AS line_item_id, pq.status
+        FROM li
+        INNER JOIN part_quotes pq ON pq.line_item_id = li.id
+      ) source
+      GROUP BY source.line_item_id
+    )
     SELECT li.id, li.product_name
-    FROM line_items li
+    FROM li
+    LEFT JOIN quote_rank qr ON qr.line_item_id = li.id
     LEFT JOIN products p ON p.id = li.product_id
     LEFT JOIN products p2 ON LOWER(p2.name) = LOWER(li.product_name)
-    WHERE li.job_card_id = ${jobCardId}
-      AND (li.scrap_pic IS NULL OR li.part_pic IS NULL)
+    WHERE LOWER(
+      COALESCE(
+        CASE
+          WHEN qr.status_rank >= 3 THEN 'received'
+          WHEN qr.status_rank = 2 THEN 'returned'
+          WHEN qr.status_rank = 1 THEN 'ordered'
+          ELSE NULL
+        END,
+        li.order_status,
+        'pending'
+      )
+    ) = 'received'
+      AND (li.scrap_pic IS NULL OR li.scrap_pic = '')
       AND (
         POSITION('spare' IN LOWER(COALESCE(p.type, p2.type, ''))) > 0
         AND POSITION('part' IN LOWER(COALESCE(p.type, p2.type, ''))) > 0
@@ -729,7 +1105,14 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
   if (missingEvidence.length) {
     return NextResponse.json(
-      { error: "Part and scrap pictures are required before completing." },
+      { error: "Scrap pictures are required for all received spare parts before completing." },
+      { status: 400 }
+    );
+  }
+  const workingVideoId = String(jobCard?.working_video_id ?? "").trim();
+  if (!workingVideoId) {
+    return NextResponse.json(
+      { error: "Working video is required before completing the job." },
       { status: 400 }
     );
   }

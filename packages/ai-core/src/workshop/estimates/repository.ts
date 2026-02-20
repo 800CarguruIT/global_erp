@@ -238,17 +238,34 @@ export async function getEstimateWithItems(
     }
   }
 
-  const vendorQuoteRows = await sql`
+  const legacyQuoteTables = await sql`
     SELECT
-      qi.estimate_item_id,
-      qi.part_type,
-      qi.unit_price
-    FROM quotes q
-    INNER JOIN quote_items qi ON qi.quote_id = q.id
-    WHERE q.company_id = ${companyId}
-      AND q.estimate_id = ${estimateId}
-      AND q.quote_type = ${"vendor_part" as QuoteType}
+      EXISTS (
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'quotes'
+      ) AS has_quotes,
+      EXISTS (
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'quote_items'
+      ) AS has_quote_items
   `;
+  const hasLegacyQuoteTables =
+    Boolean(legacyQuoteTables[0]?.has_quotes) && Boolean(legacyQuoteTables[0]?.has_quote_items);
+  const vendorQuoteRows = hasLegacyQuoteTables
+    ? await sql`
+        SELECT
+          qi.estimate_item_id,
+          qi.part_type,
+          qi.unit_price
+        FROM quotes q
+        INNER JOIN quote_items qi ON qi.quote_id = q.id
+        WHERE q.company_id = ${companyId}
+          AND q.estimate_id = ${estimateId}
+          AND q.quote_type = ${"vendor_part" as QuoteType}
+      `
+    : [];
   const vendorQuoteCostMap: Record<string, EstimateItemQuoteCosts | undefined> = {};
   for (const row of vendorQuoteRows) {
     const costKey = mapVendorPartType(row.part_type);

@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { WorkshopQuotes } from "@repo/ai-core";
 import { getSql } from "@repo/ai-core/db";
 
 type Params = { params: Promise<{ companyId: string }> };
@@ -11,10 +10,6 @@ export async function GET(req: NextRequest, { params }: Params) {
   const type = url.searchParams.get("type") ?? undefined;
   const status = url.searchParams.get("status") ?? undefined;
   try {
-    const vendorQuotes = await WorkshopQuotes.listQuotesForCompany(companyId, {
-      type: type as any,
-      status: status as any,
-    });
     const sql = getSql();
     const workshopRows = await sql`
       SELECT
@@ -68,20 +63,12 @@ export async function GET(req: NextRequest, { params }: Params) {
 
     const normalizedType = String(type ?? "").toLowerCase();
     const normalizedStatus = String(status ?? "").toLowerCase();
-    const vendorFiltered =
-      normalizedType === "branch_labor"
-        ? []
-        : vendorQuotes.filter((quote) => {
-            const qt = String(quote.quoteType ?? "").toLowerCase();
-            if (qt !== "vendor_part") return false;
-            return normalizedType ? qt === normalizedType : true;
-          });
     const workshopFiltered = workshopQuotes.filter((quote: any) => {
       if (normalizedType && normalizedType !== "branch_labor") return false;
       if (normalizedStatus && String(quote.status ?? "").toLowerCase() !== normalizedStatus) return false;
       return true;
     });
-    const data = [...vendorFiltered, ...workshopFiltered].sort(
+    const data = workshopFiltered.sort(
       (a: any, b: any) => new Date(b.updatedAt ?? 0).getTime() - new Date(a.updatedAt ?? 0).getTime()
     );
     return NextResponse.json({ data });
@@ -100,18 +87,10 @@ export async function POST(req: NextRequest, { params }: Params) {
     const body = await req.json().catch(() => ({}));
     const mode = body.type as "vendor_part" | "branch_labor";
     if (mode === "vendor_part") {
-      if (!body.estimateId || !body.vendorId) {
-        return NextResponse.json(
-          { error: "estimateId and vendorId are required for vendor_part" },
-          { status: 400 },
-        );
-      }
-      const data = await WorkshopQuotes.createVendorQuoteForEstimate(
-        companyId,
-        body.estimateId,
-        body.vendorId,
+      return NextResponse.json(
+        { error: "vendor_part is not supported by this endpoint" },
+        { status: 400 },
       );
-      return NextResponse.json({ data }, { status: 201 });
     }
     if (mode === "branch_labor") {
       if (!body.estimateId || !body.branchId) {

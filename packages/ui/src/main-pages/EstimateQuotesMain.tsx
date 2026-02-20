@@ -1905,6 +1905,27 @@ export function EstimateQuotesMain({
               {!jobVerifyDetailsLoading && jobVerifyRow ? (
                 <>
                   {(() => {
+                    const verifyItems = Array.isArray(jobVerifyDetails?.items) ? jobVerifyDetails.items : [];
+                    const collectCarVideoId = String((jobVerifyDetails?.jobCard as any)?.collect_car_video_id ?? "").trim();
+                    const workingVideoId = String((jobVerifyDetails?.jobCard as any)?.working_video_id ?? "").trim();
+                    const collectCarMileageImageId = String(
+                      (jobVerifyDetails?.jobCard as any)?.collect_car_mileage_image_id ?? ""
+                    ).trim();
+                    const lineItemVideoIds = verifyItems
+                      .flatMap((item: any) => [
+                        item?.part_video,
+                        item?.scrap_video,
+                        item?.video_file_id,
+                        item?.media_file_id,
+                      ])
+                      .map((value: any) => String(value ?? "").trim())
+                      .filter(Boolean);
+                    const videoIds = Array.from(
+                      new Set([collectCarVideoId, workingVideoId, ...lineItemVideoIds].filter(Boolean))
+                    );
+                    return (
+                      <>
+                  {(() => {
                     const quoteAmount = Number((jobVerifyRow as any).workshop_quote_total_amount ?? 0);
                     const vatAmount = Number((quoteAmount * (jobVerifyVatRate / 100)).toFixed(2));
                     const netAmount = Number((quoteAmount + vatAmount).toFixed(2));
@@ -1968,7 +1989,7 @@ export function EstimateQuotesMain({
                   </div>
                   <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
                     <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Line Items</div>
-                    {Array.isArray(jobVerifyDetails?.items) && jobVerifyDetails.items.length ? (
+                    {verifyItems.length ? (
                       <div className="overflow-auto rounded-md border border-white/10">
                         <table className="min-w-full text-xs">
                           <thead>
@@ -1976,16 +1997,60 @@ export function EstimateQuotesMain({
                               <th className="px-2 py-2 text-left">Part</th>
                               <th className="px-2 py-2 text-left">Qty</th>
                               <th className="px-2 py-2 text-left">Order Status</th>
+                              <th className="px-2 py-2 text-left">Part Pic</th>
+                              <th className="px-2 py-2 text-left">Scrap Pic</th>
                             </tr>
                           </thead>
                           <tbody>
-                            {jobVerifyDetails.items.map((item: any) => (
+                            {verifyItems.map((item: any) => {
+                              const partPic = String(item.part_pic ?? "").trim();
+                              const scrapPic = String(item.scrap_pic ?? "").trim();
+                              return (
                               <tr key={item.id} className="border-t border-white/10">
                                 <td className="px-2 py-2">{item.product_name ?? item.productName ?? "-"}</td>
                                 <td className="px-2 py-2">{item.quantity ?? "-"}</td>
                                 <td className="px-2 py-2 uppercase">{item.po_status ?? item.order_status ?? "-"}</td>
+                                <td className="px-2 py-2">
+                                  {partPic ? (
+                                    <a
+                                      href={`/api/files/${partPic}`}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="inline-flex items-center gap-2 rounded-md border border-white/15 bg-white/[0.04] px-2 py-1 hover:bg-white/[0.08]"
+                                    >
+                                      <img
+                                        src={`/api/files/${partPic}`}
+                                        alt="Part pic"
+                                        className="h-10 w-10 rounded object-cover"
+                                      />
+                                      <span className="text-[10px] text-cyan-200">Open</span>
+                                    </a>
+                                  ) : (
+                                    <span className="text-muted-foreground">-</span>
+                                  )}
+                                </td>
+                                <td className="px-2 py-2">
+                                  {scrapPic ? (
+                                    <a
+                                      href={`/api/files/${scrapPic}`}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="inline-flex items-center gap-2 rounded-md border border-white/15 bg-white/[0.04] px-2 py-1 hover:bg-white/[0.08]"
+                                    >
+                                      <img
+                                        src={`/api/files/${scrapPic}`}
+                                        alt="Scrap pic"
+                                        className="h-10 w-10 rounded object-cover"
+                                      />
+                                      <span className="text-[10px] text-cyan-200">Open</span>
+                                    </a>
+                                  ) : (
+                                    <span className="text-muted-foreground">-</span>
+                                  )}
+                                </td>
                               </tr>
-                            ))}
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>
@@ -1993,6 +2058,53 @@ export function EstimateQuotesMain({
                       <div className="text-xs text-muted-foreground">No line items found.</div>
                     )}
                   </div>
+                  <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
+                    <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Job Media
+                    </div>
+                    {collectCarMileageImageId ? (
+                      <div className="mb-3 rounded-md border border-white/10 bg-white/[0.03] p-2">
+                        <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                          Collect Mileage Image
+                        </div>
+                        <a
+                          href={`/api/files/${collectCarMileageImageId}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex rounded-md border border-white/15 bg-white/[0.04] p-1 hover:bg-white/[0.08]"
+                        >
+                          <img
+                            src={`/api/files/${collectCarMileageImageId}`}
+                            alt="Mileage"
+                            className="h-24 w-32 rounded object-cover"
+                          />
+                        </a>
+                      </div>
+                    ) : null}
+                    <div>
+                      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        Videos
+                      </div>
+                      {videoIds.length ? (
+                        <div className="grid gap-3 md:grid-cols-2">
+                          {videoIds.map((fileId) => (
+                            <video
+                              key={fileId}
+                              className="h-36 w-full rounded-md border border-white/10 bg-black/30"
+                              controls
+                              preload="metadata"
+                              src={`/api/files/${fileId}`}
+                            />
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-xs text-muted-foreground">No videos attached.</div>
+                      )}
+                    </div>
+                  </div>
+                      </>
+                    );
+                  })()}
                 </>
               ) : null}
             </div>
