@@ -1,13 +1,16 @@
-import { AppLayout, BranchQuotesMain } from "@repo/ui";
+import { AppLayout } from "@repo/ui";
 
-type Props = { params: { companyId: string; branchId: string } };
-
-export default function BranchQuotesPage({ params }: Props) {
-  const { companyId, branchId } = params;
-
+export default async function BranchQuotesPage({
+  params,
+}: {
+  params: { companyId: string; branchId: string } | Promise<{ companyId: string; branchId: string }>;
+}) {
+  await params;
   return (
     <AppLayout>
-      <BranchQuotesMain companyId={companyId} branchId={branchId} />
+      <div className="p-4 text-sm text-muted-foreground">
+        Branch quotes have been removed from the system.
+      </div>
     </AppLayout>
   );
 }

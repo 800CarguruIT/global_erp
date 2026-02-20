@@ -15,19 +15,13 @@ export async function GET(_req: NextRequest, { params }: Params) {
   try {
     const sql = getSql();
 
-    const [usersRows, quotesRows, poRows, deliveredRows, returnedRows] = await Promise.all([
+    const [usersRows, poRows, deliveredRows, returnedRows] = await Promise.all([
       sql/* sql */ `
         SELECT r.vendor_id, COUNT(DISTINCT ur.user_id)::int AS cnt
         FROM user_roles ur
         INNER JOIN roles r ON r.id = ur.role_id
         WHERE r.scope = 'vendor' AND r.vendor_id IN (SELECT id FROM vendors WHERE company_id = ${companyId})
         GROUP BY r.vendor_id
-      `,
-      sql/* sql */ `
-        SELECT vendor_id, COUNT(*)::int AS cnt
-        FROM quotes
-        WHERE company_id = ${companyId} AND quote_type = 'vendor_part'
-        GROUP BY vendor_id
       `,
       sql/* sql */ `
         SELECT vendor_id, COUNT(*)::int AS cnt
@@ -73,10 +67,6 @@ export async function GET(_req: NextRequest, { params }: Params) {
     (usersRows as any[]).forEach((r) => {
       const key = ensure(r.vendor_id);
       summary[key].users = Number(r.cnt ?? 0);
-    });
-    (quotesRows as any[]).forEach((r) => {
-      const key = ensure(r.vendor_id);
-      summary[key].quotes = Number(r.cnt ?? 0);
     });
     (poRows as any[]).forEach((r) => {
       const key = ensure(r.vendor_id);

@@ -12,7 +12,6 @@ export * from "./workshop/workorders/types";
 export * from "./workshop/qualityCheck/types";
 export * from "./workshop/invoices/types";
 export * from "./workshop/gatepass/types";
-export * from "./workshop/quotes/types";
 export * from "./workshop/procurement/types";
 export * from "./workshop/inventory/types";
 export * from "./operations/fleet/types";

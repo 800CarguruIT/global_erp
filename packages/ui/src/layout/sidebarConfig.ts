@@ -47,8 +47,6 @@ export const SIDEBAR_CONFIG: Record<NavScope, Partial<Record<NavCategory, Sideba
       { labelKey: "global.nav.finance", href: "/company/[companyId]/accounting" },
       { label: "Inventory", href: "/company/[companyId]/inventory" },
       { label: "Procurement", href: "/company/[companyId]/procurement" },
-      { label: "Vendor Quotes", href: "/company/[companyId]/quotes/vendor" },
-      { label: "Branch Quotes", href: "/company/[companyId]/quotes/branch" },
       { label: "Parts Quotes", href: "/company/[companyId]/parts-quotes" },
       { label: "Jobs", href: "/company/[companyId]/jobs" },
       { label: "Recovery Requests", href: "/company/[companyId]/recovery-requests" },
@@ -89,7 +87,6 @@ export const SIDEBAR_CONFIG: Record<NavScope, Partial<Record<NavCategory, Sideba
     Main: [
       { label: "Dashboard", href: "/company/[companyId]/branches/[branchId]" },
       { label: "Jobs", href: "/company/[companyId]/branches/[branchId]/jobs" },
-      { label: "Quotes", href: "/company/[companyId]/branches/[branchId]/quotes" },
       { label: "Accounts", href: "/company/[companyId]/branches/[branchId]/accounting" },
       { label: "Inventory", href: "/company/[companyId]/branches/[branchId]/inventory" },
       { label: "Fleet", href: "/company/[companyId]/branches/[branchId]/fleet" },
@@ -104,7 +101,6 @@ export const SIDEBAR_CONFIG: Record<NavScope, Partial<Record<NavCategory, Sideba
   vendor: {
     Main: [
       { label: "Dashboard", href: "/company/[companyId]/vendors/[vendorId]" },
-      { label: "Quotes", href: "/company/[companyId]/vendors/[vendorId]/quotes" },
       { label: "Procurement", href: "/company/[companyId]/vendors/[vendorId]/procurement" },
       { label: "Accounts", href: "/company/[companyId]/vendors/[vendorId]/accounts" },
     ],
@@ -184,15 +180,6 @@ export const SIDEBAR_TREE: Partial<Record<NavScope, SidebarItem[]>> = {
       ],
     },
     {
-      label: "Quotes",
-      href: "/company/[companyId]/quotes",
-      permissionKeys: ["quotes.vendor.view", "quotes.branch.view"],
-      children: [
-        { label: "Vendor", href: "/company/[companyId]/quotes/vendor", permissionKeys: ["quotes.vendor.view"] },
-        { label: "Branch", href: "/company/[companyId]/quotes/branch", permissionKeys: ["quotes.branch.view"] },
-      ],
-    },
-    {
       label: "Parts Order",
       href: "/company/[companyId]/parts-quotes",
       children: [
@@ -206,7 +193,6 @@ export const SIDEBAR_TREE: Partial<Record<NavScope, SidebarItem[]>> = {
       children: [
         { label: "Create", href: "/company/[companyId]/estimates/new", permissionKeys: ["estimates.create"] },
         { label: "List", href: "/company/[companyId]/estimates", exactMatch: true, permissionKeys: ["estimates.view"] },
-        { label: "Estimate Quotes", href: "/company/[companyId]/estimates/quotes", permissionKeys: ["estimates.view"] },
       ],
     },
     {

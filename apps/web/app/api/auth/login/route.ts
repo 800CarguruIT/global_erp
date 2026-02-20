@@ -62,19 +62,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    if (companyId && branchId) {
-      try {
-        const { Branches } = await import("@repo/ai-core");
-        const branch = await Branches.getBranchById(companyId, branchId);
-        if (!branch || branch.is_active === false) {
-          return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
-        }
-      } catch (err) {
-        console.error("Branch lookup failed during login", err);
-        return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
-      }
-    }
-
     // Compute redirect based on scope
     // TODO: add explicit "workshop" scope + workshopId routing when implemented.
     let redirect = "/global";

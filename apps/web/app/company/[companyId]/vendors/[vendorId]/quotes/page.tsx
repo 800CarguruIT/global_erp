@@ -1,18 +1,16 @@
-"use client";
+import { AppLayout } from "@repo/ui";
 
-import { AppLayout, ModulePlaceholder } from "@repo/ui";
-
-type Props = { params: { companyId: string; vendorId: string } };
-
-export default function VendorQuotesPage({ params }: Props) {
-  const { companyId, vendorId } = params;
+export default async function VendorQuotesPage({
+  params,
+}: {
+  params: { companyId: string; vendorId: string } | Promise<{ companyId: string; vendorId: string }>;
+}) {
+  await params;
   return (
     <AppLayout>
-      <ModulePlaceholder
-        title="Vendor Quotes"
-        description="Manage Open, Quoted, Approved, Accepted, Completed, Verified quotes for this vendor."
-        hint={`Company: ${companyId} · Vendor: ${vendorId}`}
-      />
+      <div className="p-4 text-sm text-muted-foreground">
+        Vendor quotes have been removed from the system.
+      </div>
     </AppLayout>
   );
 }
