@@ -1313,6 +1313,106 @@
           ]
         }
       }
+    },
+    {
+      "name": "Workshop - Job Card Detail (Mobile)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/workshop/job-cards/{{jobCardId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "mobile",
+            "company",
+            "{{companyId}}",
+            "workshop",
+            "job-cards",
+            "{{jobCardId}}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Workshop - Job Card Action (Mobile)",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"action\": \"collect_car\",\n  \"collectCarVideoId\": \"{{collectVideoId}}\",\n  \"collectCarMileage\": 12345,\n  \"collectCarMileageImageId\": \"{{mileageImageId}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/workshop/job-cards/{{jobCardId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "mobile",
+            "company",
+            "{{companyId}}",
+            "workshop",
+            "job-cards",
+            "{{jobCardId}}"
+          ]
+        }
+      },
+      "description": "Use action: collect_car | pre_work_check | start | complete"
+    },
+    {
+      "name": "Workshop - Job Card Line Item Photo Update (Mobile)",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"partPic\": \"{{partPicFileId}}\",\n  \"scrapPic\": \"{{scrapPicFileId}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/workshop/job-cards/{{jobCardId}}/line-items/{{lineItemId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "mobile",
+            "company",
+            "{{companyId}}",
+            "workshop",
+            "job-cards",
+            "{{jobCardId}}",
+            "line-items",
+            "{{lineItemId}}"
+          ]
+        }
+      }
     }
   ],
   "variable": [
