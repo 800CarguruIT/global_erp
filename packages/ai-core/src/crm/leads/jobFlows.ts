@@ -7,10 +7,11 @@ export type LeadStageConfig = {
 };
 
 export const RSA_STAGES: LeadStageConfig[] = [
-  { id: "open", label: "Open", description: "Lead created for RSA." },
-  { id: "assigned", label: "Assigned", description: "Accepted by an RSA technician." },
+  { id: "new", label: "New", description: "Lead created for RSA." },
+  { id: "dispatched", label: "Dispatched", description: "Assigned to an RSA technician." },
+  { id: "accepted", label: "Accepted", description: "Technician accepted the job." },
   { id: "enroute", label: "Enroute", description: "Technician on the way." },
-  { id: "inprocess", label: "In process", description: "Technician at location working." },
+  { id: "job_started", label: "Job Started", description: "Technician reached location and started work." },
   { id: "completed", label: "Completed", description: "RSA service completed." },
   { id: "closed", label: "Closed", description: "Job invoiced and closed." },
   { id: "lost", label: "Lost", description: "Lead was lost / cancelled." },

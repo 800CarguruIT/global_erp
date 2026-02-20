@@ -192,6 +192,7 @@ export const SIDEBAR_TREE: Partial<Record<NavScope, SidebarItem[]>> = {
       children: [
         { label: "Create", href: "/company/[companyId]/leads/new", permissionKeys: ["leads.create"] },
         { label: "List", href: "/company/[companyId]/leads", exactMatch: true, permissionKeys: ["leads.view"] },
+        { label: "RSA Leads", href: "/company/[companyId]/leads/rsa", exactMatch: true, permissionKeys: ["leads.view"] },
       ],
     },
     {

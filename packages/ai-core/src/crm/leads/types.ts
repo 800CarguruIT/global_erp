@@ -1,5 +1,7 @@
 export type LeadType = "rsa" | "recovery" | "workshop";
 export type LeadStatus =
+  | "pending"
+  | "done"
   | "open"
   | "accepted"
   | "car_in"

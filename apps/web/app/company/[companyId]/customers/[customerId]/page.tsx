@@ -54,6 +54,22 @@ type AppointmentFormState = {
   serviceType: ServiceRequestType;
 };
 
+type RsaLeadDivision =
+  | "Battery"
+  | "Battery_Replacement"
+  | "Tyre_Service"
+  | "New_Tyre_Installation"
+  | "Fluid_Topup"
+  | "Inspection"
+  | "Fuel_Delivery";
+
+type RsaLeadFormState = {
+  carId: string;
+  division: RsaLeadDivision | "";
+  locationLinkRsa: string;
+  remarks: string;
+};
+
 const getInitialAppointmentForm = (): AppointmentFormState => ({
   appointmentAt: "",
   type: "walkin",
@@ -62,6 +78,23 @@ const getInitialAppointmentForm = (): AppointmentFormState => ({
   dropoffLocation: "",
   remarks: "",
   serviceType: serviceRequestTypes[0],
+});
+
+const RSA_LEAD_DIVISIONS: Array<{ value: RsaLeadDivision; label: string }> = [
+  { value: "Battery", label: "New Battery" },
+  { value: "Battery_Replacement", label: "Battery - Warranty Claim" },
+  { value: "Tyre_Service", label: "Flat Tyre Service" },
+  { value: "New_Tyre_Installation", label: "New Tyre Installation" },
+  { value: "Fluid_Topup", label: "Fluid Topup" },
+  { value: "Inspection", label: "Inspection" },
+  { value: "Fuel_Delivery", label: "Fuel Delivery" },
+];
+
+const getInitialRsaLeadForm = (carId: string | null): RsaLeadFormState => ({
+  carId: carId ?? "",
+  division: "",
+  locationLinkRsa: "",
+  remarks: "",
 });
 
 export default function CustomerDetailPage({ params }: Params) {
@@ -115,6 +148,10 @@ export default function CustomerDetailPage({ params }: Params) {
   const [selectActionError, setSelectActionError] = useState<string | null>(null);
   const [servicePickerOpen, setServicePickerOpen] = useState(false);
   const [servicePickerError, setServicePickerError] = useState<string | null>(null);
+  const [rsaLeadOpen, setRsaLeadOpen] = useState(false);
+  const [rsaLeadSaving, setRsaLeadSaving] = useState(false);
+  const [rsaLeadError, setRsaLeadError] = useState<string | null>(null);
+  const [rsaLeadForm, setRsaLeadForm] = useState<RsaLeadFormState>(getInitialRsaLeadForm(null));
   const [appointmentForm, setAppointmentForm] = useState<AppointmentFormState>(getInitialAppointmentForm());
   const [companyDropoffLocation, setCompanyDropoffLocation] = useState("");
 
@@ -198,6 +235,10 @@ export default function CustomerDetailPage({ params }: Params) {
       prev.dropoffLocation ? prev : { ...prev, dropoffLocation: companyDropoffLocation }
     );
   }, [companyDropoffLocation, appointmentForm.type]);
+
+  useEffect(() => {
+    setRsaLeadForm((prev) => (prev.carId ? prev : { ...prev, carId: selectedCarId ?? "" }));
+  }, [selectedCarId]);
 
   async function loadCustomer(cId: string, custId: string, signal?: AbortSignal) {
     setLoading(true);
@@ -394,6 +435,61 @@ export default function CustomerDetailPage({ params }: Params) {
       setSelectActionError(err?.message ?? "Failed to create lead");
     } finally {
       setSelectActionSaving(false);
+    }
+  };
+
+  const createRsaLead = async () => {
+    if (!companyId || !customerId) return;
+    const division = rsaLeadForm.division;
+    const remarks = rsaLeadForm.remarks.trim();
+
+    if (!division) {
+      setRsaLeadError("Select lead division.");
+      return;
+    }
+    if (!remarks) {
+      setRsaLeadError("Lead remarks are required.");
+      return;
+    }
+
+    const extraLines = [
+      rsaLeadForm.locationLinkRsa.trim()
+        ? `Location Link: ${rsaLeadForm.locationLinkRsa.trim()}`
+        : null,
+    ].filter(Boolean);
+
+    const customerRemarks = [remarks, ...extraLines].join("\n");
+    const leadStatus = "pending";
+
+    setRsaLeadSaving(true);
+    setRsaLeadError(null);
+    try {
+      const res = await fetch(`/api/company/${companyId}/sales/leads`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customerId,
+          leadType: "rsa",
+          source: "walk_in",
+          serviceType: division,
+          status: leadStatus,
+          customerRemarks,
+          car: rsaLeadForm.carId ? { id: rsaLeadForm.carId } : undefined,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error ?? "Failed to create RSA lead");
+      }
+      setRsaLeadOpen(false);
+      setRsaLeadForm(getInitialRsaLeadForm(selectedCarId));
+      toast.success("RSA lead created.");
+      setActiveTab("leads");
+      await loadCustomerLeads(companyId, customerId);
+    } catch (err: any) {
+      setRsaLeadError(err?.message ?? "Failed to create RSA lead");
+    } finally {
+      setRsaLeadSaving(false);
     }
   };
 
@@ -1149,7 +1245,12 @@ export default function CustomerDetailPage({ params }: Params) {
                 <button
                   type="button"
                   className={`rounded-lg border px-4 py-3 text-left text-sm font-semibold ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
-                  onClick={() => setServicePickerError("RSA service will be added later.")}
+                  onClick={() => {
+                    setRsaLeadError(null);
+                    setRsaLeadForm(getInitialRsaLeadForm(selectedCarId));
+                    setRsaLeadOpen(true);
+                    setServicePickerOpen(false);
+                  }}
                 >
                   <div className="flex flex-col items-center gap-2 text-center">
                     <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-2xl">
@@ -1215,6 +1316,113 @@ export default function CustomerDetailPage({ params }: Params) {
                     </span>
                     <span>Towing Service</span>
                   </div>
+                </button>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {rsaLeadOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <Card className={`w-full max-w-2xl rounded-xl shadow-xl ${theme.cardBg} ${theme.cardBorder}`}>
+            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+              <div className="text-sm font-semibold">Create RSA Lead</div>
+              <button
+                type="button"
+                onClick={() => setRsaLeadOpen(false)}
+                className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+              >
+                Close
+              </button>
+            </div>
+            <div className="space-y-4 p-4">
+              {rsaLeadError && <div className="text-sm text-red-400">{rsaLeadError}</div>}
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <label className={`text-xs font-semibold ${theme.mutedText}`}>
+                    Select from Existing or Add New Car
+                  </label>
+                  <select
+                    className={theme.input}
+                    value={rsaLeadForm.carId}
+                    onChange={(e) => setRsaLeadForm((prev) => ({ ...prev, carId: e.target.value }))}
+                  >
+                    <option value="">Select Car</option>
+                    {linkedCars.map((item) => {
+                      const car = item?.car ?? {};
+                      const id = String(car.id ?? "");
+                      if (!id) return null;
+                      const plate = car.plate_number || car.plateNumber || "No Plate";
+                      const details = [car.make, car.model, car.model_year || car.modelYear]
+                        .filter(Boolean)
+                        .join(" ");
+                      return (
+                        <option key={id} value={id}>
+                          {details ? `${plate} - ${details}` : plate}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className={`text-xs font-semibold ${theme.mutedText}`}>Select Lead Division</label>
+                  <select
+                    className={theme.input}
+                    value={rsaLeadForm.division}
+                    onChange={(e) =>
+                      setRsaLeadForm((prev) => ({
+                        ...prev,
+                        division: e.target.value as RsaLeadDivision | "",
+                      }))
+                    }
+                  >
+                    <option value="">Select Lead Division</option>
+                    {RSA_LEAD_DIVISIONS.map((division) => (
+                      <option key={division.value} value={division.value}>
+                        {division.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className={`text-xs font-semibold ${theme.mutedText}`}>Location Link</label>
+                <textarea
+                  className={theme.input}
+                  value={rsaLeadForm.locationLinkRsa}
+                  onChange={(e) =>
+                    setRsaLeadForm((prev) => ({ ...prev, locationLinkRsa: e.target.value }))
+                  }
+                  placeholder="Enter location link"
+                  rows={3}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className={`text-xs font-semibold ${theme.mutedText}`}>Lead Remarks</label>
+                <textarea
+                  className={theme.input}
+                  value={rsaLeadForm.remarks}
+                  onChange={(e) => setRsaLeadForm((prev) => ({ ...prev, remarks: e.target.value }))}
+                  placeholder="Enter lead remarks"
+                  rows={4}
+                />
+              </div>
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  className={`rounded-md px-4 py-2 text-xs font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+                  onClick={() => setRsaLeadOpen(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="rounded-md bg-primary px-4 py-2 text-xs font-semibold uppercase tracking-wide text-primary-foreground"
+                  disabled={rsaLeadSaving}
+                  onClick={createRsaLead}
+                >
+                  {rsaLeadSaving ? "Creating..." : "Create RSA Lead"}
                 </button>
               </div>
             </div>

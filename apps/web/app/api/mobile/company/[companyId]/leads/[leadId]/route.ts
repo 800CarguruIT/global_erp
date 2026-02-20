@@ -16,6 +16,7 @@ import {
   createMobileSuccessResponse,
   handleMobileError,
 } from "@/app/api/mobile/utils";
+import { normalizeRsaStatus } from "@/lib/leads/rsa-flow";
 
 type Params = { params: Promise<{ companyId: string; leadId: string }> };
 
@@ -71,7 +72,13 @@ export async function PUT(req: NextRequest, { params }: Params) {
       branchId === null ? null : (branchId ?? lead.branchId ?? null);
     const branchChanged = branchIdFromBody !== lead.branchId;
     const nextAssignedUserId = assignedUserId ?? lead.assignedUserId ?? null;
-    const nextLeadStatus = status ?? lead.leadStatus;
+    const normalizedStatusForUpdate =
+      status === undefined || status === null || status === ""
+        ? lead.leadStatus
+        : lead.leadType === "rsa"
+          ? normalizeRsaStatus(status)
+          : status;
+    const nextLeadStatus = normalizedStatusForUpdate ?? lead.leadStatus;
     const assignmentRequested =
       lead.leadType === "workshop" &&
       nextLeadStatus === "car_in" &&
@@ -87,7 +94,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     }
 
     await updateLeadPartial(companyId, leadId, {
-      leadStatus: status ?? lead.leadStatus,
+      leadStatus: normalizedStatusForUpdate ?? lead.leadStatus,
       leadStage: leadStage ?? lead.leadStage,
       branchId: branchIdFromBody,
       assignedUserId: nextAssignedUserId,

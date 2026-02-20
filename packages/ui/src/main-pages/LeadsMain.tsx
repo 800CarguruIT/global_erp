@@ -9,6 +9,7 @@ import { Card } from "../components/Card";
 export type LeadsMainProps = {
   companyId: string;
   companyName?: string;
+  initialTab?: "all" | "rsa" | "recovery" | "workshop";
 };
 
 type SortKey =
@@ -29,12 +30,12 @@ function normalize(value: string | number | null | undefined) {
   return (value ?? "").toString().trim().toLowerCase();
 }
 
-export function LeadsMain({ companyId, companyName }: LeadsMainProps) {
+export function LeadsMain({ companyId, companyName, initialTab = "all" }: LeadsMainProps) {
   const { t } = useI18n();
   const [leads, setLeads] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<"all" | "rsa" | "recovery" | "workshop">("all");
+  const [tab, setTab] = useState<"all" | "rsa" | "recovery" | "workshop">(initialTab);
   const [query, setQuery] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("created");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
@@ -77,6 +78,10 @@ export function LeadsMain({ companyId, companyName }: LeadsMainProps) {
   useEffect(() => {
     refreshLeads();
   }, [refreshLeads]);
+
+  useEffect(() => {
+    setTab(initialTab);
+  }, [initialTab]);
 
   const filteredLeads = useMemo(() => {
     const term = normalize(query);
