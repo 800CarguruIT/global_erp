@@ -16,21 +16,26 @@ export async function GET(req: NextRequest, { params }: Params) {
 
 export async function POST(req: NextRequest, { params }: Params) {
   const { companyId } = await params;
-  const body = await req.json().catch(() => ({}));
-  if (!body.qcId && !body.estimateId) {
-    return new NextResponse("qcId or estimateId required", { status: 400 });
-  }
-  const result = body.estimateId
-    ? await createInvoiceFromEstimate(companyId, body.estimateId)
-    : await createInvoiceFromQualityCheck(companyId, body.qcId);
-  // Optionally auto-create gatepass when invoice created
-  if (body.createGatepass) {
-    const handoverType = (body.handoverType as GatepassHandoverType) ?? "branch";
-    try {
-      await createGatepassFromInvoice(companyId, result.invoice.id, handoverType);
-    } catch {
-      // swallow error to not break invoice creation
+  try {
+    const body = await req.json().catch(() => ({}));
+    if (!body.qcId && !body.estimateId) {
+      return new NextResponse("qcId or estimateId required", { status: 400 });
     }
+    const result = body.estimateId
+      ? await createInvoiceFromEstimate(companyId, body.estimateId)
+      : await createInvoiceFromQualityCheck(companyId, body.qcId);
+    // Optionally auto-create gatepass when invoice created
+    if (body.createGatepass) {
+      const handoverType = (body.handoverType as GatepassHandoverType) ?? "branch";
+      try {
+        await createGatepassFromInvoice(companyId, result.invoice.id, handoverType);
+      } catch {
+        // swallow error to not break invoice creation
+      }
+    }
+    return NextResponse.json({ data: result }, { status: 201 });
+  } catch (error: any) {
+    const message = error?.message ?? "Failed to create invoice";
+    return NextResponse.json({ error: message }, { status: 400 });
   }
-  return NextResponse.json({ data: result }, { status: 201 });
 }

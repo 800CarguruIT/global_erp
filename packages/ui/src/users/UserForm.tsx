@@ -10,6 +10,7 @@ export interface UserFormProps {
     name?: string | null;
     roleIds: string[];
     employeeId?: string | null;
+    mobile?: string | null;
   };
   roles: Array<{ id: string; name: string }>;
   employees?: Array<{ id: string; name: string }>;
@@ -24,6 +25,7 @@ export interface UserFormProps {
     password?: string;
     roleIds: string[];
     employeeId?: string | null;
+    mobile?: string | null;
     scope?: ScopeOption | null;
   }) => Promise<void>;
   onCancel?: () => void;
@@ -55,16 +57,19 @@ export function UserForm({
   const [password, setPassword] = useState("");
   const [roleIds, setRoleIds] = useState<string[]>(initialValues?.roleIds ?? []);
   const [employeeId, setEmployeeId] = useState<string | undefined>(initialValues?.employeeId ?? undefined);
+  const [mobile, setMobile] = useState(initialValues?.mobile ?? "");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [scopeSearch, setScopeSearch] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     setEmail(initialValues?.email ?? "");
     setName(initialValues?.name ?? "");
     setRoleIds(initialValues?.roleIds ?? []);
     setEmployeeId(initialValues?.employeeId ?? undefined);
+    setMobile(initialValues?.mobile ?? "");
   }, [initialValues]);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -79,6 +84,7 @@ export function UserForm({
         password: mode === "create" ? password : password || undefined,
         roleIds,
         employeeId,
+        mobile: mobile || undefined,
         scope: scopeValue ?? null,
       });
       setSaved(true);
@@ -151,15 +157,52 @@ export function UserForm({
           />
         </div>
         <div className="space-y-1">
-          <label className="text-xs font-medium">Password {mode === "create" ? "(required)" : "(leave blank to keep)"}</label>
+          <label className="text-xs font-medium">Mobile number</label>
           <input
-            type="password"
+            type="tel"
             className={inputClass}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder={mode === "create" ? "••••••" : "Leave blank to keep current"}
-            required={mode === "create"}
+            value={mobile}
+            onChange={(e) => setMobile(e.target.value)}
+            placeholder="+971 5X XXXX XXX"
           />
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs font-medium">Password {mode === "create" ? "(required)" : "(leave blank to keep)"}</label>
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              type={showPassword ? "text" : "password"}
+              className={inputClass}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder={mode === "create" ? "••••••" : "Leave blank to keep current"}
+              required={mode === "create"}
+            />
+            <button
+              type="button"
+              className="rounded-md border border-border/50 bg-muted/10 px-3 py-1 text-xs font-semibold text-muted-foreground transition hover:bg-muted/30"
+              onClick={() => setShowPassword((prev) => !prev)}
+            >
+              {showPassword ? "Hide" : "Show"}
+            </button>
+            {mode === "create" && (
+              <button
+                type="button"
+                className="rounded-md border border-border/50 bg-muted/10 px-3 py-1 text-xs font-semibold text-muted-foreground transition hover:bg-muted/30"
+                onClick={() => {
+                  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+                  const size = 10;
+                  let generated = "";
+                  for (let i = 0; i < size; i += 1) {
+                    generated += chars.charAt(Math.floor(Math.random() * chars.length));
+                  }
+                  setPassword(generated);
+                  setShowPassword(true);
+                }}
+              >
+                Generate
+              </button>
+            )}
+          </div>
         </div>
         {employees && employees.length > 0 && (
           <div className="space-y-1">

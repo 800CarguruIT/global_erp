@@ -11,14 +11,17 @@ export async function GET(req: NextRequest, { params }: Params) {
 
   const sql = getSql();
   const statusParam = req.nextUrl.searchParams.get("status")?.trim() ?? "";
+  const normalizedStatusParam = statusParam.toLowerCase();
   const statusFilter = (() => {
     if (!statusParam) return sql``;
-    const normalized = statusParam.toLowerCase();
-    if (normalized === "completed") {
+    if (normalizedStatusParam === "completed") {
       return sql`AND pq.status IN ('Received', 'Completed')`;
     }
-    if (normalized === "returns") {
+    if (normalizedStatusParam === "returns") {
       return sql`AND pq.status IN ('Return', 'Returned')`;
+    }
+    if (normalizedStatusParam === "ordered") {
+      return sql`AND (pq.status = ${statusParam} OR LOWER(COALESCE(li.status, '')) = 'approved')`;
     }
     return sql`AND pq.status = ${statusParam}`;
   })();
@@ -40,15 +43,18 @@ export async function GET(req: NextRequest, { params }: Params) {
       pq.remarks,
       pq.updated_at,
       pq.status,
-      ei.part_name,
+      li.status AS line_item_status,
+      COALESCE(li.product_name, iori.part_name) AS part_name,
       car.make AS car_make,
       car.model AS car_model,
       car.plate_number AS car_plate,
       car.vin AS car_vin
     FROM part_quotes pq
-    INNER JOIN estimate_items ei ON ei.id = pq.estimate_item_id
-    INNER JOIN estimates est ON est.id = pq.estimate_id
-    LEFT JOIN cars car ON car.id = est.car_id
+    LEFT JOIN line_items li ON li.id = pq.line_item_id
+    LEFT JOIN inspections li_inspection ON li_inspection.id = li.inspection_id
+    LEFT JOIN inventory_order_request_items iori ON iori.id = pq.inventory_request_item_id
+    LEFT JOIN inventory_order_requests ior ON ior.id = pq.inventory_request_id
+    LEFT JOIN cars car ON car.id = li_inspection.car_id
     WHERE pq.company_id = ${companyId}
       AND pq.vendor_id = ${vendorId}
       ${statusFilter}
@@ -77,6 +83,10 @@ export async function GET(req: NextRequest, { params }: Params) {
     remarks: row.remarks,
     status: row.status,
     updatedAt: row.updated_at,
+    status:
+      normalizedStatusParam === "ordered" && String(row.line_item_status ?? "").toLowerCase() === "approved"
+        ? "Approved"
+        : row.status,
   }));
 
   return NextResponse.json({ data });

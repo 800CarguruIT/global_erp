@@ -1,7 +1,8 @@
 "use client";
 
-import React, { ChangeEvent } from "react";
+import React, { useCallback, useState } from "react";
 import { useTheme } from "../../theme";
+import { DropzoneFileInput } from "./DropzoneFileInput";
 
 export interface AttachmentFieldProps {
   label: string;
@@ -16,10 +17,6 @@ export interface AttachmentFieldProps {
   viewUrlPrefix?: string;
 }
 
-/**
- * Lightweight attachment field. For now it accepts a file input and uses
- * the filename as a placeholder ID; later we can wire real uploads.
- */
 export function AttachmentField({
   label,
   value,
@@ -33,49 +30,60 @@ export function AttachmentField({
   viewUrlPrefix = "/api/files/",
 }: AttachmentFieldProps) {
   const { theme } = useTheme();
-  const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!uploadUrl) {
-      onChange(file.name);
-      return;
-    }
+  const [isUploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-    const formData = new FormData();
-    formData.append("file", file);
-    if (uploadFields) {
-      Object.entries(uploadFields).forEach(([k, v]) => {
-        if (v !== undefined && v !== null) formData.append(k, v);
-      });
-    }
+  const handleFile = useCallback(
+    async (file: File | null) => {
+      if (!file) return;
+      setError(null);
+      if (!uploadUrl) {
+        onChange(file.name);
+        return;
+      }
 
-    try {
-      const res = await fetch(uploadUrl, {
-        method: "POST",
-        body: formData,
-      });
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || "Upload failed");
+      const formData = new FormData();
+      formData.append("file", file);
+      if (uploadFields) {
+        Object.entries(uploadFields).forEach(([k, v]) => {
+          if (v !== undefined && v !== null) formData.append(k, v);
+        });
       }
-      const json = await res.json();
-      const fileId = json.fileId ?? json.id ?? json.data?.id;
-      if (fileId) {
-        onChange(fileId);
-        onUploadComplete?.(fileId);
-      } else {
-        throw new Error("Upload response missing fileId");
+
+      setUploading(true);
+      try {
+        const res = await fetch(uploadUrl, {
+          method: "POST",
+          body: formData,
+        });
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(text || "Upload failed");
+        }
+        const json = await res.json();
+        const fileId = json.fileId ?? json.id ?? json.data?.id;
+        if (fileId) {
+          onChange(fileId);
+          onUploadComplete?.(fileId);
+        } else {
+          throw new Error("Upload response missing fileId");
+        }
+      } catch (err: any) {
+        console.error("Attachment upload error", err);
+        const message = err?.message ?? "Upload failed";
+        setError(message);
+        onUploadError?.(message);
+      } finally {
+        setUploading(false);
       }
-    } catch (err: any) {
-      console.error("Attachment upload error", err);
-      onUploadError?.(err?.message ?? "Upload failed");
-    }
-  };
+    },
+    [onChange, onUploadComplete, onUploadError, uploadFields, uploadUrl]
+  );
 
   return (
     <div className="space-y-2">
       <div className="text-xs font-medium text-foreground">{label}</div>
-      <div className="flex flex-col gap-2 md:flex-row md:items-center">
+      <div className="space-y-2">
         <div className="flex-1 flex items-center gap-2">
           <input
             id={name}
@@ -96,13 +104,20 @@ export function AttachmentField({
             </a>
           )}
         </div>
-        <input
-          type="file"
-          onChange={handleFileChange}
-          className="text-xs md:w-48 file:mr-3 file:rounded-md file:border file:border-border file:bg-card file:px-3 file:py-2 file:text-foreground"
+        <DropzoneFileInput
+          disabled={isUploading}
+          onFileSelect={handleFile}
+          onReject={(message) => {
+            setError(message);
+            onUploadError?.(message);
+          }}
+          idleText="Drag and drop a file here"
+          activeText="Drop file to attach"
+          buttonText={isUploading ? "Uploading..." : "Browse"}
         />
       </div>
       {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+      {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
   );
 }

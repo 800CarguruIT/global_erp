@@ -1,13 +1,21 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { MainPageShell } from "./MainPageShell";
 import type {
   PurchaseOrder,
+  PurchaseOrderGrnEntry,
   PurchaseOrderItem,
   PurchaseOrderStatus,
   PurchaseOrderType,
 } from "@repo/ai-core/workshop/procurement/types";
+import type {
+  InventoryCategory,
+  InventoryCarMake,
+  InventoryCarModel,
+  InventoryModelYear,
+  InventorySubcategory,
+} from "@repo/ai-core/workshop/inventory/types";
 
 type LoadState<T> =
   | { status: "loading"; data: null; error: null }
@@ -17,20 +25,51 @@ type LoadState<T> =
 type ItemDraft = {
   id?: string;
   lineNo?: number;
+  quoteId?: string | null;
+  estimateItemId?: string | null;
   name: string;
   description?: string | null;
   quantity: number;
   unitCost: number;
-  receiveNow?: number;
+  receivedQty?: number;
+  status?: PurchaseOrderItem["status"];
+  partsCatalogId?: string | null;
+  inventoryRequestItemId?: string | null;
+  movedToInventory?: boolean;
+  inventoryTypeId?: string | null;
+  categoryId?: string | null;
+  subcategoryId?: string | null;
+  makeId?: string | null;
+  modelId?: string | null;
+  yearId?: string | null;
+  partType?: string | null;
+  unit?: string | null;
+  partBrand?: string | null;
+  category?: string | null;
+  subcategory?: string | null;
 };
 
 export function ProcurementDetailMain({ companyId, poId }: { companyId: string; poId: string }) {
-  const [state, setState] = useState<LoadState<{ po: PurchaseOrder; items: PurchaseOrderItem[] }>>({
+  const errorMessage = (err: unknown, fallback: string) => {
+    if (err instanceof Error && err.message) return err.message;
+    return fallback;
+  };
+  const [state, setState] = useState<
+    LoadState<{ po: PurchaseOrder; items: PurchaseOrderItem[]; grns: PurchaseOrderGrnEntry[] }>
+  >({
     status: "loading",
     data: null,
     error: null,
   });
   const [items, setItems] = useState<ItemDraft[]>([]);
+  const [inventoryTypes, setInventoryTypes] = useState<
+    Array<{ id: string; name: string; code: string; isActive: boolean }>
+  >([]);
+  const [inventoryCategories, setInventoryCategories] = useState<InventoryCategory[]>([]);
+  const [inventorySubcategories, setInventorySubcategories] = useState<InventorySubcategory[]>([]);
+  const [inventoryMakes, setInventoryMakes] = useState<InventoryCarMake[]>([]);
+  const [inventoryModels, setInventoryModels] = useState<InventoryCarModel[]>([]);
+  const [inventoryYears, setInventoryYears] = useState<InventoryModelYear[]>([]);
   const [header, setHeader] = useState<{
     status?: PurchaseOrderStatus;
     poType?: PurchaseOrderType;
@@ -41,62 +80,264 @@ export function ProcurementDetailMain({ companyId, poId }: { companyId: string; 
   }>({});
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [isReceiving, setIsReceiving] = useState(false);
-  const [receiveError, setReceiveError] = useState<string | null>(null);
+  const [receiveStatus, setReceiveStatus] = useState<
+    Record<string, { loading: boolean; error?: string | null }>
+  >({});
+  const [reconcileStatus, setReconcileStatus] = useState<{
+    loading: boolean;
+    error?: string | null;
+    message?: string | null;
+  }>({ loading: false, error: null, message: null });
+  const [moveStatus, setMoveStatus] = useState<Record<string, { loading: boolean; error?: string | null }>>({});
+  const [receiveModal, setReceiveModal] = useState<{
+    open: boolean;
+    itemId: string;
+    itemName: string;
+    maxQty: number;
+  }>({
+    open: false,
+    itemId: "",
+    itemName: "",
+    maxQty: 0,
+  });
+  const [receiveQtyInput, setReceiveQtyInput] = useState("1");
+  const [receiveModalError, setReceiveModalError] = useState<string | null>(null);
+  const [moveModal, setMoveModal] = useState<{ open: boolean; itemId: string; itemName: string }>({
+    open: false,
+    itemId: "",
+    itemName: "",
+  });
+  const [moveForm, setMoveForm] = useState({
+    type: "OEM",
+    partType: "OE",
+    categoryId: "",
+    categoryCustom: "",
+    subcategoryId: "",
+    subcategoryCustom: "",
+    makeId: "",
+    modelId: "",
+    yearId: "",
+    unit: "EA",
+    brand: "",
+  });
+
+  const loadPurchaseOrder = useCallback(async (opts?: { keepLoading?: boolean }) => {
+    const keepLoading = opts?.keepLoading ?? false;
+    if (!keepLoading) {
+      setState({ status: "loading", data: null, error: null });
+    }
+    const res = await fetch(`/api/company/${companyId}/workshop/procurement/${poId}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+    const po: PurchaseOrder =
+      json.data?.po ?? json.data?.purchaseOrder ?? json.data?.data ?? json.data?.po ?? json.data;
+    const list: PurchaseOrderItem[] = json.data?.items ?? [];
+    const grns: PurchaseOrderGrnEntry[] = json.data?.grns ?? [];
+    setState({ status: "loaded", data: { po, items: list, grns }, error: null });
+    setItems(
+      list.map((i) => ({
+        id: i.id,
+        lineNo: i.lineNo,
+        quoteId: i.quoteId ?? null,
+        estimateItemId: i.estimateItemId ?? null,
+        name: i.name ?? "",
+        description: i.description ?? "",
+        quantity: i.quantity ?? 0,
+        unitCost: i.unitCost ?? 0,
+        receivedQty: i.receivedQty ?? 0,
+        status: i.status,
+        partsCatalogId: i.partsCatalogId ?? null,
+        inventoryRequestItemId: i.inventoryRequestItemId ?? null,
+        movedToInventory: i.movedToInventory ?? false,
+        inventoryTypeId: i.inventoryTypeId ?? null,
+        categoryId: i.categoryId ?? null,
+        subcategoryId: i.subcategoryId ?? null,
+        makeId: i.makeId ?? null,
+        modelId: i.modelId ?? null,
+        yearId: i.yearId ?? null,
+        partType: i.partType ?? null,
+        unit: i.unit ?? null,
+        partBrand: i.partBrand ?? null,
+        category: i.category ?? null,
+        subcategory: i.subcategory ?? null,
+      }))
+    );
+    setHeader({
+      status: po.status,
+      poType: po.poType,
+      expectedDate: po.expectedDate ?? "",
+      notes: po.notes ?? "",
+      vendorName: po.vendorName ?? "",
+      vendorContact: po.vendorContact ?? "",
+    });
+  }, [companyId, poId]);
 
   useEffect(() => {
     let cancelled = false;
-    async function load() {
-      setState({ status: "loading", data: null, error: null });
+    (async () => {
       try {
-        const res = await fetch(`/api/company/${companyId}/workshop/procurement/${poId}`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const json = await res.json();
-        const po: PurchaseOrder = json.data?.po ?? json.data?.purchaseOrder ?? json.data?.data ?? json.data?.po ?? json.data;
-        const list: PurchaseOrderItem[] = json.data?.items ?? [];
-        if (!cancelled) {
-          setState({ status: "loaded", data: { po, items: list }, error: null });
-          setItems(
-            list.map((i) => ({
-              id: i.id,
-              lineNo: i.lineNo,
-              name: i.name ?? "",
-              description: i.description ?? "",
-              quantity: i.quantity ?? 0,
-              unitCost: i.unitCost ?? 0,
-              receiveNow: 0,
-            }))
-          );
-          setHeader({
-            status: po.status,
-            poType: po.poType,
-            expectedDate: po.expectedDate ?? "",
-            notes: po.notes ?? "",
-            vendorName: po.vendorName ?? "",
-            vendorContact: po.vendorContact ?? "",
-          });
-        }
-      } catch (err) {
+        await loadPurchaseOrder();
+      } catch {
         if (!cancelled) setState({ status: "error", data: null, error: "Failed to load purchase order." });
       }
-    }
-    load();
+    })();
     return () => {
       cancelled = true;
     };
-  }, [companyId, poId]);
+  }, [loadPurchaseOrder]);
+
+  useEffect(() => {
+    let active = true;
+    async function loadTypes() {
+      try {
+        const res = await fetch(
+          `/api/company/${companyId}/workshop/inventory/types?includeInactive=true`
+        );
+        if (!res.ok) throw new Error("Failed to load inventory types");
+        const json = await res.json();
+        if (active) setInventoryTypes(json.data ?? []);
+      } catch {
+        if (active) setInventoryTypes([]);
+      }
+    }
+    loadTypes();
+    return () => {
+      active = false;
+    };
+  }, [companyId]);
+
+  useEffect(() => {
+    let active = true;
+    async function loadMakes() {
+      try {
+        const res = await fetch(`/api/company/${companyId}/workshop/inventory/makes?includeInactive=true`);
+        if (!res.ok) throw new Error("Failed to load makes");
+        const json = await res.json();
+        if (active) setInventoryMakes(json.data ?? []);
+      } catch {
+        if (active) setInventoryMakes([]);
+      }
+    }
+    loadMakes();
+    return () => {
+      active = false;
+    };
+  }, [companyId]);
+
+  useEffect(() => {
+    let active = true;
+    async function loadModels() {
+      if (!moveForm.makeId) {
+        if (active) setInventoryModels([]);
+        return;
+      }
+      try {
+        const res = await fetch(
+          `/api/company/${companyId}/workshop/inventory/models?makeId=${encodeURIComponent(
+            moveForm.makeId
+          )}&includeInactive=true`
+        );
+        if (!res.ok) throw new Error("Failed to load models");
+        const json = await res.json();
+        if (active) setInventoryModels(json.data ?? []);
+      } catch {
+        if (active) setInventoryModels([]);
+      }
+    }
+    loadModels();
+    return () => {
+      active = false;
+    };
+  }, [companyId, moveForm.makeId]);
+
+  useEffect(() => {
+    let active = true;
+    async function loadYears() {
+      if (!moveForm.modelId) {
+        if (active) setInventoryYears([]);
+        return;
+      }
+      try {
+        const res = await fetch(
+          `/api/company/${companyId}/workshop/inventory/years?modelId=${encodeURIComponent(
+            moveForm.modelId
+          )}&includeInactive=true`
+        );
+        if (!res.ok) throw new Error("Failed to load years");
+        const json = await res.json();
+        if (active) setInventoryYears(json.data ?? []);
+      } catch {
+        if (active) setInventoryYears([]);
+      }
+    }
+    loadYears();
+    return () => {
+      active = false;
+    };
+  }, [companyId, moveForm.modelId]);
+
+  useEffect(() => {
+    let active = true;
+    async function loadTaxonomy() {
+      try {
+        const [categoriesRes, subcategoriesRes] = await Promise.all([
+          fetch(`/api/company/${companyId}/workshop/inventory/categories?includeInactive=true`),
+          fetch(`/api/company/${companyId}/workshop/inventory/subcategories?includeInactive=true`),
+        ]);
+        if (!categoriesRes.ok || !subcategoriesRes.ok) {
+          throw new Error("Failed to load inventory taxonomy");
+        }
+        const [categoriesJson, subcategoriesJson] = await Promise.all([
+          categoriesRes.json(),
+          subcategoriesRes.json(),
+        ]);
+        if (active) {
+          setInventoryCategories(categoriesJson?.data ?? []);
+          setInventorySubcategories(subcategoriesJson?.data ?? []);
+        }
+      } catch {
+        if (active) {
+          setInventoryCategories([]);
+          setInventorySubcategories([]);
+        }
+      }
+    }
+    loadTaxonomy();
+    return () => {
+      active = false;
+    };
+  }, [companyId]);
 
   const totals = useMemo(() => {
-    const total = items.reduce((sum, i) => sum + (i.quantity ?? 0) * (i.unitCost ?? 0), 0);
-    return { total };
+    const subtotal = items.reduce((sum, i) => sum + (i.quantity ?? 0) * (i.unitCost ?? 0), 0);
+    const vatRate = 0.05;
+    const vat = subtotal * vatRate;
+    const totalWithVat = subtotal + vat;
+    return { subtotal, vat, totalWithVat, vatRate };
   }, [items]);
 
-  async function save() {
+  const grnsByItem = useMemo(() => {
+    const groups = new Map<string, PurchaseOrderGrnEntry[]>();
+    const allGrns = state.status === "loaded" ? state.data.grns ?? [] : [];
+    for (const item of items) {
+      if (!item.id) continue;
+      const list = allGrns.filter((grn) => String(grn.sourceId ?? "") === String(item.id));
+      groups.set(item.id, list);
+    }
+    return groups;
+  }, [items, state]);
+
+  async function save(nextStatus?: PurchaseOrderStatus) {
     setIsSaving(true);
     setSaveError(null);
     try {
+      const statusToSave =
+        typeof nextStatus === "string" &&
+        ["draft", "issued", "partially_received", "received", "cancelled"].includes(nextStatus)
+          ? nextStatus
+          : header.status;
       const body = {
-        status: header.status,
+        status: statusToSave,
         poType: header.poType,
         expectedDate: header.expectedDate ?? null,
         notes: header.notes ?? null,
@@ -105,10 +346,14 @@ export function ProcurementDetailMain({ companyId, poId }: { companyId: string; 
         items: items.map((i, idx) => ({
           id: i.id,
           lineNo: i.lineNo ?? idx + 1,
+          quoteId: i.quoteId ?? null,
+          estimateItemId: i.estimateItemId ?? null,
           name: i.name ?? "",
           description: i.description ?? null,
           quantity: i.quantity ?? 0,
           unitCost: i.unitCost ?? 0,
+          partsCatalogId: i.partsCatalogId ?? null,
+          inventoryRequestItemId: i.inventoryRequestItemId ?? null,
         })),
       };
       const res = await fetch(`/api/company/${companyId}/workshop/procurement/${poId}`, {
@@ -117,6 +362,10 @@ export function ProcurementDetailMain({ companyId, poId }: { companyId: string; 
         body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      await loadPurchaseOrder({ keepLoading: true });
+      if (statusToSave !== header.status) {
+        setHeader((prev) => ({ ...prev, status: statusToSave }));
+      }
     } catch (err) {
       console.error(err);
       setSaveError("Failed to save");
@@ -125,36 +374,10 @@ export function ProcurementDetailMain({ companyId, poId }: { companyId: string; 
     }
   }
 
-  async function receiveSelected() {
-    setIsReceiving(true);
-    setReceiveError(null);
-    try {
-      const toReceive = items
-        .filter((i) => (i.receiveNow ?? 0) > 0 && i.id)
-        .map((i) => ({ itemId: i.id!, quantity: i.receiveNow ?? 0 }));
-      const res = await fetch(`/api/company/${companyId}/workshop/procurement/${poId}/receive`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: toReceive }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json();
-      const refreshed: PurchaseOrderItem[] = json.data?.items ?? [];
-      setItems((prev) =>
-        prev.map((p) => {
-          const newer = refreshed.find((r) => r.id === p.id);
-          return newer
-            ? { ...p, receiveNow: 0, quantity: newer.quantity ?? p.quantity, unitCost: newer.unitCost ?? p.unitCost }
-            : p;
-        })
-      );
-    } catch (err) {
-      console.error(err);
-      setReceiveError("Failed to receive");
-    } finally {
-      setIsReceiving(false);
-    }
-  }
+  const availableSubcategories = useMemo(() => {
+    if (!moveForm.categoryId || moveForm.categoryId === "Custom") return inventorySubcategories;
+    return inventorySubcategories.filter((sub) => sub.categoryId === moveForm.categoryId);
+  }, [inventorySubcategories, moveForm.categoryId]);
 
   if (state.status === "loading") {
     return (
@@ -174,46 +397,98 @@ export function ProcurementDetailMain({ companyId, poId }: { companyId: string; 
   const po = state.data.po;
   const editable = po.status === "draft";
 
+  const selectedCategory = inventoryCategories.find((cat) => cat.id === moveForm.categoryId);
+  const selectedSubcategory = inventorySubcategories.find((sub) => sub.id === moveForm.subcategoryId);
+  const resolvedCategory =
+    moveForm.categoryId === "Custom"
+      ? moveForm.categoryCustom
+      : selectedCategory?.code ?? selectedCategory?.name ?? "";
+  const resolvedSubcategory =
+    moveForm.subcategoryId === "Custom"
+      ? moveForm.subcategoryCustom
+      : selectedSubcategory?.code ?? selectedSubcategory?.name ?? "";
+  const generatedPartCode = buildPartCode(moveModal.itemId, moveForm.type, resolvedCategory, resolvedSubcategory);
+
   return (
     <MainPageShell
       title="Procurement"
       subtitle="Purchase order / LPO."
       scopeLabel={`PO ${po.poNumber}`}
       primaryAction={
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          {isSaving ? "Saving…" : "Autosaves"} · Total {totals.total.toFixed(2)}
+        <div className="flex items-center gap-2 text-xs text-slate-300">
+          {isSaving ? "Saving…" : "Autosaves"} · Total {totals.totalWithVat.toFixed(2)}
         </div>
       }
+      contentClassName="rounded-none bg-transparent p-0"
       secondaryActions={
         <div className="flex items-center gap-2">
-          <button type="button" onClick={save} className="rounded-md border px-3 py-1 text-sm font-medium">
+          <button
+            type="button"
+            onClick={() => {
+              void save();
+            }}
+            disabled={isSaving}
+            className="rounded-md bg-slate-800/80 px-3 py-1 text-sm font-medium text-slate-100 hover:bg-slate-700/80"
+          >
             Save
           </button>
           {editable ? (
             <button
               type="button"
-              onClick={() => setHeader((p) => ({ ...p, status: "issued" as PurchaseOrderStatus }))}
-              className="rounded-md border px-3 py-1 text-sm font-medium"
+              onClick={async () => {
+                if (!items.length) {
+                  setSaveError("Add at least one line item before issuing PO.");
+                  return;
+                }
+                const hasInvalidQty = items.some((item) => Number(item.quantity ?? 0) <= 0);
+                if (hasInvalidQty) {
+                  setSaveError("All line quantities must be greater than zero before issuing PO.");
+                  return;
+                }
+                await save("issued");
+              }}
+              disabled={isSaving}
+              className="rounded-md bg-emerald-600/80 px-3 py-1 text-sm font-medium text-white hover:bg-emerald-600"
             >
-              Issue PO
+              {isSaving ? "Issuing..." : "Issue PO"}
             </button>
-          ) : (
-            <button
-              type="button"
-              disabled={isReceiving}
-              onClick={receiveSelected}
-              className="rounded-md border px-3 py-1 text-sm font-medium"
-            >
-              {isReceiving ? "Receiving…" : "Receive selected"}
-            </button>
-          )}
+          ) : null}
           {saveError && <span className="text-xs text-destructive">{saveError}</span>}
-          {receiveError && <span className="text-xs text-destructive">{receiveError}</span>}
         </div>
       }
     >
+      <div className="rounded-2xl bg-slate-950/70 p-5 shadow-[0_25px_80px_-50px_rgba(15,23,42,0.9)]">
       <div className="space-y-6">
-        <section className="space-y-3 rounded-xl border p-4">
+        <section className="rounded-2xl border border-white/5 bg-slate-950/60 p-4">
+          <div className="grid gap-2 md:grid-cols-3">
+            <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+              <div className="text-[10px] uppercase tracking-wide text-slate-400">Step 1</div>
+              <div className="text-sm font-semibold text-slate-100">Review PO</div>
+              <div className="text-[11px] text-slate-400">Check supplier and ordered quantities.</div>
+            </div>
+            <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+              <div className="text-[10px] uppercase tracking-wide text-slate-400">Step 2</div>
+              <div className="text-sm font-semibold text-slate-100">Receive Items</div>
+              <div className="text-[11px] text-slate-400">Use line-item receive to create GRN entries.</div>
+            </div>
+            <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+              <div className="text-[10px] uppercase tracking-wide text-slate-400">Step 3</div>
+              <div className="text-sm font-semibold text-slate-100">Close PO</div>
+              <div className="text-[11px] text-slate-400">Close only when all lines are received/cancelled.</div>
+            </div>
+          </div>
+        </section>
+        <section className="space-y-4 rounded-2xl border border-white/5 bg-slate-950/60 p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="text-xs uppercase tracking-[0.2em] text-slate-400">Purchase order</div>
+              <div className="text-lg font-semibold text-slate-100">{po.poNumber}</div>
+            </div>
+            <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-200">
+              {header.status ?? po.status}
+            </span>
+          </div>
+
           <div className="grid gap-3 md:grid-cols-3">
             <SelectField
               label="Status"
@@ -254,106 +529,218 @@ export function ProcurementDetailMain({ companyId, poId }: { companyId: string; 
           />
         </section>
 
-        <section className="space-y-3 rounded-xl border p-4">
+        <section className="space-y-4 rounded-2xl border border-white/5 bg-slate-950/60 p-5">
           <div className="flex items-center justify-between gap-2">
-            <h2 className="text-sm font-semibold">Items</h2>
+            <div>
+              <div className="text-xs uppercase tracking-[0.2em] text-slate-400">Items</div>
+              <div className="text-sm font-semibold text-slate-100">Line items & costs</div>
+            </div>
             {editable && (
               <button
                 type="button"
                 onClick={() =>
                   setItems((prev) => [
                     ...prev,
-                    { name: "New item", description: "", quantity: 1, unitCost: 0, receiveNow: 0 },
+                    { name: "New item", description: "", quantity: 1, unitCost: 0 },
                   ])
                 }
-                className="rounded-md border px-3 py-1 text-sm font-medium"
+                className="rounded-md border border-white/10 bg-slate-900/70 px-3 py-1 text-sm font-medium text-slate-100 hover:bg-slate-800/80"
               >
                 Add line
               </button>
             )}
           </div>
-          <div className="overflow-x-auto rounded-md border">
+          <div className="overflow-x-auto rounded-xl border border-white/5 bg-slate-950/70">
             <table className="min-w-full text-xs">
               <thead>
-                <tr className="border-b bg-muted/40 text-[11px] text-muted-foreground">
+                <tr className="bg-slate-900/70 text-[11px] uppercase tracking-wide text-slate-300">
                   <th className="py-1 pl-2 pr-3 text-left">Item</th>
                   <th className="px-2 py-1 text-left">Qty</th>
                   <th className="px-2 py-1 text-left">Unit cost</th>
-                  <th className="px-2 py-1 text-left">Line total</th>
-                  <th className="px-2 py-1 text-left">Receive now</th>
+                  <th className="px-2 py-1 text-right">Line total</th>
+                  <th className="px-2 py-1 text-left">VAT (%)</th>
+                  <th className="px-2 py-1 text-right">Total (incl. VAT)</th>
+                  <th className="px-2 py-1 text-left">Order status</th>
                   <th className="px-2 py-1 text-left">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {items.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-2 text-center text-xs text-muted-foreground">
-                      No items.
-                    </td>
-                  </tr>
+                      <td colSpan={8} className="py-2 text-center text-xs text-slate-400">
+                        No items.
+                      </td>
+                    </tr>
                 ) : (
                   items.map((item, idx) => {
                     const lineTotal = (item.quantity ?? 0) * (item.unitCost ?? 0);
+                    const lineVat = lineTotal * totals.vatRate;
+                    const lineWithVat = lineTotal + lineVat;
+                    const remainingQty = Math.max(
+                      Number(item.quantity ?? 0) - Number(item.receivedQty ?? 0),
+                      0
+                    );
+                    const canReceiveLine =
+                      !editable &&
+                      remainingQty > 0 &&
+                      item.status?.toLowerCase() !== "cancelled" &&
+                      item.status?.toLowerCase() !== "received";
                     return (
-                      <tr key={item.id ?? idx} className="border-b last:border-0">
-                        <td className="py-1 pl-2 pr-3 align-top">
-                          <input
-                            className="w-full rounded border bg-background px-2 py-1 text-xs"
-                            value={item.name}
-                            onChange={(e) => updateItem(idx, { name: e.target.value })}
-                            readOnly={!editable}
-                          />
-                          <textarea
-                            className="mt-1 h-14 w-full resize-none rounded border bg-background px-2 py-1 text-[11px]"
-                            value={item.description ?? ""}
-                            onChange={(e) => updateItem(idx, { description: e.target.value })}
-                            readOnly={!editable}
-                          />
-                        </td>
+                      <tr key={item.id ?? idx} className="border-t border-white/5">
+                      <td className="py-1 pl-2 pr-3 align-top">
+                        <input
+                          className="w-full rounded border border-white/10 bg-slate-900/70 px-2 py-1 text-xs text-slate-100 placeholder:text-slate-500 focus:border-emerald-400/60 focus:outline-none"
+                          value={item.name}
+                          onChange={(e) => updateItem(idx, { name: e.target.value })}
+                          readOnly={!editable || item.status?.toLowerCase() === "received"}
+                        />
+                        <textarea
+                          className="mt-1 h-14 w-full resize-none rounded border border-white/10 bg-slate-900/70 px-2 py-1 text-[11px] text-slate-100 placeholder:text-slate-500 focus:border-emerald-400/60 focus:outline-none"
+                          value={item.description ?? ""}
+                          onChange={(e) => updateItem(idx, { description: e.target.value })}
+                          readOnly={!editable || item.status?.toLowerCase() === "received"}
+                        />
+                      </td>
+                      <td className="px-2 py-1 align-top">
+                        <input
+                          type="number"
+                          className="w-20 rounded border border-white/10 bg-slate-900/70 px-2 py-1 text-xs text-slate-100 focus:border-emerald-400/60 focus:outline-none"
+                          value={item.quantity}
+                          onChange={(e) => updateItem(idx, { quantity: Number(e.target.value) })}
+                          min={0}
+                          readOnly={!editable || item.status?.toLowerCase() === "received"}
+                        />
+                      </td>
+                      <td className="px-2 py-1 align-top">
+                        <input
+                          type="number"
+                          className="w-24 rounded border border-white/10 bg-slate-900/70 px-2 py-1 text-xs text-slate-100 focus:border-emerald-400/60 focus:outline-none"
+                          value={item.unitCost}
+                          onChange={(e) => updateItem(idx, { unitCost: Number(e.target.value) })}
+                          min={0}
+                          step="0.01"
+                          readOnly={!editable || item.status?.toLowerCase() === "received"}
+                        />
+                      </td>
+                      <td className="px-2 py-1 align-top text-right text-slate-100">{lineTotal.toFixed(2)}</td>
+                      <td className="px-2 py-1 align-top text-xs text-slate-200">
+                        {(totals.vatRate * 100).toFixed(0)}
+                      </td>
+                      <td className="px-2 py-1 align-top text-right text-slate-100">
+                        {lineWithVat.toFixed(2)}
+                      </td>
+                      <td className="px-2 py-1 align-top">
+                        <span className="rounded-full bg-white/5 px-2 py-0.5 text-[11px] text-slate-200 capitalize">
+                          {item.status ?? "pending"}
+                        </span>
+                        <div className="mt-1 text-[10px] text-slate-400">
+                          Received {Number(item.receivedQty ?? 0)} / {Number(item.quantity ?? 0)}
+                        </div>
+                      </td>
                         <td className="px-2 py-1 align-top">
-                          <input
-                            type="number"
-                            className="w-20 rounded border bg-background px-2 py-1 text-xs"
-                            value={item.quantity}
-                            onChange={(e) => updateItem(idx, { quantity: Number(e.target.value) })}
-                            min={0}
-                            readOnly={!editable}
-                          />
-                        </td>
-                        <td className="px-2 py-1 align-top">
-                          <input
-                            type="number"
-                            className="w-24 rounded border bg-background px-2 py-1 text-xs"
-                            value={item.unitCost}
-                            onChange={(e) => updateItem(idx, { unitCost: Number(e.target.value) })}
-                            min={0}
-                            step="0.01"
-                            readOnly={!editable}
-                          />
-                        </td>
-                        <td className="px-2 py-1 align-top text-right">{lineTotal.toFixed(2)}</td>
-                        <td className="px-2 py-1 align-top">
-                          <input
-                            type="number"
-                            className="w-24 rounded border bg-background px-2 py-1 text-xs"
-                            value={item.receiveNow ?? 0}
-                            onChange={(e) => updateItem(idx, { receiveNow: Number(e.target.value) })}
-                            min={0}
-                            step="0.01"
-                            disabled={editable}
-                          />
-                        </td>
-                        <td className="px-2 py-1 align-top">
-                          {editable ? (
+                          {item.inventoryRequestItemId &&
+                          item.status?.toLowerCase() === "received" ? (
+                            <div className="flex items-center gap-2">
+                              {item.movedToInventory ? (
+                                <span className="rounded-full bg-sky-500/15 px-2 py-1 text-[11px] text-sky-200">
+                                  Moved to inventory
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => openMoveModal(item.id ?? "", item.name ?? "")}
+                                  disabled={!item.id || moveStatus[item.id ?? ""]?.loading}
+                                  className="rounded-md bg-emerald-500/20 px-2 py-1 text-[11px] text-emerald-200 hover:bg-emerald-500/30 disabled:opacity-60"
+                                >
+                                  {moveStatus[item.id ?? ""]?.loading ? "Moving…" : "Move to inventory"}
+                                </button>
+                              )}
+                              {moveStatus[item.id ?? ""]?.error && (
+                                <span className="text-[11px] text-rose-300">
+                                  {moveStatus[item.id ?? ""]?.error}
+                                </span>
+                              )}
+                            </div>
+                          ) : canReceiveLine ? (
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setReceiveModal({
+                                    open: true,
+                                    itemId: item.id ?? "",
+                                    itemName: item.name ?? "Part",
+                                    maxQty: remainingQty,
+                                  });
+                                  setReceiveQtyInput(String(remainingQty));
+                                  setReceiveModalError(null);
+                                }}
+                                disabled={!item.id || receiveStatus[item.id ?? ""]?.loading}
+                                className="rounded-md bg-emerald-500/20 px-2 py-1 text-[11px] text-emerald-200 hover:bg-emerald-500/30 disabled:opacity-60"
+                              >
+                                {receiveStatus[item.id ?? ""]?.loading
+                                  ? "Receiving..."
+                                  : "Receive"}
+                              </button>
+                              {receiveStatus[item.id ?? ""]?.error && (
+                                <span className="text-[11px] text-rose-300">
+                                  {receiveStatus[item.id ?? ""]?.error}
+                                </span>
+                              )}
+                            </div>
+                          ) : editable && item.status?.toLowerCase() !== "received" ? (
                             <button
                               type="button"
                               onClick={() => removeItem(idx)}
-                              className="rounded-md border px-2 py-1 text-[11px]"
+                              className="rounded-md bg-rose-500/20 px-2 py-1 text-[11px] text-rose-200 hover:bg-rose-500/30"
                             >
                               Remove
                             </button>
                           ) : (
-                            <span className="text-[11px] text-muted-foreground">Receiving</span>
+                            <span className="text-[11px] text-slate-400">
+                              {item.status ?? "Pending"}
+                            </span>
+                          )}
+                          {item.id && (
+                            <div className="mt-2 rounded-md border border-white/10 bg-white/[0.02] p-2">
+                              <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-400">Line GRNs</div>
+                              {(grnsByItem.get(item.id) ?? []).length === 0 ? (
+                                <div className="text-[11px] text-slate-500">No GRN for this line yet.</div>
+                              ) : (
+                                <div className="space-y-1.5">
+                                  {(grnsByItem.get(item.id) ?? []).map((grn) => (
+                                    <div
+                                      key={grn.id}
+                                      className="flex flex-wrap items-center justify-between gap-2 rounded border border-white/5 bg-slate-900/50 px-2 py-1.5"
+                                    >
+                                      <div className="text-[11px] text-slate-200">
+                                        <span className="font-semibold text-emerald-300">{grn.grnNumber}</span>{" "}
+                                        · Qty {grn.quantity}
+                                        {grn.receivedBy ? ` · By ${grn.receivedBy}` : ""}
+                                      </div>
+                                      <div className="flex items-center gap-1.5">
+                                        <a
+                                          href={`/company/${companyId}/workshop/procurement/${poId}/grn`}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          className="rounded border border-cyan-400/40 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-cyan-200 hover:bg-cyan-500/20"
+                                        >
+                                          View
+                                        </a>
+                                        <a
+                                          href={`/api/company/${companyId}/workshop/procurement/${poId}/grn/pdf`}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          className="rounded border border-indigo-400/40 bg-indigo-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-indigo-200 hover:bg-indigo-500/20"
+                                        >
+                                          Print
+                                        </a>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
                           )}
                         </td>
                       </tr>
@@ -363,12 +750,393 @@ export function ProcurementDetailMain({ companyId, poId }: { companyId: string; 
               </tbody>
             </table>
           </div>
+          <div className="flex justify-end">
+            <div className="grid w-full max-w-sm gap-2 rounded-xl border border-white/5 bg-slate-950/80 p-3 text-xs text-slate-200">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] uppercase tracking-wide text-slate-400">Subtotal</span>
+                <span className="text-sm font-semibold text-slate-100">{totals.subtotal.toFixed(2)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] uppercase tracking-wide text-slate-400">VAT ({(totals.vatRate * 100).toFixed(0)}%)</span>
+                <span className="text-sm font-semibold text-amber-200">{totals.vat.toFixed(2)}</span>
+              </div>
+              <div className="h-px bg-white/5" />
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] uppercase tracking-wide text-slate-300">Total (incl. VAT)</span>
+                <span className="text-base font-semibold text-emerald-200">{totals.totalWithVat.toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+        </section>
+        <section className="space-y-3 rounded-2xl border border-white/5 bg-slate-950/60 p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-xs uppercase tracking-[0.2em] text-slate-400">GRN</div>
+              <div className="text-sm font-semibold text-slate-100">Goods receipt notes</div>
+            </div>
+            <div className="flex flex-col items-end gap-1">
+              <div className="flex items-center gap-2">
+                <a
+                  href={`/company/${companyId}/workshop/procurement/${poId}/grn`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-md border border-slate-400/30 bg-slate-500/10 px-3 py-1 text-xs font-medium text-slate-200 hover:bg-slate-500/20"
+                >
+                  View GRN
+                </a>
+                <a
+                  href={`/api/company/${companyId}/workshop/procurement/${poId}/grn/pdf`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-md border border-indigo-400/40 bg-indigo-500/10 px-3 py-1 text-xs font-medium text-indigo-200 hover:bg-indigo-500/20"
+                >
+                  GRN PDF
+                </a>
+                <button
+                  type="button"
+                  onClick={reconcileGrn}
+                  disabled={reconcileStatus.loading}
+                  className="rounded-md border border-cyan-400/40 bg-cyan-500/10 px-3 py-1 text-xs font-medium text-cyan-200 hover:bg-cyan-500/20 disabled:opacity-60"
+                >
+                  {reconcileStatus.loading ? "Reconciling..." : "Reconcile GRN"}
+                </button>
+              </div>
+              {reconcileStatus.error ? (
+                <span className="text-[11px] text-rose-300">{reconcileStatus.error}</span>
+              ) : reconcileStatus.message ? (
+                <span className="text-[11px] text-emerald-300">{reconcileStatus.message}</span>
+              ) : null}
+            </div>
+          </div>
+          <div className="overflow-x-auto rounded-xl border border-white/5 bg-slate-950/70">
+            <table className="min-w-full text-xs">
+              <thead>
+                <tr className="bg-slate-900/70 text-[11px] uppercase tracking-wide text-slate-300">
+                  <th className="py-2 pl-3 pr-4 text-left">GRN Number</th>
+                  <th className="px-4 py-2 text-left">Part</th>
+                  <th className="px-4 py-2 text-left">Qty</th>
+                  <th className="px-4 py-2 text-left">Received By</th>
+                  <th className="px-4 py-2 text-left">Received At</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(state.data?.grns ?? []).length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-3 text-center text-xs text-slate-400">
+                      No GRN entries yet.
+                    </td>
+                  </tr>
+                ) : (
+                  (state.data?.grns ?? []).map((grn) => (
+                    <tr key={grn.id} className="border-t border-white/5">
+                      <td className="py-2 pl-3 pr-4 font-semibold text-emerald-300">{grn.grnNumber}</td>
+                      <td className="px-4 py-2 text-slate-100">
+                        {grn.partName}
+                      </td>
+                      <td className="px-4 py-2 text-slate-100">{grn.quantity}</td>
+                      <td className="px-4 py-2 text-slate-200">{grn.receivedBy || "-"}</td>
+                      <td className="px-4 py-2 text-slate-300">
+                        {grn.createdAt ? new Date(grn.createdAt).toLocaleString() : "-"}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </section>
       </div>
+    </div>
+      {moveModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-xl rounded-2xl bg-slate-100 p-6 text-slate-900 shadow-[0_30px_80px_-40px_rgba(15,23,42,0.45)]">
+            <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Move to inventory</div>
+            <div className="mt-2 text-lg font-semibold text-slate-900">Confirm move</div>
+            <p className="mt-2 text-sm text-slate-600">
+              Move the received item into inventory and generate a part code.
+            </p>
+            <div className="mt-3 rounded-lg bg-slate-200/80 p-3 text-sm text-slate-700">
+              <div className="text-xs text-slate-500">Item</div>
+              <div className="font-semibold text-slate-900">{moveModal.itemName || "Part"}</div>
+            </div>
+
+            <div className="mt-4 grid gap-3 md:grid-cols-2 text-sm">
+              <label className="space-y-1">
+                <div className="text-xs text-slate-500">Type</div>
+                <select
+                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+                  value={moveForm.type}
+                  onChange={(e) => setMoveForm((prev) => ({ ...prev, type: e.target.value }))}
+                >
+                  <option value="">Select</option>
+                  {inventoryTypes.map((opt) => (
+                    <option key={opt.id} value={opt.code}>
+                      {opt.code} - {opt.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="space-y-1">
+                <div className="text-xs text-slate-500">Part type</div>
+                <select
+                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+                  value={moveForm.partType}
+                  onChange={(e) => setMoveForm((prev) => ({ ...prev, partType: e.target.value }))}
+                >
+                  <option value="">Select</option>
+                  <option value="OE">OE</option>
+                  <option value="OEM">OEM</option>
+                  <option value="After Market">After Market</option>
+                  <option value="Used">Used</option>
+                </select>
+              </label>
+
+              <label className="space-y-1">
+                <div className="text-xs text-slate-500">Unit</div>
+                <input
+                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+                  value={moveForm.unit}
+                  onChange={(e) => setMoveForm((prev) => ({ ...prev, unit: e.target.value }))}
+                  placeholder="EA"
+                />
+              </label>
+
+              <label className="space-y-1">
+                <div className="text-xs text-slate-500">Category</div>
+                <select
+                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+                  value={moveForm.categoryId}
+                  onChange={(e) =>
+                    setMoveForm((prev) => ({
+                      ...prev,
+                      categoryId: e.target.value,
+                      categoryCustom: "",
+                      subcategoryId: "",
+                      subcategoryCustom: "",
+                    }))
+                  }
+                >
+                  <option value="">Select</option>
+                  {inventoryCategories.map((opt) => (
+                    <option key={opt.id} value={opt.id}>
+                      {opt.name}
+                    </option>
+                  ))}
+                  <option value="Custom">Custom</option>
+                </select>
+              </label>
+
+              <label className="space-y-1">
+                <div className="text-xs text-slate-500">Subcategory</div>
+                <select
+                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+                  value={moveForm.subcategoryId}
+                  onChange={(e) =>
+                    setMoveForm((prev) => ({ ...prev, subcategoryId: e.target.value, subcategoryCustom: "" }))
+                  }
+                >
+                  <option value="">Select</option>
+                  {availableSubcategories.map((opt) => (
+                    <option key={opt.id} value={opt.id}>
+                      {opt.name}
+                    </option>
+                  ))}
+                  <option value="Custom">Custom</option>
+                </select>
+              </label>
+
+              <label className="space-y-1">
+                <div className="text-xs text-slate-500">Car make</div>
+                <select
+                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+                  value={moveForm.makeId}
+                  onChange={(e) =>
+                    setMoveForm((prev) => ({ ...prev, makeId: e.target.value, modelId: "", yearId: "" }))
+                  }
+                >
+                  <option value="">Select</option>
+                  {inventoryMakes.map((make) => (
+                    <option key={make.id} value={make.id}>
+                      {make.code} - {make.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="space-y-1">
+                <div className="text-xs text-slate-500">Car model</div>
+                <select
+                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+                  value={moveForm.modelId}
+                  onChange={(e) =>
+                    setMoveForm((prev) => ({ ...prev, modelId: e.target.value, yearId: "" }))
+                  }
+                  disabled={!moveForm.makeId}
+                >
+                  <option value="">Select</option>
+                  {inventoryModels.map((model) => (
+                    <option key={model.id} value={model.id}>
+                      {model.code} - {model.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="space-y-1">
+                <div className="text-xs text-slate-500">Year</div>
+                <select
+                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+                  value={moveForm.yearId}
+                  onChange={(e) => setMoveForm((prev) => ({ ...prev, yearId: e.target.value }))}
+                  disabled={!moveForm.modelId}
+                >
+                  <option value="">Select</option>
+                  {inventoryYears.map((year) => (
+                    <option key={year.id} value={year.id}>
+                      {year.year}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              {moveForm.categoryId === "Custom" && (
+                <label className="space-y-1 md:col-span-2">
+                  <div className="text-xs text-slate-500">Custom category</div>
+                  <input
+                    className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+                    value={moveForm.categoryCustom}
+                    onChange={(e) => setMoveForm((prev) => ({ ...prev, categoryCustom: e.target.value }))}
+                    placeholder="Enter category"
+                  />
+                </label>
+              )}
+
+              {moveForm.subcategoryId === "Custom" && (
+                <label className="space-y-1 md:col-span-2">
+                  <div className="text-xs text-slate-500">Custom subcategory</div>
+                  <input
+                    className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+                    value={moveForm.subcategoryCustom}
+                    onChange={(e) => setMoveForm((prev) => ({ ...prev, subcategoryCustom: e.target.value }))}
+                    placeholder="Enter subcategory"
+                  />
+                </label>
+              )}
+
+              <label className="space-y-1">
+                <div className="text-xs text-slate-500">Brand (optional)</div>
+                <input
+                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+                  value={moveForm.brand}
+                  onChange={(e) => setMoveForm((prev) => ({ ...prev, brand: e.target.value }))}
+                  placeholder="Brand"
+                />
+              </label>
+
+              <label className="space-y-1 md:col-span-2">
+                <div className="text-xs text-slate-500">Part code (auto)</div>
+                <input
+                  className="w-full rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700"
+                  value={generatedPartCode || ""}
+                  readOnly
+                />
+              </label>
+            </div>
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setMoveModal({ open: false, itemId: "", itemName: "" })}
+                className="rounded-md bg-slate-200 px-3 py-1 text-sm text-slate-700 hover:bg-slate-300"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  await moveToInventory(moveModal.itemId, {
+                    partNumber: generatedPartCode,
+                    partBrand: moveForm.brand || moveForm.type,
+                    unit: moveForm.unit,
+                    category: resolvedCategory,
+                    subcategory: resolvedSubcategory,
+                    partType: moveForm.partType || moveForm.type,
+                    makeId: moveForm.makeId || null,
+                    modelId: moveForm.modelId || null,
+                    yearId: moveForm.yearId || null,
+                  });
+                  setMoveModal({ open: false, itemId: "", itemName: "" });
+                }}
+                className="rounded-md bg-emerald-600 px-3 py-1 text-sm font-semibold text-white hover:bg-emerald-500"
+              >
+                Move to inventory
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {receiveModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl bg-slate-100 p-6 text-slate-900 shadow-[0_30px_80px_-40px_rgba(15,23,42,0.45)]">
+            <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Create GRN</div>
+            <div className="mt-2 text-lg font-semibold text-slate-900">Receive Line Item</div>
+            <div className="mt-2 rounded-lg bg-slate-200/80 p-3 text-sm">
+              <div className="text-xs text-slate-500">Item</div>
+              <div className="font-semibold text-slate-900">{receiveModal.itemName}</div>
+              <div className="mt-1 text-xs text-slate-600">Pending Qty: {receiveModal.maxQty}</div>
+            </div>
+            <label className="mt-4 block space-y-1">
+              <div className="text-xs text-slate-500">Receive Qty</div>
+              <input
+                type="number"
+                min={1}
+                max={Math.max(receiveModal.maxQty, 1)}
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+                value={receiveQtyInput}
+                onChange={(e) => setReceiveQtyInput(e.target.value)}
+              />
+            </label>
+            {receiveModalError && <div className="mt-2 text-xs text-rose-600">{receiveModalError}</div>}
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setReceiveModal({ open: false, itemId: "", itemName: "", maxQty: 0 });
+                  setReceiveModalError(null);
+                }}
+                className="rounded-md bg-slate-200 px-3 py-1 text-sm text-slate-700 hover:bg-slate-300"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const qty = Number(receiveQtyInput);
+                  if (!Number.isFinite(qty) || qty <= 0) {
+                    setReceiveModalError("Enter a valid quantity.");
+                    return;
+                  }
+                  if (qty > receiveModal.maxQty) {
+                    setReceiveModalError("Quantity cannot exceed pending quantity.");
+                    return;
+                  }
+                  await receiveRemaining(receiveModal.itemId, qty);
+                  setReceiveModal({ open: false, itemId: "", itemName: "", maxQty: 0 });
+                  setReceiveModalError(null);
+                }}
+                className="rounded-md bg-emerald-600 px-3 py-1 text-sm font-semibold text-white hover:bg-emerald-500"
+              >
+                Save GRN
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </MainPageShell>
   );
 
-  function updateItem(index: number, patch: Partial<ItemDraft>) {
+function updateItem(index: number, patch: Partial<ItemDraft>) {
     setItems((prev) => {
       const next = [...prev];
       const current = next[index];
@@ -379,7 +1147,6 @@ export function ProcurementDetailMain({ companyId, poId }: { companyId: string; 
         name: patch.name ?? current.name ?? "",
         quantity: patch.quantity ?? current.quantity ?? 0,
         unitCost: patch.unitCost ?? current.unitCost ?? 0,
-        receiveNow: patch.receiveNow ?? current.receiveNow ?? 0,
       };
       return next;
     });
@@ -388,6 +1155,147 @@ export function ProcurementDetailMain({ companyId, poId }: { companyId: string; 
   function removeItem(index: number) {
     setItems((prev) => prev.filter((_, i) => i !== index));
   }
+
+  function openMoveModal(itemId: string, itemName: string) {
+    if (!itemId) return;
+    const selectedItem = items.find((i) => i.id === itemId);
+    const typeFromItem = selectedItem?.inventoryTypeId
+      ? inventoryTypes.find((t) => t.id === selectedItem.inventoryTypeId)?.code
+      : inventoryTypes[0]?.code;
+    const resolvedCategoryId =
+      selectedItem?.categoryId ??
+      (selectedItem?.category
+        ? inventoryCategories.find(
+            (cat) =>
+              cat.code?.toLowerCase() === selectedItem.category?.toLowerCase() ||
+              cat.name?.toLowerCase() === selectedItem.category?.toLowerCase()
+          )?.id
+        : "");
+    const resolvedSubcategoryId =
+      selectedItem?.subcategoryId ??
+      (selectedItem?.subcategory
+        ? inventorySubcategories.find(
+            (sub) =>
+              sub.code?.toLowerCase() === selectedItem.subcategory?.toLowerCase() ||
+              sub.name?.toLowerCase() === selectedItem.subcategory?.toLowerCase()
+          )?.id
+        : "");
+    setMoveForm({
+      type: typeFromItem ?? "",
+      partType: selectedItem?.partType ?? "OE",
+      categoryId: resolvedCategoryId ?? "",
+      categoryCustom: "",
+      subcategoryId: resolvedSubcategoryId ?? "",
+      subcategoryCustom: "",
+      makeId: selectedItem?.makeId ?? "",
+      modelId: selectedItem?.modelId ?? "",
+      yearId: selectedItem?.yearId ?? "",
+      unit: selectedItem?.unit ?? "EA",
+      brand: selectedItem?.partBrand ?? "",
+    });
+    setMoveModal({ open: true, itemId, itemName });
+  }
+
+  async function moveToInventory(
+    itemId: string,
+    payload?: {
+      partNumber?: string;
+      partBrand?: string;
+      unit?: string;
+      category?: string;
+      subcategory?: string;
+      partType?: string;
+      makeId?: string | null;
+      modelId?: string | null;
+      yearId?: string | null;
+    }
+  ) {
+    if (!itemId) return;
+    setMoveStatus((prev) => ({ ...prev, [itemId]: { loading: true } }));
+    try {
+      const res = await fetch(
+        `/api/company/${companyId}/workshop/procurement/${poId}/move-to-inventory`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ itemId, ...payload }),
+        }
+      );
+      if (!res.ok) throw new Error(await res.text());
+      setMoveStatus((prev) => ({ ...prev, [itemId]: { loading: false, error: null } }));
+      setItems((prev) =>
+        prev.map((item) => (item.id === itemId ? { ...item, movedToInventory: true } : item))
+      );
+    } catch (err: unknown) {
+      setMoveStatus((prev) => ({
+        ...prev,
+        [itemId]: { loading: false, error: errorMessage(err, "Failed to move") },
+      }));
+    }
+  }
+
+  async function receiveRemaining(itemId: string, quantity: number) {
+    if (!itemId || quantity <= 0) return;
+    setReceiveStatus((prev) => ({ ...prev, [itemId]: { loading: true, error: null } }));
+    try {
+      const res = await fetch(`/api/company/${companyId}/workshop/procurement/${poId}/receive`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items: [{ itemId, quantity }] }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      await loadPurchaseOrder({ keepLoading: true });
+      setReceiveStatus((prev) => ({ ...prev, [itemId]: { loading: false, error: null } }));
+    } catch (err: unknown) {
+      setReceiveStatus((prev) => ({
+        ...prev,
+        [itemId]: { loading: false, error: errorMessage(err, "Failed to receive parts") },
+      }));
+    }
+  }
+
+  async function reconcileGrn() {
+    setReconcileStatus({ loading: true, error: null, message: null });
+    try {
+      const res = await fetch(`/api/company/${companyId}/workshop/procurement/${poId}/reconcile-grn`, {
+        method: "POST",
+      });
+      const raw = await res.text();
+      let json: { error?: string; message?: string; data?: { reconciledItems?: number; reconciledQty?: number } } = {};
+      try {
+        json = raw ? JSON.parse(raw) : {};
+      } catch {
+        json = {};
+      }
+      if (!res.ok) {
+        throw new Error(json?.error ?? json?.message ?? raw ?? "Failed to reconcile GRN");
+      }
+      const reconciledItems = Number(json?.data?.reconciledItems ?? 0);
+      const reconciledQty = Number(json?.data?.reconciledQty ?? 0);
+      setReconcileStatus({
+        loading: false,
+        error: null,
+        message: `Reconciled ${reconciledItems} item(s), qty ${reconciledQty.toFixed(2)}.`,
+      });
+      await loadPurchaseOrder({ keepLoading: true });
+    } catch (err: unknown) {
+      setReconcileStatus({
+        loading: false,
+        error: errorMessage(err, "Failed to reconcile GRN"),
+        message: null,
+      });
+    }
+  }
+
+}
+
+function buildPartCode(itemId: string, type?: string, category?: string, subcategory?: string) {
+  const clean = (value: string | undefined, length: number) => {
+    if (!value) return "NA";
+    return value.replace(/[^a-z0-9]/gi, "").toUpperCase().slice(0, length) || "NA";
+  };
+  const suffix = itemId ? itemId.replace(/-/g, "").slice(-4).toUpperCase() : "0000";
+  return `${clean(type, 3)}-${clean(category, 3)}-${clean(subcategory, 3)}-${suffix}`;
 }
 
 function SelectField({
@@ -405,9 +1313,9 @@ function SelectField({
 }) {
   return (
     <div className="space-y-1">
-      <label className="text-xs font-medium">{label}</label>
+      <label className="text-xs font-medium text-slate-200">{label}</label>
       <select
-        className="w-full rounded border bg-background px-2 py-1 text-sm"
+        className="w-full rounded border border-white/10 bg-slate-900/70 px-2 py-1 text-sm text-slate-100 focus:border-emerald-400/60 focus:outline-none"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}
@@ -437,9 +1345,9 @@ function TextField({
 }) {
   return (
     <div className="space-y-1">
-      <label className="text-xs font-medium">{label}</label>
+      <label className="text-xs font-medium text-slate-200">{label}</label>
       <input
-        className="w-full rounded border bg-background px-2 py-1 text-sm"
+        className="w-full rounded border border-white/10 bg-slate-900/70 px-2 py-1 text-sm text-slate-100 placeholder:text-slate-500 focus:border-emerald-400/60 focus:outline-none"
         value={value}
         readOnly={readOnly}
         type={type}
@@ -460,9 +1368,9 @@ function TextareaField({
 }) {
   return (
     <div className="space-y-1">
-      <label className="text-xs font-medium">{label}</label>
+      <label className="text-xs font-medium text-slate-200">{label}</label>
       <textarea
-        className="h-24 w-full resize-none rounded border bg-background px-3 py-2 text-sm"
+        className="h-24 w-full resize-none rounded border border-white/10 bg-slate-900/70 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-emerald-400/60 focus:outline-none"
         value={value}
         onChange={(e) => onChange(e.target.value)}
       />

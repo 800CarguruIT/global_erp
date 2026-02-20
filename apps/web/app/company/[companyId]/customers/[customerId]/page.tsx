@@ -3,7 +3,13 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { AppLayout, Card, FileUploader, useTheme } from "@repo/ui";
+import { toast } from "sonner";
 import type { Lead } from "@repo/ai-core/crm/leads/types";
+import {
+  serviceRequestTypeLabels,
+  serviceRequestTypes,
+  type ServiceRequestType,
+} from "@repo/ai-core/crm/leads/service-request-types";
 import type { Inspection } from "@repo/ai-core/workshop/inspections/types";
 import type { Estimate } from "@repo/ai-core/workshop/estimates/types";
 
@@ -37,6 +43,26 @@ type WalletTransactionRow = {
   approved_by?: string | null;
   created_at?: string | null;
 };
+
+type AppointmentFormState = {
+  appointmentAt: string;
+  type: "walkin" | "recovery";
+  recoveryType: "pickup" | "dropoff";
+  pickupLocation: string;
+  dropoffLocation: string;
+  remarks: string;
+  serviceType: ServiceRequestType;
+};
+
+const getInitialAppointmentForm = (): AppointmentFormState => ({
+  appointmentAt: "",
+  type: "walkin",
+  recoveryType: "pickup",
+  pickupLocation: "",
+  dropoffLocation: "",
+  remarks: "",
+  serviceType: serviceRequestTypes[0],
+});
 
 export default function CustomerDetailPage({ params }: Params) {
   const { theme } = useTheme();
@@ -89,14 +115,7 @@ export default function CustomerDetailPage({ params }: Params) {
   const [selectActionError, setSelectActionError] = useState<string | null>(null);
   const [servicePickerOpen, setServicePickerOpen] = useState(false);
   const [servicePickerError, setServicePickerError] = useState<string | null>(null);
-  const [appointmentForm, setAppointmentForm] = useState({
-    appointmentAt: "",
-    type: "walkin",
-    recoveryType: "pickup",
-    pickupLocation: "",
-    dropoffLocation: "",
-    remarks: "",
-  });
+  const [appointmentForm, setAppointmentForm] = useState<AppointmentFormState>(getInitialAppointmentForm());
   const [companyDropoffLocation, setCompanyDropoffLocation] = useState("");
 
   useEffect(() => {
@@ -108,7 +127,11 @@ export default function CustomerDetailPage({ params }: Params) {
 
   useEffect(() => {
     if (!companyId || !customerId) return;
-    loadCustomer(companyId, customerId);
+    const controller = new AbortController();
+    loadCustomer(companyId, customerId, controller.signal);
+    return () => {
+      controller.abort();
+    };
   }, [companyId, customerId]);
 
   useEffect(() => {
@@ -176,13 +199,16 @@ export default function CustomerDetailPage({ params }: Params) {
     );
   }, [companyDropoffLocation, appointmentForm.type]);
 
-  async function loadCustomer(cId: string, custId: string) {
+  async function loadCustomer(cId: string, custId: string, signal?: AbortSignal) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/customers/${custId}?companyId=${cId}`);
+      const res = await fetch(`/api/customers/${custId}?companyId=${cId}`, {
+        signal,
+      });
       if (!res.ok) throw new Error("Failed to load customer");
       const data = await res.json();
+      if (signal?.aborted) return;
       setCustomer(data);
       setWalletBalance(Number(data?.wallet_amount ?? 0));
       const cars: CustomerCarLink[] = data?.cars ?? [];
@@ -190,8 +216,10 @@ export default function CustomerDetailPage({ params }: Params) {
       const primaryLink = cars.find((item) => item?.link?.is_primary);
       setSelectedCarId(primaryLink?.car?.id ?? null);
     } catch (err: any) {
+      if (signal?.aborted) return;
       setError(err?.message ?? "Failed to load customer");
     } finally {
+      if (signal?.aborted) return;
       setLoading(false);
     }
   }
@@ -213,61 +241,58 @@ export default function CustomerDetailPage({ params }: Params) {
     }
   }
 
-  async function loadCustomerLeads(cId: string, custId: string) {
-    setCustomerLeadsLoading(true);
-    setCustomerLeadsError(null);
+  async function loadCustomerList<T>(
+    endpoint: string,
+    setLoading: React.Dispatch<React.SetStateAction<boolean>>,
+    setError: React.Dispatch<React.SetStateAction<string | null>>,
+    setData: React.Dispatch<React.SetStateAction<T[]>>,
+    errorMessage: string
+  ) {
+    setLoading(true);
+    setError(null);
     try {
-      const res = await fetch(`/api/customers/${custId}/leads?companyId=${cId}`, { cache: "no-store" });
+      const res = await fetch(endpoint, { cache: "no-store" });
+      const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body?.error ?? "Failed to load leads");
+        throw new Error(body?.error ?? errorMessage);
       }
-      const data = await res.json().catch(() => ({}));
-      setCustomerLeads(Array.isArray(data?.data) ? data.data : []);
+      setData(Array.isArray(body?.data) ? body.data : []);
     } catch (err: any) {
-      setCustomerLeadsError(err?.message ?? "Failed to load leads");
-      setCustomerLeads([]);
+      setError(err?.message ?? errorMessage);
+      setData([]);
     } finally {
-      setCustomerLeadsLoading(false);
+      setLoading(false);
     }
+  }
+
+  async function loadCustomerLeads(cId: string, custId: string) {
+    await loadCustomerList(
+      `/api/customers/${custId}/leads?companyId=${cId}`,
+      setCustomerLeadsLoading,
+      setCustomerLeadsError,
+      setCustomerLeads,
+      "Failed to load leads"
+    );
   }
 
   async function loadCustomerInspections(cId: string, custId: string) {
-    setCustomerInspectionsLoading(true);
-    setCustomerInspectionsError(null);
-    try {
-      const res = await fetch(`/api/customers/${custId}/inspections?companyId=${cId}`, { cache: "no-store" });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body?.error ?? "Failed to load inspections");
-      }
-      const data = await res.json().catch(() => ({}));
-      setCustomerInspections(Array.isArray(data?.data) ? data.data : []);
-    } catch (err: any) {
-      setCustomerInspectionsError(err?.message ?? "Failed to load inspections");
-      setCustomerInspections([]);
-    } finally {
-      setCustomerInspectionsLoading(false);
-    }
+    await loadCustomerList(
+      `/api/customers/${custId}/inspections?companyId=${cId}`,
+      setCustomerInspectionsLoading,
+      setCustomerInspectionsError,
+      setCustomerInspections,
+      "Failed to load inspections"
+    );
   }
 
   async function loadCustomerEstimates(cId: string, custId: string) {
-    setCustomerEstimatesLoading(true);
-    setCustomerEstimatesError(null);
-    try {
-      const res = await fetch(`/api/customers/${custId}/estimates?companyId=${cId}`, { cache: "no-store" });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body?.error ?? "Failed to load estimates");
-      }
-      const data = await res.json().catch(() => ({}));
-      setCustomerEstimates(Array.isArray(data?.data) ? data.data : []);
-    } catch (err: any) {
-      setCustomerEstimatesError(err?.message ?? "Failed to load estimates");
-      setCustomerEstimates([]);
-    } finally {
-      setCustomerEstimatesLoading(false);
-    }
+    await loadCustomerList(
+      `/api/customers/${custId}/estimates?companyId=${cId}`,
+      setCustomerEstimatesLoading,
+      setCustomerEstimatesError,
+      setCustomerEstimates,
+      "Failed to load estimates"
+    );
   }
 
 
@@ -320,6 +345,21 @@ export default function CustomerDetailPage({ params }: Params) {
     if (!companyId || !customerId || !selectActionCar) return;
     setSelectActionSaving(true);
     setSelectActionError(null);
+    let walkinRemarks: string | null = null;
+    if (action === "car_in") {
+      walkinRemarks = appointmentForm.remarks.trim();
+      if (!walkinRemarks) {
+        setSelectActionError("Remarks are required for walk-in service requests.");
+        setSelectActionSaving(false);
+        return;
+      }
+      if (!appointmentForm.serviceType) {
+        setSelectActionError("Select a service type to continue.");
+        setSelectActionSaving(false);
+        return;
+      }
+    }
+    const selectedServiceType = appointmentForm.serviceType;
     try {
       const res = await fetch(`/api/customers/${customerId}/cars/select?companyId=${companyId}`, {
         method: "POST",
@@ -332,7 +372,8 @@ export default function CustomerDetailPage({ params }: Params) {
           recoveryType: action === "appointment" ? appointmentForm.recoveryType : null,
           pickupLocation: action === "appointment" ? appointmentForm.pickupLocation : null,
           dropoffLocation: action === "appointment" ? companyDropoffLocation || null : null,
-          remarks: appointmentForm.remarks,
+          remarks: action === "car_in" ? walkinRemarks : appointmentForm.remarks,
+          serviceType: action === "car_in" ? appointmentForm.serviceType : undefined,
         }),
       });
       if (!res.ok) {
@@ -341,14 +382,14 @@ export default function CustomerDetailPage({ params }: Params) {
       }
       setSelectActionOpen(false);
       setSelectActionMode("menu");
-      setAppointmentForm({
-        appointmentAt: "",
-        type: "walkin",
-        recoveryType: "pickup",
-        pickupLocation: "",
-        dropoffLocation: "",
-        remarks: "",
-      });
+      setAppointmentForm(getInitialAppointmentForm());
+      if (action === "car_in" && selectedServiceType) {
+        toast.success(
+          `Service request (${serviceRequestTypeLabels[selectedServiceType]}) created for walk-in.`
+        );
+      } else if (action === "appointment") {
+        toast.success("Appointment created.");
+      }
     } catch (err: any) {
       setSelectActionError(err?.message ?? "Failed to create lead");
     } finally {
@@ -359,228 +400,250 @@ export default function CustomerDetailPage({ params }: Params) {
   return (
     <AppLayout>
       <div className="space-y-5 py-5">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="space-y-1">
-            <h1 className="text-2xl font-semibold">Customer Dashboard</h1>
-            <p className={`text-sm ${theme.mutedText}`}>
-              Track leads, inspections, invoices, and service history in one place.
-            </p>
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="space-y-1">
+              <h1 className="text-2xl font-semibold">Customer Dashboard</h1>
+              <p className={`text-sm ${theme.mutedText}`}>
+                Track leads, inspections, invoices, and service history in one place.
+              </p>
+            </div>
+            <Link
+              href={companyId ? `/company/${companyId}/customers` : "#"}
+              className="inline-flex items-center gap-1 rounded-full border border-white/30 bg-white/5 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white shadow-sm transition hover:bg-white/10"
+            >
+              Back to customers
+            </Link>
           </div>
-          <Link
-            href={companyId ? `/company/${companyId}/customers` : "#"}
-            className="text-sm text-primary hover:underline"
-          >
-            Back to customers
-          </Link>
+          <Card className="w-full border border-white/20 bg-white shadow-sm">
+            <div className="flex items-between gap-4 p-0">
+              <div className="flex h-12 w-12 me-1 items-center justify-center rounded-lg bg-rose-600 text-white">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  className="h-6 w-6"
+                  fill="currentColor"
+                >
+                  <path d="M4 7h16v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7zm2-3h12l2 2H4l2-2z" />
+                </svg>
+              </div>
+              <div className="flex-2 grow me-5">
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Wallet</div>
+                <div className="text-lg font-semibold">AED {walletBalance.toFixed(2)}</div>
+              </div>
+              <div className="display-flex items-center gap-2">
+                <button
+                  type="button"
+                  className=" ms-5 rounded-sm bg-amber-400 px-3 py-1 text-xs font-semibold uppercase text-black shadow"
+                  onClick={() => {
+                    setTopupError(null);
+                    setTopupOpen(true);
+                  }}
+                >
+                  Topup
+                </button>
+              </div>
+            </div>
+          </Card>
         </div>
 
         {error && <div className="text-sm text-destructive">{error}</div>}
 
-        <div className="flex flex-wrap items-center gap-2">
-          {actions.map((action) => {
-            const isServiceRequest = action.key === "service_request";
-            const isDisabled = isServiceRequest && !selectedCarId;
-            return (
-            <button
-              key={action.label}
-              type="button"
-              className={`inline-flex items-center gap-2 rounded-md px-4 py-2 text-xs font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${
-                isDisabled ? "opacity-50 cursor-not-allowed" : `${theme.mutedText} hover:bg-white/10`
-              }`}
-              disabled={isDisabled}
-              onClick={() => {
-                if (!isServiceRequest) return;
-                if (!selectedCarId) return;
-                setServicePickerError(null);
-                setServicePickerOpen(true);
-              }}
-            >
-              {action.label}
-              <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-white/10 text-[10px]">
-                v
-              </span>
-            </button>
-          );
-          })}
+        <div className="overflow-x-auto border-b border-white/10 pb-3">
+          <div className="flex gap-2 whitespace-nowrap">
+            {actions.map((action) => {
+              const isServiceRequest = action.key === "service_request";
+              const isDisabled = isServiceRequest && !selectedCarId;
+              return (
+                <button
+                  key={action.label}
+                  type="button"
+                  className={`inline-flex items-center gap-2 rounded-md px-4 py-2 text-xs font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${
+                    isDisabled ? "opacity-50 cursor-not-allowed" : `${theme.mutedText} hover:bg-white/10`
+                  }`}
+                  disabled={isDisabled}
+                  onClick={() => {
+                    if (!isServiceRequest) return;
+                    if (!selectedCarId) return;
+                    setServicePickerError(null);
+                    setServicePickerOpen(true);
+                  }}
+                >
+                  {action.label}
+                  <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-white/10 text-[10px]">
+                    v
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
+        <div className="grid gap-4 grid-cols-1 lg:grid-cols-[minmax(0,3fr)_minmax(0,9fr)]">
           <div className="space-y-4">
-            <Card className={`relative overflow-hidden ${theme.cardBg} ${theme.cardBorder}`}>
-              <div className="absolute right-0 top-0 h-16 w-16 translate-x-6 -translate-y-6 rounded-full bg-emerald-500/30" />
-              <div className="absolute -left-8 top-20 h-20 w-20 rounded-full bg-amber-500/30" />
-              <div className="space-y-4 p-4">
-                <div className="flex items-center gap-3">
-                  <div className="h-14 w-14 rounded-full bg-white/10 text-2xl flex items-center justify-center">
-                    C
+            <div className="grid gap-4">
+              <Card className={`relative overflow-hidden w-full ${theme.cardBg} ${theme.cardBorder}`}>
+                <div className="absolute right-0 top-0 h-16 w-16 translate-x-6 -translate-y-6 rounded-full bg-emerald-500/30" />
+                <div className="absolute -left-8 top-20 h-20 w-20 rounded-full bg-amber-500/30" />
+                <div className="space-y-4 p-5 sm:p-6">
+                  <div className="flex items-center gap-3">
+                    <div className="h-14 w-14 rounded-full bg-white/10 text-2xl flex items-center justify-center">
+                      C
+                    </div>
+                    <div>
+                      <div className={`text-sm ${theme.mutedText}`}>Customer</div>
+                      <div className="text-lg font-semibold">{customer?.name ?? "Mohammed Mahdy"}</div>
+                      <div className="text-xs text-rose-400">Not App User</div>
+                    </div>
                   </div>
-                  <div>
-                    <div className={`text-sm ${theme.mutedText}`}>Customer</div>
-                    <div className="text-lg font-semibold">{customer?.name ?? "Mohammed Mahdy"}</div>
-                    <div className="text-xs text-rose-400">Not App User</div>
+                  <div className={`space-y-2 text-sm ${theme.mutedText}`}>
+                    <div className="flex items-center gap-2">
+                      <span className="text-slate-400">Phone</span>
+                      <span>{customer?.phone ?? "+971 54 228 7649"}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-slate-400">Email</span>
+                      <span>{customer?.email ?? "mohdmahdy94@gmail.com"}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-slate-400">Location</span>
+                      <span>{customer?.city ?? "Abu Hail"}, {customer?.country ?? "Dubai"}</span>
+                    </div>
                   </div>
                 </div>
-                <div className={`space-y-2 text-sm ${theme.mutedText}`}>
-                  <div className="flex items-center gap-2">
-                    <span className="text-slate-400">Phone</span>
-                    <span>{customer?.phone ?? "+971 54 228 7649"}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-slate-400">Email</span>
-                    <span>{customer?.email ?? "mohdmahdy94@gmail.com"}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-slate-400">Location</span>
-                    <span>{customer?.city ?? "Abu Hail"}, {customer?.country ?? "Dubai"}</span>
-                  </div>
-                </div>
-                <div className={`rounded-lg ${theme.cardBorder} ${theme.surfaceSubtle} p-3`}>
-                  <div className={`text-xs uppercase tracking-wide ${theme.mutedText}`}>Wallet</div>
-                  <div className="mt-2 flex items-center justify-between">
-                    <div className="text-xl font-semibold">AED {walletBalance.toFixed(2)}</div>
+              </Card>
+              <div className="space-y-4">
+                <Card className={`space-y-4 w-full ${theme.cardBg} ${theme.cardBorder}`}>
+                  <div className="flex items-center justify-between px-3 pt-3">
+                    <div className="text-sm font-semibold">Customer Cars</div>
                     <button
                       type="button"
-                      className="rounded-md bg-amber-400 px-3 py-1 text-xs font-semibold text-black"
                       onClick={() => {
-                        setTopupError(null);
-                        setTopupOpen(true);
+                        setAddCarError(null);
+                        setAddCarOpen(true);
                       }}
+                      className={`rounded-md px-3 py-1 text-xs font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
                     >
-                      Topup
+                      Add New Car
                     </button>
                   </div>
-                </div>
-              </div>
-            </Card>
-
-            <Card className={`space-y-3 ${theme.cardBg} ${theme.cardBorder}`}>
-              <div className="flex items-center justify-between px-4 pt-4">
-                <div className="text-sm font-semibold">Customer Cars</div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAddCarError(null);
-                    setAddCarOpen(true);
-                  }}
-                  className={`rounded-md px-3 py-1 text-xs font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
-                >
-                  Add New Car
-                </button>
-              </div>
-              <div className="space-y-2 px-4 pb-4">
-                {linkedCars.length === 0 ? (
-                  <div className={`rounded-md ${theme.cardBorder} ${theme.surfaceSubtle} px-3 py-2 text-sm ${theme.mutedText}`}>
-                    No cars linked yet.
-                  </div>
-                ) : (
-                  linkedCars.map((c) => {
-                    const car = c.car ?? {};
-                    const plate = car.plate_number || car.plateNumber || "N/A";
-                    const label = [car.make, car.model, car.model_year].filter(Boolean).join(" ") || "Car";
-                    const type = car.body_type || "Regular";
-                    const carId = car.id ?? c.link?.id ?? "";
-                    const isSelected = carId && selectedCarId === carId;
-                    return (
-                      <div
-                        key={carId || `${plate}-${label}`}
-                        className={`rounded-md px-3 py-2 text-sm ${theme.cardBorder} ${theme.surfaceSubtle} ${
-                          isSelected ? "ring-1 ring-blue-500/70" : ""
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="font-semibold">{plate}</div>
-                          <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-white/70">
-                            {type}
-                          </span>
-                        </div>
-                        <div className={`text-xs ${theme.mutedText}`}>{label}</div>
-                        <div className="mt-2 flex items-center gap-2">
-                          <button
-                            type="button"
-                            className="rounded-md bg-amber-400 px-2 py-1 text-[10px] font-semibold text-black"
-                            onClick={() => setViewCar(car)}
-                          >
-                            View
-                          </button>
-                          <button
-                            type="button"
-                            className={`rounded-md px-2 py-1 text-[10px] font-semibold ${
-                              isSelected ? "bg-blue-600 text-white" : "bg-slate-700/80 text-white"
-                            }`}
-                            onClick={async () => {
-                              if (!carId || !companyId || !customerId) return;
-                              if (isSelected) {
-                                setSelectActionCar(car);
-                                setSelectActionMode("menu");
-                                setSelectActionError(null);
-                                setSelectActionOpen(true);
-                                return;
-                              }
-                              const linkId = c.link?.id;
-                              if (!linkId) return;
-                              setSelectedCarId(carId);
-                              try {
-                                const res = await fetch(
-                                  `/api/customers/${customerId}/cars?companyId=${companyId}&linkId=${linkId}`,
-                                  {
-                                    method: "PATCH",
-                                    headers: { "Content-Type": "application/json" },
-                                    body: JSON.stringify({ isPrimary: true }),
-                                  }
-                                );
-                                if (!res.ok) {
-                                  throw new Error("Failed to update car selection");
-                                }
-                                await loadCustomer(companyId, customerId);
-                                setSelectActionCar(car);
-                                setSelectActionMode("menu");
-                                setSelectActionError(null);
-                                setSelectActionOpen(true);
-                              } catch (err) {
-                                setSelectedCarId(null);
-                              }
-                            }}
-                          >
-                            {isSelected ? "Selected" : "Select"}
-                          </button>
-                        </div>
+                  <div className="space-y-3 px-3 pb-3">
+                    {linkedCars.length === 0 ? (
+                      <div className={`rounded-md ${theme.cardBorder} ${theme.surfaceSubtle} px-3 py-2 text-sm ${theme.mutedText}`}>
+                        No cars linked yet.
                       </div>
-                    );
-                  })
-                )}
-              </div>
-            </Card>
-
-            <Card className={`space-y-3 ${theme.cardBg} ${theme.cardBorder}`}>
-              <div className="px-4 pt-4 text-sm font-semibold">Customer Spending</div>
-              <div className="space-y-2 px-4 pb-4">
-                {cards.map((card) => (
-                  <div key={card.label} className={`rounded-md ${theme.cardBorder} ${theme.surfaceSubtle} px-3 py-2 text-sm`}>
-                    <div className={`text-xs ${theme.mutedText}`}>{card.label}</div>
-                    <div className="text-lg font-semibold">{card.value}</div>
+                    ) : (
+                      linkedCars.map((c) => {
+                        const car = c.car ?? {};
+                        const plate = car.plate_number || car.plateNumber || "N/A";
+                        const label = [car.make, car.model, car.model_year].filter(Boolean).join(" ") || "Car";
+                        const type = car.body_type || "Regular";
+                        const carId = car.id ?? c.link?.id ?? "";
+                        const isSelected = carId && selectedCarId === carId;
+                        return (
+                          <div
+                            key={carId || `${plate}-${label}`}
+                            className={`rounded-md px-3 py-2 text-sm ${theme.cardBorder} ${theme.surfaceSubtle} ${
+                              isSelected ? "ring-1 ring-blue-500/70" : ""
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="font-semibold">{plate}</div>
+                              <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-white/70">
+                                {type}
+                              </span>
+                            </div>
+                            <div className={`text-xs ${theme.mutedText}`}>{label}</div>
+                            <div className="mt-2 flex items-center gap-2">
+                              <button
+                                type="button"
+                                className="rounded-md bg-amber-400 px-2 py-1 text-[10px] font-semibold text-black"
+                                onClick={() => setViewCar(car)}
+                              >
+                                View
+                              </button>
+                              <button
+                                type="button"
+                                className={`rounded-md px-2 py-1 text-[10px] font-semibold ${
+                                  isSelected ? "bg-blue-600 text-white" : "bg-slate-700/80 text-white"
+                                }`}
+                                onClick={async () => {
+                                  if (!carId || !companyId || !customerId) return;
+                                  if (isSelected) {
+                                    setSelectActionCar(car);
+                                    setSelectActionMode("menu");
+                                    setSelectActionError(null);
+                                    setSelectActionOpen(true);
+                                    return;
+                                  }
+                                  const linkId = c.link?.id;
+                                  if (!linkId) return;
+                                  setSelectedCarId(carId);
+                                  try {
+                                    const res = await fetch(
+                                      `/api/customers/${customerId}/cars?companyId=${companyId}&linkId=${linkId}`,
+                                      {
+                                        method: "PATCH",
+                                        headers: { "Content-Type": "application/json" },
+                                        body: JSON.stringify({ isPrimary: true }),
+                                      }
+                                    );
+                                    if (!res.ok) {
+                                      throw new Error("Failed to update car selection");
+                                    }
+                                    await loadCustomer(companyId, customerId);
+                                    setSelectActionCar(car);
+                                    setSelectActionMode("menu");
+                                    setSelectActionError(null);
+                                    setSelectActionOpen(true);
+                                  } catch (err) {
+                                    setSelectedCarId(null);
+                                  }
+                                }}
+                              >
+                                {isSelected ? "Selected" : "Select"}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
                   </div>
-                ))}
+                </Card>
+                <Card className={`space-y-3 p-3 w-full ${theme.cardBg} ${theme.cardBorder}`}>
+                  <div className="text-sm font-semibold">Customer Spending</div>
+                  <div className="space-y-2">
+                    {cards.map((card) => (
+                      <div key={card.label} className={`rounded-md ${theme.cardBorder} ${theme.surfaceSubtle} px-3 py-2 text-sm`}>
+                        <div className={`text-xs ${theme.mutedText}`}>{card.label}</div>
+                        <div className="text-lg font-semibold">{card.value}</div>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
               </div>
-            </Card>
+            </div>
           </div>
 
           <div className="space-y-4">
             <Card className={`p-4 ${theme.cardBg} ${theme.cardBorder}`}>
-              <div className="flex flex-wrap gap-2 border-b border-white/10 pb-3">
-                {tabLabels.map((tab) => (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`rounded-md px-3 py-2 text-xs font-semibold uppercase tracking-wide ${
-                      activeTab === tab.id
-                        ? "bg-blue-600 text-white"
-                        : "text-white/60 hover:bg-white/10"
-                    }`}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
+              <div className="overflow-x-auto border-b border-white/10 pb-3">
+                <div className="flex gap-2 whitespace-nowrap">
+                  {tabLabels.map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`rounded-md px-3 py-2 text-xs font-semibold uppercase tracking-wide ${
+                        activeTab === tab.id
+                          ? "bg-blue-600 text-white"
+                          : "text-white/60 hover:bg-white/10"
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {activeTab === "leads" && (
@@ -825,13 +888,14 @@ export default function CustomerDetailPage({ params }: Params) {
                       } else {
                         setWalletBalance((prev) => prev + amount);
                       }
-                      setTopupForm({
+                       setTopupForm({
                         amount: "",
                         method: "cash",
                         paymentDate: "",
                         proofFileId: "",
                       });
                       setTopupOpen(false);
+                      toast.success("Topup submitted; please wait for verification.");
                     } catch (err: any) {
                       setTopupError(err?.message ?? "Failed to create topup");
                     } finally {
@@ -1187,7 +1251,12 @@ export default function CustomerDetailPage({ params }: Params) {
               {selectActionMode === "menu" && (
                 <div className="space-y-3">
                   <div className="space-y-2">
-                    <label className={`text-xs font-semibold ${theme.mutedText}`}>Remarks</label>
+                    <div className="flex items-center justify-between">
+                      <label className={`text-xs font-semibold ${theme.mutedText}`}>Remarks</label>
+                      <span className="text-[10px] uppercase tracking-wide text-white/60">
+                        Required for service requests
+                      </span>
+                    </div>
                     <textarea
                       className={theme.input}
                       value={appointmentForm.remarks}
@@ -1197,6 +1266,33 @@ export default function CustomerDetailPage({ params }: Params) {
                       placeholder="Enter remarks"
                       rows={3}
                     />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className={`text-xs font-semibold ${theme.mutedText}`}>Service Type</label>
+                      <span className="text-[10px] uppercase tracking-wide text-white/60">
+                        Required
+                      </span>
+                    </div>
+                    <select
+                      className={theme.input}
+                      value={appointmentForm.serviceType}
+                      onChange={(e) =>
+                        setAppointmentForm((prev) => ({
+                          ...prev,
+                          serviceType: e.target.value as ServiceRequestType,
+                        }))
+                      }
+                    >
+                      {serviceRequestTypes.map((value) => (
+                        <option key={value} value={value}>
+                          {serviceRequestTypeLabels[value]}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-[11px] text-white/60">
+                      You can update this later from the lead details screen.
+                    </p>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <button

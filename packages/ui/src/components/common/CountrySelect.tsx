@@ -9,9 +9,10 @@ export type CountrySelectProps = {
   onChange: (iso2: string | undefined) => void;
   label?: string;
   placeholder?: string;
+  required?: boolean;
 };
 
-export function CountrySelect({ value, onChange, label, placeholder }: CountrySelectProps) {
+export function CountrySelect({ value, onChange, label, placeholder, required }: CountrySelectProps) {
   const options = ReferenceData.ReferenceCountries.allCountries.map((c) => ({
     value: c.iso2,
     label: `${c.name} (${c.dialCode})`,
@@ -23,6 +24,7 @@ export function CountrySelect({ value, onChange, label, placeholder }: CountrySe
       options={options}
       label={label ?? "Country"}
       placeholder={placeholder ?? "Select country"}
+      required={required}
     />
   );
 }

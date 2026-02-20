@@ -28,6 +28,7 @@ export default function CompanyCustomersPage({ params }: Params) {
   const [view, setView] = useState<"active" | "archived">("active");
   const [statusUpdating, setStatusUpdating] = useState<Record<string, boolean>>({});
   const [statusError, setStatusError] = useState<string | null>(null);
+  const [mobileExpanded, setMobileExpanded] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     Promise.resolve(params).then((p) => setCompanyId(p?.companyId ?? null));
@@ -255,7 +256,124 @@ export default function CompanyCustomersPage({ params }: Params) {
               </div>
               {statusError && <div className="px-4 pt-3 text-xs text-red-500">{statusError}</div>}
               {error && <div className="px-4 pt-3 text-xs text-red-500">{error}</div>}
-              <div className="overflow-x-auto">
+              <div className="space-y-3 px-3 pb-3 pt-2 md:hidden">
+                {loading ? (
+                  <div className="rounded-xl border border-border/30 bg-muted/10 px-3 py-4 text-center text-sm text-muted-foreground">
+                    Loading customers...
+                  </div>
+                ) : filtered.length === 0 ? (
+                  <div className="rounded-xl border border-border/30 bg-muted/10 px-3 py-4 text-center text-sm text-muted-foreground">
+                    No customers found.
+                  </div>
+                ) : (
+                  filtered.map((c) => (
+                    <div key={c.id} className="rounded-xl border border-border/30 bg-background/70 p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <label className="inline-flex items-start gap-2">
+                          <input
+                            type="checkbox"
+                            checked={!!selected[c.id]}
+                            onChange={(e) => setSelected((prev) => ({ ...prev, [c.id]: e.target.checked }))}
+                            className="mt-1"
+                          />
+                          <Link
+                            href={companyId ? `/company/${companyId}/customers/${c.id}` : "#"}
+                            className="text-sm font-semibold text-primary hover:underline"
+                          >
+                            {c.name}
+                          </Link>
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setMobileExpanded((prev) => ({ ...prev, [c.id]: !prev[c.id] }))}
+                          className="inline-flex items-center rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition hover:bg-slate-50"
+                        >
+                          {mobileExpanded[c.id] ? "Hide data" : "Show data"}
+                        </button>
+                      </div>
+
+                      <div className="mt-3 flex items-center justify-between gap-2">
+                        <span
+                          className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold ${
+                            c.is_active === false
+                              ? "bg-amber-500/15 text-amber-600"
+                              : "bg-emerald-500/15 text-emerald-600"
+                          }`}
+                        >
+                          {c.is_active === false ? "Inactive" : "Active"}
+                        </span>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={c.is_active !== false}
+                          aria-busy={statusUpdating[c.id] ?? false}
+                          disabled={statusUpdating[c.id] ?? false}
+                          onClick={() => toggleStatus(c.id, c.is_active === false)}
+                          className={`relative inline-flex h-5 w-9 items-center rounded-full border transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                            c.is_active === false
+                              ? "border-border/40 bg-muted/40"
+                              : "border-emerald-400 bg-emerald-500/30"
+                          }`}
+                        >
+                          <span
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition ${
+                              c.is_active === false ? "translate-x-1" : "translate-x-4"
+                            }`}
+                          />
+                        </button>
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Link
+                          href={companyId ? `/company/${companyId}/customers/${c.id}` : "#"}
+                          className="inline-flex items-center rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition hover:bg-slate-50 hover:shadow-md"
+                        >
+                          View
+                        </Link>
+                        <Link
+                          href={companyId ? `/company/${companyId}/customers/${c.id}/edit` : "#"}
+                          className="inline-flex items-center rounded-md border border-white/30 bg-primary px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary-foreground shadow-sm transition hover:opacity-90 hover:shadow-md"
+                        >
+                          Edit
+                        </Link>
+                      </div>
+
+                      {mobileExpanded[c.id] ? (
+                        <div className="mt-3 space-y-2 rounded-lg border border-border/30 bg-muted/10 p-3 text-xs">
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="text-muted-foreground">Phone</span>
+                            <span className="font-medium">{c.phone || "-"}</span>
+                          </div>
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="text-muted-foreground">Email</span>
+                            <span className="max-w-[55vw] truncate font-medium">{c.email || "-"}</span>
+                          </div>
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="text-muted-foreground">Cars</span>
+                            <span className="font-medium">{c.carCount ?? c.carcount ?? 0}</span>
+                          </div>
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="text-muted-foreground">Code</span>
+                            <span className="font-medium">{c.code || "-"}</span>
+                          </div>
+                          <button
+                            type="button"
+                            className={`mt-1 text-xs font-semibold ${
+                              c.is_active === false ? "text-emerald-600" : "text-red-500"
+                            }`}
+                            disabled={statusUpdating[c.id] ?? false}
+                            onClick={() => toggleStatus(c.id, c.is_active === false)}
+                          >
+                            {c.is_active === false ? "Unarchive" : "Archive"}
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="hidden overflow-x-auto md:block">
                 <table className="min-w-full text-sm border-separate border-spacing-0">
                   <thead>
                     <tr className="text-left bg-muted/20">

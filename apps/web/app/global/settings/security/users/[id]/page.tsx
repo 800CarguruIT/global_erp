@@ -3,6 +3,8 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { UserForm, useI18n } from "@repo/ui";
+import { useGlobalPermissions } from "@/lib/auth/global-permissions";
+import { AccessDenied } from "@/components/AccessDenied";
 
 type Role = { id: string; name: string };
 type Employee = { id: string; name: string };
@@ -13,12 +15,15 @@ type UserDetail = {
   name?: string | null;
   roles?: { id: string; name: string }[];
   employee_id?: string | null;
+  mobile?: string | null;
 };
 
 export default function GlobalUserEditPage() {
   const { t } = useI18n();
   const params = useParams<{ id: string }>();
   const userId = params?.id?.toString();
+  const { hasPermission, loading: permLoading } = useGlobalPermissions();
+  const canEditUsers = hasPermission("global.users.edit");
   const [roles, setRoles] = useState<Role[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [user, setUser] = useState<UserDetail | null>(null);
@@ -31,9 +36,18 @@ export default function GlobalUserEditPage() {
       setLoading(false);
       return;
     }
+    if (!canEditUsers) {
+      setLoading(false);
+      setError(null);
+      return;
+    }
     async function load() {
       setLoading(true);
       setError(null);
+      if (!canEditUsers) {
+        setLoading(false);
+        return;
+      }
       try {
         const [userRes, rolesRes, employeesRes] = await Promise.all([
           fetch(`/api/admin/users/${userId}`),
@@ -67,7 +81,7 @@ export default function GlobalUserEditPage() {
       }
     }
     load();
-  }, [t, userId]);
+  }, [t, userId, canEditUsers]);
 
   async function handleSubmit(values: {
     email: string;
@@ -75,6 +89,7 @@ export default function GlobalUserEditPage() {
     password?: string;
     roleIds: string[];
     employeeId?: string | null;
+    mobile?: string | null;
   }) {
     if (!userId) return;
     const res = await fetch(`/api/admin/users/${userId}`, {
@@ -86,6 +101,7 @@ export default function GlobalUserEditPage() {
         password: values.password,
         roleIds: values.roleIds,
         employeeId: values.employeeId ?? null,
+        mobile: values.mobile ?? null,
       }),
     });
     if (!res.ok) {
@@ -95,14 +111,30 @@ export default function GlobalUserEditPage() {
     window.location.href = "/global/settings/security/users";
   }
 
-  const initialValues = user
+    const initialValues = user
     ? {
       email: user.email,
       name: user.full_name ?? user.name ?? "",
       roleIds: user.roles?.map((r) => r.id) ?? [],
       employeeId: user.employee_id ?? undefined,
+      mobile: user.mobile ?? undefined,
     }
     : undefined;
+
+  if (permLoading) {
+    return <div className="py-4 text-sm text-muted-foreground">Loading access rights...</div>;
+  }
+
+  if (!canEditUsers) {
+    return (
+      <div className="py-4">
+        <AccessDenied
+          title="Edit users access locked"
+          description="You need the global.users.edit permission to modify users."
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4 py-4">

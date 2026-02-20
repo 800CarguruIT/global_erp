@@ -125,18 +125,20 @@ export default function CompanyUserCreatePage({
     password?: string;
     roleIds: string[];
     employeeId?: string | null;
+    mobile?: string | null;
     scope?: ScopeOption | null;
   }) {
     if (!companyId) {
       throw new Error("Company is required");
     }
-    const payload: any = {
-      email: values.email,
-      name: values.name,
-      password: values.password,
-      roleIds: values.roleIds,
-      employeeId: values.employeeId ?? null,
-    };
+      const payload: any = {
+        email: values.email,
+        name: values.name,
+        password: values.password,
+        roleIds: values.roleIds,
+        employeeId: values.employeeId ?? null,
+        mobile: values.mobile ?? null,
+      };
     if (selectedScope) {
       payload.scope = selectedScope.type;
       payload.branchId = selectedScope.type === "branch" ? selectedScope.id : null;

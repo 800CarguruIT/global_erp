@@ -20,8 +20,7 @@ type PlateInputProps = {
 
 export function PlateInput({ value, onChange }: PlateInputProps) {
   const { theme } = useTheme();
-  const inputBorderClass = theme.inputBorder;
-  const inputBgClass = theme.inputBg;
+  const labelClass = "mb-1 text-sm font-medium text-foreground/90";
   const countries = ReferenceData.ReferenceCountries.allCountries;
   const states = ReferenceData.ReferenceStates.allStates;
   const cities = ReferenceData.ReferenceCities?.allCities ?? [];
@@ -50,6 +49,8 @@ export function PlateInput({ value, onChange }: PlateInputProps) {
   const locationOptionsState = statesForCountry;
   const emptyLocationLabelCity = "No cities";
   const emptyLocationLabelState = "No states";
+  const isStateChecked = locationMode === "state" || locationMode === "both";
+  const isCityChecked = locationMode === "city" || locationMode === "both";
 
   function setLocationMode(next: "state" | "city" | "both") {
     onChange({
@@ -60,11 +61,28 @@ export function PlateInput({ value, onChange }: PlateInputProps) {
     });
   }
 
+  function toggleLocationCheckbox(kind: "state" | "city") {
+    if (!hasCountry) return;
+    const nextState = kind === "state" ? !isStateChecked : isStateChecked;
+    const nextCity = kind === "city" ? !isCityChecked : isCityChecked;
+    // Keep at least one option selected.
+    if (!nextState && !nextCity) return;
+    if (nextState && nextCity) {
+      setLocationMode("both");
+      return;
+    }
+    if (nextState) {
+      setLocationMode("state");
+      return;
+    }
+    setLocationMode("city");
+  }
+
   return (
     <div className="grid grid-cols-2 gap-4 md:grid-cols-6">
       <div>
         <div className="space-y-2 ">
-          <div className="text-xs font-semibold text-muted-foreground">
+          <div className={labelClass}>
             Country Code
           </div>
         </div>
@@ -89,99 +107,52 @@ export function PlateInput({ value, onChange }: PlateInputProps) {
           ))}
         </select>
       </div>
-      <div className="flex flex-col justify-center gap-2 md:col-span-2 ">
-        <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground space-y-2">
-          <span>State or City</span>
-          {/* <button
-            type="button"
-            className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-white/30 text-[10px] text-muted-foreground transition hover:bg-white/5 hover:text-foreground"
-            title="Enable one or both to load options for the country"
-            aria-label="State or City info"
-          >
-            <svg viewBox="0 0 24 24" className="h-1 w-1" aria-hidden="true">
-              <path
-                d="M12 8.5h.01M11 11h2v5h-2z"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="1.6" />
-            </svg>
-          </button> */}
+      <div className="flex flex-col justify-center gap-2 md:col-span-2">
+        <div className="flex items-center gap-2 text-sm font-medium text-foreground/90">
+          <span>State / City</span>
         </div>
-        <div className="grid gap-4 text-xs sm:grid-cols-2">
-          <label
-            className={`flex cursor-pointer items-center gap-3 rounded-lg px-3 py-1 transition ${inputBorderClass} ${inputBgClass} ${
-              showState ? "ring-1 ring-primary/30" : "hover:bg-muted/30"
-            }`}
-          >
-            <input
-              type="checkbox"
-              className="h-4 w-4"
-              checked={showState}
-              onChange={(e) => {
-                const next = e.target.checked
-                  ? showCity
-                    ? "both"
-                    : "state"
-                  : showCity
-                  ? "city"
-                  : "state";
-                setLocationMode(next);
-              }}
+        <div className="flex flex-wrap gap-2 text-xs">
+          {(
+            [
+              { key: "state", label: "State", checked: isStateChecked },
+              { key: "city", label: "City", checked: isCityChecked },
+            ] as const
+          ).map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              role="checkbox"
+              aria-checked={item.checked}
               disabled={!hasCountry}
-            />
-            <span className="font-semibold">State</span>
-            {showState && (
-              <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold text-primary">
-                Selected
+              onClick={() => toggleLocationCheckbox(item.key)}
+              className={`inline-flex min-h-[36px] items-center gap-2 rounded-md px-3 py-1.5 font-medium transition ${
+                item.checked
+                  ? "bg-primary/12 text-foreground"
+                  : "bg-muted/40 text-muted-foreground hover:bg-muted/55"
+              } disabled:cursor-not-allowed disabled:opacity-50`}
+            >
+              <span
+                className={`inline-flex h-4 w-4 items-center justify-center rounded-sm border text-[10px] ${
+                  item.checked ? "border-primary/50 bg-primary/20 text-primary" : "border-muted-foreground/30 bg-muted/30 text-transparent"
+                }`}
+              >
+                ✓
               </span>
-            )}
-          </label>
-          <label
-            className={`flex cursor-pointer items-center gap-3 rounded-lg px-3 py-1 transition ${inputBorderClass} ${inputBgClass} ${
-              showCity ? "ring-1 ring-primary/30" : "hover:bg-muted/30"
-            }`}
-          >
-            <input
-              type="checkbox"
-              className="h-4 w-4"
-              checked={showCity}
-              onChange={(e) => {
-                const next = e.target.checked
-                  ? showState
-                    ? "both"
-                    : "city"
-                  : showState
-                  ? "state"
-                  : "city";
-                setLocationMode(next);
-              }}
-              disabled={!hasCountry}
-            />
-            <span className="font-semibold">City</span>
-            {showCity && (
-              <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold text-primary">
-                Selected
-              </span>
-            )}
-          </label>
+              {item.label}
+            </button>
+          ))}
         </div>
       </div>
       {showState && (
       <div>
-        <div className="text-xs font-semibold text-muted-foreground">State / Province</div>
+        <div className={labelClass}>State / Province</div>
         <select
           className={theme.input}
           value={value.state ?? ""}
           onChange={(e) =>
             onChange({
               ...value,
-              // If the other field is already shown, keep "both" so it doesn't disappear
-              locationMode:
-                locationMode === "city" || locationMode === "both" ? "both" : "state",
+              locationMode: locationMode === "both" ? "both" : "state",
               state: e.target.value,
             })
           }
@@ -199,15 +170,14 @@ export function PlateInput({ value, onChange }: PlateInputProps) {
       )}
       {showCity && (
       <div>
-        <div className="text-xs font-semibold text-muted-foreground">City</div>
+        <div className={labelClass}>City</div>
         <select
           className={theme.input}
           value={value.city ?? ""}
           onChange={(e) =>
             onChange({
               ...value,
-              locationMode:
-                locationMode === "state" || locationMode === "both" ? "both" : "city",
+              locationMode: locationMode === "both" ? "both" : "city",
               city: e.target.value,
             })
           }
@@ -224,7 +194,7 @@ export function PlateInput({ value, onChange }: PlateInputProps) {
         </div>
       )}
       <div>
-        <div className="text-xs font-semibold text-muted-foreground">Series (A-Z / 0-9)</div>
+        <div className={labelClass}>Series (A-Z / 0-9)</div>
         <input
           className={theme.input}
           value={value.series ?? ""}
@@ -237,7 +207,7 @@ export function PlateInput({ value, onChange }: PlateInputProps) {
         />
       </div>
       <div>
-        <div className="text-xs font-semibold text-muted-foreground">Number</div>
+        <div className={labelClass}>Number</div>
         <input
           className={theme.input}
           value={value.number ?? ""}

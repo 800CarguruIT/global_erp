@@ -1,8 +1,11 @@
 import { getSql } from "../../db";
 import { getInspectionById, listInspectionItems } from "../inspections/repository";
+import type { QuoteType } from "../quotes/types";
 import type {
   Estimate,
   EstimateItem,
+  EstimateItemCostType,
+  EstimateItemQuoteCosts,
   EstimateItemStatus,
   EstimateStatus,
 } from "./types";
@@ -30,6 +33,24 @@ function mapEstimateRow(row: any): Estimate {
   };
 }
 
+const ESTIMATE_ITEM_COST_COLUMNS: EstimateItemCostType[] = ["oem", "oe", "aftm", "used"];
+
+const VENDOR_PART_TYPE_TO_COST_TYPE: Record<string, EstimateItemCostType> = {
+  genuine: "oe",
+  original: "oe",
+  oe: "oe",
+  oem: "oem",
+  aftermarket: "aftm",
+  used: "used",
+};
+
+function mapVendorPartType(partType?: string | null): EstimateItemCostType | null {
+  if (!partType) return null;
+  const normalized = partType.trim().toLowerCase();
+  if (!normalized) return null;
+  return VENDOR_PART_TYPE_TO_COST_TYPE[normalized] ?? null;
+}
+
 function mapEstimateItemRow(row: any): EstimateItem {
   return {
     id: row.id,
@@ -46,6 +67,8 @@ function mapEstimateItemRow(row: any): EstimateItem {
     status: row.status,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    approvedType: row.approved_type as EstimateItemCostType | null,
+    approvedCost: row.approved_cost != null ? Number(row.approved_cost) : null,
   };
 }
 
@@ -180,7 +203,84 @@ export async function getEstimateWithItems(
   if (!rows.length) return null;
   const estimate = mapEstimateRow(rows[0]);
   const items = await getEstimateItems(estimateId);
-  return { estimate, items };
+  const costRows = await sql`
+    SELECT
+      ei.id AS estimate_item_id,
+      MIN(pq.oem) AS oem,
+      MIN(pq.oe) AS oe,
+      MIN(pq.aftm) AS aftm,
+      MIN(pq.used) AS used
+    FROM estimate_items ei
+    LEFT JOIN part_quotes pq
+      ON pq.company_id = ${companyId}
+      AND (
+        pq.estimate_item_id = ei.id
+        OR (ei.inspection_item_id IS NOT NULL AND pq.line_item_id = ei.inspection_item_id)
+      )
+      AND (
+        pq.estimate_id IS NULL
+        OR pq.estimate_id = ${estimateId}
+      )
+    WHERE ei.estimate_id = ${estimateId}
+    GROUP BY ei.id
+  `;
+  const quoteCostMap: Record<string, EstimateItemQuoteCosts | undefined> = {};
+  for (const row of costRows) {
+    const costs: EstimateItemQuoteCosts = {};
+    for (const column of ESTIMATE_ITEM_COST_COLUMNS) {
+      const value = row[column];
+      if (value != null) {
+        costs[column] = Number(value);
+      }
+    }
+    if (Object.keys(costs).length > 0 && row.estimate_item_id) {
+      quoteCostMap[row.estimate_item_id] = costs;
+    }
+  }
+
+  const vendorQuoteRows = await sql`
+    SELECT
+      qi.estimate_item_id,
+      qi.part_type,
+      qi.unit_price
+    FROM quotes q
+    INNER JOIN quote_items qi ON qi.quote_id = q.id
+    WHERE q.company_id = ${companyId}
+      AND q.estimate_id = ${estimateId}
+      AND q.quote_type = ${"vendor_part" as QuoteType}
+  `;
+  const vendorQuoteCostMap: Record<string, EstimateItemQuoteCosts | undefined> = {};
+  for (const row of vendorQuoteRows) {
+    const costKey = mapVendorPartType(row.part_type);
+    if (!costKey) continue;
+    const estimateItemId = row.estimate_item_id;
+    if (!estimateItemId) continue;
+    const unitPrice = row.unit_price;
+    if (unitPrice == null) continue;
+    const amount = Number(unitPrice);
+    if (Number.isNaN(amount)) continue;
+    const existing = vendorQuoteCostMap[estimateItemId] ?? (vendorQuoteCostMap[estimateItemId] = {});
+    const previous = existing[costKey];
+    if (previous == null || amount < previous) {
+      existing[costKey] = amount;
+    }
+  }
+  const enrichedItems = items.map((item) => {
+    const baseCosts = quoteCostMap[item.id];
+    const vendorCosts = vendorQuoteCostMap[item.id];
+    const combinedCosts =
+      baseCosts || vendorCosts
+        ? {
+            ...(baseCosts ?? {}),
+            ...(vendorCosts ?? {}),
+          }
+        : undefined;
+    return {
+      ...item,
+      quoteCosts: combinedCosts && Object.keys(combinedCosts).length ? combinedCosts : undefined,
+    };
+  });
+  return { estimate, items: enrichedItems };
 }
 
 export async function listEstimatesForCompany(
@@ -267,43 +367,98 @@ export async function replaceEstimateItems(
     sale?: number;
     gpPercent?: number | null;
     status?: EstimateItemStatus;
+    approvedType?: EstimateItemCostType | null;
+    approvedCost?: number | null;
   }>
 ): Promise<void> {
   const sql = getSql();
-  await sql`DELETE FROM estimate_items WHERE estimate_id = ${estimateId}`;
   if (!items.length) {
+    await sql`DELETE FROM estimate_items WHERE estimate_id = ${estimateId}`;
     await recalculateEstimateTotals(estimateId);
     return;
   }
 
-  for (const [idx, item] of items.entries()) {
+  const existingRows = await sql`
+    SELECT id
+    FROM estimate_items
+    WHERE estimate_id = ${estimateId}
+  `;
+  const existingIds = existingRows.map((row: any) => row.id as string);
+  const existingIdSet = new Set(existingIds);
+  const keepIds = new Set(items.map((item) => item.id).filter((id): id is string => Boolean(id)));
+  const deleteIds = existingIds.filter((id) => !keepIds.has(id));
+  if (deleteIds.length > 0) {
     await sql`
-      INSERT INTO estimate_items (
-        estimate_id,
-        inspection_item_id,
-        line_no,
-        part_name,
-        description,
-        type,
-        quantity,
-        cost,
-        sale,
-        gp_percent,
-        status
-      ) VALUES (
-        ${estimateId},
-        ${item.inspectionItemId ?? null},
-        ${item.lineNo ?? idx + 1},
-        ${item.partName},
-        ${item.description ?? null},
-        ${item.type},
-        ${item.quantity ?? 1},
-        ${item.cost ?? 0},
-        ${item.sale ?? 0},
-        ${item.gpPercent ?? null},
-        ${item.status ?? ("pending" as EstimateItemStatus)}
-      )
+      DELETE FROM estimate_items
+      WHERE estimate_id = ${estimateId} AND id = ANY(${deleteIds})
     `;
+  }
+
+  for (const [idx, item] of items.entries()) {
+    const inspectionItemId = item.inspectionItemId ?? null;
+    const lineNo = item.lineNo ?? idx + 1;
+    const partDescription = item.description ?? null;
+    const qty = item.quantity ?? 1;
+    const cost = item.cost ?? 0;
+    const sale = item.sale ?? 0;
+    const gpPercent = item.gpPercent ?? null;
+    const approvedCost = item.approvedCost ?? null;
+    const approvedType = item.approvedType ?? null;
+    const status = item.status ?? ("pending" as EstimateItemStatus);
+
+    if (item.id && existingIdSet.has(item.id)) {
+      await sql`
+        UPDATE estimate_items
+        SET
+          inspection_item_id = ${inspectionItemId},
+          line_no = ${lineNo},
+          part_name = ${item.partName},
+          description = ${partDescription},
+          type = ${item.type},
+          quantity = ${qty},
+          cost = ${cost},
+          sale = ${sale},
+          gp_percent = ${gpPercent},
+          approved_cost = ${approvedCost},
+          approved_type = ${approvedType},
+          status = ${status}
+        WHERE id = ${item.id} AND estimate_id = ${estimateId}
+      `;
+    } else {
+      await sql`
+        INSERT INTO estimate_items (
+          id,
+          estimate_id,
+          inspection_item_id,
+          line_no,
+          part_name,
+          description,
+          type,
+          quantity,
+          cost,
+          sale,
+          gp_percent,
+          approved_cost,
+          approved_type,
+          status
+        ) VALUES (
+          COALESCE(${item.id ?? null}, gen_random_uuid()),
+          ${estimateId},
+          ${inspectionItemId},
+          ${lineNo},
+          ${item.partName},
+          ${partDescription},
+          ${item.type},
+          ${qty},
+          ${cost},
+          ${sale},
+          ${gpPercent},
+          ${approvedCost},
+          ${approvedType},
+          ${status}
+        )
+      `;
+    }
   }
 
   await recalculateEstimateTotals(estimateId);

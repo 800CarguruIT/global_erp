@@ -27,8 +27,10 @@ export type PurchaseOrder = {
 export type PurchaseOrderItem = {
   id: string;
   purchaseOrderId: string;
+  quoteId?: string | null;
   lineNo: number;
   estimateItemId?: string | null;
+  inventoryRequestItemId?: string | null;
   partsCatalogId?: string | null;
   name: string;
   description?: string | null;
@@ -36,5 +38,29 @@ export type PurchaseOrderItem = {
   unitCost: number;
   totalCost: number;
   receivedQty: number;
+  movedToInventory?: boolean;
+  inventoryTypeId?: string | null;
+  categoryId?: string | null;
+  subcategoryId?: string | null;
+  makeId?: string | null;
+  modelId?: string | null;
+  yearId?: string | null;
+  partType?: string | null;
+  unit?: string | null;
+  partBrand?: string | null;
+  category?: string | null;
+  subcategory?: string | null;
   status: "pending" | "partial" | "received" | "cancelled";
+};
+
+export type PurchaseOrderGrnEntry = {
+  id: string;
+  grnNumber: string;
+  quantity: number;
+  partName: string;
+  partSku?: string | null;
+  sourceId?: string | null;
+  receivedBy?: string | null;
+  receivedById?: string | null;
+  createdAt: string;
 };

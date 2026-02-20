@@ -24,15 +24,28 @@ export interface SidebarItem {
 export const SIDEBAR_CONFIG: Record<NavScope, Partial<Record<NavCategory, SidebarItem[]>>> = {
   global: {
     Main: [
-      { labelKey: "global.nav.main", href: "/global" },
-      { labelKey: "global.nav.companies", href: "/global/companies" },
-      { labelKey: "global.nav.callCenter", href: "/global/call-center" },
-      { labelKey: "global.nav.leads", href: "/global/leads" },
-      { labelKey: "global.nav.marketing", href: "/global/marketing" },
-      { labelKey: "global.nav.hr", href: "/global/hr" },
-      { labelKey: "global.nav.finance", href: "/global/accounting" },
-      { label: "Invoices", href: "/global/accounting/invoices" },
-      { label: "COA Controls", href: "/global/accounting/coa-control", permissionKeys: ["accounting.manage_chart"] },
+      { labelKey: "global.nav.dashboard", href: "/global" },
+      {
+        labelKey: "global.nav.userManagement",
+        href: "/global/settings/security/users",
+        permissionKeys: ["global.users.list"],
+      },
+      {
+        labelKey: "global.nav.rolesAndPermissions",
+        href: "/global/settings/security/roles",
+        permissionKeys: ["global.roles.list"],
+      },
+      {
+        labelKey: "global.nav.companies",
+        href: "/global/companies",
+        permissionKeys: ["global.companies.list"],
+      },
+      { labelKey: "global.nav.documentation", href: "/global/docs" },
+      {
+        labelKey: "global.nav.settings",
+        href: "/global/settings",
+        permissionKeys: ["global.settings.manage"],
+      },
     ],
   },
   company: {
@@ -51,10 +64,12 @@ export const SIDEBAR_CONFIG: Record<NavScope, Partial<Record<NavCategory, Sideba
       { label: "Jobs", href: "/company/[companyId]/jobs" },
       { label: "Recovery Requests", href: "/company/[companyId]/recovery-requests" },
       { label: "Job Cards", href: "/company/[companyId]/workshop/job-cards" },
+      { label: "Workshop Earnings", href: "/company/[companyId]/workshop/earnings" },
       { label: "Branches", href: "/company/[companyId]/branches" },
       { label: "Vendors", href: "/company/[companyId]/vendors" },
       { label: "Customers", href: "/company/[companyId]/customers" },
       { label: "Car In Dashboard", href: "/company/[companyId]/car-in-dashboard" },
+      { label: "Revenue Dashboard", href: "/company/[companyId]/revenue-dashboard" },
       { label: "Inspections", href: "/company/[companyId]/inspections" },
       { label: "Cars", href: "/company/[companyId]/cars" },
     ],
@@ -108,6 +123,14 @@ export const SIDEBAR_CONFIG: Record<NavScope, Partial<Record<NavCategory, Sideba
 };
 
 export const SIDEBAR_TREE: Partial<Record<NavScope, SidebarItem[]>> = {
+  global: [
+    { labelKey: "global.nav.dashboard", href: "/global" },
+    { labelKey: "global.nav.userManagement", href: "/global/settings/security/users" },
+    { labelKey: "global.nav.rolesAndPermissions", href: "/global/settings/security/roles" },
+    { labelKey: "global.nav.companies", href: "/global/companies" },
+    { labelKey: "global.nav.settings", href: "/global/settings" },
+    { labelKey: "global.nav.documentation", href: "/global/docs" },
+  ],
   company: [
     {
       label: "Dashboard",
@@ -115,8 +138,10 @@ export const SIDEBAR_TREE: Partial<Record<NavScope, SidebarItem[]>> = {
       permissionKeys: ["company.dashboard.view"],
       children: [
         { label: "Overview", href: "/company/[companyId]", exactMatch: true, permissionKeys: ["company.dashboard.view"] },
+        { label: "Operations Dashboard", href: "/company/[companyId]/operations-dashboard", permissionKeys: ["company.dashboard.view"] },
         { label: "Car In Dashboard", href: "/company/[companyId]/car-in-dashboard", permissionKeys: ["company.dashboard.view"] },
         { label: "Parts Dashboard", href: "/company/[companyId]/parts-dashboard", permissionKeys: ["company.dashboard.view"] },
+        { label: "Revenue Dashboard", href: "/company/[companyId]/revenue-dashboard", permissionKeys: ["company.dashboard.view"] },
       ],
     },
     {
@@ -144,6 +169,14 @@ export const SIDEBAR_TREE: Partial<Record<NavScope, SidebarItem[]>> = {
       ],
     },
     {
+      label: "Earnings",
+      href: "/company/[companyId]/workshop/earnings",
+      children: [
+        { label: "Workshops", href: "/company/[companyId]/workshop/earnings", exactMatch: true },
+        { label: "Vendors", href: "/company/[companyId]/vendors", exactMatch: true },
+      ],
+    },
+    {
       label: "Call Center",
       href: "/company/[companyId]/call-center",
       permissionKeys: ["callcenter.view"],
@@ -166,8 +199,13 @@ export const SIDEBAR_TREE: Partial<Record<NavScope, SidebarItem[]>> = {
       href: "/company/[companyId]/inventory",
       permissionKeys: ["inventory.view", "inventory.create"],
       children: [
-        { label: "Create", href: "/company/[companyId]/inventory/new", disabled: true, permissionKeys: ["inventory.create"] },
-        { label: "List", href: "/company/[companyId]/inventory", exactMatch: true, permissionKeys: ["inventory.view"] },
+        { label: "Overview", href: "/company/[companyId]/inventory", exactMatch: true, permissionKeys: ["inventory.view"] },
+        { label: "Stock", href: "/company/[companyId]/inventory/stock", permissionKeys: ["inventory.view"] },
+        { label: "Locations", href: "/company/[companyId]/inventory/locations", permissionKeys: ["inventory.view"] },
+        { label: "Transfers", href: "/company/[companyId]/inventory/transfers", permissionKeys: ["inventory.view"] },
+        { label: "Products", href: "/company/edbab966-f85e-4bb1-a2b2-7d2a644f5638/inventory/products", permissionKeys: ["inventory.view"] },
+        { label: "Create order request", href: "/company/[companyId]/inventory/order-requests", permissionKeys: ["inventory.view"] },
+        { label: "Settings", href: "/company/[companyId]/inventory/settings", permissionKeys: ["inventory.view"] },
       ],
     },
     {
@@ -177,6 +215,7 @@ export const SIDEBAR_TREE: Partial<Record<NavScope, SidebarItem[]>> = {
       children: [
         { label: "Create", href: "/company/[companyId]/procurement/new", disabled: true, permissionKeys: ["procurement.create"] },
         { label: "List", href: "/company/[companyId]/procurement", exactMatch: true, permissionKeys: ["procurement.view"] },
+        { label: "GRN", href: "/company/[companyId]/procurement/grn", permissionKeys: ["procurement.view"] },
       ],
     },
     {
@@ -264,6 +303,7 @@ export const SIDEBAR_TREE: Partial<Record<NavScope, SidebarItem[]>> = {
       children: [
         { label: "Charts of Accounts", href: "/company/[companyId]/accounting/chart-of-accounts", permissionKeys: ["accounting.manage_chart"] },
         { label: "Accounts", href: "/company/[companyId]/accounting/accounts", permissionKeys: ["accounting.manage_chart"] },
+        { label: "Accounting Config", href: "/company/[companyId]/accounting/config", permissionKeys: ["accounting.post"] },
         { label: "Journals", href: "/company/[companyId]/accounting/journals", permissionKeys: ["accounting.post"] },
         { label: "Trial Balance", href: "/company/[companyId]/accounting/trial-balance", permissionKeys: ["accounting.view"] },
         { label: "Profit & Loss", href: "/company/[companyId]/accounting/reports/pnl", permissionKeys: ["accounting.view"] },

@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { getSql } from "@repo/ai-core";
 import { createSessionToken, setSessionCookie } from "../../../../lib/auth/session";
 import { getUserContext } from "../../../../lib/auth/user-context";
+import type { Branch } from "@repo/ai-core";
 
 type UserRow = {
   id: string;
@@ -62,6 +63,28 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    let branchRecord: Branch | null = null;
+    if (companyId && branchId) {
+      try {
+        const { Branches } = await import("@repo/ai-core");
+        branchRecord = await Branches.getBranchById(companyId, branchId);
+        if (!branchRecord || branchRecord.is_active === false) {
+          return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+        }
+      } catch (err) {
+        console.error("Branch lookup failed during login", err);
+        return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+      }
+    }
+
+    const baseBranchPath =
+      companyId && branchId ? `/company/${companyId}/branches/${branchId}` : null;
+    const thirdPartyWorkshopPath =
+      branchRecord?.ownership_type === "third_party" && baseBranchPath
+        ? `${baseBranchPath}/workshop`
+        : null;
+    const branchRedirectPath = thirdPartyWorkshopPath ?? (branchId ? `/branches/${branchId}` : "/company");
+
     // Compute redirect based on scope
     // TODO: add explicit "workshop" scope + workshopId routing when implemented.
     let redirect = "/global";
@@ -75,13 +98,13 @@ export async function POST(req: NextRequest) {
           ? `/company/${companyId ?? "unknown"}/vendors/${vendorId}`
           : "/global";
     } else if (scope === "branch") {
-      redirect = branchId ? `/branches/${branchId}` : "/company";
+      redirect = branchRedirectPath;
     } else if (scope === "company" && companyId) {
       redirect = `/company/${companyId}`;
     } else if (vendorId && companyId) {
       redirect = `/company/${companyId}/vendors/${vendorId}`;
     } else if (branchId && companyId) {
-      redirect = `/branches/${branchId}`;
+      redirect = branchRedirectPath;
     } else if (!ctx?.isGlobal && companies.length === 1 && companies[0]?.companyId) {
       redirect = `/company/${companies[0].companyId}`;
     } else if (!ctx?.isGlobal && companies.length > 1) {
@@ -90,7 +113,7 @@ export async function POST(req: NextRequest) {
 
     const response = NextResponse.json({ success: true, redirect });
     setSessionCookie(response, token);
-    const branchPath = companyId && branchId ? `/company/${companyId}/branches/${branchId}` : null;
+    const branchPath = thirdPartyWorkshopPath ?? baseBranchPath;
     if (branchPath) {
       response.cookies.set("last_branch_path", branchPath, {
         path: "/",

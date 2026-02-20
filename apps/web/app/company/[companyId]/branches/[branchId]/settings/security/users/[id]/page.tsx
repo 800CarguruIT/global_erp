@@ -11,6 +11,7 @@ type UserDetail = {
   full_name?: string | null;
   roles?: { id: string; name: string }[];
   employee_id?: string | null;
+  mobile?: string | null;
 };
 
 export default function BranchUserEditPage({
@@ -65,6 +66,7 @@ export default function BranchUserEditPage({
     password?: string;
     roleIds: string[];
     employeeId?: string | null;
+    mobile?: string | null;
   }) {
     if (!companyId || !branchId || !userId) {
       throw new Error("Company, branch, and user are required");
@@ -87,6 +89,7 @@ export default function BranchUserEditPage({
       name: user.full_name ?? user.name ?? "",
       roleIds: (user.roles ?? []).map((r) => r.id),
       employeeId: user.employee_id ?? undefined,
+      mobile: user.mobile ?? undefined,
     }
     : undefined;
 

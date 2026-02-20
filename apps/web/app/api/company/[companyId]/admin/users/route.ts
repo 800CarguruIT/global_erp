@@ -22,6 +22,7 @@ export async function GET(req: NextRequest, { params }: Params) {
   const branchId = searchParams.get("branchId") ?? undefined;
   const vendorId = searchParams.get("vendorId") ?? undefined;
 
+  const status = (searchParams.get("status") ?? "all") as "all" | "active" | "inactive";
   const users = await UserRepository.listUsers({
     q,
     limit: pageSize,
@@ -29,7 +30,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     companyId,
     branchId,
     vendorId,
-    activeOnly: !includeInactive,
+    status,
   });
   return NextResponse.json({ data: users });
 }
@@ -58,6 +59,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     employeeId: body.employeeId ?? null,
     roleIds: body.roleIds ?? [],
     companyId,
+    mobile: body.mobile ?? null,
   });
   return NextResponse.json({ data: user }, { status: 201 });
 }

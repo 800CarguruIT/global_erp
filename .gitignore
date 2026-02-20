@@ -5,6 +5,9 @@ node_modules
 .pnp
 .pnp.js
 
+erp-mobile-app-expo
+__packages
+
 # Local env files
 .env
 .env.local

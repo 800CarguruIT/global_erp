@@ -12,6 +12,11 @@ export type Inspection = {
   status: InspectionStatus;
   startAt?: string | null;
   completeAt?: string | null;
+  verifiedBy?: string | null;
+  verifiedAt?: string | null;
+  cancelledBy?: string | null;
+  cancelledAt?: string | null;
+  cancelRemarks?: string | null;
   healthEngine?: number | null;
   healthTransmission?: number | null;
   healthBrakes?: number | null;
@@ -46,14 +51,17 @@ export type InspectionItem = {
 };
 
 export type LineItemStatus = "Pending" | "Approved" | "Inquiry" | "Rejected";
-export type OrderStatus = "Ordered" | "Received" | "Returned";
+export type OrderStatus = "Pending" | "Ordered" | "Received" | "Returned";
 export type LineItemSource = "inspection" | "estimate";
+export type LineItemApprovedType = "oe" | "oem" | "aftm" | "used";
 
 export type InspectionLineItem = {
   id: string;
   companyId: string;
   leadId?: string | null;
   inspectionId: string;
+  jobCardId?: string | null;
+  isAdd?: number | null;
   source?: LineItemSource | null;
   productId?: number | null;
   productName?: string | null;
@@ -61,9 +69,16 @@ export type InspectionLineItem = {
   quantity: number;
   reason?: string | null;
   status: LineItemStatus;
+  approvedType?: LineItemApprovedType | null;
   mediaFileId?: string | null;
   partOrdered?: number | null;
   orderStatus?: OrderStatus | null;
+  quoteCosts?: {
+    oem?: number;
+    oe?: number;
+    aftm?: number;
+    used?: number;
+  };
   createdAt: string;
   updatedAt: string;
 };

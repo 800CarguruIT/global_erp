@@ -19,6 +19,8 @@ export async function GET(req: NextRequest, { params }: Params) {
     const fromCond = from ? sql`AND jl.created_at::date >= ${from}` : sql``;
     const toCond = to ? sql`AND jl.created_at::date <= ${to}` : sql``;
     const asOfCond = !from && !to ? sql`AND jl.created_at::date <= ${dateAsOf}` : sql``;
+    const includeDrafts = url.searchParams.get("includeDrafts") === "true";
+    const postedFilter = includeDrafts ? sql`` : sql`AND (j.is_posted = TRUE OR jl.journal_id IS NULL)`;
     const rows = await sql<
       Array<{
         headingName: string;
@@ -51,12 +53,14 @@ export async function GET(req: NextRequest, { params }: Params) {
         ${asOfCond}
         ${fromCond}
         ${toCond}
+      LEFT JOIN accounting_journals j ON j.id = jl.journal_id
       WHERE a.company_id = ${companyId}
         AND (
           a.account_code LIKE '1%' OR
           a.account_code LIKE '2%' OR
           a.account_code LIKE '3%'
         )
+        ${postedFilter}
       GROUP BY
         h.name,
         s.name,

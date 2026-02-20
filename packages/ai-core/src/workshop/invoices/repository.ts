@@ -176,6 +176,66 @@ export async function createInvoiceFromEstimate(
   const estimateData = await getEstimateWithItems(companyId, estimateId);
   if (!estimateData) throw new Error("Estimate not found");
   const { estimate, items: lines } = estimateData;
+  if (!estimate.inspectionId) {
+    throw new Error("Inspection not found for estimate");
+  }
+
+  const openJobs = await sql`
+    SELECT id
+    FROM job_cards
+    WHERE estimate_id = ${estimateId}
+      AND status IN ('Pending', 'Re-Assigned')
+    LIMIT 1
+  `;
+  if (openJobs.length) {
+    throw new Error("Cannot convert to invoice while job cards are still open.");
+  }
+
+  const unreceivedApproved = await sql`
+    WITH li AS (
+      SELECT id, order_status
+      FROM line_items
+      WHERE inspection_id = ${estimate.inspectionId}
+        AND status = 'Approved'
+    ),
+    quote_rank AS (
+      SELECT
+        source.line_item_id,
+        MAX(
+          CASE
+            WHEN LOWER(COALESCE(source.status, '')) IN ('received', 'completed') THEN 3
+            WHEN LOWER(COALESCE(source.status, '')) IN ('return', 'returned') THEN 2
+            WHEN LOWER(COALESCE(source.status, '')) = 'ordered' THEN 1
+            ELSE 0
+          END
+        ) AS status_rank
+      FROM (
+        SELECT li.id AS line_item_id, pq.status
+        FROM li
+        INNER JOIN part_quotes pq ON pq.line_item_id = li.id
+      ) source
+      GROUP BY source.line_item_id
+    )
+    SELECT li.id
+    FROM li
+    LEFT JOIN quote_rank qr ON qr.line_item_id = li.id
+    WHERE LOWER(
+      COALESCE(
+        CASE
+          WHEN qr.status_rank >= 3 THEN 'received'
+          WHEN qr.status_rank = 2 THEN 'returned'
+          WHEN qr.status_rank = 1 THEN 'ordered'
+          ELSE NULL
+        END,
+        li.order_status,
+        'pending'
+      )
+    ) <> 'received'
+    LIMIT 1
+  `;
+  if (unreceivedApproved.length) {
+    throw new Error("Cannot convert to invoice until all approved parts are received.");
+  }
 
   let workOrderId: string | null = null;
   const woRows = await sql`

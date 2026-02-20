@@ -21,6 +21,9 @@
     "node": ">=18"
   },
   "dependencies": {
+    "@fortawesome/fontawesome-svg-core": "^7.1.0",
+    "@fortawesome/free-solid-svg-icons": "^7.1.0",
+    "@fortawesome/react-fontawesome": "^3.2.0",
     "bcryptjs": "^3.0.3",
     "openai": "^6.9.1",
     "qrcode": "^1.5.4",

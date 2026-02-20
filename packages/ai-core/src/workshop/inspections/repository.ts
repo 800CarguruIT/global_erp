@@ -14,6 +14,11 @@ function mapInspectionRow(row: any): Inspection {
     status: row.status,
     startAt: row.start_at,
     completeAt: row.complete_at,
+    verifiedBy: row.verified_by,
+    verifiedAt: row.verified_at,
+    cancelledBy: row.cancelled_by,
+    cancelledAt: row.cancelled_at,
+    cancelRemarks: row.cancel_remarks,
     healthEngine: row.health_engine,
     healthTransmission: row.health_transmission,
     healthBrakes: row.health_brakes,
@@ -56,6 +61,8 @@ function mapLineItemRow(row: any): InspectionLineItem {
     companyId: row.company_id,
     leadId: row.lead_id,
     inspectionId: row.inspection_id,
+    jobCardId: row.job_card_id,
+    isAdd: row.is_add,
     source: row.source,
     productId: row.product_id,
     productName: row.product_name,
@@ -63,13 +70,36 @@ function mapLineItemRow(row: any): InspectionLineItem {
     quantity: row.quantity,
     reason: row.reason,
     status: row.status,
+    approvedType: row.approved_type,
     mediaFileId: row.media_file_id,
     partOrdered: row.part_ordered,
     orderStatus: row.order_status,
+    quoteCosts:
+      row.quote_costs ??
+      row.quoteCosts ??
+      undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
 }
+
+const orderStatusRank = (status: string | null | undefined): number => {
+  const normalized = String(status ?? "").trim().toLowerCase();
+  if (normalized === "received" || normalized === "completed") return 3;
+  if (normalized === "returned" || normalized === "return") return 2;
+  if (normalized === "ordered") return 1;
+  return 0;
+};
+
+const mergeOrderStatus = (
+  current: string | null | undefined,
+  derived: string | null | undefined
+): string | null | undefined => {
+  const currentRank = orderStatusRank(current);
+  const derivedRank = orderStatusRank(derived);
+  if (derivedRank > currentRank) return derived;
+  return current;
+};
 
 export async function listInspectionsForCompany(
   companyId: string,
@@ -198,6 +228,11 @@ export async function updateInspectionPartial(
     status: InspectionStatus;
     startAt?: string | null;
     completeAt?: string | null;
+    verifiedBy: string | null;
+    verifiedAt: string | null;
+    cancelledBy: string | null;
+    cancelledAt: string | null;
+    cancelRemarks: string | null;
     healthEngine: number | null;
     healthTransmission: number | null;
     healthBrakes: number | null;
@@ -220,6 +255,11 @@ export async function updateInspectionPartial(
     complete_at:
       patch.completeAt ??
       (patch.status === "completed" ? new Date().toISOString() : undefined),
+    verified_by: patch.verifiedBy,
+    verified_at: patch.verifiedAt,
+    cancelled_by: patch.cancelledBy,
+    cancelled_at: patch.cancelledAt,
+    cancel_remarks: patch.cancelRemarks,
     health_engine: patch.healthEngine,
     health_transmission: patch.healthTransmission,
     health_brakes: patch.healthBrakes,
@@ -293,18 +333,99 @@ export async function replaceInspectionItems(
 
 export async function listInspectionLineItems(
   inspectionId: string,
-  opts: { source?: "inspection" | "estimate" } = {}
+  opts: { source?: "inspection" | "estimate"; isAdd?: 0 | 1 } = {}
 ): Promise<InspectionLineItem[]> {
   const sql = getSql();
   const sourceFilter = opts.source ? sql`AND source = ${opts.source}` : sql``;
+  const isAddFilter = opts.isAdd !== undefined ? sql`AND is_add = ${opts.isAdd}` : sql``;
   const rows = await sql`
     SELECT *
     FROM line_items
     WHERE inspection_id = ${inspectionId}
       ${sourceFilter}
+      ${isAddFilter}
     ORDER BY created_at ASC
   `;
-  return rows.map(mapLineItemRow);
+  if (!rows.length) return [];
+
+  const lineItemIds = rows.map((row: any) => row.id).filter(Boolean);
+  let quoteStatusByLineItemId = new Map<string, string>();
+  let quoteCostsByLineItemId = new Map<
+    string,
+    { oem?: number; oe?: number; aftm?: number; used?: number }
+  >();
+  if (lineItemIds.length) {
+    const quoteStatusRows = await sql`
+      SELECT
+        source.line_item_id,
+        MAX(
+          CASE
+            WHEN LOWER(COALESCE(source.status, '')) IN ('received', 'completed') THEN 3
+            WHEN LOWER(COALESCE(source.status, '')) IN ('return', 'returned') THEN 2
+            WHEN LOWER(COALESCE(source.status, '')) = 'ordered' THEN 1
+            ELSE 0
+          END
+        ) AS status_rank
+      FROM (
+        SELECT
+          li.id AS line_item_id,
+          pq.status
+        FROM line_items li
+        INNER JOIN part_quotes pq ON pq.line_item_id = li.id
+        WHERE li.id = ANY(${lineItemIds})
+      ) source
+      GROUP BY source.line_item_id
+    `;
+    quoteStatusByLineItemId = new Map(
+      quoteStatusRows.map((row: any) => {
+        const rank = Number(row.status_rank ?? 0);
+        const derived =
+          rank >= 3 ? "Received" : rank === 2 ? "Returned" : rank === 1 ? "Ordered" : "";
+        return [String(row.line_item_id), derived] as const;
+      })
+    );
+
+    const quoteCostRows = await sql`
+      SELECT
+        line_item_id,
+        MIN(oem) AS oem,
+        MIN(oe) AS oe,
+        MIN(aftm) AS aftm,
+        MIN(used) AS used
+      FROM part_quotes
+      WHERE line_item_id = ANY(${lineItemIds})
+      GROUP BY line_item_id
+    `;
+    quoteCostsByLineItemId = new Map(
+      quoteCostRows.map((row: any) => {
+        const costs: { oem?: number; oe?: number; aftm?: number; used?: number } = {};
+        if (row.oem != null) costs.oem = Number(row.oem);
+        if (row.oe != null) costs.oe = Number(row.oe);
+        if (row.aftm != null) costs.aftm = Number(row.aftm);
+        if (row.used != null) costs.used = Number(row.used);
+        return [String(row.line_item_id), costs] as const;
+      })
+    );
+  }
+
+  const mergedRows = rows.map((row: any) => {
+    const derivedStatus = quoteStatusByLineItemId.get(String(row.id));
+    const quoteCosts = quoteCostsByLineItemId.get(String(row.id));
+    if (!derivedStatus && !quoteCosts) return row;
+    const mergedStatus = mergeOrderStatus(row.order_status, derivedStatus);
+    const next: any = {
+      ...row,
+      ...(mergedStatus
+        ? {
+            part_ordered: row.part_ordered ?? 1,
+            order_status: mergedStatus,
+          }
+        : {}),
+      ...(quoteCosts ? { quote_costs: quoteCosts } : {}),
+    };
+    return next;
+  });
+  return mergedRows.map(mapLineItemRow);
 }
 
 export async function createInspectionLineItem(args: {
@@ -312,12 +433,14 @@ export async function createInspectionLineItem(args: {
   leadId?: string | null;
   inspectionId: string;
   source?: "inspection" | "estimate";
+  isAdd?: 0 | 1;
   productId?: number | null;
   productName?: string | null;
   description?: string | null;
   quantity?: number | null;
   reason?: string | null;
   status?: LineItemStatus;
+  approvedType?: "oe" | "oem" | "aftm" | "used" | null;
   mediaFileId?: string | null;
 }): Promise<InspectionLineItem> {
   const sql = getSql();
@@ -327,24 +450,30 @@ export async function createInspectionLineItem(args: {
       lead_id,
       inspection_id,
       source,
+      order_status,
+      is_add,
       product_id,
       product_name,
       description,
       quantity,
       reason,
       status,
+      approved_type,
       media_file_id
     ) VALUES (
       ${args.companyId},
       ${args.leadId ?? null},
       ${args.inspectionId},
       ${args.source ?? "inspection"},
+      ${"Pending"},
+      ${args.isAdd ?? 0},
       ${args.productId ?? null},
       ${args.productName ?? null},
       ${args.description ?? null},
       ${args.quantity ?? 1},
       ${args.reason ?? null},
       ${args.status ?? "Pending"},
+      ${args.approvedType ?? null},
       ${args.mediaFileId ?? null}
     )
     RETURNING *
@@ -356,23 +485,27 @@ export async function updateInspectionLineItem(args: {
   companyId: string;
   lineItemId: string;
   patch: Partial<{
+    isAdd?: 0 | 1;
     productId?: number | null;
     productName?: string | null;
     description?: string | null;
     quantity?: number | null;
     reason?: string | null;
     status?: LineItemStatus;
+    approvedType?: "oe" | "oem" | "aftm" | "used" | null;
     mediaFileId?: string | null;
   }>;
 }): Promise<InspectionLineItem | null> {
   const sql = getSql();
   const updated = {
+    is_add: args.patch.isAdd,
     product_id: args.patch.productId,
     product_name: args.patch.productName,
     description: args.patch.description,
     quantity: args.patch.quantity,
     reason: args.patch.reason,
     status: args.patch.status,
+    approved_type: args.patch.approvedType,
     media_file_id: args.patch.mediaFileId,
   };
   const cleaned = Object.fromEntries(

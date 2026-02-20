@@ -2,16 +2,27 @@
 
 import React, { useEffect, useState } from "react";
 import { RoleListTable, useI18n } from "@repo/ui";
+import { useGlobalPermissions } from "@/lib/auth/global-permissions";
+import { AccessDenied } from "@/components/AccessDenied";
 
 export default function GlobalRolesSettingsPage() {
   const [roles, setRoles] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const { t } = useI18n();
+  const { hasPermission, loading: permLoading } = useGlobalPermissions();
+  const canListRoles = hasPermission("global.roles.list");
+  const canCreateRoles = hasPermission("global.roles.create");
+  const canEditRoles = hasPermission("global.roles.edit");
+  const canDeleteRoles = hasPermission("global.roles.delete");
 
   async function load() {
     setLoading(true);
     setError(null);
+    if (!canListRoles) {
+      setLoading(false);
+      return;
+    }
     try {
       const res = await fetch("/api/auth/roles?scope=global");
       if (!res.ok) throw new Error(t("settings.roles.error"));
@@ -25,8 +36,28 @@ export default function GlobalRolesSettingsPage() {
   }
 
   useEffect(() => {
+    if (!canListRoles) {
+      setLoading(false);
+      setError(null);
+      return;
+    }
     load();
-  }, []);
+  }, [canListRoles]);
+
+  if (permLoading) {
+    return <div className="py-4 text-sm text-muted-foreground">Loading access rights...</div>;
+  }
+
+  if (!canListRoles) {
+    return (
+      <div className="py-4">
+        <AccessDenied
+          title="Roles access locked"
+          description="You need the global.roles.list permission to open this area."
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4 py-4">
@@ -45,12 +76,22 @@ export default function GlobalRolesSettingsPage() {
       ) : (
         <RoleListTable
           roles={roles as any}
-          onCreate={() => (window.location.href = "/global/settings/security/roles/new")}
-          onEdit={(id) => (window.location.href = `/global/settings/security/roles/${id}`)}
-          onDelete={async (id) => {
-            await fetch(`/api/auth/roles/${id}?scope=global`, { method: "DELETE" });
-            load();
-          }}
+          onCreate={
+            canCreateRoles ? () => (window.location.href = "/global/settings/security/roles/new") : undefined
+          }
+          onEdit={
+            canEditRoles
+              ? (id) => (window.location.href = `/global/settings/security/roles/${id}`)
+              : undefined
+          }
+          onDelete={
+            canDeleteRoles
+              ? async (id) => {
+                  await fetch(`/api/auth/roles/${id}?scope=global`, { method: "DELETE" });
+                  load();
+                }
+              : undefined
+          }
         />
       )}
     </div>

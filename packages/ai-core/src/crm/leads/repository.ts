@@ -25,10 +25,11 @@ export type CreateLeadInput = {
 
 let leadAssignmentColumnsSupported: boolean | null = null;
 async function ensureLeadAssignmentColumns(): Promise<boolean> {
-  if (leadAssignmentColumnsSupported !== null) return leadAssignmentColumnsSupported;
+  if (leadAssignmentColumnsSupported !== null)
+    return leadAssignmentColumnsSupported;
   const sql = getSql();
   try {
-    const res = await sql/* sql */ `
+    const res = await sql /* sql */ `
       SELECT column_name
       FROM information_schema.columns
       WHERE table_name = 'leads'
@@ -66,7 +67,7 @@ async function ensureLeadAssignmentColumns(): Promise<boolean> {
     ].filter((c) => !names.includes(c));
     if (missing.length) {
       // add columns if they don't exist; keep null defaults to avoid migrations blocking
-      await sql/* sql */ `
+      await sql /* sql */ `
         ALTER TABLE leads
         ADD COLUMN IF NOT EXISTS branch_id uuid NULL,
         ADD COLUMN IF NOT EXISTS assigned_user_id uuid NULL,
@@ -93,8 +94,7 @@ async function ensureLeadAssignmentColumns(): Promise<boolean> {
 export async function listLeadsForCompany(companyId: string): Promise<Lead[]> {
   const sql = getSql();
   await releaseExpiredAssignments(companyId, 5);
-  const rows =
-    await sql/* sql */ `
+  const rows = await sql /* sql */ `
       SELECT
         l.*,
         c.name AS customer_name,
@@ -121,11 +121,13 @@ export async function listLeadsForCompany(companyId: string): Promise<Lead[]> {
   return rows.map(mapLeadRow);
 }
 
-export async function listLeadsForCustomer(companyId: string, customerId: string): Promise<Lead[]> {
+export async function listLeadsForCustomer(
+  companyId: string,
+  customerId: string,
+): Promise<Lead[]> {
   const sql = getSql();
   await releaseExpiredAssignments(companyId, 5);
-  const rows =
-    await sql/* sql */ `
+  const rows = await sql /* sql */ `
       SELECT
         l.*,
         c.name AS customer_name,
@@ -152,10 +154,12 @@ export async function listLeadsForCustomer(companyId: string, customerId: string
   return rows.map(mapLeadRow);
 }
 
-export async function getLeadById(companyId: string, leadId: string): Promise<Lead | null> {
+export async function getLeadById(
+  companyId: string,
+  leadId: string,
+): Promise<Lead | null> {
   const sql = getSql();
-  const rows =
-    await sql/* sql */ `
+  const rows = await sql /* sql */ `
       SELECT
         l.*,
         c.name AS customer_name,
@@ -190,7 +194,7 @@ export async function createLead(input: CreateLeadInput): Promise<Lead> {
   const leadStage = input.leadStage ?? "new";
   const supportsAssignments = await ensureLeadAssignmentColumns();
   const rows = supportsAssignments
-    ? await sql/* sql */ `
+    ? await sql /* sql */ `
         INSERT INTO leads (
           company_id,
           customer_id,
@@ -239,7 +243,7 @@ export async function createLead(input: CreateLeadInput): Promise<Lead> {
         )
         RETURNING *
       `
-    : await sql/* sql */ `
+    : await sql /* sql */ `
         INSERT INTO leads (
           company_id,
           customer_id,
@@ -267,10 +271,12 @@ export async function createLead(input: CreateLeadInput): Promise<Lead> {
   return mapLeadRow(rows[0]);
 }
 
-export async function listLeadEvents(companyId: string, leadId: string): Promise<LeadEvent[]> {
+export async function listLeadEvents(
+  companyId: string,
+  leadId: string,
+): Promise<LeadEvent[]> {
   const sql = getSql();
-  const rows =
-    await sql/* sql */ `
+  const rows = await sql /* sql */ `
       SELECT le.*, COALESCE(u.full_name, u.email, le.actor_user_id::text) AS actor_name
       FROM lead_events le
       LEFT JOIN users u ON u.id = le.actor_user_id
@@ -289,7 +295,9 @@ function mapLeadRow(row: any): Lead {
     branchId: row.branch_id ?? null,
     assignedUserId: row.assigned_user_id ?? null,
     serviceType: row.service_type ?? null,
-    assignedAt: row.assigned_at ? new Date(row.assigned_at).toISOString() : null,
+    assignedAt: row.assigned_at
+      ? new Date(row.assigned_at).toISOString()
+      : null,
     recoveryDirection: row.recovery_direction ?? null,
     recoveryFlow: row.recovery_flow ?? null,
     pickupFrom: row.pickup_from ?? null,
@@ -303,17 +311,17 @@ function mapLeadRow(row: any): Lead {
     source: row.source,
     slaMinutes: row.sla_minutes,
     firstResponseAt: row.first_response_at,
-  lastActivityAt: row.last_activity_at,
-  closedAt: row.closed_at,
-  checkinAt: row.checkin_at,
-  isLocked: row.is_locked,
-  healthScore: row.health_score,
-  sentimentScore: row.sentiment_score,
-  customerFeedback: row.customer_feedback,
-  agentRemark: row.agent_remark,
-  customerRemark: row.customer_remark,
-  carInVideo: row.carin_video ?? null,
-  carOutVideo: row.carout_video ?? null,
+    lastActivityAt: row.last_activity_at,
+    closedAt: row.closed_at,
+    checkinAt: row.checkin_at,
+    isLocked: row.is_locked,
+    healthScore: row.health_score,
+    sentimentScore: row.sentiment_score,
+    customerFeedback: row.customer_feedback,
+    agentRemark: row.agent_remark,
+    customerRemark: row.customer_remark,
+    carInVideo: row.carin_video ?? null,
+    carOutVideo: row.carout_video ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     customerName: row.customer_name,
@@ -324,7 +332,7 @@ function mapLeadRow(row: any): Lead {
     branchName: row.branch_name ?? null,
     agentName: row.agent_name,
     customerDetailsRequested: row.customer_details_requested ?? false,
-  customerDetailsApproved: row.customer_details_approved ?? false,
+    customerDetailsApproved: row.customer_details_approved ?? false,
   };
 }
 
@@ -351,8 +359,15 @@ export async function appendLeadEvent(args: {
   eventPayload?: any;
 }): Promise<void> {
   const sql = getSql();
-  const { companyId, leadId, actorUserId = null, actorEmployeeId = null, eventType, eventPayload = null } = args;
-  await sql/* sql */ `
+  const {
+    companyId,
+    leadId,
+    actorUserId = null,
+    actorEmployeeId = null,
+    eventType,
+    eventPayload = null,
+  } = args;
+  await sql /* sql */ `
     INSERT INTO lead_events (
       lead_id,
       company_id,
@@ -402,12 +417,15 @@ function computeHealthScoreFromSla(args: {
   return score;
 }
 
-export async function releaseExpiredAssignments(companyId: string, timeoutMinutes = 5): Promise<void> {
+export async function releaseExpiredAssignments(
+  companyId: string,
+  timeoutMinutes = 5,
+): Promise<void> {
   const sql = getSql();
   const supported = await ensureLeadAssignmentColumns();
   if (!supported) return;
   try {
-    await sql/* sql */ `
+    await sql /* sql */ `
       UPDATE leads
       SET branch_id = NULL, assigned_user_id = NULL, assigned_at = NULL
       WHERE company_id = ${companyId}
@@ -441,6 +459,7 @@ export async function updateLeadPartial(
     recoveryFlow?: string | null;
     pickupFrom?: string | null;
     dropoffTo?: string | null;
+    dropoffGoogleLocation?: string | null;
     customerDetailsRequested?: boolean;
     customerDetailsApproved?: boolean;
     isArchived?: boolean;
@@ -451,7 +470,7 @@ export async function updateLeadPartial(
     checkinAt?: string | null;
     carInVideo?: string | null;
     carOutVideo?: string | null;
-  }
+  },
 ): Promise<void> {
   const supportsAssignments = await ensureLeadAssignmentColumns();
   const current = await getLeadById(companyId, leadId);
@@ -463,55 +482,78 @@ export async function updateLeadPartial(
   }
 
   const archiveStage = patch.isArchived ? "archived" : undefined;
-  const newStatus = patch.isArchived ? "closed" : patch.leadStatus ?? current.leadStatus;
+  const newStatus = patch.isArchived
+    ? "closed"
+    : (patch.leadStatus ?? current.leadStatus);
   const newStage = archiveStage ?? patch.leadStage ?? current.leadStage;
-  const newAgentRemark = patch.agentRemark !== undefined ? patch.agentRemark : current.agentRemark ?? null;
+  const newAgentRemark =
+    patch.agentRemark !== undefined
+      ? patch.agentRemark
+      : (current.agentRemark ?? null);
   const newCustomerRemark =
-    patch.customerRemark !== undefined ? patch.customerRemark : current.customerRemark ?? null;
+    patch.customerRemark !== undefined
+      ? patch.customerRemark
+      : (current.customerRemark ?? null);
   const newCustomerFeedback =
-    patch.customerFeedback !== undefined ? patch.customerFeedback : current.customerFeedback ?? null;
+    patch.customerFeedback !== undefined
+      ? patch.customerFeedback
+      : (current.customerFeedback ?? null);
   const newSentimentScore =
-    patch.sentimentScore !== undefined ? patch.sentimentScore : current.sentimentScore ?? null;
+    patch.sentimentScore !== undefined
+      ? patch.sentimentScore
+      : (current.sentimentScore ?? null);
   const newBranchId = supportsAssignments
     ? patch.branchId !== undefined
       ? patch.branchId
-      : current.branchId ?? null
+      : (current.branchId ?? null)
     : null;
   const newAssignedUserId =
     supportsAssignments && patch.assignedUserId !== undefined
       ? patch.assignedUserId
       : supportsAssignments
-        ? current.assignedUserId ?? null
+        ? (current.assignedUserId ?? null)
         : null;
   const newServiceType =
-    supportsAssignments && patch.serviceType !== undefined ? patch.serviceType : supportsAssignments ? current.serviceType ?? null : null;
+    supportsAssignments && patch.serviceType !== undefined
+      ? patch.serviceType
+      : supportsAssignments
+        ? (current.serviceType ?? null)
+        : null;
   const newRecoveryDirection =
     supportsAssignments && patch.recoveryDirection !== undefined
       ? patch.recoveryDirection
       : supportsAssignments
-        ? current.recoveryDirection ?? null
+        ? (current.recoveryDirection ?? null)
         : null;
   const newRecoveryFlow =
     supportsAssignments && patch.recoveryFlow !== undefined
       ? patch.recoveryFlow
       : supportsAssignments
-        ? current.recoveryFlow ?? null
+        ? (current.recoveryFlow ?? null)
         : null;
   const newPickupFrom =
-    supportsAssignments && patch.pickupFrom !== undefined ? patch.pickupFrom : supportsAssignments ? current.pickupFrom ?? null : null;
+    supportsAssignments && patch.pickupFrom !== undefined
+      ? patch.pickupFrom
+      : supportsAssignments
+        ? (current.pickupFrom ?? null)
+        : null;
   const newDropoffTo =
-    supportsAssignments && patch.dropoffTo !== undefined ? patch.dropoffTo : supportsAssignments ? current.dropoffTo ?? null : null;
+    supportsAssignments && patch.dropoffTo !== undefined
+      ? patch.dropoffTo
+      : supportsAssignments
+        ? (current.dropoffTo ?? null)
+        : null;
   const newPickupGoogle =
     supportsAssignments && (patch as any).pickupGoogleLocation !== undefined
       ? (patch as any).pickupGoogleLocation
       : supportsAssignments
-        ? (current as any).pickupGoogleLocation ?? null
+        ? ((current as any).pickupGoogleLocation ?? null)
         : null;
   const newDropoffGoogle =
     supportsAssignments && (patch as any).dropoffGoogleLocation !== undefined
       ? (patch as any).dropoffGoogleLocation
       : supportsAssignments
-        ? (current as any).dropoffGoogleLocation ?? null
+        ? ((current as any).dropoffGoogleLocation ?? null)
         : null;
   const newAssignedAt =
     supportsAssignments && patch.assignedAt !== undefined
@@ -523,21 +565,30 @@ export async function updateLeadPartial(
     supportsAssignments && patch.customerDetailsRequested !== undefined
       ? patch.customerDetailsRequested
       : supportsAssignments
-        ? current.customerDetailsRequested ?? false
+        ? (current.customerDetailsRequested ?? false)
         : false;
   const newCustomerApproved =
     supportsAssignments && patch.customerDetailsApproved !== undefined
       ? patch.customerDetailsApproved
       : supportsAssignments
-        ? current.customerDetailsApproved ?? false
+        ? (current.customerDetailsApproved ?? false)
         : false;
-  const newCheckinAt = patch.checkinAt !== undefined ? patch.checkinAt : current.checkinAt ?? null;
-  const newCarInVideo = patch.carInVideo !== undefined ? patch.carInVideo : (current as any).carInVideo ?? null;
-  const newCarOutVideo = patch.carOutVideo !== undefined ? patch.carOutVideo : (current as any).carOutVideo ?? null;
+  const newCheckinAt =
+    patch.checkinAt !== undefined
+      ? patch.checkinAt
+      : (current.checkinAt ?? null);
+  const newCarInVideo =
+    patch.carInVideo !== undefined
+      ? patch.carInVideo
+      : ((current as any).carInVideo ?? null);
+  const newCarOutVideo =
+    patch.carOutVideo !== undefined
+      ? patch.carOutVideo
+      : ((current as any).carOutVideo ?? null);
 
   const newClosedAt =
     newStatus === "closed_won" || newStatus === "lost"
-      ? current.closedAt ?? new Date().toISOString()
+      ? (current.closedAt ?? new Date().toISOString())
       : current.closedAt;
 
   const healthScore = computeHealthScoreFromSla({
@@ -549,7 +600,7 @@ export async function updateLeadPartial(
 
   const sql = getSql();
   if (supportsAssignments) {
-    await sql/* sql */ `
+    await sql /* sql */ `
       UPDATE leads
       SET
         lead_status = ${newStatus},
@@ -563,7 +614,7 @@ export async function updateLeadPartial(
         dropoff_to = ${newDropoffTo},
         pickup_google_location = ${newPickupGoogle},
         dropoff_google_location = ${newDropoffGoogle},
-        assigned_at = ${newAssignedUserId ? newAssignedAt ?? new Date().toISOString() : null},
+        assigned_at = ${newAssignedUserId ? (newAssignedAt ?? new Date().toISOString()) : null},
         customer_details_requested = ${newCustomerRequested},
         customer_details_approved = ${newCustomerApproved},
         agent_remark = ${newAgentRemark},
@@ -579,7 +630,7 @@ export async function updateLeadPartial(
       WHERE company_id = ${companyId} AND id = ${leadId}
     `;
   } else {
-    await sql/* sql */ `
+    await sql /* sql */ `
       UPDATE leads
       SET
         lead_status = ${newStatus},
@@ -599,9 +650,12 @@ export async function updateLeadPartial(
   }
 }
 
-export async function lockLead(companyId: string, leadId: string): Promise<void> {
+export async function lockLead(
+  companyId: string,
+  leadId: string,
+): Promise<void> {
   const sql = getSql();
-  await sql/* sql */ `
+  await sql /* sql */ `
     UPDATE leads
     SET
       lead_status = 'closed',
@@ -612,12 +666,15 @@ export async function lockLead(companyId: string, leadId: string): Promise<void>
   `;
 }
 
-export async function deleteLead(companyId: string, leadId: string): Promise<void> {
+export async function deleteLead(
+  companyId: string,
+  leadId: string,
+): Promise<void> {
   const sql = getSql();
-  await sql/* sql */ `
+  await sql /* sql */ `
     DELETE FROM lead_events WHERE company_id = ${companyId} AND lead_id = ${leadId}
   `;
-  await sql/* sql */ `
+  await sql /* sql */ `
     DELETE FROM leads WHERE company_id = ${companyId} AND id = ${leadId}
   `;
 }

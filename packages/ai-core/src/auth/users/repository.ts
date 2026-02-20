@@ -16,6 +16,7 @@ export type UserListRow = {
   branch_id?: string | null;
   vendor_id?: string | null;
   branch_name?: string | null;
+  mobile?: string | null;
 };
 
 function rowsFrom<T>(result: T[] | { rows: T[] }): T[] {
@@ -31,9 +32,11 @@ export async function listUsers(params: {
   vendorId?: string;
   activeOnly?: boolean;
   globalOnly?: boolean;
+  status?: "all" | "active" | "inactive";
 }): Promise<UserListRow[]> {
   const sql = getSql();
   const { q, limit = 50, offset = 0, companyId, branchId, vendorId, activeOnly = true, globalOnly = false } = params;
+  const resolvedStatus = params.status ?? (params.activeOnly === false ? "all" : "active");
   const search =
     q && q.trim().length
       ? sql`AND (LOWER(u.email) LIKE ${"%" + q.toLowerCase() + "%"} OR LOWER(COALESCE(u.full_name, '')) LIKE ${
@@ -62,12 +65,18 @@ export async function listUsers(params: {
         )
       )`
     : sql``;
-  const activeFilter = activeOnly ? sql`AND u.is_active = TRUE` : sql``;
+  const statusFilter =
+    resolvedStatus === "active"
+      ? sql`AND u.is_active = TRUE`
+      : resolvedStatus === "inactive"
+      ? sql`AND u.is_active = FALSE`
+      : sql``;
 
   const rows = await sql<UserListRow[]>`
     SELECT u.id, u.email, u.full_name, u.is_active, u.employee_id, u.created_at, u.updated_at, u.company_id,
            u.branch_id, u.vendor_id, b.name as branch_name,
-           (SELECT MAX(last_seen_at) FROM user_sessions us WHERE us.user_id = u.id) as last_login_at
+           (SELECT MAX(last_seen_at) FROM user_sessions us WHERE us.user_id = u.id) as last_login_at,
+           u.mobile
     FROM users u
     LEFT JOIN employees e ON e.id = u.employee_id
     LEFT JOIN branches b ON b.id = u.branch_id
@@ -77,7 +86,7 @@ export async function listUsers(params: {
       ${globalFilter}
       ${branchFilter}
       ${vendorFilter}
-      ${activeFilter}
+      ${statusFilter}
     ORDER BY u.created_at DESC
     LIMIT ${limit} OFFSET ${offset}
   `;
@@ -108,7 +117,7 @@ export async function listUsers(params: {
 export async function getUserById(id: string): Promise<UserListRow | null> {
   const sql = getSql();
   const res = await sql<UserListRow[]>`
-    SELECT u.id, u.email, u.full_name, u.is_active, u.employee_id, u.created_at, u.updated_at, u.company_id
+    SELECT u.id, u.email, u.full_name, u.is_active, u.employee_id, u.created_at, u.updated_at, u.company_id, u.mobile
     FROM users u
     WHERE u.id = ${id}
     LIMIT 1
@@ -132,16 +141,17 @@ export async function createUser(input: {
   employeeId?: string | null;
   roleIds?: string[];
   companyId?: string | null;
+  mobile?: string | null;
 }): Promise<UserListRow> {
   const sql = getSql();
   const passwordHash = await bcrypt.hash(input.password, 10);
   const roleIds = input.roleIds ?? [];
   const res = await sql<UserListRow[]>`
-    INSERT INTO users (email, full_name, password_hash, employee_id, is_active, company_id)
+    INSERT INTO users (email, full_name, password_hash, employee_id, is_active, company_id, mobile)
     VALUES (${input.email.toLowerCase()}, ${input.fullName ?? null}, ${passwordHash}, ${
     input.employeeId ?? null
-  }, true, ${input.companyId ?? null})
-    RETURNING id, email, full_name, is_active, employee_id, created_at, updated_at, company_id
+  }, true, ${input.companyId ?? null}, ${input.mobile ?? null})
+    RETURNING id, email, full_name, is_active, employee_id, created_at, updated_at, company_id, mobile
   `;
   const user = rowsFrom(res)[0];
   if (!user) {
@@ -167,6 +177,7 @@ export async function updateUser(
     employeeId?: string | null;
     isActive?: boolean;
     roleIds?: string[];
+    mobile?: string | null;
   }
 ): Promise<UserListRow> {
   const sql = getSql();
@@ -177,11 +188,12 @@ export async function updateUser(
   if (patch.employeeId !== undefined) updated.employee_id = patch.employeeId ?? null;
   if (patch.isActive !== undefined) updated.is_active = patch.isActive;
   if (patch.password !== undefined) updated.password_hash = passwordHash ?? null;
+  if (patch.mobile !== undefined) updated.mobile = patch.mobile ?? null;
   const res = await sql<UserListRow[]>`
     UPDATE users
     SET ${sql(updated)}
     WHERE id = ${id}
-    RETURNING id, email, full_name, is_active, employee_id, created_at, updated_at, company_id
+    RETURNING id, email, full_name, is_active, employee_id, created_at, updated_at, company_id, mobile
   `;
   const user = rowsFrom(res)[0];
   if (!user) throw new Error("User not found");
@@ -198,7 +210,11 @@ export async function updateUser(
       }
     });
   }
-  return { ...user, roles: patch.roleIds?.map((rid) => ({ id: rid, name: "" })) ?? user.roles ?? [] };
+  return {
+    ...user,
+    mobile: patch.mobile !== undefined ? patch.mobile ?? null : user.mobile ?? null,
+    roles: patch.roleIds?.map((rid) => ({ id: rid, name: "" })) ?? user.roles ?? [],
+  };
 }
 
 export async function softDeleteUser(id: string): Promise<void> {

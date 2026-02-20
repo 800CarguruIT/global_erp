@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { appendLeadEvent, deleteLead, getLeadById, updateLeadPartial } from "@repo/ai-core/crm/leads/repository";
 import { getSql } from "@repo/ai-core/db";
 import { createInspection, getLatestInspectionForLead } from "@repo/ai-core/workshop/inspections/repository";
+import { getCurrentUserIdFromRequest } from "@/lib/auth/current-user";
 
 type Params = { params: Promise<{ companyId: string; id: string }> };
 
@@ -14,6 +15,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
 export async function PUT(req: NextRequest, { params }: Params) {
   const { companyId, id } = await params;
+  const currentUserId = await getCurrentUserIdFromRequest(req);
   const lead = await getLeadById(companyId, id);
   if (!lead) return new NextResponse("Not found", { status: 404 });
 
@@ -29,12 +31,29 @@ export async function PUT(req: NextRequest, { params }: Params) {
     leadStage,
     recoveryDirection,
     recoveryFlow,
+    ensureInspection,
   } = body ?? {};
 
   const branchIdFromBody = branchId === null ? null : branchId ?? lead.branchId ?? null;
   const branchChanged = branchIdFromBody !== lead.branchId;
   const nextAssignedUserId = assignedUserId ?? lead.assignedUserId ?? null;
   const nextLeadStatus = status ?? lead.leadStatus;
+  const assignmentRequested =
+    lead.leadType === "workshop" &&
+    nextLeadStatus === "car_in" &&
+    (branchIdFromBody || nextAssignedUserId) &&
+    (branchChanged || nextAssignedUserId !== lead.assignedUserId || ensureInspection === true);
+
+  if (assignmentRequested) {
+    const latestInspection = await getLatestInspectionForLead(companyId, id);
+    const isVerified = Boolean(latestInspection?.verifiedAt ?? (latestInspection as any)?.verified_at);
+    if (isVerified) {
+      return NextResponse.json(
+        { error: "Inspection already verified. Reassign/assign is not allowed." },
+        { status: 400 }
+      );
+    }
+  }
 
   await updateLeadPartial(companyId, id, {
     leadStatus: status ?? lead.leadStatus,
@@ -68,12 +87,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     });
   }
 
-  if (
-    lead.leadType === "workshop" &&
-    nextLeadStatus === "car_in" &&
-    (branchIdFromBody || nextAssignedUserId) &&
-    (branchChanged || nextAssignedUserId !== lead.assignedUserId)
-  ) {
+  if (assignmentRequested) {
     try {
       const existing = await getLatestInspectionForLead(companyId, id);
       if (!existing) {
@@ -89,15 +103,21 @@ export async function PUT(req: NextRequest, { params }: Params) {
         const sql = getSql();
         await sql/* sql */ `
           UPDATE inspections
-          SET status = 'pending',
-              start_at = ${new Date().toISOString()},
-              complete_at = NULL,
-              branch_id = ${branchIdFromBody ?? null},
-              inspector_employee_id = NULL,
-              advisor_employee_id = NULL,
-              draft_payload = NULL
+          SET status = 'cancelled',
+              cancelled_by = ${currentUserId ?? null},
+              cancelled_at = ${new Date().toISOString()},
+              cancel_remarks = ${"Inspection reassigned to another workshop/branch."}
           WHERE company_id = ${companyId} AND id = ${existing.id}
         `;
+        await createInspection({
+          companyId,
+          leadId: id,
+          carId: lead.carId ?? null,
+          customerId: lead.customerId ?? null,
+          branchId: branchIdFromBody ?? null,
+          status: "pending",
+        });
+
       }
     } catch (err) {
       console.error("Failed to create inspection after assignment", err);

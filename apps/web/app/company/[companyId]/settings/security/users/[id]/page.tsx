@@ -19,6 +19,7 @@ type UserDetail = {
   name?: string | null;
   roles?: { id: string; name: string }[];
   employee_id?: string | null;
+  mobile?: string | null;
 };
 
 export default function CompanyUserEditPage({
@@ -186,6 +187,7 @@ export default function CompanyUserEditPage({
     password?: string;
     roleIds: string[];
     employeeId?: string | null;
+    mobile?: string | null;
     scope?: ScopeOption | null;
   }) {
     if (!companyId || !userId) {
@@ -200,6 +202,7 @@ export default function CompanyUserEditPage({
         password: values.password,
         roleIds: values.roleIds,
         employeeId: values.employeeId ?? null,
+        mobile: values.mobile ?? null,
         scope: selectedScope?.type ?? null,
         branchId: selectedScope?.type === "branch" ? selectedScope.id : null,
         vendorId: selectedScope?.type === "vendor" ? selectedScope.id : null,
@@ -220,6 +223,7 @@ export default function CompanyUserEditPage({
         name: user.full_name ?? user.name ?? "",
         roleIds: user.roles?.map((r) => r.id) ?? [],
         employeeId: user.employee_id ?? undefined,
+        mobile: user.mobile ?? undefined,
       }
     : undefined;
 

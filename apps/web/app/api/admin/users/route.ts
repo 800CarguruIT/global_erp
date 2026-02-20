@@ -18,15 +18,15 @@ export async function GET(req: NextRequest) {
     const page = Number(searchParams.get("page") ?? 1);
     const pageSize = Number(searchParams.get("pageSize") ?? 50);
     const offset = (page - 1) * pageSize;
-    const includeInactive = searchParams.get("includeInactive") === "true";
+    const status = (searchParams.get("status") ?? "all") as "all" | "active" | "inactive";
 
-    const users = await UserRepository.listUsers({
-      q,
-      limit: pageSize,
-      offset,
-      activeOnly: !includeInactive,
-      globalOnly,
-    });
+      const users = await UserRepository.listUsers({
+        q,
+        limit: pageSize,
+        offset,
+        globalOnly,
+        status,
+      });
     return NextResponse.json({ data: users });
   } catch (error) {
     console.error("GET /api/admin/users error", error);
@@ -50,6 +50,7 @@ export async function POST(req: NextRequest) {
     employeeId: body.employeeId ?? null,
     roleIds: body.roleIds ?? [],
     companyId: body.companyId ?? null,
+    mobile: body.mobile ?? null,
   });
   return NextResponse.json({ data: user }, { status: 201 });
 }

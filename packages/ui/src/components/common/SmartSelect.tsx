@@ -13,6 +13,7 @@ export type SmartSelectProps = {
   label?: string;
   disabled?: boolean;
   allowCustomValue?: boolean;
+  required?: boolean;
 };
 
 export function SmartSelect({
@@ -23,6 +24,7 @@ export function SmartSelect({
   label,
   disabled,
   allowCustomValue = false,
+  required,
 }: SmartSelectProps) {
   const { theme } = useTheme();
   const [input, setInput] = useState("");
@@ -67,10 +69,11 @@ export function SmartSelect({
 
   return (
     <div className="relative space-y-1">
-      {label && <div className="text-xs font-semibold text-muted-foreground">{label}</div>}
+      {label && <div className="text-sm font-medium text-foreground/90">{label}</div>}
       <div className="relative">
         <input
-          className={`${theme.input} pr-10`}
+          required={required}
+          className={`${theme.input} pr-10 min-h-[3rem] text-sm text-foreground placeholder:text-muted-foreground`}
           placeholder={placeholder}
           value={displayValue}
           onChange={handleInputChange}
@@ -86,13 +89,15 @@ export function SmartSelect({
           onKeyDown={handleKeyDown}
           disabled={disabled}
         />
-        <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs opacity-60">
-          ▾
+        <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-muted-foreground">
+          <svg viewBox="0 0 20 20" className="h-3 w-3" aria-hidden="true">
+            <path d="M6 8l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+          </svg>
         </span>
       </div>
       {open && (
         <div
-          className={`absolute z-30 mt-2 max-h-64 w-full overflow-auto rounded-xl ${theme.cardBorder} ${theme.cardBg} shadow-2xl backdrop-blur`}
+          className={`absolute z-30 mt-2 max-h-72 min-w-[16rem] w-full overflow-auto rounded-xl ${theme.cardBorder} bg-slate-950 shadow-2xl`}
         >
           {filtered.length === 0 ? (
             <div className="px-3 py-2 text-sm opacity-70">No matches</div>

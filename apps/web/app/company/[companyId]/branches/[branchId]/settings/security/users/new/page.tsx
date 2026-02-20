@@ -10,6 +10,7 @@ type UserPayload = {
   roleIds: string[];
   employeeId?: string | null;
   password?: string;
+  mobile?: string | null;
 };
 
 export default function BranchUserCreatePage({

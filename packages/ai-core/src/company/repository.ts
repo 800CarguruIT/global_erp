@@ -113,6 +113,7 @@ export async function updateCompany(
       country = COALESCE(${patch.country ?? null}, country),
       timezone = COALESCE(${patch.timezone ?? null}, timezone),
       currency = COALESCE(${patch.currency ?? null}, currency),
+      is_active = COALESCE(${patch.is_active ?? null}, is_active),
       google_location = COALESCE(${patch.google_location ?? null}, google_location),
       google_maps_api_key = COALESCE(${patch.google_maps_api_key ?? null}, google_maps_api_key),
       updated_at = NOW()

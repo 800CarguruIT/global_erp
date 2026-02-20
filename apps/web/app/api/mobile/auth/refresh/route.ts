@@ -1,31 +1,36 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { createAccessToken, createRefreshToken, verifyToken } from "../../../../../lib/auth/mobile-jwt";
+import { buildMobileUserProfile } from "../../../../../lib/auth/mobile-user-profile";
+import { createMobileErrorResponse, createMobileSuccessResponse } from "../../utils";
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => null);
     const refreshToken = body?.refreshToken?.toString();
     if (!refreshToken) {
-      return NextResponse.json({ error: "refreshToken is required" }, { status: 400 });
+      return createMobileErrorResponse("refreshToken is required", 400);
     }
 
     const payload = verifyToken(refreshToken, "refresh");
     if (!payload) {
-      return NextResponse.json({ error: "Invalid refresh token" }, { status: 401 });
+      return createMobileErrorResponse("Invalid refresh token", 401);
     }
 
     const { token: accessToken, expiresIn } = createAccessToken(payload.sub);
     const { token: newRefreshToken, expiresIn: refreshExpiresIn } = createRefreshToken(payload.sub);
+    const user = await buildMobileUserProfile(payload.sub);
 
-    return NextResponse.json({
+    return createMobileSuccessResponse({
       tokenType: "Bearer",
       accessToken,
       refreshToken: newRefreshToken,
       expiresIn,
       refreshExpiresIn,
+      user,
+      redirect: user?.dashboard?.path ?? null,
     });
   } catch (error: any) {
     console.error("POST /api/mobile/auth/refresh error:", error);
-    return NextResponse.json({ error: "Failed to refresh" }, { status: 500 });
+    return createMobileErrorResponse("Failed to refresh");
   }
 }

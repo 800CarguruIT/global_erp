@@ -12,6 +12,7 @@ export type CitySelectProps = {
   disabled?: boolean;
   placeholder?: string;
   placeholderDisabled?: string;
+  required?: boolean;
 };
 
 export function CitySelect({
@@ -22,6 +23,7 @@ export function CitySelect({
   disabled,
   placeholder,
   placeholderDisabled,
+  required,
 }: CitySelectProps) {
   const cities = countryIso2
     ? ReferenceData.ReferenceCities.citiesForCountry(countryIso2)
@@ -40,6 +42,7 @@ export function CitySelect({
           : placeholderDisabled ?? "Select country first"
       }
       disabled={isDisabled}
+      required={required}
     />
   );
 }

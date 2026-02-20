@@ -2,6 +2,7 @@ import {
   assignRolesToUser as repoAssignRoles,
   getAllPermissions as repoGetAllPermissions,
   getPermissionsByKeys,
+  getPermissionsByPrefix,
   getRoleById,
   getRolePermissions,
   getRolesByScope,
@@ -21,6 +22,16 @@ import type {
   UpdateRoleInput,
 } from "./types";
 
+const GLOBAL_PERMISSION_PREFIX = "global.";
+
+function filterPermissionKeysForScope(scope: RoleScope, keys: string[]): string[] {
+  if (!keys.length) return [];
+  if (scope === "global") {
+    return keys.filter((key) => key.startsWith(GLOBAL_PERMISSION_PREFIX));
+  }
+  return keys;
+}
+
 function validateScope(input: CreateRoleInput) {
   if (input.scope === "global") return;
   if (input.scope === "company" && !input.companyId) {
@@ -38,7 +49,8 @@ export async function createRole(
   input: CreateRoleInput
 ): Promise<RoleRow & { permissions: PermissionRow[] }> {
   validateScope(input);
-  const perms = await getPermissionsByKeys(input.permissionKeys ?? []);
+  const filteredKeys = filterPermissionKeysForScope(input.scope, input.permissionKeys ?? []);
+  const perms = await getPermissionsByKeys(filteredKeys);
   const row = await insertRole({
     name: input.name,
     key: input.key,
@@ -63,7 +75,8 @@ export async function updateRole(
     description: input.description ?? existing.description,
   });
   if (input.permissionKeys) {
-    const perms = await getPermissionsByKeys(input.permissionKeys);
+    const filteredKeys = filterPermissionKeysForScope(existing.scope, input.permissionKeys);
+    const perms = await getPermissionsByKeys(filteredKeys);
     await replaceRolePermissions(id, perms.map((p) => p.id));
   }
   const perms = await getRolePermissions(id);
@@ -99,6 +112,13 @@ export async function listAllPermissions(): Promise<PermissionRow[]> {
 }
 
 export const getAllPermissions = listAllPermissions;
+
+export async function listPermissionsForScope(scope: RoleScope): Promise<PermissionRow[]> {
+  if (scope === "global") {
+    return getPermissionsByPrefix(GLOBAL_PERMISSION_PREFIX);
+  }
+  return listAllPermissions();
+}
 
 export async function assignRolesToUser(userId: string, roleIds: string[]): Promise<void> {
   await repoAssignRoles(userId, roleIds);

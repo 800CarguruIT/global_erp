@@ -11,9 +11,12 @@ export async function GET(req: NextRequest, { params }: Params) {
 
   try {
     const url = new URL(req.url);
+    const dateFrom = url.searchParams.get("dateFrom");
     const dateTo = url.searchParams.get("dateTo") ?? new Date().toISOString().slice(0, 10);
     const entityId = await Accounting.resolveEntityId("company", companyId);
     const sql = getSql();
+    const includeDrafts = url.searchParams.get("includeDrafts") === "true";
+    const postedFilter = includeDrafts ? sql`` : sql`AND (j.is_posted = TRUE OR jl.journal_id IS NULL)`;
     const rows = await sql<
       Array<{
         headingName: string;
@@ -43,8 +46,15 @@ export async function GET(req: NextRequest, { params }: Params) {
       JOIN accounting_headings h ON h.id = a.heading_id
       LEFT JOIN accounting_journal_lines jl ON jl.account_id = a.id
         AND jl.entity_id = ${entityId}
-        AND jl.created_at::date <= ${dateTo}
+      LEFT JOIN accounting_journals j ON j.id = jl.journal_id
       WHERE a.company_id = ${companyId}
+        AND (
+          jl.account_id IS NULL OR (
+            (${dateFrom}::date IS NULL OR COALESCE(j.date::date, jl.created_at::date) >= ${dateFrom}::date)
+            AND COALESCE(j.date::date, jl.created_at::date) <= ${dateTo}::date
+          )
+        )
+        ${postedFilter}
       GROUP BY
         h.name,
         s.name,

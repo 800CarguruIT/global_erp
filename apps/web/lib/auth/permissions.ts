@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { ScopeContext } from "@repo/ai-core";
 import { Rbac } from "@repo/ai-core";
 import { getCurrentUserIdFromRequest } from "./current-user";
+import { filterGlobalPermissionKeys, isGlobalPermissionKey } from "./global-permission-keys";
 
 function normalizeScopeId(value?: string) {
   if (!value) return undefined;
@@ -52,3 +53,7 @@ export async function requirePermission(
   }
   return null;
 }
+
+const GLOBAL_PERMISSION_PREFIX = "global.";
+
+export { isGlobalPermissionKey, filterGlobalPermissionKeys };

@@ -2,6 +2,43 @@ import { getSql } from "../../db";
 import { getEstimateWithItems, recalculateEstimateTotals } from "../estimates/repository";
 import type { PartCatalogItem, PartsRequirementRow, ProcurementStatus } from "./types";
 
+let inventoryMovementTriggerPresentCache: boolean | null = null;
+
+async function hasInventoryMovementTrigger(sql: ReturnType<typeof getSql>): Promise<boolean> {
+  if (inventoryMovementTriggerPresentCache != null) return inventoryMovementTriggerPresentCache;
+  const rows = await sql<{ exists: boolean }[]>`
+    SELECT EXISTS (
+      SELECT 1
+      FROM pg_trigger t
+      JOIN pg_class c ON c.oid = t.tgrelid
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE n.nspname = 'public'
+        AND c.relname = 'inventory_movements'
+        AND t.tgname = 'trg_apply_inventory_movement'
+        AND NOT t.tgisinternal
+    ) AS exists
+  `;
+  inventoryMovementTriggerPresentCache = Boolean(rows[0]?.exists);
+  return inventoryMovementTriggerPresentCache;
+}
+
+async function upsertInventoryStockFallback(params: {
+  sql: ReturnType<typeof getSql>;
+  companyId: string;
+  partId: string;
+  locationCode: string;
+  quantity: number;
+}) {
+  const hasTrigger = await hasInventoryMovementTrigger(params.sql);
+  if (hasTrigger) return;
+  await params.sql`
+    INSERT INTO inventory_stock (company_id, part_id, location_code, on_hand)
+    VALUES (${params.companyId}, ${params.partId}, ${params.locationCode}, ${params.quantity})
+    ON CONFLICT (company_id, part_id, location_code)
+    DO UPDATE SET on_hand = inventory_stock.on_hand + ${params.quantity}, updated_at = now()
+  `;
+}
+
 function mapCatalogRow(row: any): PartCatalogItem {
   return {
     id: row.id,
@@ -68,16 +105,37 @@ export async function ensurePartCatalogItem(
   companyId: string,
   partNumber: string,
   brand: string,
-  description?: string | null
+  description?: string | null,
+  meta?: { category?: string | null; subcategory?: string | null; unit?: string | null }
 ): Promise<PartCatalogItem> {
   const sql = getSql();
+  const normalizedDescription = (description ?? "").trim() || null;
   const existing = await sql`
     SELECT * FROM parts_catalog
     WHERE company_id = ${companyId} AND part_number = ${partNumber} AND brand = ${brand}
     LIMIT 1
   `;
   if (existing.length) {
-    return mapCatalogRow(existing[0]);
+    const row = existing[0];
+    if (meta && (meta.category || meta.subcategory || meta.unit)) {
+      await sql`
+        UPDATE parts_catalog
+        SET
+          category = COALESCE(${meta.category ?? null}, category),
+          subcategory = COALESCE(${meta.subcategory ?? null}, subcategory),
+          unit = COALESCE(${meta.unit ?? null}, unit),
+          description = COALESCE(NULLIF(description, ''), ${normalizedDescription})
+        WHERE id = ${row.id}
+      `;
+    } else if (normalizedDescription) {
+      await sql`
+        UPDATE parts_catalog
+        SET description = COALESCE(NULLIF(description, ''), ${normalizedDescription})
+        WHERE id = ${row.id}
+      `;
+    }
+    const refreshed = await sql`SELECT * FROM parts_catalog WHERE id = ${row.id} LIMIT 1`;
+    return mapCatalogRow(refreshed[0] ?? row);
   }
 
   const sku = `P-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
@@ -90,14 +148,20 @@ export async function ensurePartCatalogItem(
       brand,
       sku,
       description,
-      qr_code
+      qr_code,
+      category,
+      subcategory,
+      unit
     ) VALUES (
       ${companyId},
       ${partNumber},
       ${brand},
       ${sku},
-      ${description ?? null},
-      ${qrCode}
+      ${normalizedDescription},
+      ${qrCode},
+      ${meta?.category ?? null},
+      ${meta?.subcategory ?? null},
+      ${meta?.unit ?? null}
     )
     RETURNING *
   `;
@@ -113,11 +177,13 @@ export async function receivePartsForEstimateItem(
     description?: string;
     quantity: number;
     costPerUnit?: number;
+    purchaseOrderId?: string | null;
   }
 ): Promise<{ grnNumber: string; part: PartCatalogItem }> {
   const sql = getSql();
   const { partNumber, brand, description, quantity } = payload;
-  const part = await ensurePartCatalogItem(companyId, partNumber, brand, description);
+  const resolvedDescription = (description ?? "").trim() || `Received part ${partNumber}`;
+  const part = await ensurePartCatalogItem(companyId, partNumber, brand, resolvedDescription);
 
   const grnNumber = `GRN-${new Date().toISOString().slice(0, 10)}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 
@@ -131,7 +197,8 @@ export async function receivePartsForEstimateItem(
       source_type,
       source_id,
       grn_number,
-      note
+      note,
+      purchase_order_id
     ) VALUES (
       ${companyId},
       ${part.id},
@@ -141,9 +208,17 @@ export async function receivePartsForEstimateItem(
       ${"receipt"},
       ${estimateItemId},
       ${grnNumber},
-      ${description ?? null}
+      ${resolvedDescription},
+      ${payload.purchaseOrderId ?? null}
     )
   `;
+  await upsertInventoryStockFallback({
+    sql,
+    companyId,
+    partId: part.id,
+    locationCode: "MAIN",
+    quantity,
+  });
 
   await sql`
     UPDATE estimate_items
@@ -160,6 +235,100 @@ export async function receivePartsForEstimateItem(
   `;
 
   await recalculateEstimateTotalsForItem(estimateItemId);
+
+  return { grnNumber, part };
+}
+
+export async function receivePartsForInventoryRequestItem(
+  companyId: string,
+  requestItemId: string,
+  payload: { quantity: number; purchaseOrderId?: string | null }
+): Promise<{ grnNumber: string; part: PartCatalogItem } | null> {
+  const sql = getSql();
+  const rows = await sql`
+    SELECT * FROM inventory_order_request_items
+    WHERE id = ${requestItemId}
+    LIMIT 1
+  `;
+  if (!rows.length) return null;
+  const item = rows[0];
+  let partNumber = (item.part_number as string | undefined)?.trim();
+  let brand = (item.part_brand as string | undefined)?.trim();
+  if (!partNumber) {
+    partNumber = `INV-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+  }
+  if (!brand) {
+    brand = "Generic";
+  }
+  if (!item.part_number || !item.part_brand) {
+    await sql`
+      UPDATE inventory_order_request_items
+      SET part_number = ${partNumber},
+          part_brand = ${brand}
+      WHERE id = ${requestItemId}
+    `;
+  }
+
+  const part = await ensurePartCatalogItem(
+    companyId,
+    partNumber,
+    brand,
+    (String(item.description ?? "").trim() || String(item.part_name ?? "").trim() || `Received part ${partNumber}`),
+    {
+      category: item.category ?? null,
+      subcategory: item.subcategory ?? null,
+      unit: item.unit ?? null,
+    }
+  );
+
+  const grnNumber = `GRN-${new Date().toISOString().slice(0, 10)}-${Math.random()
+    .toString(36)
+    .slice(2, 6)
+    .toUpperCase()}`;
+
+  await sql`
+    INSERT INTO inventory_movements (
+      company_id,
+      part_id,
+      location_code,
+      direction,
+      quantity,
+      source_type,
+      source_id,
+      grn_number,
+      note,
+      purchase_order_id
+    ) VALUES (
+      ${companyId},
+      ${part.id},
+      ${"MAIN"},
+      ${"in"},
+      ${payload.quantity},
+      ${"receipt"},
+      ${requestItemId},
+      ${grnNumber},
+      ${item.description ?? item.part_name ?? null},
+      ${payload.purchaseOrderId ?? null}
+    )
+  `;
+
+  // Fallback: ensure stock row exists even if trigger is missing.
+  await upsertInventoryStockFallback({
+    sql,
+    companyId,
+    partId: part.id,
+    locationCode: "MAIN",
+    quantity: payload.quantity,
+  });
+
+  const newReceived = Number(item.received_qty ?? 0) + Number(payload.quantity ?? 0);
+  const newStatus = newReceived >= Number(item.quantity ?? 0) ? "received" : item.status ?? "pending";
+  await sql`
+    UPDATE inventory_order_request_items
+    SET received_qty = ${newReceived},
+        status = ${newStatus}
+    WHERE id = ${requestItemId}
+  `;
 
   return { grnNumber, part };
 }
