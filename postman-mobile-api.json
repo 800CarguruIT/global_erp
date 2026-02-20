@@ -1413,6 +1413,114 @@
           ]
         }
       }
+    },
+    {
+      "name": "Workshop - Job Card Working Video (Mobile)",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"action\": \"working_video\",\n  \"workingVideoId\": \"{{workingVideoId}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/workshop/job-cards/{{jobCardId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "mobile",
+            "company",
+            "{{companyId}}",
+            "workshop",
+            "job-cards",
+            "{{jobCardId}}"
+          ]
+        }
+      },
+      "description": "Save working video for the job card workflow."
+    },
+    {
+      "name": "Workshop - Job Card Add Additional Item (Mobile)",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"action\": \"add_additional_item\",\n  \"itemName\": \"Engine Mount\",\n  \"addMode\": \"recommended\",\n  \"imageId\": \"{{itemImageId}}\",\n  \"quantity\": 1\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/workshop/job-cards/{{jobCardId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "mobile",
+            "company",
+            "{{companyId}}",
+            "workshop",
+            "job-cards",
+            "{{jobCardId}}"
+          ]
+        }
+      },
+      "description": "Creates additional item in a separate pending job-card and marks estimate pending approval."
+    },
+    {
+      "name": "Workshop - Job Card Final Inspection (Mobile)",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"action\": \"final_inspection\",\n  \"checks\": {\n    \"testDrive\": true,\n    \"clusterWarning\": true,\n    \"carWash\": true,\n    \"tyreCheck\": true,\n    \"computerReset\": true,\n    \"protectiveShields\": true\n  },\n  \"carOutVideoId\": \"{{carOutVideoId}}\",\n  \"remarks\": \"Final QA passed\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/mobile/company/{{companyId}}/workshop/job-cards/{{jobCardId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "mobile",
+            "company",
+            "{{companyId}}",
+            "workshop",
+            "job-cards",
+            "{{jobCardId}}"
+          ]
+        }
+      },
+      "description": "Saves final inspection checklist and car out video after completion."
     }
   ],
   "variable": [

@@ -28,9 +28,20 @@ export async function GET(req: NextRequest, { params }: Params) {
              jc.collect_car_mileage,
              jc.collect_car_mileage_image_id,
              jc.collect_car_at,
+             jc.working_video_id,
              jc.pre_work_checked_at,
              jc.pre_work_checked_by,
              jc.pre_work_note,
+             jc.final_inspection_test_drive,
+             jc.final_inspection_cluster_warning,
+             jc.final_inspection_car_wash,
+             jc.final_inspection_tyre_check,
+             jc.final_inspection_computer_reset,
+             jc.final_inspection_protective_shields,
+             jc.final_inspection_remarks,
+             jc.final_inspection_car_out_video_id,
+             jc.final_inspection_at,
+             jc.final_inspection_by,
              jc.estimate_id,
              jc.lead_id,
              jc.status,
@@ -159,7 +170,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       body?.action !== "start" &&
       body?.action !== "complete" &&
       body?.action !== "collect_car" &&
-      body?.action !== "pre_work_check"
+      body?.action !== "pre_work_check" &&
+      body?.action !== "working_video" &&
+      body?.action !== "add_additional_item" &&
+      body?.action !== "final_inspection"
     ) {
       return createMobileErrorResponse("Invalid action", 400);
     }
@@ -389,6 +403,227 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         RETURNING *
       `;
       return createMobileSuccessResponse({ jobCard: updated[0] ?? jobCard });
+    }
+
+    if (body?.action === "working_video") {
+      const workingVideoId = String(body?.workingVideoId ?? "").trim();
+      if (!workingVideoId) {
+        return createMobileErrorResponse("Working video is required.", 400);
+      }
+      const updated = await sql`
+        UPDATE job_cards
+        SET working_video_id = ${workingVideoId}
+        WHERE id = ${jobCardId}
+        RETURNING *
+      `;
+      return createMobileSuccessResponse({ jobCard: updated[0] ?? jobCard });
+    }
+
+    if (body?.action === "add_additional_item") {
+      if (!jobCard?.estimate_id || !jobCard?.inspection_id) {
+        return createMobileErrorResponse("Estimate or inspection not found for this job card.", 400);
+      }
+      const partName = String(body?.partName ?? body?.itemName ?? "").trim();
+      const description = String(body?.description ?? "").trim() || null;
+      const qtyRaw = Number(body?.quantity ?? 1);
+      const quantity = Number.isFinite(qtyRaw) ? Math.max(1, Math.floor(qtyRaw)) : 1;
+      const normalizedType = String(body?.type ?? "aftermarket").trim().toLowerCase();
+      const estimateType =
+        normalizedType === "genuine" ||
+        normalizedType === "oem" ||
+        normalizedType === "aftermarket" ||
+        normalizedType === "used" ||
+        normalizedType === "repair"
+          ? normalizedType
+          : "aftermarket";
+      const additionalItemModeRaw = String(body?.additionalItemMode ?? body?.addMode ?? "").trim().toLowerCase();
+      const additionalItemMode =
+        additionalItemModeRaw === "mandatory" || additionalItemModeRaw === "recommended"
+          ? additionalItemModeRaw
+          : "recommended";
+      const additionalItemImageId = String(body?.additionalItemImageId ?? body?.imageId ?? "").trim();
+      if (!partName) return createMobileErrorResponse("Part name is required.", 400);
+      if (!additionalItemImageId) return createMobileErrorResponse("Additional item image is required.", 400);
+
+      const nextLineNoRows = await sql`
+        SELECT COALESCE(MAX(line_no), 0) + 1 AS next_line_no
+        FROM estimate_items
+        WHERE estimate_id = ${jobCard.estimate_id}
+      `;
+      const nextLineNo = Number(nextLineNoRows[0]?.next_line_no ?? 1);
+
+      const created = await sql.begin(async (trx) => {
+        const existingAdditionalJobCardRows = await trx`
+          SELECT jc.id
+          FROM job_cards jc
+          WHERE jc.estimate_id = ${jobCard.estimate_id}
+            AND jc.id <> ${jobCardId}
+            AND jc.status IN ('Pending', 'Re-Assigned')
+            AND EXISTS (
+              SELECT 1
+              FROM line_items li
+              WHERE li.job_card_id = jc.id
+                AND COALESCE(li.is_add, 0) = 1
+            )
+          ORDER BY jc.created_at DESC
+          LIMIT 1
+        `;
+        let targetJobCardId = String(existingAdditionalJobCardRows[0]?.id ?? "");
+        if (!targetJobCardId) {
+          const createdJobCardRows = await trx`
+            INSERT INTO job_cards (
+              done_by,
+              estimate_id,
+              lead_id,
+              status
+            ) VALUES (
+              ${userId},
+              ${jobCard.estimate_id},
+              ${jobCard.lead_id ?? null},
+              'Pending'
+            )
+            RETURNING id
+          `;
+          targetJobCardId = String(createdJobCardRows[0]?.id ?? "");
+        }
+        if (!targetJobCardId) throw new Error("Failed to create additional job card.");
+
+        const createdLineItemRows = await trx`
+          INSERT INTO line_items (
+            company_id,
+            lead_id,
+            inspection_id,
+            product_name,
+            description,
+            quantity,
+            reason,
+            status,
+            source,
+            is_add,
+            order_status,
+            job_card_id,
+            additional_item_mode,
+            additional_item_image_id,
+            customer_approval_status
+          ) VALUES (
+            ${companyId},
+            ${jobCard.lead_id ?? null},
+            ${jobCard.inspection_id},
+            ${partName},
+            ${description},
+            ${quantity},
+            ${"Additional item from workshop"},
+            ${"Pending"},
+            ${"estimate"},
+            ${1},
+            ${"Pending"},
+            ${targetJobCardId},
+            ${additionalItemMode},
+            ${additionalItemImageId},
+            ${"pending"}
+          )
+          RETURNING *
+        `;
+        const createdLineItem = createdLineItemRows[0];
+        if (!createdLineItem) throw new Error("Failed to create additional line item.");
+
+        await trx`
+          INSERT INTO estimate_items (
+            estimate_id,
+            inspection_item_id,
+            line_no,
+            part_name,
+            description,
+            type,
+            quantity,
+            cost,
+            sale,
+            gp_percent,
+            status
+          ) VALUES (
+            ${jobCard.estimate_id},
+            ${createdLineItem.id},
+            ${nextLineNo},
+            ${partName},
+            ${description},
+            ${estimateType},
+            ${quantity},
+            ${0},
+            ${0},
+            ${null},
+            ${"pending"}
+          )
+        `;
+
+        await trx`
+          UPDATE estimates
+          SET status = ${"pending_approval"}
+          WHERE id = ${jobCard.estimate_id}
+            AND company_id = ${companyId}
+        `;
+
+        await trx`
+          UPDATE job_cards
+          SET updated_at = NOW()
+          WHERE id = ${targetJobCardId}
+        `;
+
+        return { createdLineItem, targetJobCardId };
+      });
+
+      return createMobileSuccessResponse({
+        lineItem: {
+          ...created?.createdLineItem,
+          po_status: created?.createdLineItem?.order_status ?? "Pending",
+          order_status: created?.createdLineItem?.order_status ?? "Pending",
+          customer_approval_status: created?.createdLineItem?.customer_approval_status ?? "pending",
+          target_job_card_id: created?.targetJobCardId ?? null,
+        },
+      });
+    }
+
+    if (body?.action === "final_inspection") {
+      if (!jobCard?.complete_at) {
+        return createMobileErrorResponse("Complete the job before final inspection.", 400);
+      }
+      if (!jobCard?.working_video_id) {
+        return createMobileErrorResponse("Working video is required before final inspection.", 400);
+      }
+      const checks = body?.checks ?? {};
+      const requiredChecks = [
+        "testDrive",
+        "clusterWarning",
+        "carWash",
+        "tyreCheck",
+        "computerReset",
+        "protectiveShields",
+      ] as const;
+      const hasMissingCheck = requiredChecks.some((k) => checks?.[k] !== true);
+      if (hasMissingCheck) {
+        return createMobileErrorResponse("All final inspection checklist items are required.", 400);
+      }
+      const finalInspectionCarOutVideoId = String(body?.carOutVideoId ?? "").trim();
+      if (!finalInspectionCarOutVideoId) {
+        return createMobileErrorResponse("Final inspection car out video is required.", 400);
+      }
+      const finalInspectionRemarks = typeof body?.remarks === "string" ? body.remarks.trim() : "";
+      const finalUpdated = await sql`
+        UPDATE job_cards
+        SET
+          final_inspection_test_drive = ${checks.testDrive},
+          final_inspection_cluster_warning = ${checks.clusterWarning},
+          final_inspection_car_wash = ${checks.carWash},
+          final_inspection_tyre_check = ${checks.tyreCheck},
+          final_inspection_computer_reset = ${checks.computerReset},
+          final_inspection_protective_shields = ${checks.protectiveShields},
+          final_inspection_remarks = ${finalInspectionRemarks || null},
+          final_inspection_car_out_video_id = ${finalInspectionCarOutVideoId},
+          final_inspection_by = ${userId},
+          final_inspection_at = NOW()
+        WHERE id = ${jobCardId}
+        RETURNING *
+      `;
+      return createMobileSuccessResponse({ jobCard: finalUpdated[0] ?? jobCard });
     }
 
     const remarks = typeof body?.remarks === "string" ? body.remarks.trim() : "";
