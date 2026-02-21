@@ -24,6 +24,14 @@ export async function GET(req: NextRequest, { params }: Params) {
     const status = searchParams.get("status") as InspectionStatus | null;
     const branchId = searchParams.get("branchId");
     const q = searchParams.get("q")?.trim().toLowerCase() ?? "";
+    const dateFrom = searchParams.get("dateFrom") ?? searchParams.get("from");
+    const dateTo = searchParams.get("dateTo") ?? searchParams.get("to");
+    const limitValue = Number(searchParams.get("limit") ?? 20);
+    const offsetValue = Number(searchParams.get("offset") ?? 0);
+    const limit = Number.isFinite(limitValue)
+      ? Math.max(1, Math.min(100, limitValue))
+      : 20;
+    const offset = Number.isFinite(offsetValue) ? Math.max(0, offsetValue) : 0;
 
     let inspections = await listInspectionsForCompany(companyId, {
       status: status ?? undefined,
@@ -126,7 +134,7 @@ export async function GET(req: NextRequest, { params }: Params) {
         : null,
     }));
 
-    const filtered = !q
+    const filteredByQuery = !q
       ? enriched
       : enriched.filter((inspection) => {
           const branchLabel = inspection?.branch
@@ -153,7 +161,37 @@ export async function GET(req: NextRequest, { params }: Params) {
           return haystack.includes(q);
         });
 
-    return createMobileSuccessResponse({ inspections: filtered });
+    const fromTs = dateFrom ? new Date(dateFrom).getTime() : null;
+    const toTs = dateTo ? new Date(dateTo).getTime() : null;
+    const normalizedFrom = Number.isFinite(fromTs) ? fromTs : null;
+    const normalizedTo = Number.isFinite(toTs) ? toTs : null;
+    const filtered = filteredByQuery.filter((inspection: any) => {
+      const raw =
+        inspection?.createdAt ??
+        inspection?.created_at ??
+        inspection?.startAt ??
+        inspection?.start_at ??
+        null;
+      if (!raw) return true;
+      const ts = new Date(raw).getTime();
+      if (!Number.isFinite(ts)) return true;
+      if (normalizedFrom !== null && ts < normalizedFrom) return false;
+      if (normalizedTo !== null && ts > normalizedTo) return false;
+      return true;
+    });
+
+    const total = filtered.length;
+    const paged = filtered.slice(offset, offset + limit);
+
+    return createMobileSuccessResponse({
+      inspections: paged,
+      meta: {
+        total,
+        limit,
+        offset,
+        hasMore: offset + limit < total,
+      },
+    });
   } catch (error) {
     console.error("GET /api/mobile/company/[companyId]/inspections error:", error);
     return handleMobileError(error);

@@ -19,6 +19,17 @@ export async function GET(req: NextRequest, { params }: Params) {
     const estimateId = searchParams.get("estimateId");
     const includeAll =
       searchParams.get("all") === "1" || searchParams.get("all") === "true";
+    const status = searchParams.get("status")?.trim().toLowerCase() ?? "";
+    const q = searchParams.get("q")?.trim().toLowerCase() ?? "";
+    const plate = searchParams.get("plate")?.trim().toLowerCase() ?? "";
+    const dateFrom = searchParams.get("dateFrom") ?? searchParams.get("from");
+    const dateTo = searchParams.get("dateTo") ?? searchParams.get("to");
+    const limitValue = Number(searchParams.get("limit") ?? 20);
+    const offsetValue = Number(searchParams.get("offset") ?? 0);
+    const limit = Number.isFinite(limitValue)
+      ? Math.max(1, Math.min(100, limitValue))
+      : 20;
+    const offset = Number.isFinite(offsetValue) ? Math.max(0, offsetValue) : 0;
 
     const sql = getSql();
     if (!estimateId) {
@@ -44,7 +55,66 @@ export async function GET(req: NextRequest, { params }: Params) {
         ORDER BY jc.created_at DESC
       `;
 
-      return createMobileSuccessResponse({ jobCards: rows });
+      const fromTs = dateFrom ? new Date(dateFrom).getTime() : null;
+      const toTs = dateTo ? new Date(dateTo).getTime() : null;
+      const normalizedFrom = Number.isFinite(fromTs) ? fromTs : null;
+      const normalizedTo = Number.isFinite(toTs) ? toTs : null;
+
+      const filtered = rows.filter((row: any) => {
+        const createdAtRaw = row?.created_at ?? null;
+        const createdAtTs = createdAtRaw ? new Date(createdAtRaw).getTime() : null;
+        if (
+          normalizedFrom !== null &&
+          typeof createdAtTs === "number" &&
+          createdAtTs < normalizedFrom
+        ) {
+          return false;
+        }
+        if (
+          normalizedTo !== null &&
+          typeof createdAtTs === "number" &&
+          createdAtTs > normalizedTo
+        ) {
+          return false;
+        }
+
+        const rowStatus = String(row?.status ?? "").trim().toLowerCase();
+        if (status && rowStatus !== status) return false;
+
+        const rowPlate = String(row?.plate_number ?? "").trim().toLowerCase();
+        if (plate && !rowPlate.includes(plate)) return false;
+
+        if (q) {
+          const haystack = [
+            row?.id,
+            row?.status,
+            row?.branch_name,
+            row?.customer_name,
+            row?.customer_phone,
+            row?.plate_number,
+            row?.make,
+            row?.model,
+          ]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase();
+          if (!haystack.includes(q)) return false;
+        }
+
+        return true;
+      });
+
+      const total = filtered.length;
+      const paged = filtered.slice(offset, offset + limit);
+      return createMobileSuccessResponse({
+        jobCards: paged,
+        meta: {
+          total,
+          limit,
+          offset,
+          hasMore: offset + limit < total,
+        },
+      });
     }
 
     if (includeAll) {

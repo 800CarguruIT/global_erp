@@ -28,7 +28,9 @@ export async function GET(req: NextRequest, { params }: Params) {
     const carInLeads = leads.filter((lead) => lead.leadStatus === "car_in");
 
     const leadIds = carInLeads.map((lead) => lead.id).filter(Boolean);
-    const customerIds = carInLeads.map((lead) => lead.customerId ?? lead.customer_id).filter(Boolean);
+    const customerIds = carInLeads
+      .map((lead) => lead.customerId ?? null)
+      .filter(Boolean);
 
     const sql = getSql();
     const wallets = customerIds.length
@@ -45,8 +47,8 @@ export async function GET(req: NextRequest, { params }: Params) {
 
     const enrichedLeads = carInLeads.map((lead) => ({
       ...lead,
-      customerId: lead.customerId ?? lead.customer_id ?? null,
-      customerWalletAmount: walletMap[lead.customerId ?? lead.customer_id ?? ""] ?? 0,
+      customerId: lead.customerId ?? null,
+      customerWalletAmount: walletMap[lead.customerId ?? ""] ?? 0,
     }));
 
     const inspections =
@@ -111,7 +113,7 @@ export async function GET(req: NextRequest, { params }: Params) {
             normalized AS (
               SELECT
                 li.*,
-                i.lead_id,
+                i.lead_id AS inspection_lead_id,
                 CASE
                   WHEN qr.status_rank >= 3 THEN 'Received'
                   WHEN qr.status_rank = 2 THEN 'Returned'
@@ -125,7 +127,7 @@ export async function GET(req: NextRequest, { params }: Params) {
                 AND i.lead_id = ANY(${leadIds})
             )
             SELECT
-              n.lead_id,
+              n.inspection_lead_id AS lead_id,
               COUNT(*) FILTER (WHERE n.normalized_order_status = 'Ordered') AS ordered_count,
               COUNT(*) FILTER (WHERE n.normalized_order_status = 'Received') AS received_count,
               COUNT(*) FILTER (
@@ -140,7 +142,7 @@ export async function GET(req: NextRequest, { params }: Params) {
             LEFT JOIN products p ON p.id = n.product_id
             LEFT JOIN products p2 ON LOWER(p2.name) = LOWER(n.product_name)
             WHERE n.normalized_order_status IN ('Ordered', 'Received', 'Returned')
-            GROUP BY n.lead_id
+            GROUP BY n.inspection_lead_id
           `
         : [];
 
