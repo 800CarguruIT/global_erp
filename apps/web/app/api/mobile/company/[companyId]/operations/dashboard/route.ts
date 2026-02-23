@@ -17,6 +17,7 @@ type JobCardRow = {
   estimate_id?: string | null;
   lead_id?: string | null;
   created_at?: string | null;
+  start_at?: string | null;
   complete_at?: string | null;
   workshop_quote_id?: string | null;
   workshop_quote_status?: string | null;
@@ -236,7 +237,44 @@ export async function GET(req: NextRequest, { params }: Params) {
       .sort(byCreatedAtDesc);
 
     const completedInspectionsRaw = inspections
-      .filter((row: any) => toLower(row?.status) === "completed")
+      .filter(
+        (row: any) =>
+          toLower(row?.status) === "completed" &&
+          !Boolean(
+            row?.verifiedAt ??
+              row?.verified_at ??
+              row?.verifiedBy ??
+              row?.verified_by,
+          ),
+      )
+      .filter((row: any) =>
+        matchesQuery(q, [
+          row?.id,
+          row?.status,
+          row?.car?.plate_number,
+          row?.car?.make,
+          row?.car?.model,
+          row?.customer?.name,
+          row?.customer?.phone,
+          row?.branch?.display_name,
+          row?.branch?.name,
+          row?.branch?.code,
+        ]),
+      )
+      .filter((row: any) =>
+        matchesDateRange(row?.createdAt ?? row?.updatedAt, fromTs, toTs),
+      )
+      .sort(byCreatedAtDesc);
+
+    const verifiedInspectionsRaw = inspections
+      .filter((row: any) =>
+        Boolean(
+          row?.verifiedAt ??
+            row?.verified_at ??
+            row?.verifiedBy ??
+            row?.verified_by,
+        ),
+      )
       .filter((row: any) =>
         matchesQuery(q, [
           row?.id,
@@ -257,7 +295,20 @@ export async function GET(req: NextRequest, { params }: Params) {
       .sort(byCreatedAtDesc);
 
     const quotedJobsRaw = jobCardsRows
-      .filter((row: JobCardRow) => Boolean(row?.workshop_quote_id))
+      .filter((row: JobCardRow) => {
+        const quoteStatus = toLower(row?.workshop_quote_status);
+        return (
+          Boolean(row?.workshop_quote_id) &&
+          [
+            "pending",
+            "quoted",
+            "approved",
+            "negotiation",
+            "accepted",
+            "rejected",
+          ].includes(quoteStatus)
+        );
+      })
       .filter((row: JobCardRow) =>
         matchesQuery(q, [
           row?.id,
@@ -276,13 +327,85 @@ export async function GET(req: NextRequest, { params }: Params) {
       )
       .sort(byCreatedAtDesc);
 
-    const pendingJobStatuses = new Set(["pending", "re-assigned", "in progress", "in_progress"]);
-    const pendingJobsRaw = jobCardsRows
-      .filter((row: JobCardRow) => pendingJobStatuses.has(toLower(row?.status)))
+    const pendingQuotesRaw = estimatesRows
+      .filter((row: any) =>
+        ["pending_approval", "draft"].includes(toLower(row?.status)),
+      )
+      .filter((row: any) =>
+        matchesQuery(q, [
+          row?.id,
+          row?.status,
+          row?.branch_name,
+          row?.customer_name,
+          row?.customer_phone,
+          row?.car_plate,
+          row?.car_make,
+          row?.car_model,
+        ]),
+      )
+      .filter((row: any) =>
+        matchesDateRange(row?.created_at ?? row?.updated_at, fromTs, toTs),
+      )
+      .sort(byCreatedAtDesc);
+
+    const inProcessJcRaw = jobCardsRows
+      .filter((row: JobCardRow) => {
+        const status = toLower(row?.status);
+        const completedByTime = Boolean(row?.complete_at);
+        const completedByStatus = status === "completed";
+        if (completedByTime || completedByStatus) return false;
+        if (status === "in progress" || status === "in_progress") return true;
+        if (row?.start_at && !row?.complete_at) return true;
+        return toLower(row?.workshop_quote_status) === "accepted";
+      })
       .filter((row: JobCardRow) =>
         matchesQuery(q, [
           row?.id,
           row?.status,
+          row?.workshop_quote_status,
+          row?.branch_name,
+          row?.customer_name,
+          row?.customer_phone,
+          row?.plate_number,
+          row?.make,
+          row?.model,
+        ]),
+      )
+      .filter((row: JobCardRow) =>
+        matchesDateRange(row?.created_at ?? row?.complete_at, fromTs, toTs),
+      )
+      .sort(byCreatedAtDesc);
+
+    const completedJcRaw = jobCardsRows
+      .filter(
+        (row: JobCardRow) =>
+          toLower(row?.status) === "completed" || Boolean(row?.complete_at),
+      )
+      .filter((row: JobCardRow) =>
+        matchesQuery(q, [
+          row?.id,
+          row?.status,
+          row?.workshop_quote_status,
+          row?.branch_name,
+          row?.customer_name,
+          row?.customer_phone,
+          row?.plate_number,
+          row?.make,
+          row?.model,
+        ]),
+      )
+      .filter((row: JobCardRow) =>
+        matchesDateRange(row?.created_at ?? row?.complete_at, fromTs, toTs),
+      )
+      .sort(byCreatedAtDesc);
+
+    const verifiedJcRaw = jobCardsRows
+      .filter((row: JobCardRow) => toLower(row?.workshop_quote_status) === "verified")
+      .filter((row: JobCardRow) =>
+        matchesQuery(q, [
+          row?.id,
+          row?.status,
+          row?.workshop_quote_status,
           row?.branch_name,
           row?.customer_name,
           row?.customer_phone,
@@ -312,30 +435,90 @@ export async function GET(req: NextRequest, { params }: Params) {
       )
       .filter((row: any) => matchesDateRange(row?.created_at ?? row?.updated_at, fromTs, toTs));
 
+    const servicePendingRaw = estimatesRows
+      .filter((row: any) => toLower(row?.status) === "pending_approval")
+      .filter((row: any) =>
+        matchesQuery(q, [
+          row?.id,
+          row?.status,
+          row?.currency,
+          row?.car_plate,
+          row?.car_make,
+          row?.car_model,
+          row?.customer_name,
+          row?.customer_phone,
+          row?.branch_name,
+        ]),
+      )
+      .filter((row: any) => matchesDateRange(row?.created_at ?? row?.updated_at, fromTs, toTs))
+      .sort(byCreatedAtDesc);
+
+    const serviceCompletedRaw = estimatesRows
+      .filter((row: any) => toLower(row?.status) === "approved")
+      .filter((row: any) =>
+        matchesQuery(q, [
+          row?.id,
+          row?.status,
+          row?.currency,
+          row?.car_plate,
+          row?.car_make,
+          row?.car_model,
+          row?.customer_name,
+          row?.customer_phone,
+          row?.branch_name,
+        ]),
+      )
+      .filter((row: any) => matchesDateRange(row?.created_at ?? row?.updated_at, fromTs, toTs))
+      .sort(byCreatedAtDesc);
+
     const pendingInspections = toPaged(pendingInspectionsRaw, limit, offset);
     const completedInspections = toPaged(completedInspectionsRaw, limit, offset);
+    const verifiedInspections = toPaged(verifiedInspectionsRaw, limit, offset);
+    const pendingQuotes = toPaged(pendingQuotesRaw, limit, offset);
     const quotedJobs = toPaged(quotedJobsRaw, limit, offset);
-    const pendingJobs = toPaged(pendingJobsRaw, limit, offset);
+    const inProcessJc = toPaged(inProcessJcRaw, limit, offset);
+    const completedJc = toPaged(completedJcRaw, limit, offset);
+    const verifiedJc = toPaged(verifiedJcRaw, limit, offset);
     const estimates = toPaged(estimatesRaw, limit, offset);
+    const servicePending = toPaged(servicePendingRaw, limit, offset);
+    const serviceCompleted = toPaged(serviceCompletedRaw, limit, offset);
 
     return createMobileSuccessResponse({
       summary: {
+        pendingQuote: pendingQuotesRaw.length,
+        quotedJc: quotedJobsRaw.length,
+        inProcessJc: inProcessJcRaw.length,
+        completedJc: completedJcRaw.length,
+        verifiedJc: verifiedJcRaw.length,
         pendingInspections: pendingInspectionsRaw.length,
         completedInspections: completedInspectionsRaw.length,
-        quotedJobs: quotedJobsRaw.length,
-        pendingJobs: pendingJobsRaw.length,
+        verifiedInspections: verifiedInspectionsRaw.length,
+        servicePending: servicePendingRaw.length,
+        serviceCompleted: serviceCompletedRaw.length,
         estimates: estimatesRaw.length,
       },
+      pendingQuote: pendingQuotes.rows,
+      quotedJc: quotedJobs.rows,
+      inProcessJc: inProcessJc.rows,
+      completedJc: completedJc.rows,
+      verifiedJc: verifiedJc.rows,
       pendingInspections: pendingInspections.rows,
       completedInspections: completedInspections.rows,
-      quotedJobs: quotedJobs.rows,
-      pendingJobs: pendingJobs.rows,
+      verifiedInspections: verifiedInspections.rows,
+      servicePending: servicePending.rows,
+      serviceCompleted: serviceCompleted.rows,
       estimates: estimates.rows,
       meta: {
+        pendingQuote: toMeta(pendingQuotes.total, limit, offset),
+        quotedJc: toMeta(quotedJobs.total, limit, offset),
+        inProcessJc: toMeta(inProcessJc.total, limit, offset),
+        completedJc: toMeta(completedJc.total, limit, offset),
+        verifiedJc: toMeta(verifiedJc.total, limit, offset),
         pendingInspections: toMeta(pendingInspections.total, limit, offset),
         completedInspections: toMeta(completedInspections.total, limit, offset),
-        quotedJobs: toMeta(quotedJobs.total, limit, offset),
-        pendingJobs: toMeta(pendingJobs.total, limit, offset),
+        verifiedInspections: toMeta(verifiedInspections.total, limit, offset),
+        servicePending: toMeta(servicePending.total, limit, offset),
+        serviceCompleted: toMeta(serviceCompleted.total, limit, offset),
         estimates: toMeta(estimates.total, limit, offset),
       },
     });
