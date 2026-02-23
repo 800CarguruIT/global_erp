@@ -1,17 +1,18 @@
 import fs from "node:fs";
 import { promises as fsPromises } from "node:fs";
 import path from "node:path";
+import { getSql } from "@repo/ai-core/db";
 
 const DOCS_ROOT_CANDIDATES = [
-    path.resolve(process.cwd(), "global", "docs"),
-    path.resolve(process.cwd(), "../global", "docs"),
-    path.resolve(process.cwd(), "../../global", "docs"),
     path.resolve(process.cwd(), "docs"),
     path.resolve(process.cwd(), "../docs"),
     path.resolve(process.cwd(), "../../docs"),
+    path.resolve(process.cwd(), "global", "docs"),
+    path.resolve(process.cwd(), "../global", "docs"),
+    path.resolve(process.cwd(), "../../global", "docs"),
 ];
 
-function resolveDocsRoot(): string | null {
+export function resolveDocsRoot(): string | null {
     for (const candidate of DOCS_ROOT_CANDIDATES) {
         try {
             if (fs.existsSync(candidate) && fs.statSync(candidate).isDirectory()) {
@@ -35,9 +36,17 @@ export interface DocSummary {
 
 export interface DocDetail extends DocSummary {
     content: string;
+    currentVersionId?: string;
+    currentVersionLabel?: string;
+    currentVersionNo?: number;
 }
 
 export async function listDocs(): Promise<DocSummary[]> {
+    const fromDb = await listDocsFromDb();
+    if (fromDb) {
+        return fromDb;
+    }
+
     const root = resolveDocsRoot();
     if (!root) {
         return [];
@@ -52,6 +61,11 @@ export async function listDocs(): Promise<DocSummary[]> {
 }
 
 export async function getDocBySlug(slug: string): Promise<DocDetail | null> {
+    const fromDb = await getDocBySlugFromDb(slug);
+    if (fromDb) {
+        return fromDb;
+    }
+
     const root = resolveDocsRoot();
     if (!root) {
         return null;
@@ -65,6 +79,128 @@ export async function getDocBySlug(slug: string): Promise<DocDetail | null> {
     }
 
     return null;
+}
+
+async function listDocsFromDb(): Promise<DocSummary[] | null> {
+    try {
+        const sql = getSql();
+        const [tableCheck] = await sql<{ exists: boolean }[]>`
+            SELECT to_regclass('public.docs_pages') IS NOT NULL AS exists
+        `;
+        if (!tableCheck?.exists) {
+            return null;
+        }
+
+        const rows = await sql<{
+            slug: string;
+            title: string | null;
+            section: string | null;
+            excerpt: string | null;
+            content: string | null;
+            updated_at: string;
+            relative_path: string;
+            fallback_title: string;
+            fallback_section: string;
+            fallback_excerpt: string | null;
+            fallback_content: string;
+        }[]>`
+            SELECT
+              p.slug,
+              v.title,
+              v.section,
+              v.excerpt,
+              v.content,
+              p.updated_at,
+              p.relative_path,
+              p.title AS fallback_title,
+              p.section AS fallback_section,
+              p.excerpt AS fallback_excerpt,
+              p.content AS fallback_content
+            FROM docs_pages p
+            LEFT JOIN docs_versions v ON v.id = p.current_version_id
+            WHERE is_deleted = FALSE
+            ORDER BY p.updated_at DESC
+        `;
+
+        return rows.map((row) => ({
+            slug: row.slug,
+            title: row.title ?? row.fallback_title,
+            section: (row.section ?? row.fallback_section) || "root",
+            excerpt: row.excerpt ?? row.fallback_excerpt ?? extractExcerpt(row.content ?? row.fallback_content),
+            updatedAt: new Date(row.updated_at).toISOString(),
+            relativePath: row.relative_path,
+        }));
+    } catch {
+        return null;
+    }
+}
+
+async function getDocBySlugFromDb(slug: string): Promise<DocDetail | null> {
+    try {
+        const sql = getSql();
+        const [tableCheck] = await sql<{ exists: boolean }[]>`
+            SELECT to_regclass('public.docs_pages') IS NOT NULL AS exists
+        `;
+        if (!tableCheck?.exists) {
+            return null;
+        }
+
+        const [row] = await sql<{
+            slug: string;
+            title: string | null;
+            section: string | null;
+            excerpt: string | null;
+            content: string | null;
+            updated_at: string;
+            relative_path: string;
+            current_version_id: string | null;
+            version_label: string | null;
+            version_no: number | null;
+            fallback_title: string;
+            fallback_section: string;
+            fallback_excerpt: string | null;
+            fallback_content: string;
+        }[]>`
+            SELECT
+              p.slug,
+              v.title,
+              v.section,
+              v.excerpt,
+              v.content,
+              p.updated_at,
+              p.relative_path,
+              p.current_version_id,
+              v.version_label,
+              v.version_no,
+              p.title AS fallback_title,
+              p.section AS fallback_section,
+              p.excerpt AS fallback_excerpt,
+              p.content AS fallback_content
+            FROM docs_pages p
+            LEFT JOIN docs_versions v ON v.id = p.current_version_id
+            WHERE p.slug = ${slug} AND p.is_deleted = FALSE
+            LIMIT 1
+        `;
+
+        if (!row) {
+            return null;
+        }
+
+        return {
+            slug: row.slug,
+            title: row.title ?? row.fallback_title,
+            section: (row.section ?? row.fallback_section) || "root",
+            excerpt: row.excerpt ?? row.fallback_excerpt ?? extractExcerpt(row.content ?? row.fallback_content),
+            updatedAt: new Date(row.updated_at).toISOString(),
+            relativePath: row.relative_path,
+            content: row.content ?? row.fallback_content,
+            currentVersionId: row.current_version_id ?? undefined,
+            currentVersionLabel: row.version_label ?? undefined,
+            currentVersionNo: row.version_no ?? undefined,
+        };
+    } catch {
+        return null;
+    }
 }
 
 async function buildDocEntry(root: string, relativePath: string): Promise<DocSummary>;
@@ -127,7 +263,7 @@ async function collectMarkdownFiles(root: string, relativeDir: string): Promise<
     return results;
 }
 
-function makeDocSlug(relativePath: string): string {
+export function makeDocSlug(relativePath: string): string {
     const normalized = relativePath.replace(/\\/g, "/").replace(/\.md$/i, "");
     const slug = normalized
         .split("/")
@@ -137,7 +273,7 @@ function makeDocSlug(relativePath: string): string {
     return slug || "doc";
 }
 
-function slugify(value: string): string {
+export function slugify(value: string): string {
     return value
         .toLowerCase()
         .replace(/[\s_]+/g, "-")

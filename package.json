@@ -7,7 +7,9 @@
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types",
+    "db:migrate": "ts-node --transpile-only --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" packages/ai-core/scripts/migrate.ts",
     "db:seed": "ts-node --transpile-only --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" packages/ai-core/scripts/seed.ts",
+    "db:seed:docs": "ts-node --transpile-only --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" packages/ai-core/scripts/seed-docs.ts",
     "db:bootstrap:minimal": "ts-node --transpile-only --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" packages/ai-core/scripts/bootstrap-minimal.ts"
   },
   "devDependencies": {

@@ -1,4 +1,4 @@
-﻿## Business / Theoretical Document
+## Business / Theoretical Document
 
 ### What is a module?
 A module is a cohesive business area within Global ERP, encapsulating a set of capabilities (e.g., Leads, Inventory, Workshop, Accounting) that solve a distinct operational need. Each module houses its own data structures, workflows, and user journeys, while aligning with shared global services such as authentication, permissions, and reporting.
@@ -9,5 +9,5 @@ Modules exchange data through well-defined APIs, shared catalogs, and standardiz
 ### Measuring module health
 Track adoption metrics (users, transactions, automation rate) alongside quality signals (bug count, regression risk) to decide when a module needs investment. Document assumptions, dependencies, and caveats for each module so product and operations teams can plan releases with confidence.
 
-### Governance & evolution
+### Operations Control & evolution
 Module owners maintain a living charter, aligning with global standards (security, compliance, localization). When a module grows beyond a single bounded context, split it into smaller domains or introduce feature flags so migration stays safe. Document all architectural decisions in this knowledge base for future contributors.

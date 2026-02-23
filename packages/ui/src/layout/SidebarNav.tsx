@@ -16,6 +16,32 @@ const GLOBAL_SUBTITLES = [
   })),
 ];
 
+const COMPANY_SESSIONS = DOCUMENTATION_STRUCTURE.find((chapter) => chapter.key === "company")?.sessions ?? [];
+const COMPANY_SUBTITLES = [
+  { label: "Overview", href: COMPANY_SESSIONS[0] ? `/global/docs/${COMPANY_SESSIONS[0].slug}` : "/global/docs" },
+  ...COMPANY_SESSIONS.map((session) => ({
+    label: session.title,
+    href: `/global/docs/${session.slug}`,
+  })),
+];
+const getChapterSubtitles = (key: string) => {
+  if (key === "global") {
+    return GLOBAL_SUBTITLES;
+  }
+  if (key === "company") {
+    return COMPANY_SUBTITLES;
+  }
+  const sessions = DOCUMENTATION_STRUCTURE.find((chapter) => chapter.key === key)?.sessions ?? [];
+  const firstHref = sessions[0] ? `/global/docs/${sessions[0].slug}` : "/global/docs";
+  return [
+    { label: "Overview", href: firstHref },
+    ...sessions.map((session) => ({
+      label: session.title,
+      href: `/global/docs/${session.slug}`,
+    })),
+  ];
+};
+
 function getCookieValue(name: string): string | null {
   if (typeof document === "undefined") return null;
   const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
@@ -54,7 +80,7 @@ export function SidebarNav({
   const isDocsRoute = currentPathname.startsWith("/global/docs");
   if (isDocsRoute) {
     return (
-    <div className="mx-auto flex gap-6">
+    <div className="mx-auto flex w-full max-w-[1720px] gap-6">
       <aside className="w-64 shrink-0">
         <DocsSidebar currentPathname={currentPathname} />
       </aside>
@@ -642,6 +668,14 @@ function DocsSidebar({ currentPathname }: { currentPathname: string }) {
     [DOCUMENTATION_STRUCTURE[0]?.key ?? ""]: true,
   }));
 
+  useEffect(() => {
+    const activeChapter = DOCUMENTATION_STRUCTURE.find((chapter) =>
+      chapter.sessions.some((session) => currentPathname === `/global/docs/${session.slug}`)
+    );
+    if (!activeChapter) return;
+    setOpenChapters((prev) => ({ ...prev, [activeChapter.key]: true }));
+  }, [currentPathname]);
+
   const toggleChapter = (key: string) => {
     setOpenChapters((prev) => ({ ...prev, [key]: !prev[key] }));
   };
@@ -650,8 +684,8 @@ function DocsSidebar({ currentPathname }: { currentPathname: string }) {
     <nav className="relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-slate-950/85 via-slate-900/70 to-slate-950/85 p-4 text-sm shadow-[0_24px_60px_-32px_rgba(15,23,42,0.85)]">
       <div className="relative mb-4 flex items-center justify-between gap-3">
         <div>
-          <p className="text-[10px] uppercase tracking-[0.2em] text-white/50">Documentation</p>
-          <p className="text-xs text-white/70">Global system handbook</p>
+          <p className="text-[10px] uppercase tracking-[0.16em] text-white/60">Documentation</p>
+          <p className="text-xs text-white/85">Global system handbook</p>
         </div>
         <Link
           href="/global"
@@ -671,29 +705,16 @@ function DocsSidebar({ currentPathname }: { currentPathname: string }) {
                 onClick={() => toggleChapter(chapter.key)}
                 className="flex w-full flex-col items-start gap-1 text-left"
               >
-                <span className="text-sm font-semibold uppercase tracking-[0.2em] text-white">{chapter.title}</span>
-                <span className="text-[10px] uppercase tracking-[0.2em] text-white/50">{chapter.tagline}</span>
+                <span className="text-sm font-semibold uppercase tracking-[0.16em] text-white">{chapter.title}</span>
+                <span className="text-[10px] uppercase tracking-[0.14em] text-white/65">{chapter.tagline}</span>
               </button>
-              {chapter.key === "global" && isOpen && (
+              {isOpen && (
                 <div className="mt-3 space-y-2">
-                  {GLOBAL_SUBTITLES.map((subtitle) => (
+                  {getChapterSubtitles(chapter.key).map((subtitle) => (
                     <DocNavItem
                       key={subtitle.label}
                       href={subtitle.href}
                       label={subtitle.label}
-                      currentPathname={currentPathname}
-                    />
-                  ))}
-                </div>
-              )}
-              {isOpen && chapter.key !== "global" && (
-                <div className="mt-3 space-y-1">
-                  {chapter.sessions.map((session) => (
-                    <DocNavItem
-                      key={session.slug}
-                      href={`/global/docs/${session.slug}`}
-                      label={session.title}
-                      badge={session.badge}
                       currentPathname={currentPathname}
                     />
                   ))}
@@ -718,22 +739,27 @@ function DocNavItem({
   badge?: string;
   currentPathname: string;
 }) {
-  const active = currentPathname === href || currentPathname.startsWith(`${href}/`);
+  const active =
+    href === "/global/docs"
+      ? currentPathname === href
+      : currentPathname === href || currentPathname.startsWith(`${href}/`);
   return (
     <Link
       href={href}
-      className={`group relative flex items-center gap-3 rounded-2xl border border-white/10 bg-black/40 px-3 py-2 text-sm font-semibold uppercase tracking-[0.15em] text-white transition hover:border-white/50 ${
-        active ? "bg-white/[0.08]" : ""
+      className={`group relative flex items-center gap-3 rounded-2xl border px-3 py-2 text-sm font-semibold uppercase tracking-[0.12em] text-white transition duration-200 ${
+        active
+          ? "border-primary/60 bg-primary/20 text-white shadow-[inset_0_0_0_1px_rgba(16,185,129,0.35)]"
+          : "border-white/10 bg-black/40 hover:border-white/50 hover:bg-white/[0.06]"
       }`}
     >
       <span
         className={`h-6 w-1 rounded-full transition ${
-          active ? "bg-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.8)]" : "bg-white/25 group-hover:bg-white/40"
+          active ? "bg-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.8)]" : "bg-white/30 group-hover:bg-white/55"
         }`}
       />
       <span className="flex-1 text-left">{label}</span>
       {badge && (
-        <span className="rounded-full border border-white/20 px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+        <span className="rounded-full border border-white/25 px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-white/80">
           {badge}
         </span>
       )}
