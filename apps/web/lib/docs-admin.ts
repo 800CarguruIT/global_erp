@@ -361,32 +361,62 @@ async function createVersion(page: DbDocRow, input: {
 export async function readActionLogs(limit = 100): Promise<DocActionLog[]> {
   if (!(await docsTableReady())) return [];
   const sql = getSql();
-  const rows = await sql<{
-    id: string;
-    action: DocActionType;
-    slug: string;
-    title: string;
-    relative_path: string;
-    details: string | null;
-    created_at: string;
-    version_id: string | null;
-  }[]>`
-    SELECT id, action, slug, title, relative_path, details, created_at, version_id
-    FROM docs_action_logs
-    ORDER BY created_at DESC
-    LIMIT ${Math.max(1, Math.min(limit, 500))}
-  `;
+  const safeLimit = Math.max(1, Math.min(limit, 500));
 
-  return rows.map((row) => ({
-    id: row.id,
-    action: row.action,
-    slug: row.slug,
-    title: row.title,
-    relativePath: row.relative_path,
-    details: row.details ?? undefined,
-    createdAt: new Date(row.created_at).toISOString(),
-    versionId: row.version_id ?? undefined,
-  }));
+  try {
+    const rows = await sql<{
+      id: string;
+      action: DocActionType;
+      slug: string;
+      title: string;
+      relative_path: string;
+      details: string | null;
+      created_at: string;
+      version_id: string | null;
+    }[]>`
+      SELECT id, action, slug, title, relative_path, details, created_at, version_id
+      FROM docs_action_logs
+      ORDER BY created_at DESC
+      LIMIT ${safeLimit}
+    `;
+
+    return rows.map((row) => ({
+      id: row.id,
+      action: row.action,
+      slug: row.slug,
+      title: row.title,
+      relativePath: row.relative_path,
+      details: row.details ?? undefined,
+      createdAt: new Date(row.created_at).toISOString(),
+      versionId: row.version_id ?? undefined,
+    }));
+  } catch {
+    // Backward compatibility before docs versioning migration is applied.
+    const rows = await sql<{
+      id: string;
+      action: "create" | "edit" | "delete";
+      slug: string;
+      title: string;
+      relative_path: string;
+      details: string | null;
+      created_at: string;
+    }[]>`
+      SELECT id, action, slug, title, relative_path, details, created_at
+      FROM docs_action_logs
+      ORDER BY created_at DESC
+      LIMIT ${safeLimit}
+    `;
+
+    return rows.map((row) => ({
+      id: row.id,
+      action: row.action,
+      slug: row.slug,
+      title: row.title,
+      relativePath: row.relative_path,
+      details: row.details ?? undefined,
+      createdAt: new Date(row.created_at).toISOString(),
+    }));
+  }
 }
 
 export async function listDocVersions(

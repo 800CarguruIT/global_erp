@@ -246,7 +246,16 @@ export function DocsIndexClient({ docs }: { docs: DocSummary[] }) {
     setError(null);
     try {
       const res = await fetch("/api/global/docs/export/pdf");
-      if (!res.ok) throw new Error("Failed to export PDF.");
+      if (!res.ok) {
+        let message = "Failed to export PDF.";
+        try {
+          const json = (await res.json()) as { error?: string };
+          if (json?.error) message = json.error;
+        } catch {
+          // ignore non-json failures
+        }
+        throw new Error(message);
+      }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");

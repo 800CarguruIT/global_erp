@@ -11,6 +11,9 @@ export async function GET(
   const limit = Number.isFinite(Number(limitRaw)) ? Number(limitRaw) : 50;
   const result = await listDocVersions(slug, limit);
   if (!result.ok) {
+    if (result.error === "docs_versions_unavailable") {
+      return NextResponse.json({ data: [], unavailable: true });
+    }
     const status = result.error === "doc_not_found" ? 404 : result.error === "docs_versions_unavailable" ? 503 : 400;
     return NextResponse.json({ error: result.error }, { status });
   }

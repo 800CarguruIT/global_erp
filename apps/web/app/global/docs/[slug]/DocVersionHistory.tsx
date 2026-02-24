@@ -20,14 +20,21 @@ export function DocVersionHistory({ slug }: { slug: string }) {
   const [saving, setSaving] = useState(false);
   const [versions, setVersions] = useState<DocVersion[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [unavailable, setUnavailable] = useState(false);
 
   const loadVersions = async () => {
     setLoading(true);
     setError(null);
+    setUnavailable(false);
     try {
       const res = await fetch(`/api/global/docs/${slug}/versions?limit=20`, { cache: "no-store" });
-      const json = (await res.json()) as { data?: DocVersion[]; error?: string };
+      const json = (await res.json()) as { data?: DocVersion[]; error?: string; unavailable?: boolean };
       if (!res.ok) throw new Error(json.error ?? "Failed to load versions.");
+      if (json.unavailable) {
+        setUnavailable(true);
+        setVersions([]);
+        return;
+      }
       setVersions(Array.isArray(json.data) ? json.data : []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load versions.");
@@ -82,7 +89,14 @@ export function DocVersionHistory({ slug }: { slug: string }) {
       </div>
       {loading ? <p className="text-sm text-muted-foreground">Loading versions...</p> : null}
       {error ? <p className="text-xs text-red-300">{error}</p> : null}
-      {!loading && versions.length === 0 ? <p className="text-sm text-muted-foreground">No versions yet.</p> : null}
+      {!loading && unavailable ? (
+        <p className="text-xs text-muted-foreground">
+          Version history is currently unavailable until docs versioning migration is applied.
+        </p>
+      ) : null}
+      {!loading && !unavailable && versions.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No versions yet.</p>
+      ) : null}
       <div className="space-y-2">
         {versions.map((version) => (
           <div key={version.id} className="rounded-lg border border-white/10 bg-white/[0.02] p-2">

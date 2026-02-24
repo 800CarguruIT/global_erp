@@ -132,6 +132,13 @@ export const DOCUMENTATION_STRUCTURE: DocChapter[] = [
         badge: "Quotes",
       },
       {
+        slug: "recovery-request-web-view",
+        title: "Recovery Request",
+        description:
+          "Create and manage recovery requests from company operations screens.",
+        badge: "Recovery",
+      },
+      {
         slug: "company-admin-roles",
         title: "Admin roles reference",
         description:
@@ -268,6 +275,13 @@ export const DOCUMENTATION_STRUCTURE: DocChapter[] = [
         title: "Procurement",
         description: "Company procurement module endpoints for app clients.",
         badge: "Procurement",
+      },
+      {
+        slug: "recovery-request-api",
+        title: "Recovery Request API",
+        description:
+          "API contracts for creating, assigning, tracking, and closing recovery requests.",
+        badge: "Recovery",
       },
       {
         slug: "app-api-company-accounting",
