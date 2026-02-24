@@ -1,8 +1,10 @@
 import { NextRequest } from "next/server";
 import { getSql } from "@repo/ai-core/db";
+import { createEstimateFromInspection } from "@repo/ai-core/workshop/estimates/repository";
 import { requireMobileUserId } from "@/lib/auth/mobile-auth";
 import { ensureCompanyAccess } from "@/lib/auth/mobile-company";
 import {
+  createMobileErrorResponse,
   createMobileSuccessResponse,
   handleMobileError,
 } from "@/app/api/mobile/utils";
@@ -135,6 +137,36 @@ export async function GET(req: NextRequest, { params }: Params) {
     });
   } catch (error) {
     console.error("GET /api/mobile/company/[companyId]/workshop/estimates error:", error);
+    return handleMobileError(error);
+  }
+}
+
+export async function POST(req: NextRequest, { params }: Params) {
+  try {
+    const userId = requireMobileUserId(req);
+    const { companyId } = await params;
+    await ensureCompanyAccess(userId, companyId);
+
+    const body = await req.json().catch(() => ({}));
+    const inspectionId = String(body?.inspectionId ?? "").trim();
+
+    if (!inspectionId) {
+      return createMobileErrorResponse("inspectionId required", 400);
+    }
+
+    const estimate = await createEstimateFromInspection(companyId, inspectionId);
+
+    return createMobileSuccessResponse(
+      {
+        estimate,
+      },
+      201,
+    );
+  } catch (error) {
+    console.error(
+      "POST /api/mobile/company/[companyId]/workshop/estimates error:",
+      error,
+    );
     return handleMobileError(error);
   }
 }
