@@ -15,6 +15,23 @@
 | --- | --- | --- |
 | Get Accounting Summary | GET | `/api/company/{companyId}/accounting/summary` |
 
+## Implemented Requests (Current Route Handlers)
+
+| Endpoint | Methods |
+| --- | --- |
+| `/api/company/{companyId}/accounting/summary` | `GET` |
+| `/api/company/{companyId}/accounting/accounts` | `GET`, `POST` |
+| `/api/company/{companyId}/accounting/journals` | `GET`, `POST` |
+| `/api/company/{companyId}/accounting/journals/{id}` | `GET`, `PATCH`, `PUT` |
+| `/api/company/{companyId}/accounting/trial-balance` | `GET` |
+| `/api/company/{companyId}/accounting/pnl` | `GET` |
+| `/api/company/{companyId}/accounting/balance-sheet` | `GET` |
+| `/api/company/{companyId}/accounting/cashflow` | `GET` |
+| `/api/company/{companyId}/accounting/account-statement` | `GET` |
+| `/api/company/{companyId}/accounting/config` | `GET`, `PATCH` |
+| `/api/company/{companyId}/accounting/ai-summary` | `GET` |
+| `/api/company/{companyId}/accounting/chart-of-accounts/pdf` | `GET` |
+
 ## Workflow Sequence
 
 `Operational Entries -> Journal Lines -> Summary Metrics -> Ledger Preview`

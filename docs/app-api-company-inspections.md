@@ -16,6 +16,15 @@
 | List Inspections | GET | `/api/company/{companyId}/workshop/inspections` |
 | Create Inspection | POST | `/api/company/{companyId}/workshop/inspections` |
 
+## Implemented Requests (Current Route Handlers)
+
+| Endpoint | Methods |
+| --- | --- |
+| `/api/company/{companyId}/workshop/inspections` | `GET`, `POST` |
+| `/api/company/{companyId}/workshop/inspections/{inspectionId}` | `GET`, `PATCH` |
+| `/api/company/{companyId}/workshop/inspections/{inspectionId}/line-items` | `GET`, `POST`, `PATCH` |
+| `/api/company/{companyId}/workshop/inspections/{inspectionId}/line-items/{lineItemId}` | `PATCH`, `DELETE` |
+
 ## Workflow Sequence
 
 `Lead/Car -> Create Inspection -> Capture Findings -> Return Inspection`

@@ -15,6 +15,36 @@
 | --- | --- | --- |
 | Get Stock | GET | `/api/company/{companyId}/workshop/inventory/stock` |
 
+## Implemented Requests (Current Route Handlers)
+
+| Endpoint | Methods |
+| --- | --- |
+| `/api/company/{companyId}/inventory/products-tree` | `GET` |
+| `/api/company/{companyId}/workshop/inventory/stock` | `GET` |
+| `/api/company/{companyId}/workshop/inventory/movements` | `GET` |
+| `/api/company/{companyId}/workshop/inventory/ai-summary` | `GET` |
+| `/api/company/{companyId}/workshop/inventory/manual/receive` | `POST` |
+| `/api/company/{companyId}/workshop/inventory/manual/issue` | `POST` |
+| `/api/company/{companyId}/workshop/inventory/parts` | `GET`, `POST` |
+| `/api/company/{companyId}/workshop/inventory/parts/{partId}` | `PATCH`, `DELETE` |
+| `/api/company/{companyId}/workshop/inventory/locations` | `GET`, `POST`, `PATCH`, `DELETE` |
+| `/api/company/{companyId}/workshop/inventory/transfers` | `GET`, `POST` |
+| `/api/company/{companyId}/workshop/inventory/transfers/{transferId}` | `GET`, `PATCH` |
+| `/api/company/{companyId}/workshop/inventory/order-requests` | `GET`, `POST` |
+| `/api/company/{companyId}/workshop/inventory/order-requests/{requestId}` | `PATCH`, `DELETE` |
+| `/api/company/{companyId}/workshop/inventory/types` | `GET`, `POST` |
+| `/api/company/{companyId}/workshop/inventory/types/{typeId}` | `PATCH`, `DELETE` |
+| `/api/company/{companyId}/workshop/inventory/categories` | `GET`, `POST` |
+| `/api/company/{companyId}/workshop/inventory/categories/{categoryId}` | `PATCH`, `DELETE` |
+| `/api/company/{companyId}/workshop/inventory/subcategories` | `GET`, `POST` |
+| `/api/company/{companyId}/workshop/inventory/subcategories/{subcategoryId}` | `PATCH`, `DELETE` |
+| `/api/company/{companyId}/workshop/inventory/makes` | `GET`, `POST` |
+| `/api/company/{companyId}/workshop/inventory/makes/{makeId}` | `PATCH`, `DELETE` |
+| `/api/company/{companyId}/workshop/inventory/models` | `GET`, `POST` |
+| `/api/company/{companyId}/workshop/inventory/models/{modelId}` | `PATCH`, `DELETE` |
+| `/api/company/{companyId}/workshop/inventory/years` | `GET`, `POST` |
+| `/api/company/{companyId}/workshop/inventory/years/{yearId}` | `PATCH`, `DELETE` |
+
 ## Workflow Sequence
 
 `Receive/Issue/Transfer Movements -> Query Stock -> Return Filtered Availability`

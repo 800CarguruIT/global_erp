@@ -16,6 +16,14 @@
 | List Estimates | GET | `/api/company/{companyId}/workshop/estimates` |
 | Create Estimate | POST | `/api/company/{companyId}/workshop/estimates` |
 
+## Implemented Requests (Current Route Handlers)
+
+| Endpoint | Methods |
+| --- | --- |
+| `/api/company/{companyId}/workshop/estimates` | `GET`, `POST` |
+| `/api/company/{companyId}/workshop/estimates/{estimateId}` | `GET`, `PATCH` |
+| `/api/company/{companyId}/workshop/estimates/{estimateId}/quote` | `GET` |
+
 ## Workflow Sequence
 
 `Approved Inspection -> Create Estimate -> Calculate Totals -> Return Estimate`

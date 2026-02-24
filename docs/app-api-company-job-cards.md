@@ -16,6 +16,14 @@
 | Get Job Cards | GET | `/api/company/{companyId}/workshop/job-cards` |
 | Create Job Card | POST | `/api/company/{companyId}/workshop/job-cards` |
 
+## Implemented Requests (Current Route Handlers)
+
+| Endpoint | Methods |
+| --- | --- |
+| `/api/company/{companyId}/workshop/job-cards` | `GET`, `POST` |
+| `/api/company/{companyId}/workshop/job-cards/{jobCardId}` | `GET`, `PATCH` |
+| `/api/company/{companyId}/workshop/job-cards/{jobCardId}/line-items/{lineItemId}` | `PATCH` |
+
 ## Workflow Sequence
 
 `Estimate -> Create Job Card -> Attach Approved Line Items -> Track Status`

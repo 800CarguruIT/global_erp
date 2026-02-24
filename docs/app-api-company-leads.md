@@ -16,6 +16,19 @@
 | List Leads | GET | `/api/company/{companyId}/crm/leads` |
 | Create Lead | POST | `/api/company/{companyId}/crm/leads` |
 
+## Implemented Requests (Current Route Handlers)
+
+| Endpoint | Methods |
+| --- | --- |
+| `/api/company/{companyId}/crm/leads` | `GET`, `POST`, `DELETE` |
+| `/api/company/{companyId}/crm/leads/{leadId}` | `GET`, `PATCH`, `DELETE` |
+| `/api/company/{companyId}/crm/leads/{leadId}/events` | `GET` |
+| `/api/company/{companyId}/sales/leads` | `GET`, `POST`, `DELETE` |
+| `/api/company/{companyId}/sales/leads/{id}` | `GET`, `PUT`, `DELETE` |
+| `/api/company/{companyId}/sales/leads/{id}/car-check` | `POST` |
+| `/api/company/{companyId}/sales/leads/{id}/customer-visibility` | `POST` |
+| `/api/company/{companyId}/sales/leads/{id}/request-customer` | `POST` |
+
 ## Workflow Sequence
 
 `Customer/Car Input -> Create Lead -> Append Event -> Return Lead`

@@ -16,6 +16,24 @@
 | List Purchase Orders | GET | `/api/company/{companyId}/workshop/procurement` |
 | Create Purchase Order | POST | `/api/company/{companyId}/workshop/procurement` |
 
+## Implemented Requests (Current Route Handlers)
+
+| Endpoint | Methods |
+| --- | --- |
+| `/api/company/{companyId}/workshop/procurement` | `GET`, `POST` |
+| `/api/company/{companyId}/workshop/procurement/{poId}` | `GET`, `PATCH` |
+| `/api/company/{companyId}/workshop/procurement/{poId}/receive` | `POST` |
+| `/api/company/{companyId}/workshop/procurement/{poId}/reconcile-grn` | `POST` |
+| `/api/company/{companyId}/workshop/procurement/{poId}/move-to-inventory` | `POST` |
+| `/api/company/{companyId}/workshop/procurement/{poId}/grn/pdf` | `GET` |
+| `/api/company/{companyId}/workshop/procurement/next-po-number` | `GET` |
+| `/api/company/{companyId}/workshop/procurement/ai-summary` | `GET` |
+| `/api/company/{companyId}/part-quotes` | `GET` |
+| `/api/company/{companyId}/part-quotes/order` | `POST` |
+| `/api/company/{companyId}/vendors/{vendorId}/inquiries` | `GET` |
+| `/api/company/{companyId}/vendors/{vendorId}/inquiries/{estimateId}/parts` | `GET` |
+| `/api/company/{companyId}/vendors/{vendorId}/bids` | `GET` |
+
 ## Workflow Sequence
 
 `Inquiry/Quote -> PO Create -> Order -> Receive -> Reconcile`
