@@ -19,10 +19,11 @@ type OrderedDoc = DbDoc & {
   orderChapter: string;
 };
 
-type RenderLine = {
-  text: string;
-  kind: "h1" | "h2" | "h3" | "body" | "list" | "code";
-};
+type TextKind = "h1" | "h2" | "h3" | "body" | "list";
+type RenderBlock =
+  | { kind: "text"; text: string; textKind: TextKind }
+  | { kind: "code"; lines: string[]; language: string | null }
+  | { kind: "table"; header: string[]; rows: string[][] };
 
 type TocRow = {
   label: string;
@@ -60,59 +61,89 @@ function normalizeInline(text: string) {
   return toPdfSafeText(cleaned);
 }
 
-function parseMarkdownToLines(content: string): RenderLine[] {
+function parseTableCells(line: string): string[] | null {
+  const trimmed = line.trim();
+  if (!trimmed.includes("|")) return null;
+  if (trimmed.startsWith("|")) {
+    const cells = trimmed
+      .slice(1, trimmed.endsWith("|") ? -1 : undefined)
+      .split("|")
+      .map((cell) => normalizeInline(cell.trim()));
+    return cells.length ? cells : null;
+  }
+  return trimmed
+    .split("|")
+    .map((cell) => normalizeInline(cell.trim()))
+    .filter(Boolean).length
+    ? trimmed.split("|").map((cell) => normalizeInline(cell.trim()))
+    : null;
+}
+
+function isTableSeparatorRow(cells: string[]) {
+  if (!cells.length) return false;
+  return cells.every((cell) => /^:?-{3,}:?$/.test(cell.replace(/\s+/g, "")));
+}
+
+function parseMarkdownToBlocks(content: string): RenderBlock[] {
   const lines = content.replace(/\r\n/g, "\n").split("\n");
-  const output: RenderLine[] = [];
-  let inCode = false;
+  const output: RenderBlock[] = [];
+  let i = 0;
 
-  for (const raw of lines) {
+  while (i < lines.length) {
+    const raw = lines[i] ?? "";
     const trimmed = raw.trim();
-    if (trimmed.startsWith("```")) {
-      inCode = !inCode;
-      continue;
-    }
 
-    if (inCode) {
-      output.push({ text: toPdfSafeText(raw, true), kind: "code" });
+    if (trimmed.startsWith("```")) {
+      const language = trimmed.slice(3).trim().toLowerCase() || null;
+      const codeLines: string[] = [];
+      i += 1;
+      while (i < lines.length && !(lines[i] ?? "").trim().startsWith("```")) {
+        codeLines.push(toPdfSafeText(lines[i] ?? "", true));
+        i += 1;
+      }
+      output.push({ kind: "code", lines: codeLines, language });
+      i += 1;
       continue;
     }
 
     if (!trimmed) {
-      output.push({ text: "", kind: "body" });
+      output.push({ kind: "text", text: "", textKind: "body" });
+      i += 1;
+      continue;
+    }
+
+    const tableHeader = parseTableCells(trimmed);
+    const tableSeparator = i + 1 < lines.length ? parseTableCells((lines[i + 1] ?? "").trim()) : null;
+    if (tableHeader && tableSeparator && isTableSeparatorRow(tableSeparator)) {
+      const rows: string[][] = [];
+      i += 2;
+      while (i < lines.length) {
+        const rowCells = parseTableCells((lines[i] ?? "").trim());
+        if (!rowCells || isTableSeparatorRow(rowCells)) break;
+        rows.push(rowCells);
+        i += 1;
+      }
+      output.push({ kind: "table", header: tableHeader, rows });
       continue;
     }
 
     const heading = trimmed.match(/^(#{1,6})\s+(.*)$/);
     if (heading) {
       const level = heading[1].length;
-      output.push({
-        text: normalizeInline(heading[2]),
-        kind: level <= 1 ? "h1" : level === 2 ? "h2" : "h3",
-      });
+      output.push({ kind: "text", text: normalizeInline(heading[2]), textKind: level <= 1 ? "h1" : level === 2 ? "h2" : "h3" });
+      i += 1;
       continue;
     }
 
     const list = trimmed.match(/^([-*+]|\d+\.)\s+(.*)$/);
     if (list) {
-      output.push({ text: `- ${normalizeInline(list[2])}`, kind: "list" });
+      output.push({ kind: "text", text: `- ${normalizeInline(list[2])}`, textKind: "list" });
+      i += 1;
       continue;
     }
 
-    if (trimmed.includes("|")) {
-      const tableLike = trimmed
-        .replace(/^\|/, "")
-        .replace(/\|$/, "")
-        .split("|")
-        .map((cell) => normalizeInline(cell))
-        .filter(Boolean)
-        .join(" | ");
-      if (tableLike.replace(/[-:| ]/g, "")) {
-        output.push({ text: tableLike, kind: "code" });
-      }
-      continue;
-    }
-
-    output.push({ text: normalizeInline(trimmed), kind: "body" });
+    output.push({ kind: "text", text: normalizeInline(trimmed), textKind: "body" });
+    i += 1;
   }
 
   return output;
@@ -139,12 +170,29 @@ function wrapText(text: string, font: PDFFont, size: number, maxWidth: number): 
   return lines;
 }
 
-function metrics(kind: RenderLine["kind"]) {
+function metrics(kind: TextKind) {
   if (kind === "h1") return { size: 20, gap: 8 };
   if (kind === "h2") return { size: 16, gap: 7 };
   if (kind === "h3") return { size: 13, gap: 6 };
-  if (kind === "code") return { size: 9, gap: 4 };
   return { size: 10.5, gap: 4 };
+}
+
+function wrapCodeLine(text: string, font: PDFFont, size: number, maxWidth: number): string[] {
+  const safe = toPdfSafeText(text, true);
+  if (!safe) return [""];
+  const out: string[] = [];
+  let cursor = "";
+  for (let i = 0; i < safe.length; i += 1) {
+    const next = cursor + safe[i];
+    if (font.widthOfTextAtSize(next, size) <= maxWidth) {
+      cursor = next;
+    } else {
+      out.push(cursor);
+      cursor = safe[i];
+    }
+  }
+  out.push(cursor);
+  return out;
 }
 
 function drawWrapped(params: {
@@ -441,26 +489,140 @@ export async function GET() {
       });
       y = metaDraw.y - 6;
 
-      const lines = parseMarkdownToLines(doc.content || "");
-      for (const line of lines) {
-        const spec = metrics(line.kind);
-        const font = line.kind === "h1" || line.kind === "h2" || line.kind === "h3" ? bold : line.kind === "code" ? mono : regular;
-        const wrapped = wrapText(line.text || " ", font, spec.size, PAGE.width - PAGE.marginX * 2);
-        const needed = wrapped.length * (spec.size + spec.gap);
-        if (y - needed < PAGE.contentBottom) {
-          page = pdf.addPage([PAGE.width, PAGE.height]);
-          y = PAGE.contentTop;
+      const blocks = parseMarkdownToBlocks(doc.content || "");
+      for (const block of blocks) {
+        if (block.kind === "text") {
+          const spec = metrics(block.textKind);
+          const font = block.textKind === "h1" || block.textKind === "h2" || block.textKind === "h3" ? bold : regular;
+          const wrapped = wrapText(block.text || " ", font, spec.size, PAGE.width - PAGE.marginX * 2);
+          const needed = wrapped.length * (spec.size + spec.gap);
+          if (y - needed < PAGE.contentBottom) {
+            page = pdf.addPage([PAGE.width, PAGE.height]);
+            y = PAGE.contentTop;
+          }
+          const drawn = drawWrapped({
+            page,
+            text: block.text,
+            font,
+            size: spec.size,
+            gap: spec.gap,
+            y,
+            color: rgb(0.08, 0.08, 0.08),
+          });
+          y = drawn.y;
+          continue;
         }
-        const drawn = drawWrapped({
-          page,
-          text: line.text,
-          font,
-          size: spec.size,
-          gap: spec.gap,
-          y,
-          color: line.kind === "code" ? rgb(0.2, 0.2, 0.2) : rgb(0.08, 0.08, 0.08),
+
+        if (block.kind === "code") {
+          const codeSize = 9;
+          const codeGap = 3;
+          const codePadX = 8;
+          const codePadY = 7;
+          const maxTextWidth = PAGE.width - PAGE.marginX * 2 - codePadX * 2;
+          const flattened = (block.lines.length ? block.lines : [""]).flatMap((line) =>
+            wrapCodeLine(line, mono, codeSize, maxTextWidth)
+          );
+          const contentHeight = Math.max(1, flattened.length) * (codeSize + codeGap) - codeGap;
+          const boxHeight = contentHeight + codePadY * 2;
+          if (y - boxHeight < PAGE.contentBottom) {
+            page = pdf.addPage([PAGE.width, PAGE.height]);
+            y = PAGE.contentTop;
+          }
+
+          const boxBottom = y - boxHeight;
+          page.drawRectangle({
+            x: PAGE.marginX,
+            y: boxBottom,
+            width: PAGE.width - PAGE.marginX * 2,
+            height: boxHeight,
+            color: rgb(0.94, 0.94, 0.94),
+            borderColor: rgb(0.82, 0.82, 0.82),
+            borderWidth: 0.8,
+          });
+
+          let codeY = y - codePadY - codeSize;
+          for (const line of flattened) {
+            page.drawText(toPdfSafeText(line, true), {
+              x: PAGE.marginX + codePadX,
+              y: codeY,
+              size: codeSize,
+              font: mono,
+              color: rgb(0.18, 0.18, 0.18),
+            });
+            codeY -= codeSize + codeGap;
+          }
+          y = boxBottom - 8;
+          continue;
+        }
+
+        const columnCount = Math.max(
+          block.header.length,
+          ...block.rows.map((row) => row.length)
+        );
+        const tableRows = [block.header, ...block.rows].map((row) => {
+          const normalized = [...row];
+          while (normalized.length < columnCount) normalized.push("");
+          return normalized;
         });
-        y = drawn.y;
+        const cellPadX = 6;
+        const cellPadY = 5;
+        const cellGap = 2.5;
+        const headerFontSize = 9.5;
+        const bodyFontSize = 9;
+        const tableWidth = PAGE.width - PAGE.marginX * 2;
+        const colWidth = tableWidth / Math.max(1, columnCount);
+
+        const drawTableRow = (cells: string[], isHeader: boolean) => {
+          const rowFont = isHeader ? bold : regular;
+          const rowSize = isHeader ? headerFontSize : bodyFontSize;
+          const wrappedCells = cells.map((cell) =>
+            wrapText(cell, rowFont, rowSize, colWidth - cellPadX * 2)
+          );
+          const maxLines = Math.max(...wrappedCells.map((w) => Math.max(1, w.length)));
+          const rowHeight = maxLines * (rowSize + cellGap) - cellGap + cellPadY * 2;
+          if (y - rowHeight < PAGE.contentBottom) {
+            page = pdf.addPage([PAGE.width, PAGE.height]);
+            y = PAGE.contentTop;
+            if (!isHeader) {
+              drawTableRow(tableRows[0], true);
+            }
+          }
+
+          const topY = y;
+          for (let col = 0; col < columnCount; col += 1) {
+            const x = PAGE.marginX + col * colWidth;
+            const bottom = topY - rowHeight;
+            page.drawRectangle({
+              x,
+              y: bottom,
+              width: colWidth,
+              height: rowHeight,
+              color: isHeader ? rgb(0.92, 0.92, 0.92) : rgb(1, 1, 1),
+              borderColor: rgb(0.82, 0.82, 0.82),
+              borderWidth: 0.6,
+            });
+            let textY = topY - cellPadY - rowSize;
+            for (const line of wrappedCells[col] ?? [""]) {
+              page.drawText(toPdfSafeText(line, true), {
+                x: x + cellPadX,
+                y: textY,
+                size: rowSize,
+                font: rowFont,
+                color: rgb(0.1, 0.1, 0.1),
+              });
+              textY -= rowSize + cellGap;
+            }
+          }
+          y = topY - rowHeight;
+        };
+
+        if (tableRows.length > 0) {
+          drawTableRow(tableRows[0], true);
+          for (let rowIdx = 1; rowIdx < tableRows.length; rowIdx += 1) {
+            drawTableRow(tableRows[rowIdx], false);
+          }
+          y -= 8;
+        }
       }
       y -= 10;
     }

@@ -85,3 +85,167 @@
 | --- | --- |
 | 400 | `{ "error": "Invalid payload" }` |
 | 500 | `{ "error": "Failed to create inspection" }` |
+
+## 3. Name: Get / Update Inspection
+
+### Endpoints
+- `GET /api/company/{companyId}/workshop/inspections/{inspectionId}`
+- `PATCH /api/company/{companyId}/workshop/inspections/{inspectionId}`
+
+### Description
+Fetch one inspection and update inspection state/details.
+
+### A) Get Inspection
+
+#### Request Schema
+
+| Field | Type | Required | Nullable | Description |
+| --- | --- | --- | --- | --- |
+| companyId (path) | string (uuid) | Yes | No | Company ID. |
+| inspectionId (path) | string (uuid) | Yes | No | Inspection ID. |
+
+#### Success Response Schema (200)
+
+| Field | Type | Nullable | Description |
+| --- | --- | --- | --- |
+| data.id | string (uuid) | No | Inspection ID. |
+| data.status | string | No | Inspection status. |
+| data.leadId | string (uuid) | Yes | Linked lead ID. |
+| data.carId | string (uuid) | Yes | Linked car ID. |
+| data.customerId | string (uuid) | Yes | Linked customer ID. |
+| data.inspectorEmployeeId | string (uuid) | Yes | Assigned inspector. |
+| data.advisorEmployeeId | string (uuid) | Yes | Assigned advisor. |
+| data.createdAt | string (ISO datetime) | Yes | Creation timestamp. |
+| data.updatedAt | string (ISO datetime) | Yes | Last update timestamp. |
+
+### B) Update Inspection
+
+#### Request Body Schema (PATCH)
+
+| Field | Type | Required | Nullable | Description |
+| --- | --- | --- | --- | --- |
+| status | string | No | Yes | Updated inspection status. |
+| inspectorEmployeeId | string (uuid) | No | Yes | Updated inspector assignment. |
+| advisorEmployeeId | string (uuid) | No | Yes | Updated advisor assignment. |
+| customerRemark | string | No | Yes | Customer-side remark. |
+| agentRemark | string | No | Yes | Internal remark. |
+| draftPayload | object | No | Yes | Draft structure/details. |
+
+#### Request Example
+
+```json
+{
+  "status": "completed",
+  "advisorEmployeeId": "fa0ea235-f89d-40f6-8fe3-9d8cfd1cd2ec",
+  "agentRemark": "Final review completed by advisor."
+}
+```
+
+#### Success Response Schema (200)
+
+| Field | Type | Nullable | Description |
+| --- | --- | --- | --- |
+| data.id | string (uuid) | No | Inspection ID. |
+| data.status | string | No | Updated status. |
+| data.updatedAt | string (ISO datetime) | Yes | Update timestamp. |
+
+### Error Response Schema
+
+| Code | Shape |
+| --- | --- |
+| 400 | `{ "error": "Invalid inspection update payload" }` |
+| 404 | `{ "error": "Inspection not found" }` |
+| 500 | `{ "error": "Failed to update inspection" }` |
+
+## 4. Name: Inspection Line Items
+
+### Endpoints
+- `GET /api/company/{companyId}/workshop/inspections/{inspectionId}/line-items`
+- `POST /api/company/{companyId}/workshop/inspections/{inspectionId}/line-items`
+- `PATCH /api/company/{companyId}/workshop/inspections/{inspectionId}/line-items`
+- `PATCH /api/company/{companyId}/workshop/inspections/{inspectionId}/line-items/{lineItemId}`
+- `DELETE /api/company/{companyId}/workshop/inspections/{inspectionId}/line-items/{lineItemId}`
+
+### Description
+Create/update/delete inspection findings and recommendations at line-item level.
+
+### A) Get Line Items
+
+#### Request Schema
+
+| Field | Type | Required | Nullable | Description |
+| --- | --- | --- | --- | --- |
+| companyId (path) | string (uuid) | Yes | No | Company ID. |
+| inspectionId (path) | string (uuid) | Yes | No | Inspection ID. |
+
+#### Success Response Schema (200)
+
+| Field | Type | Nullable | Description |
+| --- | --- | --- | --- |
+| data | array | No | Line item list. |
+| data[].id | string (uuid) | No | Line item ID. |
+| data[].title | string | Yes | Item title/name. |
+| data[].status | string | Yes | Item status. |
+| data[].notes | string | Yes | Item notes. |
+
+### B) Create Line Item
+
+#### Request Body Schema (POST)
+
+| Field | Type | Required | Nullable | Description |
+| --- | --- | --- | --- | --- |
+| title | string | Yes | No | Item title/name. |
+| category | string | No | Yes | Item category. |
+| severity | string | No | Yes | Severity level. |
+| status | string | No | Yes | Initial status. |
+| notes | string | No | Yes | Notes/findings. |
+| recommendedAction | string | No | Yes | Recommendation text. |
+
+#### Request Example
+
+```json
+{
+  "title": "Front Brake Pads",
+  "category": "Brakes",
+  "severity": "medium",
+  "status": "pending",
+  "notes": "Pads worn below threshold",
+  "recommendedAction": "Replace front brake pads"
+}
+```
+
+### C) Update Line Items
+
+#### Endpoints
+- `PATCH /api/company/{companyId}/workshop/inspections/{inspectionId}/line-items`
+- `PATCH /api/company/{companyId}/workshop/inspections/{inspectionId}/line-items/{lineItemId}`
+
+#### Request Body Schema (typical)
+
+| Field | Type | Required | Nullable | Description |
+| --- | --- | --- | --- | --- |
+| status | string | No | Yes | Updated status. |
+| notes | string | No | Yes | Updated notes. |
+| severity | string | No | Yes | Updated severity. |
+| recommendedAction | string | No | Yes | Updated recommendation. |
+
+### D) Delete Line Item
+
+#### Endpoint
+- `DELETE /api/company/{companyId}/workshop/inspections/{inspectionId}/line-items/{lineItemId}`
+
+#### Success Response (typical)
+
+```json
+{
+  "ok": true
+}
+```
+
+### Error Response Schema
+
+| Code | Shape |
+| --- | --- |
+| 400 | `{ "error": "Invalid line item payload" }` |
+| 404 | `{ "error": "Line item not found" }` |
+| 500 | `{ "error": "Failed to process line item" }` |

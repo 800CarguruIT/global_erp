@@ -78,3 +78,121 @@
 | 404 | `{ "error": "Estimate not found" }` |
 | 409 | `{ "error": "Job card already active" }` |
 | 500 | `{ "error": "Failed to create job card" }` |
+
+## 3. Name: Get / Update Job Card
+
+### Endpoints
+- `GET /api/company/{companyId}/workshop/job-cards/{jobCardId}`
+- `PATCH /api/company/{companyId}/workshop/job-cards/{jobCardId}`
+
+### Description
+Fetch one job card and update execution status/progress details.
+
+### A) Get Job Card
+
+#### Request Schema
+
+| Field | Type | Required | Nullable | Description |
+| --- | --- | --- | --- | --- |
+| companyId (path) | string (uuid) | Yes | No | Company ID. |
+| jobCardId (path) | string (uuid) | Yes | No | Job card ID. |
+
+#### Success Response Schema (200)
+
+| Field | Type | Nullable | Description |
+| --- | --- | --- | --- |
+| data.id | string (uuid) | No | Job card ID. |
+| data.status | string | No | Job card status. |
+| data.estimateId | string (uuid) | Yes | Linked estimate ID. |
+| data.leadId | string (uuid) | Yes | Linked lead ID. |
+| data.assignedTechnicianId | string (uuid) | Yes | Assigned technician. |
+| data.startedAt | string (ISO datetime) | Yes | Start timestamp. |
+| data.completedAt | string (ISO datetime) | Yes | Completion timestamp. |
+| data.updatedAt | string (ISO datetime) | Yes | Last update timestamp. |
+
+### B) Update Job Card
+
+#### Request Body Schema (PATCH)
+
+| Field | Type | Required | Nullable | Description |
+| --- | --- | --- | --- | --- |
+| status | string | No | Yes | Updated status (e.g. Pending/In Progress/Completed). |
+| assignedTechnicianId | string (uuid) | No | Yes | Technician assignment. |
+| progressNote | string | No | Yes | Internal progress note. |
+| startedAt | string (ISO datetime) | No | Yes | Explicit start timestamp. |
+| completedAt | string (ISO datetime) | No | Yes | Explicit completion timestamp. |
+
+#### Request Example
+
+```json
+{
+  "status": "In Progress",
+  "assignedTechnicianId": "4cfeab7e-aebf-4e76-b5f0-2c8e38e3268f",
+  "progressNote": "Vehicle moved to bay and work started."
+}
+```
+
+#### Success Response Schema (200)
+
+| Field | Type | Nullable | Description |
+| --- | --- | --- | --- |
+| data.id | string (uuid) | No | Job card ID. |
+| data.status | string | No | Updated status. |
+| data.updatedAt | string (ISO datetime) | Yes | Update timestamp. |
+
+### Error Response Schema
+
+| Code | Shape |
+| --- | --- |
+| 400 | `{ "error": "Invalid job card update payload" }` |
+| 404 | `{ "error": "Job card not found" }` |
+| 500 | `{ "error": "Failed to update job card" }` |
+
+## 4. Name: Update Job Card Line Item
+
+### Endpoint
+- Method: `PATCH`
+- URL: `/api/company/{companyId}/workshop/job-cards/{jobCardId}/line-items/{lineItemId}`
+
+### Description
+Update job-card line item execution fields (quantity, status, notes).
+
+### Request Schema
+
+| Field | Type | Required | Nullable | Description |
+| --- | --- | --- | --- | --- |
+| companyId (path) | string (uuid) | Yes | No | Company ID. |
+| jobCardId (path) | string (uuid) | Yes | No | Job card ID. |
+| lineItemId (path) | string (uuid) | Yes | No | Job-card line item ID. |
+| status | string | No | Yes | Updated line-item status. |
+| quantity | number | No | Yes | Executed/consumed quantity. |
+| notes | string | No | Yes | Technician/internal notes. |
+| laborHours | number | No | Yes | Labor hours consumed (if tracked). |
+
+### Request Example
+
+```json
+{
+  "status": "completed",
+  "quantity": 1,
+  "notes": "Part replaced and torque verified.",
+  "laborHours": 1.5
+}
+```
+
+### Success Response Schema (200)
+
+| Field | Type | Nullable | Description |
+| --- | --- | --- | --- |
+| data.id | string (uuid) | No | Line item ID. |
+| data.status | string | Yes | Updated status. |
+| data.quantity | number | Yes | Updated quantity. |
+| data.updatedAt | string (ISO datetime) | Yes | Update timestamp. |
+
+### Error Response Schema
+
+| Code | Shape |
+| --- | --- |
+| 400 | `{ "error": "Invalid line item update payload" }` |
+| 404 | `{ "error": "Line item not found" }` |
+| 500 | `{ "error": "Failed to update job card line item" }` |
