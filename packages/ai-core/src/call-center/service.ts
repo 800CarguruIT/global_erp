@@ -3,6 +3,7 @@ import type { DialerIntegration, PlaceCallResult } from "../dialer/types";
 import {
   getCallCenterDashboardData,
   getCallSessionById,
+  insertInboundCallSession,
   insertCallRecording,
   insertCallSession,
   listCallSessions,
@@ -87,8 +88,16 @@ function mapProviderStatus(status: string | undefined): CallStatus | undefined {
   if (!status) return undefined;
   const normalized = status.toLowerCase();
   if (normalized.includes("ring")) return "ringing";
+  if (normalized.includes("incoming")) return "ringing";
   if (normalized === "initiated" || normalized === "init") return "initiated";
+  if (normalized.includes("answer")) return "in_progress";
   if (normalized === "in_progress" || normalized === "in-progress" || normalized === "progress") return "in_progress";
+  if (normalized.includes("no answer") || normalized.includes("no_answer")) return "cancelled";
+  if (normalized.includes("missed")) return "cancelled";
+  if (normalized.includes("declin") || normalized.includes("reject")) return "cancelled";
+  if (normalized.includes("busy")) return "failed";
+  if (normalized.includes("hangup")) return "completed";
+  if (normalized.includes("over") || normalized.includes("bye")) return "completed";
   if (normalized === "completed" || normalized === "finished" || normalized === "done") return "completed";
   if (normalized === "failed" || normalized === "error") return "failed";
   if (normalized === "cancelled" || normalized === "canceled") return "cancelled";
@@ -97,16 +106,40 @@ function mapProviderStatus(status: string | undefined): CallStatus | undefined {
 
 export async function handleDialerWebhookUpdate(update: DialerWebhookUpdate): Promise<void> {
   const mappedStatus = mapProviderStatus(update.status);
-  const callSessionId = await updateCallSessionStatusByProviderCallId(update.providerCallId, {
+  let callSessionId = await updateCallSessionStatusByProviderCallId(update.providerCallId, {
     status: mappedStatus,
     startedAt: update.startedAt,
     endedAt: update.endedAt,
     durationSeconds: update.durationSeconds ?? null,
+    fromNumber: update.fromNumber ?? null,
+    toNumber: update.toNumber ?? null,
     metadataPatch: {
       providerStatus: update.status,
       rawPayload: update.rawPayload,
     },
   });
+
+  if (!callSessionId) {
+    const scope = update.scope ?? (update.companyId ? "company" : "global");
+    const session = await insertInboundCallSession({
+      providerKey: update.providerKey,
+      providerCallId: update.providerCallId,
+      status: mappedStatus ?? "ringing",
+      fromNumber: (update.fromNumber ?? "").trim() || "unknown",
+      toNumber: (update.toNumber ?? "").trim() || "unknown",
+      scope,
+      companyId: scope === "company" ? update.companyId ?? null : null,
+      branchId: scope === "company" ? update.branchId ?? null : null,
+      startedAt: update.startedAt ?? null,
+      endedAt: update.endedAt ?? null,
+      durationSeconds: update.durationSeconds ?? null,
+      metadata: {
+        providerStatus: update.status,
+        rawPayload: update.rawPayload ?? {},
+      },
+    });
+    callSessionId = session.id;
+  }
 
   if (callSessionId && (update.recordingId || update.recordingUrl)) {
     await insertCallRecording({

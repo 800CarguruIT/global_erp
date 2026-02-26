@@ -20,6 +20,7 @@ import {
 } from "./providers";
 import "./providers/example-twilio";
 import "./providers/twilio";
+import "./providers/yeastar";
 import type { IntegrationHealth, IntegrationHealthStatus } from "./types";
 import { upsertIntegrationHealth, getIntegrationHealthForIds } from "../shared/healthRepository";
 import {

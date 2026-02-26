@@ -76,6 +76,7 @@ export const SIDEBAR_CONFIG: Record<NavScope, Partial<Record<NavCategory, Sideba
     "Call Center": [
       { labelKey: "global.nav.callCenter", href: "/company/[companyId]/call-center" },
       { label: "Call history", href: "/company/[companyId]/call-center/history" },
+      { label: "User Extensions", href: "/company/[companyId]/integrations/dialer/extensions" },
     ],
     Jobs: [
       { label: "RSA", href: "/company/[companyId]/jobs/rsa", moduleKey: "jobs" },
@@ -183,6 +184,7 @@ export const SIDEBAR_TREE: Partial<Record<NavScope, SidebarItem[]>> = {
       children: [
         { label: "Overview", href: "/company/[companyId]/call-center", exactMatch: true, permissionKeys: ["callcenter.view"] },
         { label: "History", href: "/company/[companyId]/call-center/history", permissionKeys: ["callcenter.history.view"] },
+        { label: "User Extensions", href: "/company/[companyId]/integrations/dialer/extensions", permissionKeys: ["callcenter.view"] },
       ],
     },
     {

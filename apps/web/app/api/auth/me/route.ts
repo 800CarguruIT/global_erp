@@ -12,6 +12,7 @@ export async function GET(req: NextRequest) {
           id: user.id,
           fullName: user.full_name ?? null,
           email: user.email ?? null,
+          mobile: user.mobile ?? null,
         }
       : null,
   });

@@ -36,13 +36,16 @@ export async function PUT(req: NextRequest, { params }: Params) {
   }
   if (authError) return authError;
   const body = await req.json().catch(() => ({}));
+  const fullNamePatch =
+    body.name !== undefined ? body.name ?? null : body.fullName !== undefined ? body.fullName ?? null : undefined;
   const user = await UserRepository.updateUser(id, {
-    email: body.email,
-    fullName: body.name ?? body.fullName ?? null,
-    password: body.password,
-    employeeId: body.employeeId ?? null,
-    isActive: body.isActive ?? undefined,
-    roleIds: body.roleIds ?? undefined,
+    email: body.email !== undefined ? body.email : undefined,
+    fullName: fullNamePatch,
+    password: body.password !== undefined ? body.password : undefined,
+    employeeId: body.employeeId !== undefined ? body.employeeId ?? null : undefined,
+    isActive: body.isActive !== undefined ? Boolean(body.isActive) : undefined,
+    roleIds: Array.isArray(body.roleIds) ? body.roleIds : undefined,
+    mobile: body.mobile !== undefined ? body.mobile ?? null : undefined,
   });
   return NextResponse.json({ data: user });
 }

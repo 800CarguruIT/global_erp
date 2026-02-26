@@ -106,6 +106,12 @@ export interface DialerWebhookUpdate {
   providerKey: string;
   providerCallId: string;
   status: string;
+  direction?: CallDirection | null;
+  fromNumber?: string | null;
+  toNumber?: string | null;
+  scope?: CallScope;
+  companyId?: string | null;
+  branchId?: string | null;
   startedAt?: Date | null;
   endedAt?: Date | null;
   durationSeconds?: number | null;

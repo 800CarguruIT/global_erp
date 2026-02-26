@@ -15,6 +15,9 @@ const publicPaths = [
   "/api/files",
   "/api/public/recovery-requests",
   "/api/i18n-generate",
+  "/api/webhooks/dialer",
+  "/api/webhooks/channels",
+  "/api/global/call-center/incoming/stream",
   // Allow global lead APIs to be accessed without forcing login (used by public call center/global flows)
   "/api/global/leads",
   "/favicon.ico",

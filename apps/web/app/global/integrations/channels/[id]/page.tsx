@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import { AppLayout, ChannelIntegrationForm } from "@repo/ui";
 import { ChannelTypes } from "@repo/ai-core";
 
@@ -20,11 +21,9 @@ type ChannelRow = {
   updated_at: string;
 };
 
-export default function GlobalChannelsEditPage({
-  params,
-}: {
-  params: { id: string };
-}) {
+export default function GlobalChannelsEditPage() {
+  const params = useParams<{ id?: string }>();
+  const integrationId = typeof params?.id === "string" ? params.id : "";
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [row, setRow] = useState<ChannelRow | null>(null);
@@ -32,10 +31,15 @@ export default function GlobalChannelsEditPage({
   useEffect(() => {
     let cancelled = false;
     async function load() {
+      if (!integrationId) {
+        setError("Invalid integration id");
+        setLoading(false);
+        return;
+      }
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch(`/api/channels/integrations/${params.id}?scope=global`);
+        const res = await fetch(`/api/channels/integrations/${integrationId}?scope=global`);
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
           throw new Error(body.error || "Failed to load integration");
@@ -53,7 +57,7 @@ export default function GlobalChannelsEditPage({
     return () => {
       cancelled = true;
     };
-  }, [params.id]);
+  }, [integrationId]);
 
   return (
     <AppLayout>

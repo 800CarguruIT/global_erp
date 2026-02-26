@@ -16,6 +16,7 @@ export async function GET(req: NextRequest) {
         direction: string | null;
         status: string | null;
         started_at: string | null;
+        created_at: string | null;
       }[]
     >`
       SELECT
@@ -25,10 +26,18 @@ export async function GET(req: NextRequest) {
         to_number,
         direction,
         status,
-        started_at
+        started_at::text,
+        created_at::text
       FROM call_sessions
-      WHERE status IN ('ringing','in_progress')
-      ORDER BY started_at DESC NULLS LAST
+      WHERE
+        (
+          (status = 'ringing' AND created_at > NOW() - INTERVAL '3 minutes')
+          OR (
+            status = 'in_progress'
+            AND COALESCE(started_at, created_at) > NOW() - INTERVAL '4 hours'
+          )
+        )
+      ORDER BY COALESCE(started_at, created_at) DESC NULLS LAST
       LIMIT ${Number.isFinite(limit) && limit > 0 ? limit : 20}
     `;
     return NextResponse.json({ data: rows });

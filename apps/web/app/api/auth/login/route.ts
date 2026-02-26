@@ -11,6 +11,7 @@ type UserRow = {
   password_hash: string;
   is_active: boolean;
   company_id?: string | null;
+  mobile?: string | null;
 };
 
 export async function POST(req: NextRequest) {
@@ -24,7 +25,7 @@ export async function POST(req: NextRequest) {
 
     const sql = getSql();
     const res = await sql<UserRow[]>`
-      SELECT id, email, password_hash, is_active, company_id
+      SELECT id, email, password_hash, is_active, company_id, mobile
       FROM users
       WHERE email = ${email}
       LIMIT 1
@@ -111,7 +112,8 @@ export async function POST(req: NextRequest) {
       redirect = "/auth/select-company";
     }
 
-    const response = NextResponse.json({ success: true, redirect });
+    const assignedExtension = String(user.mobile ?? "").trim() || null;
+    const response = NextResponse.json({ success: true, redirect, assignedExtension });
     setSessionCookie(response, token);
     const branchPath = thirdPartyWorkshopPath ?? baseBranchPath;
     if (branchPath) {
@@ -125,6 +127,17 @@ export async function POST(req: NextRequest) {
     } else {
       // Clear stale branch preference for non-branch redirects.
       response.cookies.set("last_branch_path", "", { path: "/", maxAge: 0 });
+    }
+    if (assignedExtension) {
+      response.cookies.set("dialer_agent_extension", assignedExtension, {
+        path: "/",
+        sameSite: "lax",
+        httpOnly: false,
+        secure: process.env.NODE_ENV === "production",
+        maxAge: 60 * 60 * 24 * 30,
+      });
+    } else {
+      response.cookies.set("dialer_agent_extension", "", { path: "/", maxAge: 0 });
     }
     return response;
   } catch (error: any) {

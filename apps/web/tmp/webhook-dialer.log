@@ -1,0 +1,2 @@
+{"ts":"2026-02-25T12:58:24.825Z","stage":"received","providerKey":"yeastar","method":"POST","url":"http://0.0.0.0:3000/api/webhooks/dialer/yeastar","payload":{}}
+{"ts":"2026-02-25T12:58:24.894Z","stage":"success","providerKey":"yeastar"}

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import { AppLayout, DialerIntegrationForm } from "@repo/ui";
 
 type DialerRow = {
@@ -17,11 +18,9 @@ type DialerRow = {
 };
 type AuthType = DialerRow["auth_type"];
 
-export default function GlobalDialerEditPage({
-  params,
-}: {
-  params: { id: string };
-}) {
+export default function GlobalDialerEditPage() {
+  const params = useParams<{ id?: string }>();
+  const integrationId = typeof params?.id === "string" ? params.id : "";
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [integration, setIntegration] = useState<DialerRow | null>(null);
@@ -31,10 +30,15 @@ export default function GlobalDialerEditPage({
     let cancelled = false;
 
     async function load() {
+      if (!integrationId) {
+        setError("Invalid integration id");
+        setLoading(false);
+        return;
+      }
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch(`/api/dialer/integrations/${params.id}?scope=global`);
+        const res = await fetch(`/api/dialer/integrations/${integrationId}?scope=global`);
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
           throw new Error(body.error || "Failed to load integration");
@@ -58,7 +62,7 @@ export default function GlobalDialerEditPage({
     return () => {
       cancelled = true;
     };
-  }, [params.id]);
+  }, [integrationId]);
 
   return (
     <AppLayout>

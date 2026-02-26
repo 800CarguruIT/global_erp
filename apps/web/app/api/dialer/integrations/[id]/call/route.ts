@@ -2,10 +2,20 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { Dialer, DialerTypes } from "@repo/ai-core";
 
+const optionalNonEmptyString = z.preprocess(
+  (value) => {
+    if (value === null || value === undefined) return undefined;
+    if (typeof value !== "string") return value;
+    const trimmed = value.trim();
+    return trimmed === "" ? undefined : trimmed;
+  },
+  z.string().min(1).optional()
+);
+
 const bodySchema = z.object({
   to: z.string().min(1, "to is required"),
-  from: z.string().min(1).optional().nullable(),
-  callerId: z.string().min(1).optional().nullable(),
+  from: optionalNonEmptyString,
+  callerId: optionalNonEmptyString,
   customPayload: z.unknown().optional(),
 });
 

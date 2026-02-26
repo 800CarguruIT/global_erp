@@ -5,6 +5,7 @@ function buildLogoutResponse(req: NextRequest) {
   const redirectUrl = new URL("/auth/login", req.url);
   const res = NextResponse.redirect(redirectUrl);
   clearSessionCookie(res);
+  res.cookies.set("dialer_agent_extension", "", { path: "/", maxAge: 0 });
   return res;
 }
 

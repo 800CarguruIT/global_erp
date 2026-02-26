@@ -136,11 +136,15 @@ export async function updateCallSessionStatusByProviderCallId(
     startedAt?: Date | null;
     endedAt?: Date | null;
     durationSeconds?: number | null;
+    fromNumber?: string | null;
+    toNumber?: string | null;
     metadataPatch?: Record<string, unknown>;
   }
 ): Promise<string | null> {
   const sql = getSql();
   const metadataJson = patch.metadataPatch ? JSON.stringify(patch.metadataPatch) : null;
+  const fromPatch = (patch.fromNumber ?? "").trim() || null;
+  const toPatch = (patch.toNumber ?? "").trim() || null;
   const result = await sql<{ id: string }[]>`
     UPDATE call_sessions
     SET
@@ -148,6 +152,18 @@ export async function updateCallSessionStatusByProviderCallId(
       started_at = COALESCE(${patch.startedAt ?? null}, started_at),
       ended_at = COALESCE(${patch.endedAt ?? null}, ended_at),
       duration_seconds = COALESCE(${patch.durationSeconds ?? null}, duration_seconds),
+      from_number = CASE
+        WHEN ${fromPatch}::text IS NOT NULL
+          AND LOWER(BTRIM(COALESCE(from_number, ''))) = 'unknown'
+          THEN ${fromPatch}::text
+        ELSE from_number
+      END,
+      to_number = CASE
+        WHEN ${toPatch}::text IS NOT NULL
+          AND LOWER(BTRIM(COALESCE(to_number, ''))) = 'unknown'
+          THEN ${toPatch}::text
+        ELSE to_number
+      END,
       metadata =
         CASE
           WHEN ${metadataJson}::jsonb IS NOT NULL
@@ -161,6 +177,73 @@ export async function updateCallSessionStatusByProviderCallId(
 
   const row = rowsFrom(result)[0] as { id: string } | undefined;
   return row?.id ?? null;
+}
+
+export async function insertInboundCallSession(params: {
+  providerKey: string;
+  providerCallId: string;
+  status: CallStatus;
+  fromNumber: string;
+  toNumber: string;
+  scope: CallSession["scope"];
+  companyId?: string | null;
+  branchId?: string | null;
+  startedAt?: Date | null;
+  endedAt?: Date | null;
+  durationSeconds?: number | null;
+  metadata?: Record<string, unknown>;
+}): Promise<CallSession> {
+  const sql = getSql();
+  const existing = await sql<CallSessionRow[]>`
+    SELECT *
+    FROM call_sessions
+    WHERE provider_call_id = ${params.providerCallId}
+    LIMIT 1
+  `;
+  const existingRow = rowsFrom(existing)[0] as CallSessionRow | undefined;
+  if (existingRow) return mapSession(existingRow);
+
+  const result = await sql<CallSessionRow[]>`
+    INSERT INTO call_sessions (
+      scope,
+      company_id,
+      branch_id,
+      created_by_user_id,
+      direction,
+      from_number,
+      to_number,
+      to_entity_type,
+      to_entity_id,
+      provider_key,
+      provider_call_id,
+      status,
+      started_at,
+      ended_at,
+      duration_seconds,
+      metadata
+    ) VALUES (
+      ${params.scope},
+      ${params.scope === "company" ? params.companyId ?? null : null},
+      ${params.scope === "company" ? params.branchId ?? null : null},
+      ${"00000000-0000-0000-0000-000000000000"},
+      ${"inbound"},
+      ${params.fromNumber},
+      ${params.toNumber},
+      NULL,
+      NULL,
+      ${params.providerKey},
+      ${params.providerCallId},
+      ${params.status},
+      ${params.startedAt ?? null},
+      ${params.endedAt ?? null},
+      ${params.durationSeconds ?? null},
+      ${params.metadata ?? {}}::jsonb
+    )
+    RETURNING *
+  `;
+  const row = rowsFrom(result)[0] as CallSessionRow | undefined;
+  if (!row) throw new Error("Failed to insert inbound call session");
+  return mapSession(row);
 }
 
 export async function listCallSessions(filter: ListCallsFilter): Promise<CallSession[]> {

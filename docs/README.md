@@ -25,6 +25,7 @@ This documentation is designed to be useful, simple, and quick to access.
 - `procurement-playbook.md`
 - `accounting-overview.md`
 - `api-integration-guide.md`
+- `aws-deployment-plan.md`
 - `troubleshooting-faq.md`
 - `workshop-integration-guide.md`
 - `workshop-api-contacts.md`

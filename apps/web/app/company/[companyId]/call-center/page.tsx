@@ -131,10 +131,18 @@ function CallCenterContent({ companyId }: { companyId: string }) {
   useEffect(() => {
     async function loadActive() {
       try {
-        const res = await fetch("/api/global/call-center/active", { cache: "no-store" });
-        if (!res.ok) return;
-        const data = await res.json().catch(() => ({}));
-        setActiveCalls(Array.isArray(data) ? data : data.data ?? []);
+        const companyRes = await fetch(`/api/company/${companyId}/call-center/active`, { cache: "no-store" });
+        const companyData = companyRes.ok ? await companyRes.json().catch(() => ({})) : {};
+        const scopedRows = Array.isArray(companyData) ? companyData : companyData.data ?? [];
+        if (scopedRows.length > 0) {
+          setActiveCalls(scopedRows);
+          return;
+        }
+
+        const globalRes = await fetch("/api/global/call-center/active", { cache: "no-store" });
+        if (!globalRes.ok) return;
+        const globalData = await globalRes.json().catch(() => ({}));
+        setActiveCalls(Array.isArray(globalData) ? globalData : globalData.data ?? []);
       } catch {
         // ignore
       }

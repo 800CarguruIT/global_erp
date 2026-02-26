@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { AppLayout, Card, useTheme } from "@repo/ui";
 import { CarMakeModelSelect } from "@repo/ui/components/common/CarMakeModelSelect";
 import { PhoneInput } from "@repo/ui/components/common/PhoneInput";
@@ -22,6 +23,26 @@ const EMPTY_PLATE: PlateValue = {
 
 const CAR_TYPE_OPTIONS = ["Regular", "SUV", "Pickup", "Van", "Truck", "Motorcycle", "Other"];
 
+function parsePhonePrefill(raw: string): PhoneValue {
+  const value = String(raw ?? "").trim();
+  if (!value) return EMPTY_PHONE;
+
+  const cleaned = value.replace(/\s+/g, "");
+  if (cleaned.startsWith("+971")) {
+    return { dialCode: "+971", nationalNumber: cleaned.slice(4) };
+  }
+
+  if (cleaned.startsWith("971")) {
+    return { dialCode: "+971", nationalNumber: cleaned.slice(3) };
+  }
+
+  if (cleaned.startsWith("+")) {
+    return { dialCode: "+971", nationalNumber: cleaned.replace(/^\+/, "") };
+  }
+
+  return { dialCode: "+971", nationalNumber: cleaned };
+}
+
 type CustomerDuplicateInfo = {
   id: string;
   name: string | null;
@@ -35,6 +56,7 @@ type CarDuplicateInfo = {
 
 export default function CustomerCreatePage({ params }: Params) {
   const { theme } = useTheme();
+  const searchParams = useSearchParams();
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -59,6 +81,16 @@ export default function CustomerCreatePage({ params }: Params) {
   useEffect(() => {
     Promise.resolve(params).then((p) => setCompanyId(p?.companyId ?? null));
   }, [params]);
+
+  useEffect(() => {
+    const prefillPhoneRaw = searchParams.get("phone")?.trim() ?? "";
+    if (!prefillPhoneRaw || prefillPhoneRaw.toLowerCase() === "unknown") return;
+    const parsed = parsePhonePrefill(prefillPhoneRaw);
+    setForm((prev) => {
+      if ((prev.phone.nationalNumber ?? "").trim().length > 0) return prev;
+      return { ...prev, phone: parsed };
+    });
+  }, [searchParams]);
 
   function update<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));

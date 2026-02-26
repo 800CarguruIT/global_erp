@@ -153,6 +153,14 @@ function LoginContent() {
       if (!res.ok) {
         throw new Error(body.error || "Invalid credentials");
       }
+      if (typeof window !== "undefined") {
+        const assignedExtension = String(body?.assignedExtension ?? "").trim();
+        if (assignedExtension) {
+          window.localStorage.setItem("dialer_agent_extension", assignedExtension);
+        } else {
+          window.localStorage.removeItem("dialer_agent_extension");
+        }
+      }
       const target = body.redirect || "/global";
       // Use full navigation to ensure cookies and middleware pick up the new session.
       window.location.assign(target);

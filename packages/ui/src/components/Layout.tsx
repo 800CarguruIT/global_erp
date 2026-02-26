@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ThemeProvider } from "../theme";
@@ -80,7 +80,53 @@ type LayoutProps = {
   children: React.ReactNode;
   forceScope?: ScopeInfo;
   hideSidebar?: boolean;
+  disableIncomingCallRealtime?: boolean;
 };
+
+type IncomingPopupState = {
+  callId: string;
+  fromNumber: string;
+  toNumber: string;
+  customer?: {
+    id?: string | null;
+    name?: string | null;
+    carId?: string | null;
+    car?: string | null;
+    phone?: string | null;
+    type?: string | null;
+  } | null;
+};
+
+function normalizeAgentToken(value: string | null | undefined): string {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  return raw.replace(/\s+/g, "");
+}
+
+function agentTokenVariants(value: string | null | undefined): string[] {
+  const normalized = normalizeAgentToken(value);
+  if (!normalized) return [];
+  const digits = normalized.replace(/\D+/g, "");
+  const out = new Set<string>([normalized.toLowerCase()]);
+  if (digits) out.add(digits);
+  return Array.from(out);
+}
+
+function buildAgentTokenSet(values: Array<string | null | undefined>): Set<string> {
+  const set = new Set<string>();
+  for (const value of values) {
+    for (const token of agentTokenVariants(value)) set.add(token);
+  }
+  return set;
+}
+
+function tokenMatchesAgent(set: Set<string>, value: string | null | undefined): boolean {
+  if (!set.size) return false;
+  for (const token of agentTokenVariants(value)) {
+    if (set.has(token)) return true;
+  }
+  return false;
+}
 
 function getCookieValue(name: string): string | null {
   if (typeof document === "undefined") return null;
@@ -129,7 +175,7 @@ function detectScope(pathname: string): ScopeInfo {
   return { scope: "global" };
 }
 
-function LayoutInner({ children, forceScope, hideSidebar }: LayoutProps) {
+function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRealtime }: LayoutProps) {
   const pathname = usePathname() || "/";
   const scopeInfo = forceScope ?? detectScope(pathname);
   const useBranchRoot = scopeInfo.scope === "branch" && pathname.startsWith("/branches/");
@@ -142,6 +188,10 @@ function LayoutInner({ children, forceScope, hideSidebar }: LayoutProps) {
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [lookupAttempted, setLookupAttempted] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [incomingPopups, setIncomingPopups] = useState<IncomingPopupState[]>([]);
+  const seenIncomingCallIdsRef = useRef<Map<string, number>>(new Map());
+  const incomingPopupsRef = useRef<IncomingPopupState[]>([]);
+  const agentTokensRef = useRef<Set<string>>(new Set());
   const branchBase = useBranchRoot
     ? `/branches/${scopeInfo.branchId ?? ""}`
     : `/company/${scopeInfo.companyId ?? ""}/branches/${scopeInfo.branchId ?? ""}`;
@@ -257,6 +307,270 @@ function LayoutInner({ children, forceScope, hideSidebar }: LayoutProps) {
   useEffect(() => {
     setSidebarOpen(false);
   }, [pathname]);
+
+  useEffect(() => {
+    incomingPopupsRef.current = incomingPopups;
+  }, [incomingPopups]);
+
+  useEffect(() => {
+    if (disableIncomingCallRealtime) return;
+
+    const companyId =
+      scopeInfo.scope === "company" || scopeInfo.scope === "branch" || scopeInfo.scope === "vendor"
+        ? scopeInfo.companyId
+        : null;
+    if (!companyId) return;
+
+    let stopped = false;
+
+    async function loadCustomerHintByPhone(phone: string) {
+      if (!phone.trim()) return null;
+      try {
+        const res = await fetch(
+          `/api/company/${companyId}/call-center/dashboard?search=${encodeURIComponent(phone.trim())}`,
+          { cache: "no-store" }
+        );
+        if (!res.ok) return null;
+        const payload = await res.json().catch(() => ({}));
+        const list = (Array.isArray(payload) ? payload : payload.data ?? payload.result ?? []) as any[];
+        const first =
+          list.find((row) => row?.isActive !== false && String(row?.type ?? "").toLowerCase() === "customer") ??
+          list.find((row) => row?.isActive !== false);
+        if (!first) return null;
+        return {
+          id: first.type === "customer" ? first.id ?? null : null,
+          name: first.name ?? null,
+          carId: first.carId ?? null,
+          car: first.car ?? null,
+          phone: first.phone ?? null,
+          type: first.type ?? null,
+        };
+      } catch {
+        return null;
+      }
+    }
+
+    async function handleIncomingCall(input: {
+      callId: string;
+      fromNumber?: string | null;
+      toNumber?: string | null;
+    }) {
+      const now = Date.now();
+      const dedupeTtlMs = 10 * 1000;
+      for (const [key, seenAt] of seenIncomingCallIdsRef.current.entries()) {
+        if (now - seenAt > dedupeTtlMs) {
+          seenIncomingCallIdsRef.current.delete(key);
+        }
+      }
+
+      const callId = String(input.callId ?? "").trim();
+      if (!callId) return;
+      const alreadySeenAt = seenIncomingCallIdsRef.current.get(callId);
+      const existingPopup = incomingPopupsRef.current.find((p) => p.callId === callId);
+      if (alreadySeenAt && now - alreadySeenAt <= dedupeTtlMs && !existingPopup) return;
+      seenIncomingCallIdsRef.current.set(callId, now);
+      if (stopped) return;
+
+      const fromNumber = String(input.fromNumber ?? "").trim();
+      const toNumber = String(input.toNumber ?? "").trim();
+      if (agentTokensRef.current.size > 0 && toNumber && !tokenMatchesAgent(agentTokensRef.current, toNumber)) {
+        return;
+      }
+      const customer = fromNumber ? await loadCustomerHintByPhone(fromNumber) : null;
+      if (stopped) return;
+      const safeFromNumber = fromNumber && fromNumber.toLowerCase() !== "unknown" ? fromNumber : "";
+
+      setIncomingPopups((prev) => {
+        const nextItem: IncomingPopupState = {
+          callId,
+          fromNumber: safeFromNumber || "Unknown",
+          toNumber: toNumber || "Unknown",
+          customer,
+        };
+        const idx = prev.findIndex((p) => p.callId === callId);
+        if (idx >= 0) {
+          const copy = [...prev];
+          const current = copy[idx];
+          copy[idx] = {
+            ...current,
+            fromNumber:
+              current.fromNumber && current.fromNumber.toLowerCase() !== "unknown"
+                ? current.fromNumber
+                : nextItem.fromNumber,
+            toNumber: nextItem.toNumber || current.toNumber,
+            customer: nextItem.customer ?? current.customer ?? null,
+          };
+          return copy;
+        }
+        return [...prev, nextItem].slice(-4);
+      });
+    }
+
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let socket: WebSocket | null = null;
+
+    const connectSocket = () => {
+      if (stopped) return;
+      const scheme = window.location.protocol === "https:" ? "wss" : "ws";
+      const agentTokens = Array.from(agentTokensRef.current);
+      const url = `${scheme}://${window.location.host}/ws/call-center/incoming?companyId=${encodeURIComponent(
+        companyId
+      )}&agentIds=${encodeURIComponent(agentTokens.join(","))}`;
+      socket = new WebSocket(url);
+      socket.onmessage = (evt) => {
+        try {
+          const message = JSON.parse(String(evt.data || "{}"));
+          if (String(message?.type ?? "").toLowerCase() !== "incoming") return;
+          const payload = message?.data ?? {};
+          const incomingCallId = String(payload.providerCallId ?? payload.callId ?? "").trim();
+          const incomingFromNumber = String(payload.fromNumber ?? "").trim();
+          const incomingToNumber = String(payload.toNumber ?? "").trim();
+          const direction = String(payload.direction ?? "").toLowerCase();
+          const status = String(payload.status ?? "").toLowerCase();
+
+          const open = incomingPopupsRef.current.find((p) => p.callId === incomingCallId);
+          if (
+            open &&
+            incomingCallId &&
+            open.callId === incomingCallId &&
+            incomingFromNumber &&
+            incomingFromNumber.toLowerCase() !== "unknown" &&
+            (!open.fromNumber || open.fromNumber.toLowerCase() === "unknown")
+          ) {
+            setIncomingPopups((prev) =>
+              prev.map((p) =>
+                p.callId === incomingCallId ? { ...p, fromNumber: incomingFromNumber } : p
+              )
+            );
+          }
+
+          const isTerminal =
+            status.includes("complete") ||
+            status.includes("hangup") ||
+            status.includes("declin") ||
+            status.includes("reject") ||
+            status.includes("no answer") ||
+            status.includes("no_answer") ||
+            status.includes("missed") ||
+            status.includes("cancel") ||
+            status.includes("bye") ||
+            status.includes("over") ||
+            status.includes("failed");
+          const isAnswered =
+            status.includes("answer") ||
+            status.includes("in_progress") ||
+            status.includes("in-progress") ||
+            status.includes("progress");
+
+          if (isAnswered && incomingCallId) {
+            const hasAgentTokens = agentTokensRef.current.size > 0;
+            const belongsToCurrentUser =
+              hasAgentTokens && incomingToNumber
+                ? tokenMatchesAgent(agentTokensRef.current, incomingToNumber)
+                : false;
+
+            if (hasAgentTokens && !belongsToCurrentUser) {
+              setIncomingPopups((prev) => prev.filter((p) => p.callId !== incomingCallId));
+              return;
+            }
+
+            setIncomingPopups((prev) =>
+              prev.map((p) =>
+                p.callId === incomingCallId
+                  ? {
+                      ...p,
+                      toNumber: incomingToNumber || p.toNumber,
+                      fromNumber:
+                        incomingFromNumber && incomingFromNumber.toLowerCase() !== "unknown"
+                          ? incomingFromNumber
+                          : p.fromNumber,
+                    }
+                  : p
+              )
+            );
+            return;
+          }
+
+          if (isTerminal) {
+            const hasOpen = incomingPopupsRef.current.some((p) => p.callId === incomingCallId);
+            if (incomingCallId && hasOpen) {
+              const canShowResolvedNumber =
+                incomingFromNumber && incomingFromNumber.toLowerCase() !== "unknown";
+              if (canShowResolvedNumber) {
+                setTimeout(() => {
+                  setIncomingPopups((prev) =>
+                    prev.filter((p) => p.callId !== incomingCallId)
+                  );
+                }, 1200);
+              } else {
+                setIncomingPopups((prev) => prev.filter((p) => p.callId !== incomingCallId));
+              }
+            }
+            return;
+          }
+
+          if (direction !== "inbound") return;
+          if (!(status.includes("ring") || status.includes("incoming"))) return;
+          void handleIncomingCall({
+            callId: incomingCallId,
+            fromNumber: payload.fromNumber ?? null,
+            toNumber: payload.toNumber ?? null,
+          });
+        } catch {
+          // ignore parse errors
+        }
+      };
+      socket.onclose = () => {
+        if (stopped) return;
+        reconnectTimer = setTimeout(connectSocket, 1500);
+      };
+      socket.onerror = () => {
+        try {
+          socket?.close();
+        } catch {
+          // ignore
+        }
+      };
+    };
+    const initializeAgentTokensAndConnect = async () => {
+      const values: string[] = [];
+      try {
+        const manual = window.localStorage.getItem("dialer_agent_extension") ?? "";
+        manual
+          .split(",")
+          .map((v) => v.trim())
+          .filter(Boolean)
+          .forEach((v) => values.push(v));
+      } catch {
+        // ignore localStorage errors
+      }
+
+      try {
+        const meRes = await fetch("/api/auth/me", { cache: "no-store" });
+        if (meRes.ok) {
+          const me = await meRes.json().catch(() => ({}));
+          const userMobile = String(me?.user?.mobile ?? "").trim();
+          if (userMobile) values.push(userMobile);
+        }
+      } catch {
+        // ignore auth profile errors
+      }
+
+      agentTokensRef.current = buildAgentTokenSet(values);
+      connectSocket();
+    };
+    void initializeAgentTokensAndConnect();
+
+    return () => {
+      stopped = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      try {
+        socket?.close();
+      } catch {
+        // ignore
+      }
+    };
+  }, [scopeInfo.scope, scopeInfo.companyId, disableIncomingCallRealtime]);
 
   async function handleLookup() {
     if (!scopeInfo.companyId) return;
@@ -437,15 +751,97 @@ function LayoutInner({ children, forceScope, hideSidebar }: LayoutProps) {
           </SidebarNav>
         )}
       </div>
+
+      {incomingPopups.length > 0 &&
+        (scopeInfo.scope === "company" || scopeInfo.scope === "branch" || scopeInfo.scope === "vendor") &&
+        scopeInfo.companyId && (
+          <div className="fixed bottom-4 right-4 z-[80] flex max-w-[92vw] flex-col-reverse gap-3">
+            {incomingPopups.map((popup) => (
+              <div
+                key={popup.callId}
+                className="w-[22rem] rounded-2xl border border-emerald-400/40 bg-slate-950/95 p-4 shadow-2xl backdrop-blur"
+              >
+                <div className="text-xs uppercase tracking-[0.18em] text-emerald-300">Incoming Call</div>
+                <div className="mt-1 text-lg font-semibold">{popup.customer?.name ?? "Unknown Caller"}</div>
+                <div className="mt-1 text-xs text-slate-300">To: {popup.toNumber}</div>
+                <div className="mt-2 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-sm">
+                  <div className="text-xs text-slate-300">Mobile No: {popup.customer?.phone ?? popup.fromNumber}</div>
+                  {popup.customer?.car ? (
+                    <div className="text-xs text-slate-300">Car: {popup.customer.car}</div>
+                  ) : null}
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2 text-[11px]">
+                  {popup.customer?.id ? (
+                    <Link
+                      href={`/company/${scopeInfo.companyId}/customers/${popup.customer.id}`}
+                      className="rounded-full border border-white/25 px-3 py-1 hover:border-white/60"
+                      onClick={() =>
+                        setIncomingPopups((prev) => prev.filter((p) => p.callId !== popup.callId))
+                      }
+                    >
+                      Visit Customer Dashboard
+                    </Link>
+                  ) : (
+                    <>
+                      <Link
+                        href={
+                          popup.fromNumber && popup.fromNumber !== "Unknown"
+                            ? `/company/${scopeInfo.companyId}/customers/new?phone=${encodeURIComponent(
+                                popup.fromNumber
+                              )}`
+                            : `/company/${scopeInfo.companyId}/customers/new`
+                        }
+                        className="rounded-full border border-white/25 px-3 py-1 hover:border-white/60"
+                        onClick={() =>
+                          setIncomingPopups((prev) => prev.filter((p) => p.callId !== popup.callId))
+                        }
+                      >
+                        Create Customer
+                      </Link>
+                      <Link
+                        href={
+                          popup.fromNumber && popup.fromNumber !== "Unknown"
+                            ? `/company/${scopeInfo.companyId}/leads/new?phone=${encodeURIComponent(
+                                popup.fromNumber
+                              )}`
+                            : `/company/${scopeInfo.companyId}/leads/new`
+                        }
+                        className="rounded-full border border-white/25 px-3 py-1 hover:border-white/60"
+                        onClick={() =>
+                          setIncomingPopups((prev) => prev.filter((p) => p.callId !== popup.callId))
+                        }
+                      >
+                        Create Lead
+                      </Link>
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    className="rounded-full border border-white/15 px-3 py-1 opacity-80 hover:opacity-100"
+                    onClick={() =>
+                      setIncomingPopups((prev) => prev.filter((p) => p.callId !== popup.callId))
+                    }
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
     </div>
   );
 }
 
-export function AppLayout({ children, forceScope, hideSidebar }: LayoutProps) {
+export function AppLayout({ children, forceScope, hideSidebar, disableIncomingCallRealtime }: LayoutProps) {
   return (
     <ThemeProvider>
       <I18nProvider>
-        <LayoutInner forceScope={forceScope} hideSidebar={hideSidebar}>
+        <LayoutInner
+          forceScope={forceScope}
+          hideSidebar={hideSidebar}
+          disableIncomingCallRealtime={disableIncomingCallRealtime}
+        >
           {children}
         </LayoutInner>
       </I18nProvider>
