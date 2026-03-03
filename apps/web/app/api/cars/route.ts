@@ -33,7 +33,23 @@ export async function GET(req: NextRequest) {
     const scope = (url.searchParams.get("scope") ?? "company") as "global" | "company";
     const companyId = url.searchParams.get("companyId");
     const search = url.searchParams.get("search") ?? undefined;
+    const statusRaw = (url.searchParams.get("status") ?? "").toLowerCase();
+    const status: "active" | "archived" | "all" =
+      statusRaw === "active" || statusRaw === "archived" ? statusRaw : "all";
     const activeOnly = url.searchParams.get("activeOnly") === "true";
+    const page = Math.max(1, Number(url.searchParams.get("page") ?? "1") || 1);
+    const pageSizeRaw = (url.searchParams.get("pageSize") ?? "50").trim().toLowerCase();
+    const pageSize = pageSizeRaw === "all" ? "all" : Math.min(200, Math.max(10, Number(pageSizeRaw) || 50));
+    const sortByRaw = (url.searchParams.get("sortBy") ?? "created_at").toLowerCase();
+    const sortBy: "created_at" | "plate_number" | "vin" | "make" | "model_year" | "code" =
+      sortByRaw === "plate_number" ||
+      sortByRaw === "vin" ||
+      sortByRaw === "make" ||
+      sortByRaw === "model_year" ||
+      sortByRaw === "code"
+        ? sortByRaw
+        : "created_at";
+    const sortDir = (url.searchParams.get("sortDir") ?? "desc").toLowerCase() === "asc" ? "asc" : "desc";
 
     if (scope === "company" && !companyId) {
       return NextResponse.json({ error: "companyId is required" }, { status: 400 });
@@ -54,24 +70,47 @@ export async function GET(req: NextRequest) {
       console.warn("cars view permission skipped", err);
     }
 
-    const list =
-      scope === "global"
-        ? await Crm.listCarsForGlobal(companyId ?? "")
-        : await Crm.listCarsWithSummary(companyId!);
+    if (scope === "global") {
+      const list = await Crm.listCarsForGlobal(companyId ?? "");
+      type GlobalCar = {
+        code?: string | null;
+        plate_number?: string | null;
+        make?: string | null;
+        model?: string | null;
+        vin?: string | null;
+        model_year?: number | null;
+        is_active?: boolean;
+      };
+      const filtered = search
+        ? list.filter(
+            (c: GlobalCar) =>
+              (c.code ?? "").toLowerCase().includes(search.toLowerCase()) ||
+              (c.plate_number ?? "").toLowerCase().includes(search.toLowerCase()) ||
+              (c.make ?? "").toLowerCase().includes(search.toLowerCase()) ||
+              (c.model ?? "").toLowerCase().includes(search.toLowerCase())
+          )
+        : list;
+      const final =
+        status === "active" || activeOnly
+          ? filtered.filter((c: GlobalCar) => c.is_active)
+          : status === "archived"
+            ? filtered.filter((c: GlobalCar) => c.is_active === false)
+            : filtered;
+      return NextResponse.json({
+        data: final,
+        meta: { total: final.length, page: 1, pageSize: final.length || 1, totalPages: 1 },
+      });
+    }
 
-    const filtered = search
-      ? list.filter(
-          (c: any) =>
-            c.code.toLowerCase().includes(search.toLowerCase()) ||
-            (c.plate_number ?? "").toLowerCase().includes(search.toLowerCase()) ||
-            (c.make ?? "").toLowerCase().includes(search.toLowerCase()) ||
-            (c.model ?? "").toLowerCase().includes(search.toLowerCase())
-        )
-      : list;
-
-    const final = activeOnly ? filtered.filter((c: any) => c.is_active) : filtered;
-
-    return NextResponse.json({ data: final });
+    const paged = await Crm.listCarsWithSummaryPaginated(companyId!, {
+      search,
+      status: activeOnly ? "active" : status,
+      sortBy,
+      sortDir,
+      page,
+      pageSize,
+    });
+    return NextResponse.json(paged);
   } catch (error) {
     console.error("GET /api/cars error:", error);
     return NextResponse.json({ error: "Failed to load cars" }, { status: 500 });

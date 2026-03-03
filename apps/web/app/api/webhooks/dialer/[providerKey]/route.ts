@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { CallCenter, Dialer, getSql } from "@repo/ai-core";
 import { publishIncomingPopupEvent } from "../../../../../lib/call-center/incoming-popup-bus";
 import { appendFile, mkdir } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import * as http from "node:http";
 import * as https from "node:https";
@@ -26,7 +27,9 @@ type DialerWebhookUpdate = {
 };
 
 export const dynamic = "force-dynamic";
-const WEBHOOK_LOG_PATH = path.resolve(process.cwd(), "..", "..", "tmp", "webhook-dialer.log");
+const WEBHOOK_LOG_PATH =
+  process.env.DIALER_WEBHOOK_LOG_PATH?.trim() ||
+  path.join(os.tmpdir(), "global-erp", "webhook-dialer.log");
 
 function safeJson(value: unknown): string {
   try {

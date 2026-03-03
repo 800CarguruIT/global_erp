@@ -325,10 +325,19 @@ export async function listEstimatesForCustomer(
 ): Promise<Estimate[]> {
   const sql = getSql();
   const { status, limit = 100 } = opts;
+  const legacyGuard = sql`
+    (
+      COALESCE(meta->>'legacy_source', '') <> 'carguru2.estimates'
+      OR COALESCE(
+        NULLIF(regexp_replace(COALESCE(meta->>'legacy_account_id', ''), '[^0-9-]', '', 'g'), ''),
+        '0'
+      )::bigint > 0
+    )
+  `;
   const where =
     status != null
-      ? sql`company_id = ${companyId} AND customer_id = ${customerId} AND status = ${status}`
-      : sql`company_id = ${companyId} AND customer_id = ${customerId}`;
+      ? sql`company_id = ${companyId} AND customer_id = ${customerId} AND status = ${status} AND ${legacyGuard}`
+      : sql`company_id = ${companyId} AND customer_id = ${customerId} AND ${legacyGuard}`;
   const rows = await sql`
     SELECT *
     FROM estimates

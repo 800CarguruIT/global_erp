@@ -73,17 +73,69 @@ function buildQuoteHtml(payload: {
       <meta charset="utf-8" />
       <title>Quotation</title>
       <style>
-        @page { size: A4; margin: 20mm; }
-        body { font-family: "Times New Roman", serif; color: #111; }
-        .header { display: flex; justify-content: space-between; align-items: flex-start; }
-        .brand h1 { margin: 0; font-size: 20px; color: #0a8b00; }
-        .brand p { margin: 2px 0; font-size: 12px; }
-        .logo { width: 90px; height: 90px; object-fit: contain; }
-        .bar { background: #0a8b00; color: #fff; text-align: center; font-weight: bold; padding: 6px; margin-top: 12px; }
+        @page { size: A4; margin: 18mm 14mm; }
+        * { box-sizing: border-box; }
+        body { font-family: "Segoe UI", Arial, sans-serif; color: #111827; margin: 0; }
+        .topbar {
+          display: flex;
+          justify-content: space-between;
+          align-items: stretch;
+          border: 1px solid #d1d5db;
+          border-radius: 10px;
+          overflow: hidden;
+          background: #fff;
+        }
+        .brand { flex: 1; padding: 14px 16px; }
+        .brand h1 { margin: 0; font-size: 14px; letter-spacing: 0.3px; color: #0f172a; }
+        .brand .company { margin-top: 6px; font-size: 14px; font-weight: 700; color: #0f172a; }
+        .brand p { margin: 4px 0 0; font-size: 12px; color: #475569; }
+        .meta-panel {
+          width: 230px;
+          border-left: 1px solid #e5e7eb;
+          background: #fff;
+          padding: 12px 14px;
+        }
+        .logo-box {
+          width: 92px;
+          height: 92px;
+          border: 1px solid #e5e7eb;
+          border-radius: 8px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin-bottom: 10px;
+          overflow: hidden;
+          background: #fff;
+        }
+        .logo { width: 100%; height: 100%; object-fit: contain; }
+        .meta-row {
+          display: flex;
+          justify-content: space-between;
+          gap: 8px;
+          padding: 4px 0;
+          border-bottom: 1px dashed #e5e7eb;
+          font-size: 12px;
+        }
+        .meta-row:last-child { border-bottom: 0; }
+        .meta-key { color: #64748b; font-weight: 600; }
+        .meta-val { color: #111827; font-weight: 700; }
+        .bar {
+          margin-top: 12px;
+          border: 1px solid #d1d5db;
+          border-radius: 8px;
+          background: #f8fafc;
+          color: #0f172a;
+          text-align: center;
+          font-weight: 700;
+          letter-spacing: 0.5px;
+          padding: 7px;
+          text-transform: uppercase;
+          font-size: 12px;
+        }
         table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 12px; }
-        th, td { border: 1px solid #333; padding: 6px; }
-        th { background: #f2f2f2; }
-        .meta td { background: #f2f2f2; }
+        th, td { border: 1px solid #d1d5db; padding: 7px; }
+        th { background: #f8fafc; color: #475569; text-transform: uppercase; font-size: 11px; }
+        .meta td { background: #fff; }
         .center { text-align: center; }
         .right { text-align: right; }
         .terms { margin-top: 14px; font-size: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
@@ -93,16 +145,22 @@ function buildQuoteHtml(payload: {
       </style>
     </head>
     <body>
-      <div class="header">
+      <div class="topbar">
         <div class="brand">
-          <h1>${escapeHtml(payload.companyName)}</h1>
+          <h1>Estimate Quotation</h1>
+          <p class="company">${escapeHtml(payload.companyName)}</p>
           <p>${escapeHtml(payload.companyLegalName)}</p>
           <p>${escapeHtml(payload.companyAddress)}</p>
           <p>Call: ${escapeHtml(payload.companyPhone)}</p>
           <p>Email: ${escapeHtml(payload.companyEmail)}</p>
           <p>TRN: ${escapeHtml(payload.companyTrn)}</p>
         </div>
-        ${payload.companyLogo ? `<img class="logo" src="${payload.companyLogo}" alt="Logo" />` : ""}
+        <div class="meta-panel">
+          <div class="logo-box">${payload.companyLogo ? `<img class="logo" src="${payload.companyLogo}" alt="Logo" />` : ""}</div>
+          <div class="meta-row"><span class="meta-key">Estimate Ref</span><span class="meta-val">${escapeHtml(payload.estimateId)}</span></div>
+          <div class="meta-row"><span class="meta-key">Date</span><span class="meta-val">${escapeHtml(payload.date)}</span></div>
+          <div class="meta-row"><span class="meta-key">Document</span><span class="meta-val">Quotation</span></div>
+        </div>
       </div>
 
       <div class="bar">QUOTATION</div>

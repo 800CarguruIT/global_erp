@@ -49,7 +49,7 @@ app.prepare().then(() => {
     const host = req.headers.host || `${hostname}:${port}`;
     const url = new URL(req.url || "/", `http://${host}`);
     if (url.pathname !== "/ws/call-center/incoming") {
-      socket.destroy();
+      // Let Next.js handle its own upgrade paths (e.g. dev HMR websocket).
       return;
     }
 

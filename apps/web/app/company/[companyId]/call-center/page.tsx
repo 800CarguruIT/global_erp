@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import Link from "next/link";
 import {
   AppLayout,
@@ -111,6 +111,7 @@ function CallCenterContent({ companyId }: { companyId: string }) {
   const [liveSuggestions, setLiveSuggestions] = useState<string[]>([]);
   const [liveAppreciation, setLiveAppreciation] = useState<string | null>(null);
   const [liveStatus, setLiveStatus] = useState<"idle" | "connecting" | "live">("idle");
+  const [activeLoading, setActiveLoading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -128,29 +129,31 @@ function CallCenterContent({ companyId }: { companyId: string }) {
     };
   }, [companyId, t]);
 
-  useEffect(() => {
-    async function loadActive() {
-      try {
-        const companyRes = await fetch(`/api/company/${companyId}/call-center/active`, { cache: "no-store" });
-        const companyData = companyRes.ok ? await companyRes.json().catch(() => ({})) : {};
-        const scopedRows = Array.isArray(companyData) ? companyData : companyData.data ?? [];
-        if (scopedRows.length > 0) {
-          setActiveCalls(scopedRows);
-          return;
-        }
-
-        const globalRes = await fetch("/api/global/call-center/active", { cache: "no-store" });
-        if (!globalRes.ok) return;
-        const globalData = await globalRes.json().catch(() => ({}));
-        setActiveCalls(Array.isArray(globalData) ? globalData : globalData.data ?? []);
-      } catch {
-        // ignore
+  const loadActive = useCallback(async () => {
+    setActiveLoading(true);
+    try {
+      const companyRes = await fetch(`/api/company/${companyId}/call-center/active`, { cache: "no-store" });
+      const companyData = companyRes.ok ? await companyRes.json().catch(() => ({})) : {};
+      const scopedRows = Array.isArray(companyData) ? companyData : companyData.data ?? [];
+      if (scopedRows.length > 0) {
+        setActiveCalls(scopedRows);
+        return;
       }
+
+      const globalRes = await fetch("/api/global/call-center/active", { cache: "no-store" });
+      if (!globalRes.ok) return;
+      const globalData = await globalRes.json().catch(() => ({}));
+      setActiveCalls(Array.isArray(globalData) ? globalData : globalData.data ?? []);
+    } catch {
+      // ignore
+    } finally {
+      setActiveLoading(false);
     }
-    loadActive();
-    const id = setInterval(loadActive, 5000);
-    return () => clearInterval(id);
-  }, []);
+  }, [companyId]);
+
+  useEffect(() => {
+    void loadActive();
+  }, [loadActive]);
 
   function connectLive(callId: string) {
     if (!callId) return;
@@ -400,14 +403,24 @@ function CallCenterContent({ companyId }: { companyId: string }) {
                   <div className="text-lg font-semibold">{t("call.ai.title")}</div>
                   <div className="text-xs text-muted-foreground">{t("call.ai.subtitle")}</div>
                 </div>
-                <span className="text-xs text-muted-foreground">
-                  {t("call.ai.status")} {" "}
-                  {liveStatus === "live"
-                    ? t("call.ai.status.live")
-                    : liveStatus === "connecting"
-                    ? t("call.ai.status.connecting")
-                    : t("call.ai.status.idle")}
-                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void loadActive()}
+                    className="rounded-md border px-2 py-1 text-xs"
+                    disabled={activeLoading}
+                  >
+                    {activeLoading ? "Refreshing..." : "Refresh Active Calls"}
+                  </button>
+                  <span className="text-xs text-muted-foreground">
+                    {t("call.ai.status")} {" "}
+                    {liveStatus === "live"
+                      ? t("call.ai.status.live")
+                      : liveStatus === "connecting"
+                      ? t("call.ai.status.connecting")
+                      : t("call.ai.status.idle")}
+                  </span>
+                </div>
               </div>
               <div className="grid gap-3 md:grid-cols-3">
                 <div className="space-y-2">

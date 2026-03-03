@@ -83,28 +83,91 @@ function buildInvoiceHtml(payload: {
       <meta charset="utf-8" />
       <title>Tax Invoice</title>
       <style>
-        @page { size: A4; margin: 16mm; }
-        body { font-family: Arial, Helvetica, sans-serif; color: #111; }
-        .bar { background: #0a0a0a; color: #fff; text-align: center; font-weight: 700; padding: 8px; letter-spacing: 6px; border-radius: 6px; }
-        .header { display: flex; justify-content: space-between; gap: 12px; margin-top: 12px; }
-        .brand h1 { margin: 0 0 2px; font-size: 16px; color: #0a8b00; }
-        .brand p { margin: 2px 0; font-size: 11px; }
-        .logo { width: 90px; height: 90px; object-fit: contain; }
+        @page { size: A4; margin: 18mm 14mm; }
+        * { box-sizing: border-box; }
+        body { font-family: "Segoe UI", Arial, sans-serif; color: #111827; margin: 0; }
+        .topbar {
+          display: flex;
+          justify-content: space-between;
+          align-items: stretch;
+          border: 1px solid #d1d5db;
+          border-radius: 10px;
+          overflow: hidden;
+          background: #fff;
+          margin-bottom: 12px;
+        }
+        .brand { flex: 1; padding: 14px 16px; }
+        .brand h1 { margin: 0; font-size: 14px; letter-spacing: 0.3px; color: #0f172a; }
+        .brand .company { margin-top: 6px; font-size: 14px; font-weight: 700; color: #0f172a; }
+        .brand p { margin: 4px 0 0; font-size: 12px; color: #475569; }
+        .meta-panel {
+          width: 240px;
+          border-left: 1px solid #e5e7eb;
+          background: #fff;
+          padding: 12px 14px;
+        }
+        .logo-box {
+          width: 92px;
+          height: 92px;
+          border: 1px solid #e5e7eb;
+          border-radius: 8px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin-bottom: 10px;
+          overflow: hidden;
+          background: #fff;
+        }
+        .logo { width: 100%; height: 100%; object-fit: contain; }
+        .meta-row {
+          display: flex;
+          justify-content: space-between;
+          gap: 8px;
+          padding: 4px 0;
+          border-bottom: 1px dashed #e5e7eb;
+          font-size: 12px;
+        }
+        .meta-row:last-child { border-bottom: 0; }
+        .meta-key { color: #64748b; font-weight: 600; }
+        .meta-val { color: #111827; font-weight: 700; }
+        .status-chip {
+          display: inline-block;
+          margin-top: 8px;
+          padding: 4px 8px;
+          border-radius: 999px;
+          font-size: 10px;
+          font-weight: 700;
+          border: 1px solid ${String(payload.status).toLowerCase() === "paid" ? "#059669" : "#d97706"};
+          color: ${String(payload.status).toLowerCase() === "paid" ? "#065f46" : "#92400e"};
+          background: ${String(payload.status).toLowerCase() === "paid" ? "#d1fae5" : "#fef3c7"};
+        }
+        .bar {
+          border: 1px solid #d1d5db;
+          border-radius: 8px;
+          background: #f8fafc;
+          color: #0f172a;
+          text-align: center;
+          font-weight: 700;
+          letter-spacing: 0.5px;
+          padding: 7px;
+          text-transform: uppercase;
+          font-size: 12px;
+        }
         .meta { margin-top: 12px; width: 100%; border-collapse: separate; border-spacing: 4px; font-size: 12px; }
         .meta td { padding: 4px 6px; border-radius: 4px; }
-        .meta .label { background: #d1d1d1; font-weight: 600; width: 24%; }
-        .meta .value { background: #fff; border: 1px solid #cfcfcf; }
+        .meta .label { background: #f1f5f9; color: #475569; font-weight: 600; width: 24%; }
+        .meta .value { background: #fff; border: 1px solid #d1d5db; }
         .meta .right { width: 13%; }
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         table.items { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 12px; }
-        table.items th, table.items td { border: 1px solid #bdbdbd; padding: 6px; }
-        table.items th { background: #e5e5e5; font-weight: 700; }
+        table.items th, table.items td { border: 1px solid #d1d5db; padding: 7px; }
+        table.items th { background: #f8fafc; font-weight: 700; color: #475569; text-transform: uppercase; font-size: 11px; }
         .center { text-align: center; }
         .right { text-align: right; }
         .totals { width: 45%; margin-left: auto; margin-top: 8px; border-collapse: separate; border-spacing: 4px; font-size: 12px; }
         .totals td { padding: 4px 6px; border-radius: 4px; }
-        .totals .label { background: #d1d1d1; font-weight: 600; }
-        .totals .value { background: #fff; border: 1px solid #cfcfcf; text-align: right; min-width: 90px; }
+        .totals .label { background: #f1f5f9; color: #475569; font-weight: 600; }
+        .totals .value { background: #fff; border: 1px solid #d1d5db; text-align: right; min-width: 90px; }
         .terms { margin-top: 16px; font-size: 10px; }
         .terms h3 { margin: 0 0 6px; font-size: 11px; text-decoration: underline; }
         .terms ol { margin: 0; padding-left: 16px; }
@@ -112,18 +175,25 @@ function buildInvoiceHtml(payload: {
       </style>
     </head>
     <body>
-      <div class="bar">TAX INVOICE</div>
-      <div class="header">
+      <div class="topbar">
         <div class="brand">
-          <h1>${escapeHtml(payload.companyName)}</h1>
+          <h1>Tax Invoice</h1>
+          <p class="company">${escapeHtml(payload.companyName)}</p>
           <p>${escapeHtml(payload.companyLegalName)}</p>
           <p>${escapeHtml(payload.companyAddress)}</p>
-          <p>Call: ${escapeHtml(payload.companyPhone)}</p>
-          <p>Email: ${escapeHtml(payload.companyEmail)}</p>
+          <p>Call: ${escapeHtml(payload.companyPhone)} | Email: ${escapeHtml(payload.companyEmail)}</p>
           <p>TRN: ${escapeHtml(payload.companyTrn)}</p>
         </div>
-        ${payload.companyLogo ? `<img class="logo" src="${payload.companyLogo}" alt="Logo" />` : ""}
+        <div class="meta-panel">
+          <div class="logo-box">${payload.companyLogo ? `<img class="logo" src="${payload.companyLogo}" alt="Logo" />` : ""}</div>
+          <div class="meta-row"><span class="meta-key">Invoice Ref</span><span class="meta-val">${escapeHtml(payload.invoiceNumber)}</span></div>
+          <div class="meta-row"><span class="meta-key">Date</span><span class="meta-val">${escapeHtml(payload.invoiceDate)}</span></div>
+          <div class="meta-row"><span class="meta-key">Document</span><span class="meta-val">Tax Invoice</span></div>
+          <div class="status-chip">${escapeHtml(payload.status)}</div>
+        </div>
       </div>
+
+      <div class="bar">TAX INVOICE</div>
 
       <div class="grid">
         <table class="meta">

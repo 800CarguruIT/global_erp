@@ -17,15 +17,92 @@ function roundMoney(value: number) {
   return Math.round(value * 100) / 100;
 }
 
+function scoreToCheck(value: unknown): "good" | "avg" | "bad" | "" {
+  const num = Number(value ?? 0);
+  if (!Number.isFinite(num) || num <= 0) return "";
+  if (num === 1) return "good";
+  if (num === 2) return "avg";
+  return "bad";
+}
+
 export async function GET(_req: NextRequest, { params }: Params) {
   const { companyId, inspectionId } = await params;
   const inspection = await getInspectionById(companyId, inspectionId);
   if (!inspection) {
     return new NextResponse("Not found", { status: 404 });
   }
+  const sql = getSql();
+
+  let inspectionView = inspection;
+  const status = String(inspection.status ?? "").toLowerCase();
+  const draftPayload = (inspection as any)?.draftPayload ?? {};
+  const hasDraftChecks =
+    draftPayload &&
+    typeof draftPayload === "object" &&
+    draftPayload.checks &&
+    typeof draftPayload.checks === "object" &&
+    Object.keys(draftPayload.checks).length > 0;
+
+  if (!hasDraftChecks && status === "completed") {
+    const legacyRows = await sql/* sql */ `
+      SELECT
+        ci.id,
+        ci.engine,
+        ci.steering,
+        ci.tyres,
+        ci.ac_cooling,
+        ci.car_body,
+        ci.gear,
+        ci.suspension,
+        ci.brakes,
+        ci.battery,
+        ci.infotainment,
+        ci.lead_remarks,
+        ci.inspector_name,
+        ci.inspector_remarks,
+        ci.insp_location
+      FROM migration.legacy_inspection_map lm
+      JOIN carguru2.inspections ci
+        ON ci.id::bigint = lm.legacy_inspection_id
+      WHERE lm.company_id = ${companyId}
+        AND lm.inspection_id = ${inspectionId}
+      LIMIT 1
+    `;
+
+    const legacy = (legacyRows as any)?.[0];
+    if (legacy) {
+      const builtDraft = {
+        ...draftPayload,
+        advisorName: draftPayload?.advisorName ?? (legacy.insp_location ? `${legacy.insp_location}_Department` : ""),
+        inspectorName: draftPayload?.inspectorName ?? legacy.inspector_name ?? "",
+        carInMileage: draftPayload?.carInMileage ?? "",
+        customerComplain: draftPayload?.customerComplain ?? legacy.lead_remarks ?? "",
+        inspectorRemarks: draftPayload?.inspectorRemarks ?? legacy.inspector_remarks ?? "",
+        checks: {
+          engine: scoreToCheck(legacy.engine),
+          steering: scoreToCheck(legacy.steering),
+          tyres: scoreToCheck(legacy.tyres),
+          ac: scoreToCheck(legacy.ac_cooling),
+          body: scoreToCheck(legacy.car_body),
+          gear: scoreToCheck(legacy.gear),
+          suspension: scoreToCheck(legacy.suspension),
+          brakes: scoreToCheck(legacy.brakes),
+          battery: scoreToCheck(legacy.battery),
+          infotainment: scoreToCheck(legacy.infotainment),
+        },
+        legacySnapshot: true,
+        legacyInspectionId: legacy.id,
+      };
+
+      inspectionView = {
+        ...inspection,
+        draftPayload: builtDraft,
+      } as typeof inspection;
+    }
+  }
+
   const items = await listInspectionItems(inspectionId);
   const lineItems = await listInspectionLineItems(inspectionId, { source: "inspection" });
-  const sql = getSql();
   const earningsRows = await sql/* sql */ `
     SELECT *
     FROM inspection_earnings
@@ -38,7 +115,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
     WHERE company_id = ${companyId} AND inspection_id = ${inspectionId}
     ORDER BY created_at DESC
   `;
-  return NextResponse.json({ data: { inspection, items, lineItems, earnings: earningsRows[0] ?? null, fines } });
+  return NextResponse.json({ data: { inspection: inspectionView, items, lineItems, earnings: earningsRows[0] ?? null, fines } });
 }
 
 export async function PATCH(req: NextRequest, { params }: Params) {

@@ -8,9 +8,13 @@ export async function GET(req: NextRequest, { params }: Params) {
   const { companyId } = await params;
   const { searchParams } = new URL(req.url);
   const status = searchParams.get("status") as EstimateStatus | null;
+  const limitParam = searchParams.get("limit");
+  const parsedLimit = limitParam ? Number.parseInt(limitParam, 10) : NaN;
+  const limit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : 200000;
 
   const estimates = await listEstimatesForCompany(companyId, {
     status: status ?? undefined,
+    limit,
   });
 
   return NextResponse.json({ data: estimates });

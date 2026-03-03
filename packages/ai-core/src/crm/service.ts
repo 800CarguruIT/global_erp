@@ -33,10 +33,15 @@ import {
   getCustomerWalletBalance,
   listCustomerWalletTransactions,
   listCompanyWalletTransactions as repoListCompanyWalletTransactions,
+  listCompanyWalletTransactionsPaged as repoListCompanyWalletTransactionsPaged,
   listCars as repoListCars,
+  countCars as repoCountCars,
+  countCustomers as repoCountCustomers,
   listLinksForCar,
   listLinksForCustomer,
   listCustomers as repoListCustomers,
+  listCarsPageWithSummary as repoListCarsPageWithSummary,
+  listCustomersPageWithSummary as repoListCustomersPageWithSummary,
   approveCustomerWalletTransaction as repoApproveCustomerWalletTransaction,
   updateCustomerWalletAmount,
   updateCar,
@@ -179,6 +184,66 @@ export async function listCustomersWithSummary(
   return customers.map((c) => ({ ...c, carCount: map[c.id] ?? 0 }));
 }
 
+export async function listCustomersWithSummaryPaginated(
+  companyId: string,
+  opts?: {
+    search?: string;
+    activeOnly?: boolean;
+    status?: "active" | "archived" | "all";
+    sortBy?: "created_at" | "name" | "code" | "phone" | "email";
+    sortDir?: "asc" | "desc";
+    page?: number;
+    pageSize?: number | "all";
+  }
+): Promise<{
+  data: (CustomerRow & { carCount: number })[];
+  meta: {
+    total: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+    counts: { all: number; active: number; archived: number };
+  };
+}> {
+  const page = Math.max(1, opts?.page ?? 1);
+  const wantAll = opts?.pageSize === "all";
+  const pageSize = wantAll ? 0 : Math.max(10, Math.min(Number(opts?.pageSize ?? 50), 200));
+  const offset = (page - 1) * pageSize;
+
+  const status =
+    opts?.status ?? (opts?.activeOnly ? "active" : "all");
+
+  const [allCount, activeCount, archivedCount] = await Promise.all([
+    repoCountCustomers(companyId, { search: opts?.search, status: "all" }),
+    repoCountCustomers(companyId, { search: opts?.search, status: "active" }),
+    repoCountCustomers(companyId, { search: opts?.search, status: "archived" }),
+  ]);
+
+  const total = status === "active" ? activeCount : status === "archived" ? archivedCount : allCount;
+
+  const limit = wantAll ? 500000 : pageSize;
+  const data = await repoListCustomersPageWithSummary(companyId, {
+    search: opts?.search,
+    status,
+    sortBy: opts?.sortBy,
+    sortDir: opts?.sortDir,
+    limit,
+    offset: wantAll ? 0 : offset,
+  });
+
+  const totalPages = wantAll ? 1 : Math.max(1, Math.ceil(total / pageSize));
+  return {
+    data,
+    meta: {
+      total,
+      page: wantAll ? 1 : page,
+      pageSize: wantAll ? total : pageSize,
+      totalPages,
+      counts: { all: allCount, active: activeCount, archived: archivedCount },
+    },
+  };
+}
+
 // Cars
 export async function createCar(input: CreateCarInput): Promise<CarRow> {
   const code = input.code || (await generateCarCode(input.companyId));
@@ -268,6 +333,63 @@ export async function listCarsWithSummary(
     map[row.car_id] = Number(row.cnt);
   }
   return cars.map((c) => ({ ...c, customerCount: map[c.id] ?? 0 }));
+}
+
+export async function listCarsWithSummaryPaginated(
+  companyId: string,
+  opts?: {
+    search?: string;
+    activeOnly?: boolean;
+    status?: "active" | "archived" | "all";
+    sortBy?: "created_at" | "plate_number" | "vin" | "make" | "model_year" | "code";
+    sortDir?: "asc" | "desc";
+    page?: number;
+    pageSize?: number | "all";
+  }
+): Promise<{
+  data: (CarRow & { customerCount: number })[];
+  meta: {
+    total: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+    counts: { all: number; active: number; archived: number };
+  };
+}> {
+  const page = Math.max(1, opts?.page ?? 1);
+  const wantAll = opts?.pageSize === "all";
+  const pageSize = wantAll ? 0 : Math.max(10, Math.min(Number(opts?.pageSize ?? 50), 200));
+  const offset = (page - 1) * pageSize;
+  const status = opts?.status ?? (opts?.activeOnly ? "active" : "all");
+
+  const [allCount, activeCount, archivedCount] = await Promise.all([
+    repoCountCars(companyId, { search: opts?.search, status: "all" }),
+    repoCountCars(companyId, { search: opts?.search, status: "active" }),
+    repoCountCars(companyId, { search: opts?.search, status: "archived" }),
+  ]);
+
+  const total = status === "active" ? activeCount : status === "archived" ? archivedCount : allCount;
+  const limit = wantAll ? 500000 : pageSize;
+  const data = await repoListCarsPageWithSummary(companyId, {
+    search: opts?.search,
+    status,
+    sortBy: opts?.sortBy,
+    sortDir: opts?.sortDir,
+    limit,
+    offset: wantAll ? 0 : offset,
+  });
+
+  const totalPages = wantAll ? 1 : Math.max(1, Math.ceil(total / pageSize));
+  return {
+    data,
+    meta: {
+      total,
+      page: wantAll ? 1 : page,
+      pageSize: wantAll ? total : pageSize,
+      totalPages,
+      counts: { all: allCount, active: activeCount, archived: archivedCount },
+    },
+  };
 }
 
 // Linking
@@ -394,6 +516,28 @@ export async function listCompanyWalletTopups(
   approvedOnly = false
 ): Promise<CustomerWalletTransactionWithCustomer[]> {
   return repoListCompanyWalletTransactions(companyId, { approvedOnly });
+}
+
+export async function listCompanyWalletTopupsPaged(
+  companyId: string,
+  opts?: {
+    approvalState?: "all" | "approved" | "unapproved";
+    search?: string;
+    paymentMethod?: string;
+    page?: number;
+    pageSize?: number;
+  }
+): Promise<{ rows: CustomerWalletTransactionWithCustomer[]; total: number }> {
+  const page = Math.max(1, Number(opts?.page ?? 1));
+  const pageSize = Math.max(1, Math.min(Number(opts?.pageSize ?? 25), 500));
+  const offset = (page - 1) * pageSize;
+  return repoListCompanyWalletTransactionsPaged(companyId, {
+    approvalState: opts?.approvalState ?? "all",
+    search: opts?.search,
+    paymentMethod: opts?.paymentMethod,
+    limit: pageSize,
+    offset,
+  });
 }
 
 export async function getCustomerWalletSummary(companyId: string, customerId: string) {

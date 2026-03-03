@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Card } from "./Card";
 import { useTheme } from "../theme";
 
@@ -43,6 +43,7 @@ export function DialerIntegrationsScreen({ level, companyId }: Props) {
 
   const [items, setItems] = useState<DialerRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mutatingId, setMutatingId] = useState<string | null>(null);
   const [testStates, setTestStates] = useState<Record<string, TestCallState>>({});
@@ -73,37 +74,42 @@ export function DialerIntegrationsScreen({ level, companyId }: Props) {
       ? "/global/integrations"
       : `/company/${companyId}/integrations`;
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function load() {
-      setLoading(true);
+  const loadIntegrations = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      const silent = opts?.silent === true;
+      if (!silent) {
+        setLoading(true);
+      } else {
+        setRefreshing(true);
+      }
       setError(null);
       try {
-        const res = await fetch(`/api/dialer/integrations?${scopeParam}`);
+        const res = await fetch(`/api/dialer/integrations?${scopeParam}`, { cache: "no-store" });
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
           throw new Error(body.error || "Failed to load dialer integrations");
         }
         const data = await res.json();
-        if (!cancelled) setItems(data.items ?? []);
+        setItems(data.items ?? []);
       } catch (err: unknown) {
         console.error(err);
-        if (!cancelled) {
-          const message =
-            err instanceof Error ? err.message : "Failed to load dialer integrations";
-          setError(message);
-        }
+        const message =
+          err instanceof Error ? err.message : "Failed to load dialer integrations";
+        setError(message);
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!silent) {
+          setLoading(false);
+        } else {
+          setRefreshing(false);
+        }
       }
-    }
+    },
+    [scopeParam]
+  );
 
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [scopeParam]);
+  useEffect(() => {
+    void loadIntegrations();
+  }, [loadIntegrations]);
 
   useEffect(() => {
     async function loadHealth(ids: string[]) {
@@ -291,6 +297,13 @@ export function DialerIntegrationsScreen({ level, companyId }: Props) {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="text-xs sm:text-sm opacity-70">{headerText}</div>
         <div className="flex gap-2">
+          <button
+            className="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-xs sm:text-sm transition disabled:opacity-50"
+            disabled={loading || refreshing}
+            onClick={() => void loadIntegrations({ silent: true })}
+          >
+            {refreshing ? "Refreshing…" : "Refresh"}
+          </button>
           <button
             className="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-xs sm:text-sm transition"
             onClick={() => (window.location.href = backHref)}

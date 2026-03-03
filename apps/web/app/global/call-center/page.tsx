@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   AppLayout,
@@ -68,6 +68,7 @@ function CallCenterContent() {
   const [activeCalls, setActiveCalls] = useState<
     Array<{ id: string; provider_call_id?: string | null; from_number?: string | null; to_number?: string | null; direction?: string | null; status?: string | null }>
   >([]);
+  const [activeLoading, setActiveLoading] = useState(false);
   const { theme, surfaceSubtle, cardBorder, card } = useTheme();
   const { t } = useI18n();
   const router = useRouter();
@@ -78,21 +79,23 @@ function CallCenterContent() {
       .catch(() => setError(t("call.main.error")));
   }, [t]);
 
-  useEffect(() => {
-    async function loadActive() {
-      try {
-        const res = await fetch("/api/global/call-center/active", { cache: "no-store" });
-        if (!res.ok) return;
-        const data = await res.json().catch(() => ({}));
-        setActiveCalls(Array.isArray(data) ? data : data.data ?? []);
-      } catch {
-        // ignore
-      }
+  const loadActive = useCallback(async () => {
+    setActiveLoading(true);
+    try {
+      const res = await fetch("/api/global/call-center/active", { cache: "no-store" });
+      if (!res.ok) return;
+      const data = await res.json().catch(() => ({}));
+      setActiveCalls(Array.isArray(data) ? data : data.data ?? []);
+    } catch {
+      // ignore
+    } finally {
+      setActiveLoading(false);
     }
-    loadActive();
-    const id = setInterval(loadActive, 5000);
-    return () => clearInterval(id);
   }, []);
+
+  useEffect(() => {
+    void loadActive();
+  }, [loadActive]);
 
   function connectLive(callId: string) {
     if (!callId) return;
@@ -256,9 +259,19 @@ function CallCenterContent() {
               <div className="text-lg font-semibold">AI intercept</div>
               <div className="text-xs text-muted-foreground">Connect to a live call to see transcript and suggestions.</div>
             </div>
-            <span className="text-xs text-muted-foreground">
-              Status: {liveStatus === "live" ? "Live" : liveStatus === "connecting" ? "Connecting..." : "Idle"}
-            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className="rounded-md border px-2 py-1 text-xs"
+                onClick={() => void loadActive()}
+                disabled={activeLoading}
+              >
+                {activeLoading ? "Refreshing..." : "Refresh Active Calls"}
+              </button>
+              <span className="text-xs text-muted-foreground">
+                Status: {liveStatus === "live" ? "Live" : liveStatus === "connecting" ? "Connecting..." : "Idle"}
+              </span>
+            </div>
           </div>
           <div className="grid gap-3 md:grid-cols-3">
             <div className="space-y-2">

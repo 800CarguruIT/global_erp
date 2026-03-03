@@ -8,6 +8,64 @@ import { isModuleVisibleForScope, CURRENT_MODULE_PHASE } from "@repo/ai-core/sha
 import { useI18n } from "../i18n";
 import { DOCUMENTATION_STRUCTURE } from "../docs/docsStructure";
 
+type PermissionScopeKey = {
+  scope: NavScope;
+  companyId?: string;
+  branchId?: string;
+  vendorId?: string;
+};
+
+const PERMISSIONS_TTL_MS = 30_000;
+const permissionsCache = new Map<string, { ts: number; permissions: string[] }>();
+const permissionsInflight = new Map<string, Promise<string[]>>();
+
+function buildPermissionsCacheKey(input: PermissionScopeKey): string {
+  return [
+    input.scope,
+    input.companyId ?? "",
+    input.branchId ?? "",
+    input.vendorId ?? "",
+  ].join("|");
+}
+
+async function fetchPermissionsOnce(input: PermissionScopeKey): Promise<string[]> {
+  const cacheKey = buildPermissionsCacheKey(input);
+  const now = Date.now();
+  const cached = permissionsCache.get(cacheKey);
+  if (cached && now - cached.ts < PERMISSIONS_TTL_MS) {
+    return cached.permissions;
+  }
+
+  const inflight = permissionsInflight.get(cacheKey);
+  if (inflight) {
+    return inflight;
+  }
+
+  const params = new URLSearchParams();
+  params.set("scope", input.scope);
+  if (input.scope !== "global" && input.companyId) {
+    params.set("companyId", input.companyId);
+    if (input.branchId) params.set("branchId", input.branchId);
+    if (input.vendorId) params.set("vendorId", input.vendorId);
+  }
+
+  const request = fetch(`/api/auth/permissions/me?${params.toString()}`)
+    .then(async (res) => {
+      if (!res.ok) return [];
+      const data = await res.json().catch(() => ({}));
+      const permissions = Array.isArray(data?.permissions) ? data.permissions : [];
+      permissionsCache.set(cacheKey, { ts: Date.now(), permissions });
+      return permissions;
+    })
+    .catch(() => [])
+    .finally(() => {
+      permissionsInflight.delete(cacheKey);
+    });
+
+  permissionsInflight.set(cacheKey, request);
+  return request;
+}
+
 const GLOBAL_SUBTITLES = [
   { label: "Overview", href: "/global/docs" },
   ...(DOCUMENTATION_STRUCTURE.find((chapter) => chapter.key === "global")?.sessions ?? []).map((session) => ({
@@ -177,24 +235,9 @@ export function SidebarNav({
       }
       setPermissionsLoaded(false);
       try {
-        const params = new URLSearchParams();
-        params.set("scope", scope);
-        if (scope !== "global" && companyId) {
-          params.set("companyId", companyId);
-          if (branchId) params.set("branchId", branchId);
-          if (vendorId) params.set("vendorId", vendorId);
-        }
-        const res = await fetch(`/api/auth/permissions/me?${params.toString()}`);
-        if (!res.ok) {
-          if (!cancelled) {
-            setPermissions([]);
-            setPermissionsLoaded(true);
-          }
-          return;
-        }
-        const data = await res.json();
+        const data = await fetchPermissionsOnce({ scope, companyId, branchId, vendorId });
         if (!cancelled) {
-          setPermissions(Array.isArray(data?.permissions) ? data.permissions : []);
+          setPermissions(data);
           setPermissionsLoaded(true);
         }
       } catch {

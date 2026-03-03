@@ -190,8 +190,8 @@ export function CompanyForm({ mode, initialValues, onSubmit }: CompanyFormProps)
     return errors;
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function submitForm() {
+    if (saving) return;
     const validation = collectValidationErrors();
     if (validation.length > 0) {
       setValidationErrors(validation);
@@ -214,7 +214,7 @@ export function CompanyForm({ mode, initialValues, onSubmit }: CompanyFormProps)
   const showContactWarning = !hasContact && validationErrors.includes(contactRequiredMessage);
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <div className="space-y-6">
       {validationErrors.length > 0 && (
         <div className="rounded-2xl border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-700 space-y-1">
           {validationErrors.map((message) => (
@@ -663,7 +663,10 @@ export function CompanyForm({ mode, initialValues, onSubmit }: CompanyFormProps)
       {success && <div className="text-green-400 text-sm">{success}</div>}
 
       <button
-        type="submit"
+        type="button"
+        onClick={() => {
+          void submitForm();
+        }}
         disabled={saving}
         className={`px-4 py-2 rounded-xl border shadow-sm disabled:opacity-50 transition ${theme.surfaceSubtle} ${theme.cardBorder} ${theme.appText} hover:border-primary/60`}
       >
@@ -673,7 +676,7 @@ export function CompanyForm({ mode, initialValues, onSubmit }: CompanyFormProps)
           ? t("companies.save.update")
           : t("companies.save.create")}
       </button>
-    </form>
+    </div>
   );
 }
 

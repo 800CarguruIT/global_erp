@@ -61,6 +61,129 @@ export async function listCustomers(
   return rowsFrom(res);
 }
 
+export async function countCustomers(
+  companyId: string,
+  opts?: { search?: string; activeOnly?: boolean; status?: "active" | "archived" | "all" }
+): Promise<number> {
+  const sql = getSql();
+  const rawSearch = opts?.search?.trim();
+  const search = rawSearch ? `%${rawSearch}%` : null;
+  const status = opts?.status ?? (opts?.activeOnly ? "active" : "all");
+  const statusFilterSql =
+    status === "active"
+      ? sql`AND is_active = TRUE`
+      : status === "archived"
+        ? sql`AND is_active = FALSE`
+        : sql``;
+  const filterSql = search
+    ? sql`
+      AND (
+        code ILIKE ${search} OR
+        name ILIKE ${search} OR
+        email ILIKE ${search} OR
+        phone ILIKE ${search}
+      )`
+    : sql``;
+
+  const res = await sql<{ cnt: number | string }[]>`
+    SELECT COUNT(*)::bigint AS cnt
+    FROM customers
+    WHERE company_id = ${companyId}
+      ${statusFilterSql}
+      ${filterSql}
+  `;
+  const row = rowsFrom(res)[0] as { cnt: number | string } | undefined;
+  return Number(row?.cnt ?? 0);
+}
+
+export async function listCustomersPageWithSummary(
+  companyId: string,
+  opts?: {
+    search?: string;
+    activeOnly?: boolean;
+    status?: "active" | "archived" | "all";
+    sortBy?: "created_at" | "name" | "code" | "phone" | "email";
+    sortDir?: "asc" | "desc";
+    limit?: number;
+    offset?: number;
+  }
+): Promise<(CustomerRow & { carCount: number })[]> {
+  const sql = getSql();
+  const rawSearch = opts?.search?.trim();
+  const search = rawSearch ? `%${rawSearch}%` : null;
+  const status = opts?.status ?? (opts?.activeOnly ? "active" : "all");
+  const statusFilterSql =
+    status === "active"
+      ? sql`AND is_active = TRUE`
+      : status === "archived"
+        ? sql`AND is_active = FALSE`
+        : sql``;
+  const filterSql = search
+    ? sql`
+      AND (
+        code ILIKE ${search} OR
+        name ILIKE ${search} OR
+        email ILIKE ${search} OR
+        phone ILIKE ${search}
+      )`
+    : sql``;
+
+  const safeLimit = Math.max(1, Math.min(opts?.limit ?? 50, 500000));
+  const safeOffset = Math.max(0, opts?.offset ?? 0);
+  const sortBy = opts?.sortBy ?? "created_at";
+  const sortDir = opts?.sortDir === "asc" ? "asc" : "desc";
+  const sortDirSql = sortDir === "asc" ? sql`ASC` : sql`DESC`;
+  const orderSqlPaged =
+    sortBy === "name"
+      ? sql`ORDER BY name ${sortDirSql}, id ${sortDirSql}`
+      : sortBy === "code"
+        ? sql`ORDER BY code ${sortDirSql}, id ${sortDirSql}`
+        : sortBy === "phone"
+          ? sql`ORDER BY phone ${sortDirSql}, id ${sortDirSql}`
+          : sortBy === "email"
+            ? sql`ORDER BY email ${sortDirSql}, id ${sortDirSql}`
+            : sql`ORDER BY created_at ${sortDirSql}, id ${sortDirSql}`;
+  const orderSqlFinal =
+    sortBy === "name"
+      ? sql`ORDER BY p.name ${sortDirSql}, p.id ${sortDirSql}`
+      : sortBy === "code"
+        ? sql`ORDER BY p.code ${sortDirSql}, p.id ${sortDirSql}`
+        : sortBy === "phone"
+          ? sql`ORDER BY p.phone ${sortDirSql}, p.id ${sortDirSql}`
+          : sortBy === "email"
+            ? sql`ORDER BY p.email ${sortDirSql}, p.id ${sortDirSql}`
+            : sql`ORDER BY p.created_at ${sortDirSql}, p.id ${sortDirSql}`;
+
+  const res = await sql<(CustomerRow & { carCount: number })[]>`
+    WITH paged AS (
+      SELECT *
+      FROM customers
+      WHERE company_id = ${companyId}
+        ${statusFilterSql}
+        ${filterSql}
+      ${orderSqlPaged}
+      LIMIT ${safeLimit}
+      OFFSET ${safeOffset}
+    ),
+    car_counts AS (
+      SELECT l.customer_id, COUNT(*)::int AS cnt
+      FROM customer_car_links l
+      JOIN paged p ON p.id = l.customer_id
+      WHERE l.company_id = ${companyId}
+        AND l.is_active = TRUE
+      GROUP BY l.customer_id
+    )
+    SELECT
+      p.*,
+      COALESCE(cc.cnt, 0)::int AS "carCount"
+    FROM paged p
+    LEFT JOIN car_counts cc ON cc.customer_id = p.id
+    ${orderSqlFinal}
+  `;
+
+  return rowsFrom(res);
+}
+
 export async function insertCustomer(data: { code: string } & CreateCustomerInput): Promise<CustomerRow> {
   const sql = getSql();
   const res = await sql<CustomerRow[]>`
@@ -182,6 +305,135 @@ export async function listCars(
       ${filterSql}
     ORDER BY created_at DESC
   `;
+  return rowsFrom(res);
+}
+
+export async function countCars(
+  companyId: string,
+  opts?: { search?: string; activeOnly?: boolean; status?: "active" | "archived" | "all" }
+): Promise<number> {
+  const sql = getSql();
+  const rawSearch = opts?.search?.trim();
+  const search = rawSearch ? `%${rawSearch}%` : null;
+  const status = opts?.status ?? (opts?.activeOnly ? "active" : "all");
+  const statusFilterSql =
+    status === "active"
+      ? sql`AND is_active = TRUE`
+      : status === "archived"
+        ? sql`AND is_active = FALSE`
+        : sql``;
+  const filterSql = search
+    ? sql`
+      AND (
+        code ILIKE ${search} OR
+        plate_number ILIKE ${search} OR
+        vin ILIKE ${search} OR
+        make ILIKE ${search} OR
+        model ILIKE ${search}
+      )`
+    : sql``;
+
+  const res = await sql<{ cnt: number | string }[]>`
+    SELECT COUNT(*)::bigint AS cnt
+    FROM cars
+    WHERE company_id = ${companyId}
+      ${statusFilterSql}
+      ${filterSql}
+  `;
+  const row = rowsFrom(res)[0] as { cnt: number | string } | undefined;
+  return Number(row?.cnt ?? 0);
+}
+
+export async function listCarsPageWithSummary(
+  companyId: string,
+  opts?: {
+    search?: string;
+    activeOnly?: boolean;
+    status?: "active" | "archived" | "all";
+    sortBy?: "created_at" | "plate_number" | "vin" | "make" | "model_year" | "code";
+    sortDir?: "asc" | "desc";
+    limit?: number;
+    offset?: number;
+  }
+): Promise<(CarRow & { customerCount: number })[]> {
+  const sql = getSql();
+  const rawSearch = opts?.search?.trim();
+  const search = rawSearch ? `%${rawSearch}%` : null;
+  const status = opts?.status ?? (opts?.activeOnly ? "active" : "all");
+  const statusFilterSql =
+    status === "active"
+      ? sql`AND is_active = TRUE`
+      : status === "archived"
+        ? sql`AND is_active = FALSE`
+        : sql``;
+  const filterSql = search
+    ? sql`
+      AND (
+        code ILIKE ${search} OR
+        plate_number ILIKE ${search} OR
+        vin ILIKE ${search} OR
+        make ILIKE ${search} OR
+        model ILIKE ${search}
+      )`
+    : sql``;
+
+  const safeLimit = Math.max(1, Math.min(opts?.limit ?? 50, 500000));
+  const safeOffset = Math.max(0, opts?.offset ?? 0);
+  const sortBy = opts?.sortBy ?? "created_at";
+  const sortDir = opts?.sortDir === "asc" ? "asc" : "desc";
+  const sortDirSql = sortDir === "asc" ? sql`ASC` : sql`DESC`;
+  const orderSqlPaged =
+    sortBy === "plate_number"
+      ? sql`ORDER BY plate_number ${sortDirSql}, id ${sortDirSql}`
+      : sortBy === "vin"
+        ? sql`ORDER BY vin ${sortDirSql}, id ${sortDirSql}`
+        : sortBy === "make"
+          ? sql`ORDER BY make ${sortDirSql}, model ${sortDirSql}, id ${sortDirSql}`
+          : sortBy === "model_year"
+            ? sql`ORDER BY model_year ${sortDirSql}, id ${sortDirSql}`
+            : sortBy === "code"
+              ? sql`ORDER BY code ${sortDirSql}, id ${sortDirSql}`
+              : sql`ORDER BY created_at ${sortDirSql}, id ${sortDirSql}`;
+  const orderSqlFinal =
+    sortBy === "plate_number"
+      ? sql`ORDER BY p.plate_number ${sortDirSql}, p.id ${sortDirSql}`
+      : sortBy === "vin"
+        ? sql`ORDER BY p.vin ${sortDirSql}, p.id ${sortDirSql}`
+        : sortBy === "make"
+          ? sql`ORDER BY p.make ${sortDirSql}, p.model ${sortDirSql}, p.id ${sortDirSql}`
+          : sortBy === "model_year"
+            ? sql`ORDER BY p.model_year ${sortDirSql}, p.id ${sortDirSql}`
+            : sortBy === "code"
+              ? sql`ORDER BY p.code ${sortDirSql}, p.id ${sortDirSql}`
+              : sql`ORDER BY p.created_at ${sortDirSql}, p.id ${sortDirSql}`;
+
+  const res = await sql<(CarRow & { customerCount: number })[]>`
+    WITH paged AS (
+      SELECT *
+      FROM cars
+      WHERE company_id = ${companyId}
+        ${statusFilterSql}
+        ${filterSql}
+      ${orderSqlPaged}
+      LIMIT ${safeLimit}
+      OFFSET ${safeOffset}
+    ),
+    customer_counts AS (
+      SELECT l.car_id, COUNT(*)::int AS cnt
+      FROM customer_car_links l
+      JOIN paged p ON p.id = l.car_id
+      WHERE l.company_id = ${companyId}
+        AND l.is_active = TRUE
+      GROUP BY l.car_id
+    )
+    SELECT
+      p.*,
+      COALESCE(cc.cnt, 0)::int AS "customerCount"
+    FROM paged p
+    LEFT JOIN customer_counts cc ON cc.car_id = p.id
+    ${orderSqlFinal}
+  `;
+
   return rowsFrom(res);
 }
 
@@ -330,16 +582,27 @@ export async function listCustomerWalletTransactions(
   companyId: string,
   customerId: string,
   opts?: { approvedOnly?: boolean }
-): Promise<CustomerWalletTransactionRow[]> {
+): Promise<CustomerWalletTransactionWithCustomer[]> {
   const sql = getSql();
   const approvedFilter = opts?.approvedOnly ? sql`AND approved_at IS NOT NULL` : sql``;
-  const res = await sql<CustomerWalletTransactionRow[]>`
-    SELECT *
-    FROM customer_wallet_transactions
-    WHERE company_id = ${companyId}
-      AND customer_id = ${customerId}
+  const res = await sql<CustomerWalletTransactionWithCustomer[]>`
+    SELECT
+      t.*,
+      COALESCE(
+        NULLIF(u.full_name, ''),
+        NULLIF(e.full_name, ''),
+        NULLIF(b.display_name, ''),
+        NULLIF(b.name, ''),
+        NULLIF(u.email, '')
+      ) AS approved_by_name
+    FROM customer_wallet_transactions t
+    LEFT JOIN users u ON u.id = t.approved_by
+    LEFT JOIN employees e ON e.id = u.employee_id
+    LEFT JOIN branches b ON b.id = COALESCE(u.branch_id, e.branch_id)
+    WHERE t.company_id = ${companyId}
+      AND t.customer_id = ${customerId}
       ${approvedFilter}
-    ORDER BY created_at DESC
+    ORDER BY t.created_at DESC
   `;
   return rowsFrom(res);
 }
@@ -356,15 +619,97 @@ export async function listCompanyWalletTransactions(
       c.name AS customer_name,
       c.phone AS customer_phone,
       c.email AS customer_email,
-      COALESCE(u.full_name, u.email) AS approved_by_name
+      COALESCE(
+        NULLIF(u.full_name, ''),
+        NULLIF(e.full_name, ''),
+        NULLIF(b.display_name, ''),
+        NULLIF(b.name, ''),
+        NULLIF(u.email, '')
+      ) AS approved_by_name
     FROM customer_wallet_transactions t
     JOIN customers c ON c.id = t.customer_id
     LEFT JOIN users u ON u.id = t.approved_by
+    LEFT JOIN employees e ON e.id = u.employee_id
+    LEFT JOIN branches b ON b.id = COALESCE(u.branch_id, e.branch_id)
     WHERE t.company_id = ${companyId}
       ${approvedFilter}
     ORDER BY t.created_at DESC
   `;
   return rowsFrom(res);
+}
+
+export async function listCompanyWalletTransactionsPaged(
+  companyId: string,
+  opts?: {
+    approvalState?: "all" | "approved" | "unapproved";
+    search?: string;
+    paymentMethod?: string;
+    limit?: number;
+    offset?: number;
+  }
+): Promise<{ rows: CustomerWalletTransactionWithCustomer[]; total: number }> {
+  const sql = getSql();
+  const approvedFilter =
+    opts?.approvalState === "approved"
+      ? sql`AND t.approved_at IS NOT NULL`
+      : opts?.approvalState === "unapproved"
+      ? sql`AND t.approved_at IS NULL`
+      : sql``;
+  const q = (opts?.search ?? "").trim();
+  const searchFilter = q
+    ? sql`AND (
+      c.name ILIKE ${`%${q}%`}
+      OR c.phone ILIKE ${`%${q}%`}
+      OR c.email ILIKE ${`%${q}%`}
+      OR coalesce(t.payment_method, '') ILIKE ${`%${q}%`}
+      OR coalesce(t.notes, '') ILIKE ${`%${q}%`}
+    )`
+    : sql``;
+  const paymentMethodFilter =
+    opts?.paymentMethod && opts.paymentMethod !== "all"
+      ? sql`AND lower(coalesce(t.payment_method, 'unknown')) = lower(${opts.paymentMethod})`
+      : sql``;
+  const limit = Math.max(1, Math.min(Number(opts?.limit ?? 25), 500));
+  const offset = Math.max(0, Number(opts?.offset ?? 0));
+
+  const countRes = await sql<{ total: number }[]>`
+    SELECT COUNT(*)::int AS total
+    FROM customer_wallet_transactions t
+    JOIN customers c ON c.id = t.customer_id
+    WHERE t.company_id = ${companyId}
+      ${approvedFilter}
+      ${searchFilter}
+      ${paymentMethodFilter}
+  `;
+  const total = Number(rowsFrom(countRes)[0]?.total ?? 0);
+
+  const dataRes = await sql<CustomerWalletTransactionWithCustomer[]>`
+    SELECT
+      t.*,
+      c.name AS customer_name,
+      c.phone AS customer_phone,
+      c.email AS customer_email,
+      COALESCE(
+        NULLIF(u.full_name, ''),
+        NULLIF(e.full_name, ''),
+        NULLIF(b.display_name, ''),
+        NULLIF(b.name, ''),
+        NULLIF(u.email, '')
+      ) AS approved_by_name
+    FROM customer_wallet_transactions t
+    JOIN customers c ON c.id = t.customer_id
+    LEFT JOIN users u ON u.id = t.approved_by
+    LEFT JOIN employees e ON e.id = u.employee_id
+    LEFT JOIN branches b ON b.id = COALESCE(u.branch_id, e.branch_id)
+    WHERE t.company_id = ${companyId}
+      ${approvedFilter}
+      ${searchFilter}
+      ${paymentMethodFilter}
+    ORDER BY t.created_at DESC
+    LIMIT ${limit}
+    OFFSET ${offset}
+  `;
+  return { rows: rowsFrom(dataRes), total };
 }
 
 export async function getCustomerWalletTransactionById(

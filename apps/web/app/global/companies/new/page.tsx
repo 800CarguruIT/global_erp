@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { AppLayout, CompanyForm, useI18n, useTheme } from "@repo/ui";
 
 export default function GlobalCompanyCreatePage() {
@@ -19,6 +20,7 @@ function CreateCompanyContent() {
   const [subEndsAt, setSubEndsAt] = useState("");
   const [addSubscription, setAddSubscription] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
+  const router = useRouter();
   const { t } = useI18n();
   const { theme } = useTheme();
 
@@ -101,22 +103,28 @@ function CreateCompanyContent() {
         }
       }
 
-      window.location.href = "/global/companies";
+      router.push("/global/companies");
     } catch (err: any) {
       setError(err?.message ?? t("companies.save.error"));
     }
   }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 py-6">
+    <div
+      className="max-w-5xl mx-auto space-y-6 py-6"
+      onSubmitCapture={(e) => {
+        e.preventDefault();
+      }}
+    >
       <div className="flex items-center justify-between">
         <div className="space-y-1">
           <p className="text-xs uppercase text-muted-foreground">{t("companies.breadcrumb")}</p>
           <h1 className="text-2xl font-semibold">{t("companies.create.title")}</h1>
         </div>
         <button
+          type="button"
           className={`px-3 py-1.5 rounded-lg text-sm bg-transparent hover:bg-black/5 ${theme.cardBorder}`}
-          onClick={() => (window.location.href = "/global/companies")}
+          onClick={() => router.push("/global/companies")}
         >
           {"<"} {t("companies.back")}
         </button>
