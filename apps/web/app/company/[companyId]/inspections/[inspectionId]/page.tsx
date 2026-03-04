@@ -191,40 +191,36 @@ export function InspectionDetailPageClient({
         }
         if (payload?.id && companyId) {
           const itemsRes = await fetch(
-            `/api/company/${companyId}/workshop/inspections/${payload.id}/line-items?source=inspection`
+            `/api/company/${companyId}/workshop/inspections/${payload.id}/line-items?source=inspection&isAdd=0`
           );
-          if (itemsRes.ok) {
-            const itemsJson = await itemsRes.json();
-            const items = itemsJson?.data ?? [];
-            if (items.length) {
-              const mappedParts = items.map((item: any) => ({
-                id: item.id,
-                productId: item.productId ?? item.product_id ?? null,
-                productType: item.productType ?? item.product_type ?? item.type ?? null,
-                part: item.productName ?? item.product_name ?? "",
-                description: item.description ?? "",
-                qty: String(item.quantity ?? 1),
-                reason: item.reason ?? "Mandatory",
-                mediaFileId: item.mediaFileId ?? item.media_file_id ?? null,
-                partOrdered: item.partOrdered ?? item.part_ordered ?? 0,
-                orderStatus: item.orderStatus ?? item.order_status ?? null,
-                isSaved: true,
-              }));
-              setParts(
-                mappedParts
-              );
-              initialPartsSignatureRef.current = JSON.stringify(
-                mappedParts.map((p) => ({
-                  id: p.id ?? null,
-                  part: p.part?.trim?.() ?? "",
-                  description: p.description?.trim?.() ?? "",
-                  qty: String(p.qty ?? ""),
-                  reason: p.reason ?? "",
-                  mediaFileId: p.mediaFileId ?? null,
-                  productId: p.productId ?? null,
-                }))
-              );
-            }
+          const itemsJson = itemsRes.ok ? await itemsRes.json().catch(() => ({})) : {};
+          const items = itemsJson?.data ?? [];
+          if (items.length) {
+            const mappedParts = items.map((item: any) => ({
+              id: item.id,
+              productId: item.productId ?? item.product_id ?? null,
+              productType: item.productType ?? item.product_type ?? item.type ?? null,
+              part: item.productName ?? item.product_name ?? "",
+              description: item.description ?? "",
+              qty: String(item.quantity ?? 1),
+              reason: item.reason ?? "Mandatory",
+              mediaFileId: item.mediaFileId ?? item.media_file_id ?? null,
+              partOrdered: item.partOrdered ?? item.part_ordered ?? 0,
+              orderStatus: item.orderStatus ?? item.order_status ?? null,
+              isSaved: true,
+            }));
+            setParts(mappedParts);
+            initialPartsSignatureRef.current = JSON.stringify(
+              mappedParts.map((p) => ({
+                id: p.id ?? null,
+                part: p.part?.trim?.() ?? "",
+                description: p.description?.trim?.() ?? "",
+                qty: String(p.qty ?? ""),
+                reason: p.reason ?? "",
+                mediaFileId: p.mediaFileId ?? null,
+                productId: p.productId ?? null,
+              }))
+            );
           }
         }
       } catch (err: any) {

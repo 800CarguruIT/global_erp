@@ -42,4 +42,8 @@ export type EstimateItem = {
   updatedAt: string;
   approvedType?: EstimateItemCostType | null;
   quoteCosts?: EstimateItemQuoteCosts;
+  approvedSale?: number | null;
+  discount?: number | null;
+  discountPercent?: number | null;
+  subTotal?: number | null;
 };

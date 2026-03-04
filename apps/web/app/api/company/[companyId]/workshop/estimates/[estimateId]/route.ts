@@ -64,6 +64,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       status?: EstimateItemStatus;
       approvedType?: EstimateItemCostType | null;
       approvedCost?: number | null;
+      approvedSale?: number | null;
+      discount?: number | null;
+      discountPercent?: number | null;
     }>;
 
     let inspectionItems: Awaited<ReturnType<typeof listInspectionLineItems>> = [];
@@ -212,6 +215,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
           status: item.status ?? ("pending" as EstimateItemStatus),
           approvedType: (item as any).approvedType ?? null,
           approvedCost: (item as any).approvedCost ?? null,
+          approvedSale: (item as any).approvedSale ?? null,
+          discount: (item as any).discount ?? null,
+          discountPercent: (item as any).discountPercent ?? null,
         });
       }
 

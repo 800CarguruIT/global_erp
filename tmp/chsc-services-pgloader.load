@@ -1,0 +1,7 @@
+﻿LOAD DATABASE
+  FROM mysql://root:root123@host.docker.internal:3309/carguru2
+  INTO postgresql://autoguru:autoguru@host.docker.internal:5432/global_erp_migration
+
+WITH include no drop, create no tables, create no indexes, reset no sequences, data only, truncate
+INCLUDING ONLY TABLE NAMES MATCHING ~/^chsc_services$/
+;

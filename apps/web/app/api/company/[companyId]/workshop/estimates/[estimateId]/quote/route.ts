@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { chromium } from "playwright";
-import fs from "node:fs/promises";
-import { Crm, Files, Leads, WorkshopEstimates } from "@repo/ai-core";
-import { getCompanyById } from "@repo/ai-core/company/service";
+import { getSql } from "@repo/ai-core/db";
 
 export const runtime = "nodejs";
 
@@ -247,53 +245,84 @@ export async function GET(_req: NextRequest, { params }: Params) {
   let browser: Awaited<ReturnType<typeof chromium.launch>> | null = null;
   try {
     const { companyId, estimateId } = await params;
-    const data = await WorkshopEstimates.getEstimateWithItems(companyId, estimateId);
-    if (!data) {
+    const sql = getSql();
+    const estimateRows = await sql`
+      SELECT id, customer_id, car_id, lead_id, inspection_id, created_at, meta
+      FROM estimates
+      WHERE company_id = ${companyId} AND id = ${estimateId}
+      LIMIT 1
+    `;
+    if (!estimateRows.length) {
       return NextResponse.json({ error: "Estimate not found" }, { status: 404 });
     }
+    const estimate = estimateRows[0];
+    const isLegacyEstimate =
+      String((estimate.meta as any)?.legacy_source ?? "").trim().toLowerCase() === "carguru2.estimates";
+    const itemRows = isLegacyEstimate
+      ? await sql`
+          SELECT
+            li.product_name AS part_name,
+            li.description,
+            li.quantity,
+            COALESCE(li.approved_sale, li.approved_cost, 0)::numeric AS sale,
+            COALESCE(li.discount_amount, 0)::numeric AS discount,
+            LOWER(COALESCE(li.status, 'pending')) AS status,
+            li.created_at
+          FROM line_items li
+          WHERE li.company_id = ${companyId}
+            AND li.inspection_id = ${estimate.inspection_id}
+            AND COALESCE(li.is_add, 0) = 0
+          ORDER BY li.created_at ASC, li.id ASC
+        `
+      : await sql`
+          SELECT
+            ei.part_name,
+            ei.description,
+            ei.quantity,
+            COALESCE(ei.sale, 0)::numeric AS sale,
+            0::numeric AS discount,
+            LOWER(COALESCE(ei.status, 'pending')) AS status,
+            ei.created_at
+          FROM estimate_items ei
+          WHERE ei.estimate_id = ${estimateId}
+          ORDER BY ei.line_no ASC, ei.created_at ASC
+        `;
 
-    const company = await getCompanyById(companyId);
-    const estimate = data.estimate;
-    const items = data.items.filter((i) => i.status !== "rejected");
-    const customer = estimate.customerId ? await Crm.getCustomerById(estimate.customerId) : null;
-    const car = estimate.carId ? await Crm.getCarById(estimate.carId) : null;
-    const lead = estimate.leadId ? await Leads.getLeadById(companyId, estimate.leadId) : null;
+    const items = itemRows.filter((i: any) => String(i.status ?? "").toLowerCase() !== "rejected");
+    const customerRows = estimate.customer_id
+      ? await sql`
+          SELECT name, phone
+          FROM customers
+          WHERE id = ${estimate.customer_id}
+          LIMIT 1
+        `
+      : [];
+    const customer = customerRows[0] ?? null;
 
-    const companyName = (company as any)?.display_name || (company as any)?.legal_name || "800CARGURU";
-    const companyLegalName = (company as any)?.legal_name || "Mobile Auto Repair Services L.L.C";
-    const companyAddress =
-      (company as any)?.address_line1 ||
-      (company as any)?.address_line2 ||
-      (company as any)?.city ||
-      "Dubai, UAE";
-    const companyPhone = (company as any)?.company_phone || "800 2274878";
-    const companyEmail = (company as any)?.company_email || "info@800carguru.ae";
-    const companyTrn = (company as any)?.vat_number || "100585978800003";
+    const carRows = estimate.car_id
+      ? await sql`
+          SELECT make, model, plate_number
+          FROM cars
+          WHERE id = ${estimate.car_id}
+          LIMIT 1
+        `
+      : [];
+    const car = carRows[0] ?? null;
 
-    const logoFileId = (company as any)?.logo_file_id ?? null;
-    let companyLogo: string | null = null;
-    if (logoFileId) {
-      try {
-        const record = await Files.getFileById(logoFileId);
-        const storagePath = (record as any)?.storage_path ?? (record as any)?.storagePath;
-        const mimeType = (record as any)?.mime_type ?? (record as any)?.mimeType ?? "image/png";
-        if (storagePath) {
-          const data = await fs.readFile(storagePath);
-          const base64 = Buffer.from(data).toString("base64");
-          companyLogo = `data:${mimeType};base64,${base64}`;
-        }
-      } catch {
-        companyLogo = null;
-      }
-    }
+    const companyName = "800CARGURU";
+    const companyLegalName = "Mobile Auto Repair Services L.L.C";
+    const companyAddress = "Dubai, UAE";
+    const companyPhone = "800 2274878";
+    const companyEmail = "info@800carguru.ae";
+    const companyTrn = "-";
 
     const rows = items.map((item) => {
       const qty = Number(item.quantity ?? 0) || 0;
       const rate = Number(item.sale ?? 0) || 0;
-      const discount = 0;
+      const discount = Number(item.discount ?? 0) || 0;
       const price = rate * qty - discount;
       return {
-        name: item.partName ?? "",
+        name: item.part_name ?? "",
         description: item.description ?? "",
         qty,
         rate,
@@ -309,16 +338,14 @@ export async function GET(_req: NextRequest, { params }: Params) {
       companyPhone: String(companyPhone),
       companyEmail: String(companyEmail),
       companyTrn: String(companyTrn),
-      companyLogo,
+      companyLogo: null,
       customerName: String(customer?.name ?? "Customer"),
       customerPhone: String(customer?.phone ?? "-"),
-      carMakeModel: String(
-        [car?.make, car?.model].filter(Boolean).join(" ") || (lead as any)?.car_model || "-"
-      ),
-      carPlate: String(car?.plate_number ?? (lead as any)?.car_plate_number ?? "-"),
-      advisor: String((lead as any)?.advisor ?? (lead as any)?.agent_name ?? "-"),
+      carMakeModel: String([car?.make, car?.model].filter(Boolean).join(" ") || "-"),
+      carPlate: String(car?.plate_number ?? "-"),
+      advisor: "-",
       estimateId: String(estimate.id),
-      date: formatDateOnly(estimate.createdAt),
+      date: formatDateOnly(estimate.created_at),
       items: rows,
     });
 

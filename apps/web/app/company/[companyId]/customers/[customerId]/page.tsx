@@ -49,9 +49,11 @@ type WalletTransactionRow = {
 
 type CustomerInvoiceRow = {
   id: string;
+  estimate_id?: string | null;
   invoice_number?: string | null;
   invoice_date?: string | null;
   status?: string | null;
+  payment_status?: "paid" | "unpaid" | string | null;
   payment_method?: string | null;
   grand_total?: number | null;
   paid_at?: string | null;
@@ -59,6 +61,9 @@ type CustomerInvoiceRow = {
   updated_at?: string | null;
   car_plate?: string | null;
   advisor_name?: string | null;
+  source?: "global_erp" | "carguru2_estimate" | string | null;
+  print_url?: string | null;
+  action_url?: string | null;
 };
 
 type AppointmentFormState = {
@@ -2119,7 +2124,7 @@ function CustomerInvoicesTable({
   }, [search, statusFilter, rows]);
 
   const statusOptions = useMemo(
-    () => Array.from(new Set(invoices.map((row) => String(row.status ?? "")).filter(Boolean))).sort(),
+    () => Array.from(new Set(invoices.map((row) => String(row.payment_status ?? "")).filter(Boolean))).sort(),
     [invoices]
   );
 
@@ -2127,13 +2132,16 @@ function CustomerInvoicesTable({
     const q = search.trim().toLowerCase();
     return invoices
       .filter((row) => {
-        if (statusFilter !== "all" && String(row.status ?? "").toLowerCase() !== statusFilter) return false;
+        if (statusFilter !== "all" && String(row.payment_status ?? "").toLowerCase() !== statusFilter) return false;
         if (!q) return true;
         const haystack = [
           row.id,
+          row.estimate_id,
           row.invoice_number,
           row.car_plate,
           row.advisor_name,
+          row.source,
+          row.payment_status,
           row.payment_method,
           row.status,
           row.grand_total?.toString(),
@@ -2223,10 +2231,10 @@ function CustomerInvoicesTable({
               <th className="w-[120px] px-3 py-2 text-left">Plate#</th>
               <th className="w-[140px] px-3 py-2 text-left">Sales Agent</th>
               <th className="w-[140px] px-3 py-2 text-left">Total Amount</th>
-              <th className="w-[120px] px-3 py-2 text-left">Status</th>
+              <th className="w-[140px] px-3 py-2 text-left">Payment Status</th>
               <th className="w-[120px] px-3 py-2 text-left">Mode</th>
               <th className="w-[180px] px-3 py-2 text-left">Payment Date</th>
-              <th className="w-[140px] px-3 py-2 text-left">Actions</th>
+              <th className="w-[180px] px-3 py-2 text-left">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -2246,21 +2254,49 @@ function CustomerInvoicesTable({
                   <td className="px-3 py-2">{row.car_plate ?? "-"}</td>
                   <td className="px-3 py-2">{row.advisor_name ?? "-"}</td>
                   <td className="px-3 py-2">{formatAmount(row.grand_total)}</td>
-                  <td className="px-3 py-2">{titleize(row.status)}</td>
+                  <td className="px-3 py-2">
+                    <span
+                      className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
+                        String(row.payment_status ?? "").toLowerCase() === "paid"
+                          ? "border-emerald-400/35 bg-emerald-500/15 text-emerald-300"
+                          : "border-amber-400/35 bg-amber-500/15 text-amber-300"
+                      }`}
+                    >
+                      {String(row.payment_status ?? "").toLowerCase() === "paid" ? "Paid" : "Unpaid"}
+                    </span>
+                  </td>
                   <td className="px-3 py-2">{titleize(row.payment_method)}</td>
                   <td className="px-3 py-2">{formatDateTime(row.paid_at ?? row.invoice_date)}</td>
                   <td className="px-3 py-2">
-                    {companyId ? (
-                      <Link
-                        href={`/api/company/${companyId}/workshop/invoices/${row.id}/print`}
-                        target="_blank"
-                        className="rounded-md border border-white/20 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white/70 hover:bg-white/10"
-                      >
-                        Print
-                      </Link>
-                    ) : (
-                      <span className="text-white/60">-</span>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {companyId && row.estimate_id ? (
+                        <Link
+                          href={`/company/${companyId}/estimates/${row.estimate_id}`}
+                          className="rounded-md border border-sky-400/35 bg-sky-500/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-sky-200 hover:bg-sky-500/20"
+                        >
+                          View Estimate
+                        </Link>
+                      ) : null}
+                      {String(row.payment_status ?? "").toLowerCase() !== "paid" && companyId && row.action_url ? (
+                        <Link
+                          href={row.action_url}
+                          className="rounded-md border border-amber-400/35 bg-amber-500/15 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-amber-200 hover:bg-amber-500/25"
+                        >
+                          Pay
+                        </Link>
+                      ) : null}
+                      {companyId ? (
+                        <Link
+                          href={row.print_url ?? `/api/company/${companyId}/workshop/invoices/${row.id}/print`}
+                          target="_blank"
+                          className="rounded-md border border-white/20 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white/70 hover:bg-white/10"
+                        >
+                          Print
+                        </Link>
+                      ) : (
+                        <span className="text-white/60">-</span>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))

@@ -36,6 +36,7 @@ type ItemDraft = {
   sale: number;
   approvedSale: number;
   discount: number;
+  discountPercent: number;
   gpPercent?: number | null;
   status: EstimateItemStatus;
   source?: "inspection" | "estimate";
@@ -75,6 +76,7 @@ type PersistedNewJobLineItemDraft = {
   sale?: number | null;
   approvedSale?: number | null;
   discount?: number | null;
+  discountPercent?: number | null;
   approvedType?: EstimateItemCostType | null;
   approvedCost?: number | null;
   gpPercent?: number | null;
@@ -97,6 +99,7 @@ const getPersistedNewJobDraftMap = (meta: any): PersistedNewJobDraftMap => {
       sale: toFiniteNumberOrNull(value?.sale),
       approvedSale: toFiniteNumberOrNull(value?.approvedSale),
       discount: toFiniteNumberOrNull(value?.discount),
+      discountPercent: toFiniteNumberOrNull(value?.discountPercent),
       approvedType:
         value?.approvedType === "oe" ||
         value?.approvedType === "oem" ||
@@ -194,7 +197,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
   const isAllowedLockedFinancialPatch = (patch: Partial<ItemDraft>) => {
     const keys = Object.keys(patch);
     if (!keys.length) return false;
-    return keys.every((key) => key === "approvedSale" || key === "discount");
+    return keys.every((key) => key === "approvedSale" || key === "discount" || key === "discountPercent");
   };
 
   const mapAdditionalLineItemsToDraft = (
@@ -219,6 +222,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
           sale: Number(persisted?.sale ?? 0) || 0,
           approvedSale: Number(persisted?.approvedSale ?? 0) || 0,
           discount: Number(persisted?.discount ?? 0) || 0,
+          discountPercent: Number(persisted?.discountPercent ?? 0) || 0,
           gpPercent:
             persisted?.gpPercent != null && Number.isFinite(Number(persisted.gpPercent))
               ? Number(persisted.gpPercent)
@@ -348,6 +352,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                 sale: 0,
                 approvedSale: 0,
                 discount: 0,
+                discountPercent: 0,
                 gpPercent: null,
                 status: "pending",
                 source: "inspection",
@@ -384,8 +389,9 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                 quantity: i.quantity ?? 1,
                 cost: i.cost ?? 0,
                 sale: i.sale ?? 0,
-                approvedSale: i.sale ?? 0,
-                discount: 0,
+                approvedSale: (i as any).approvedSale ?? i.sale ?? 0,
+                discount: (i as any).discount ?? 0,
+                discountPercent: (i as any).discountPercent ?? 0,
                 gpPercent: i.gpPercent ?? null,
                 status: i.status,
                 source: i.inspectionItemId ? "inspection" : "estimate",
@@ -563,6 +569,19 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
 
   async function saveEstimate(): Promise<ItemDraft[] | null> {
     if (!draft) return null;
+    const legacySource =
+      loadState.status === "loaded"
+        ? String(loadState.data?.estimate?.meta?.legacy_source ?? "").trim().toLowerCase()
+        : "";
+    const legacyInvoiceStatus =
+      loadState.status === "loaded"
+        ? String(loadState.data?.estimate?.meta?.legacy_invoice_status ?? "").trim().toLowerCase()
+        : "";
+    const isLegacyInvoiced = legacySource === "carguru2.estimates" && legacyInvoiceStatus === "invoiced";
+    if (loadState.status === "loaded" && (loadState.data?.estimate?.status === "invoiced" || isLegacyInvoiced)) {
+      setSaveError("Invoiced estimates are closed.");
+      return null;
+    }
     setIsSaving(true);
     setSaveError(null);
     try {
@@ -656,6 +675,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
           sale: toFiniteNumberOrNull(item.sale),
           approvedSale: toFiniteNumberOrNull(item.approvedSale),
           discount: toFiniteNumberOrNull(item.discount),
+          discountPercent: toFiniteNumberOrNull((item as any).discountPercent),
           approvedType: item.approvedType ?? null,
           approvedCost: toFiniteNumberOrNull(item.approvedCost),
           gpPercent: toFiniteNumberOrNull(item.gpPercent),
@@ -686,6 +706,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
           status: i.status ?? "pending",
           approvedType: i.approvedType ?? null,
           approvedCost: i.approvedCost ?? null,
+          discountPercent: i.discountPercent ?? null,
         })),
       };
       const res = await fetch(`/api/company/${companyId}/workshop/estimates/${estimateId}`, {
@@ -871,6 +892,21 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
   async function createWorkOrder() {
     try {
       if (!draft) return;
+      const legacySource =
+        loadState.status === "loaded"
+          ? String(loadState.data?.estimate?.meta?.legacy_source ?? "").trim().toLowerCase()
+          : "";
+      const legacyInvoiceStatus =
+        loadState.status === "loaded"
+          ? String(loadState.data?.estimate?.meta?.legacy_invoice_status ?? "").trim().toLowerCase()
+          : "";
+      const isLegacyInvoiced = legacySource === "carguru2.estimates" && legacyInvoiceStatus === "invoiced";
+      const isClosed =
+        (loadState.status === "loaded" && loadState.data?.estimate?.status === "invoiced") || isLegacyInvoiced;
+      if (isClosed) {
+        setSaveError("Invoiced estimates are closed.");
+        return;
+      }
       if (draft.items.some((item) => item.status === "approved")) {
         await orderApprovedParts(true);
       }
@@ -932,6 +968,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
           sale: patch.sale ?? current.sale ?? 0,
           approvedSale: patch.approvedSale ?? current.approvedSale ?? 0,
           discount: patch.discount ?? current.discount ?? 0,
+          discountPercent: patch.discountPercent ?? current.discountPercent ?? 0,
           productType: patch.productType ?? current.productType ?? null,
           inspectionItemId: patch.inspectionItemId ?? current.inspectionItemId ?? null,
           gpPercent: patch.gpPercent ?? current.gpPercent ?? null,
@@ -962,6 +999,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                   sale: 0,
                   approvedSale: 0,
                   discount: 0,
+                  discountPercent: 0,
                   status: "pending",
                   source: "estimate",
                   quoteCosts: undefined,
@@ -1072,6 +1110,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                 sale: 0,
                 approvedSale: 0,
                 discount: 0,
+                discountPercent: 0,
                 gpPercent: null,
                 status: "pending",
                 source: "inspection",
@@ -1111,8 +1150,9 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
             quantity: i.quantity ?? 1,
             cost: i.cost ?? 0,
             sale: i.sale ?? 0,
-            approvedSale: i.sale ?? 0,
-            discount: 0,
+            approvedSale: (i as any).approvedSale ?? i.sale ?? 0,
+            discount: (i as any).discount ?? 0,
+            discountPercent: (i as any).discountPercent ?? 0,
             gpPercent: i.gpPercent ?? null,
             status: i.status,
             source: i.inspectionItemId ? "inspection" : "estimate",
@@ -1146,6 +1186,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
         sale: 0,
         approvedSale: 0,
         discount: 0,
+        discountPercent: 0,
         status: "pending",
         source: "estimate",
         approvedType: null,
@@ -1169,6 +1210,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
           sale: patch.sale ?? item.sale ?? 0,
           approvedSale: patch.approvedSale ?? item.approvedSale ?? 0,
           discount: patch.discount ?? item.discount ?? 0,
+          discountPercent: patch.discountPercent ?? item.discountPercent ?? 0,
           productType: patch.productType ?? item.productType ?? null,
           inspectionItemId: patch.inspectionItemId ?? item.inspectionItemId ?? null,
           gpPercent: patch.gpPercent ?? item.gpPercent ?? null,
@@ -1187,6 +1229,10 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
 
   async function createAdditionalJobCard() {
     if (!inspection?.id) return;
+    if (loadState.status === "loaded" && loadState.data?.estimate?.status === "invoiced") {
+      setSaveError("Invoiced estimates are closed.");
+      return;
+    }
     const inspectionLocked =
       Boolean(inspection?.verifiedAt ?? inspection?.verified_at) ||
       String(inspection?.status ?? "").toLowerCase() === "cancelled" ||
@@ -1365,6 +1411,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
       approvedCost: 0,
       approvedSale: 0,
       discount: 0,
+      discountPercent: 0,
       subTotal: 0,
     };
     for (const item of newJobItems) {
@@ -1460,6 +1507,12 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
   const hasActiveJobCard = Boolean(activeJobCardId);
   const canStartAdditionalJobCard =
     newJobItems.some((item) => item.partName.trim() && item.status === "approved");
+  const legacySource = String(estimate.meta?.legacy_source ?? "").trim().toLowerCase();
+  const legacyInvoiceStatus = String(estimate.meta?.legacy_invoice_status ?? "").trim().toLowerCase();
+  const isLegacyEstimate = legacySource === "carguru2.estimates";
+  const isEstimateClosed =
+    estimate.status === "invoiced" ||
+    (legacySource === "carguru2.estimates" && legacyInvoiceStatus === "invoiced");
   const openJobCards = jobCards.filter((job) => {
     const s = String(job.status ?? "").toLowerCase();
     return s === "pending" || s === "re-assigned";
@@ -1471,6 +1524,24 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
   });
   const hasReassignedJobCards = jobCards.some((job) => String(job.status ?? "").toLowerCase() === "re-assigned");
   const convertBlocked = openJobCards.length > 0 || approvedLineItemsNotReceived.length > 0;
+  const isConvertDisabled = convertBlocked || isEstimateClosed;
+  const convertDisabledReason = isEstimateClosed
+    ? "Closed (Invoiced)"
+    : convertBlocked
+    ? "Pending Dependencies"
+    : null;
+  const reviewConvertLabel = isEstimateClosed
+    ? "Closed (Invoiced)"
+    : convertBlocked
+    ? "Blocked - Resolve Items"
+    : "Review & Convert";
+  const convertInvoiceLabel = isConvertingInvoice
+    ? "Converting..."
+    : isEstimateClosed
+    ? "Closed (Invoiced)"
+    : convertBlocked
+    ? "Blocked - Resolve Items"
+    : "Convert Invoice";
   const estimateItemByInspectionId = new Map(
     draft.items
       .filter((item) => item.inspectionItemId)
@@ -1623,7 +1694,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                   type="button"
                   onClick={refreshQuoteUpdates}
                   className="rounded-md border border-slate-500/60 bg-slate-800/60 px-3 py-1.5 text-xs font-semibold text-slate-100"
-                  disabled={isRefreshingQuotes}
+                  disabled={isRefreshingQuotes || isEstimateClosed}
                 >
                   {isRefreshingQuotes ? "Refreshing..." : "Refresh Quotes"}
                 </button>
@@ -1645,7 +1716,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                       <th className="px-2 py-1 text-left">Approved Cost</th>
                       <th className="px-2 py-1 text-left">GP</th>
                       <th className="px-2 py-1 text-left">Approved Sale</th>
-                      <th className="px-2 py-1 text-left">Discount</th>
+                      <th className="px-2 py-1 text-left">{isLegacyEstimate ? "Discount %" : "Discount"}</th>
                       <th className="px-2 py-1 text-left">Sub Total</th>
                       <th className="px-2 py-1 text-left">Status</th>
                     </tr>
@@ -1674,7 +1745,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                         const lineCost = approvedCostValue;
                         const gpPercent =
                           subTotal > 0 ? ((subTotal - lineCost) / subTotal) * 100 : 0;
-                        const isLocked = item.partOrdered === 1 && item.status === "approved";
+                        const isLocked = isEstimateClosed || (item.partOrdered === 1 && item.status === "approved");
                         const selectedApprovedType = item.approvedType ?? null;
                         return (
                           <tr key={idx} className="border-b border-slate-600/60 transition-colors odd:bg-slate-900/15 hover:bg-slate-800/25 last:border-0">
@@ -1795,12 +1866,19 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                                   step="0.01"
                                   className={`${theme.input} h-8 w-24 text-xs`}
                                   value={item.approvedSale}
-                                  disabled={false}
+                                  disabled={isLocked}
                                   onChange={(e) => {
                                     const approvedSale = Number(e.target.value) || 0;
-                                    updateItem(idx, {
-                                      approvedSale,
-                                    });
+                                    if (isLegacyEstimate) {
+                                      const discountPercent = Number(item.discountPercent ?? 0) || 0;
+                                      const discountAmount = Number(((approvedSale * discountPercent) / 100).toFixed(2));
+                                      updateItem(idx, {
+                                        approvedSale,
+                                        discount: discountAmount,
+                                      });
+                                      return;
+                                    }
+                                    updateItem(idx, { approvedSale });
                                   }}
                                 />
                               </div>
@@ -1810,9 +1888,18 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                                 type="number"
                                 step="0.01"
                                 className={`${theme.input} h-8 w-20 text-xs`}
-                                value={item.discount}
-                                disabled={false}
-                                onChange={(e) => updateItem(idx, { discount: Number(e.target.value) || 0 })}
+                                value={isLegacyEstimate ? item.discountPercent ?? 0 : item.discount}
+                                disabled={isLocked}
+                                onChange={(e) => {
+                                  const value = Number(e.target.value) || 0;
+                                  if (isLegacyEstimate) {
+                                    const saleBase = Number(item.approvedSale ?? item.sale) || 0;
+                                    const discountAmount = Number(((saleBase * value) / 100).toFixed(2));
+                                    updateItem(idx, { discountPercent: value, discount: discountAmount });
+                                    return;
+                                  }
+                                  updateItem(idx, { discount: value });
+                                }}
                               />
                             </td>
                             <td className="px-2 py-1 text-xs">{subTotal.toFixed(2)}</td>
@@ -1850,7 +1937,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                             <input
                               type="checkbox"
                               checked={allTypeChecked.oe}
-                              disabled={!typeSelectable.oe}
+                              disabled={!typeSelectable.oe || isEstimateClosed}
                               onChange={(e) => applyApprovedTypeToAll("oe", e.target.checked)}
                             />
                             <span>{lineItemTableTotals.oe.toFixed(2)}</span>
@@ -1861,7 +1948,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                             <input
                               type="checkbox"
                               checked={allTypeChecked.oem}
-                              disabled={!typeSelectable.oem}
+                              disabled={!typeSelectable.oem || isEstimateClosed}
                               onChange={(e) => applyApprovedTypeToAll("oem", e.target.checked)}
                             />
                             <span>{lineItemTableTotals.oem.toFixed(2)}</span>
@@ -1872,7 +1959,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                             <input
                               type="checkbox"
                               checked={allTypeChecked.aftm}
-                              disabled={!typeSelectable.aftm}
+                              disabled={!typeSelectable.aftm || isEstimateClosed}
                               onChange={(e) => applyApprovedTypeToAll("aftm", e.target.checked)}
                             />
                             <span>{lineItemTableTotals.aftm.toFixed(2)}</span>
@@ -1883,7 +1970,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                             <input
                               type="checkbox"
                               checked={allTypeChecked.used}
-                              disabled={!typeSelectable.used}
+                              disabled={!typeSelectable.used || isEstimateClosed}
                               onChange={(e) => applyApprovedTypeToAll("used", e.target.checked)}
                             />
                             <span>{lineItemTableTotals.used.toFixed(2)}</span>
@@ -1912,7 +1999,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                   type="button"
                   onClick={addItem}
                   className="rounded-md bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white"
-                  disabled={hasActiveJobCard}
+                  disabled={hasActiveJobCard || isEstimateClosed}
                 >
                   + Add
                 </button>
@@ -1928,6 +2015,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                   }}
                   className="rounded-md bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white"
                   disabled={
+                    isEstimateClosed ||
                     hasActiveJobCard ||
                     !draft.items.some((item) => !item.inspectionItemId && item.source !== "inspection")
                   }
@@ -2034,11 +2122,11 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                       type="button"
                       onClick={createWorkOrder}
                       className={`rounded-md px-4 py-2 text-xs font-semibold shadow-sm ${
-                        canStartJobCard
+                        canStartJobCard && !isEstimateClosed
                           ? "bg-indigo-600 text-white"
-                          : "cursor-not-allowed bg-slate-600/60 text-white/60"
+                          : "cursor-not-allowed border border-slate-500/40 bg-slate-700/35 text-slate-300/70 opacity-70"
                       }`}
-                      disabled={!canStartJobCard}
+                      disabled={!canStartJobCard || isEstimateClosed}
                     >
                       Create Job Card
                     </button>
@@ -2046,8 +2134,12 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                   <button
                     type="button"
                     onClick={saveEstimate}
-                    className="rounded-md bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-sm"
-                    disabled={isSaving}
+                    className={`rounded-md px-4 py-2 text-xs font-semibold shadow-sm ${
+                      isSaving || isEstimateClosed
+                        ? "cursor-not-allowed border border-slate-500/40 bg-slate-700/35 text-slate-300/70 opacity-70"
+                        : "bg-emerald-600 text-white"
+                    }`}
+                    disabled={isSaving || isEstimateClosed}
                   >
                     {isSaving ? "Saving..." : "Save Estimate"}
                   </button>
@@ -2064,6 +2156,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                 type="button"
                 onClick={addNewJobItem}
                 className="rounded-md border border-cyan-500/60 bg-cyan-500/10 px-3 py-1.5 text-xs font-semibold text-cyan-200"
+                disabled={isEstimateClosed}
               >
                 Start New Job
               </button>
@@ -2110,7 +2203,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                         const lineCost = approvedCostValue;
                         const gpPercent = subTotal > 0 ? ((subTotal - lineCost) / subTotal) * 100 : 0;
                         const selectedApprovedType = item.approvedType ?? null;
-                        const isLocked = isLineItemLocked(item);
+                        const isLocked = isEstimateClosed || isLineItemLocked(item);
 
                         return (
                           <tr key={`new-job-${idx}`} className="border-b border-slate-600/60 transition-colors odd:bg-slate-900/15 hover:bg-slate-800/25 last:border-0">
@@ -2217,7 +2310,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                                 type="number"
                                 className={`${theme.input} h-8 w-24 text-xs`}
                                 value={item.approvedSale}
-                                disabled={false}
+                                disabled={isLocked}
                                 onChange={(e) => updateNewJobItem(idx, { approvedSale: Number(e.target.value) || 0 })}
                               />
                             </td>
@@ -2226,7 +2319,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                                 type="number"
                                 className={`${theme.input} h-8 w-20 text-xs`}
                                 value={item.discount}
-                                disabled={false}
+                                disabled={isLocked}
                                 onChange={(e) => updateNewJobItem(idx, { discount: Number(e.target.value) || 0 })}
                               />
                             </td>
@@ -2269,7 +2362,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                               <input
                                 type="checkbox"
                                 checked={newJobAllTypeChecked.oe}
-                                disabled={!newJobTypeSelectable.oe}
+                                disabled={!newJobTypeSelectable.oe || isEstimateClosed}
                                 onChange={(e) => applyApprovedTypeToAllNewJob("oe", e.target.checked)}
                               />
                               <span>{newJobLineItemTableTotals.oe.toFixed(2)}</span>
@@ -2280,7 +2373,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                               <input
                                 type="checkbox"
                                 checked={newJobAllTypeChecked.oem}
-                                disabled={!newJobTypeSelectable.oem}
+                                disabled={!newJobTypeSelectable.oem || isEstimateClosed}
                                 onChange={(e) => applyApprovedTypeToAllNewJob("oem", e.target.checked)}
                               />
                               <span>{newJobLineItemTableTotals.oem.toFixed(2)}</span>
@@ -2291,7 +2384,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                               <input
                                 type="checkbox"
                                 checked={newJobAllTypeChecked.aftm}
-                                disabled={!newJobTypeSelectable.aftm}
+                                disabled={!newJobTypeSelectable.aftm || isEstimateClosed}
                                 onChange={(e) => applyApprovedTypeToAllNewJob("aftm", e.target.checked)}
                               />
                               <span>{newJobLineItemTableTotals.aftm.toFixed(2)}</span>
@@ -2302,7 +2395,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                               <input
                                 type="checkbox"
                                 checked={newJobAllTypeChecked.used}
-                                disabled={!newJobTypeSelectable.used}
+                                disabled={!newJobTypeSelectable.used || isEstimateClosed}
                                 onChange={(e) => applyApprovedTypeToAllNewJob("used", e.target.checked)}
                               />
                               <span>{newJobLineItemTableTotals.used.toFixed(2)}</span>
@@ -2331,6 +2424,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                     type="button"
                     onClick={addNewJobItem}
                     className="rounded-md bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white"
+                    disabled={isEstimateClosed}
                   >
                     + Add
                   </button>
@@ -2341,7 +2435,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                       if (lastIndex >= 0) removeNewJobItem(lastIndex);
                     }}
                     className="rounded-md bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white"
-                    disabled={newJobItems.length === 0}
+                    disabled={newJobItems.length === 0 || isEstimateClosed}
                   >
                     Remove ?
                   </button>
@@ -2416,7 +2510,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                     type="button"
                     onClick={saveEstimate}
                     className="rounded-md border border-emerald-500/60 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-200"
-                    disabled={isSaving}
+                    disabled={isSaving || isEstimateClosed}
                   >
                     {isSaving ? "Saving..." : "Save Line Items"}
                   </button>
@@ -2428,7 +2522,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                         ? "bg-indigo-600 text-white"
                         : "cursor-not-allowed bg-slate-600/60 text-white/60"
                     }`}
-                    disabled={!canStartAdditionalJobCard}
+                    disabled={!canStartAdditionalJobCard || isEstimateClosed}
                   >
                     Create New Job Card
                   </button>
@@ -2546,16 +2640,21 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
               <button
                 type="button"
                 className={`w-full rounded-md px-3 py-2 text-xs font-semibold ${
-                  convertBlocked ? "cursor-not-allowed bg-slate-700/70 text-slate-300" : "bg-emerald-600 text-white"
+                  isConvertDisabled
+                    ? "cursor-not-allowed border border-slate-500/40 bg-slate-700/70 text-slate-300"
+                    : "bg-emerald-600 text-white"
                 }`}
-                disabled={convertBlocked}
+                disabled={isConvertDisabled}
                 onClick={() => {
                   setInvoiceConvertError(null);
                   setShowInvoiceModal(true);
                 }}
               >
-                Review & Convert
+                {reviewConvertLabel}
               </button>
+              {convertDisabledReason && (
+                <div className="text-center text-[11px] text-slate-400">{convertDisabledReason}</div>
+              )}
               {convertBlocked && (
                 <div className="space-y-1 text-[11px] text-amber-300">
                   {openJobCards.length > 0 && <div>{openJobCards.length} job card(s) still open.</div>}
@@ -2639,12 +2738,14 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                 <button
                   type="button"
                   className={`rounded-md px-3 py-1.5 text-xs font-semibold ${
-                    convertBlocked ? "cursor-not-allowed bg-slate-700/70 text-slate-300" : "bg-emerald-600 text-white"
+                    isConvertDisabled
+                      ? "cursor-not-allowed border border-slate-500/40 bg-slate-700/70 text-slate-300"
+                      : "bg-emerald-600 text-white"
                   }`}
-                  disabled={convertBlocked || isConvertingInvoice}
+                  disabled={isConvertDisabled || isConvertingInvoice}
                   onClick={convertToInvoice}
                 >
-                  {isConvertingInvoice ? "Converting..." : "Convert Invoice"}
+                  {convertInvoiceLabel}
                 </button>
               </div>
             </div>
