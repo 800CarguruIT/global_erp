@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { Users, Rbac } from "@repo/ai-core";
-import { buildScopeContextFromRoute, requirePermission } from "../../../lib/auth/permissions";
+import { buildScopeContextFromRoute, requirePermission } from "@/lib/auth/permissions";
 
 const schema = z.object({
   email: z.string().email(),

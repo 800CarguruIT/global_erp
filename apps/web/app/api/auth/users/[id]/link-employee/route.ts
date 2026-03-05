@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { Users } from "@repo/ai-core";
-import { buildScopeContextFromRoute, requirePermission } from "../../../../../lib/auth/permissions";
+import { buildScopeContextFromRoute, requirePermission } from "@/lib/auth/permissions";
 
 const schema = z.object({
   employeeId: z.string(),

@@ -3,7 +3,7 @@ import { Accounting } from "@repo/ai-core";
 import { getSql } from "@repo/ai-core/db";
 import { buildScopeContextFromRoute, requirePermission } from "@/lib/auth/permissions";
 
-type Params = { params: { companyId: string } };
+type Params = { params: { companyId: string } | Promise<{ companyId: string }> };
 
 type AccountDto = {
   id: string;

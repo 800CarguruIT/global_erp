@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Accounting } from "@repo/ai-core";
-import { buildScopeContextFromRoute, requirePermission } from "../../../../lib/auth/permissions";
+import { buildScopeContextFromRoute, requirePermission } from "@/lib/auth/permissions";
 
 type ParamsCtx = { params: { id: string } } | { params: Promise<{ id: string }> };
 

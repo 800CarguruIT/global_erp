@@ -1,1 +1,1 @@
-export { default } from "../../../aiPanel/page";
+export { default } from "../panel/page";

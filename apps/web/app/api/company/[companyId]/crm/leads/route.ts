@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Crm, CrmTypes, Leads } from "@repo/ai-core";
-import { buildScopeContextFromRoute, requirePermission } from "../../../../../lib/auth/permissions";
+import { buildScopeContextFromRoute, requirePermission } from "@/lib/auth/permissions";
 import { getCurrentUserIdFromRequest } from "../../../../../../lib/auth/current-user";
 
 type Params = { params: Promise<{ companyId: string }> };

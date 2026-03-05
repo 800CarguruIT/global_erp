@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { Accounting } from "@repo/ai-core";
-import { buildScopeContextFromRoute, requirePermission } from "../../../lib/auth/permissions";
+import { buildScopeContextFromRoute, requirePermission } from "@/lib/auth/permissions";
 
 const lineSchema = z.object({
   accountId: z.string(),
