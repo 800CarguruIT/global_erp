@@ -8,6 +8,7 @@ This repository hosts the Global ERP app (Next.js frontend, shared UI, and ai-co
 - Run migrations (example): `pnpm --filter ai-core run migrate`
 - Seed full demo data: `pnpm db:seed`
 - Minimal bootstrap (only global admin): `pnpm db:bootstrap:minimal`
+- Full Ubuntu VPS Docker deployment runbook (dev + prod + DB): `docs/docker-deploy-workflow.md`
 
 Default demo logins:
 - Global admin (demo seed): `admin@demo.test` / `Admin@123`
