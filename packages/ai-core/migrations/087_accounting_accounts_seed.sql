@@ -1,6 +1,34 @@
 -- 087_accounting_accounts_seed.sql
 -- Seed accounts per group
 
+-- Ensure table exists when running from a clean database.
+CREATE TABLE IF NOT EXISTS accounting_entities (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  scope text NOT NULL CHECK (scope IN ('global','company')),
+  company_id uuid NULL REFERENCES companies(id),
+  name text NOT NULL,
+  base_currency text NOT NULL DEFAULT 'USD',
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_accounting_entities_scope_company
+ON accounting_entities (scope, company_id);
+
+ALTER TABLE IF EXISTS accounting_accounts
+  ADD COLUMN IF NOT EXISTS standard_id uuid,
+  ADD COLUMN IF NOT EXISTS code text,
+  ADD COLUMN IF NOT EXISTS name text,
+  ADD COLUMN IF NOT EXISTS type text,
+  ADD COLUMN IF NOT EXISTS sub_type text,
+  ADD COLUMN IF NOT EXISTS normal_balance text,
+  ADD COLUMN IF NOT EXISTS parent_id uuid,
+  ADD COLUMN IF NOT EXISTS is_leaf boolean NOT NULL DEFAULT true,
+  ADD COLUMN IF NOT EXISTS is_active boolean NOT NULL DEFAULT true;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_accounting_accounts_entity_code
+ON accounting_accounts (entity_id, code);
+
 WITH entities AS (
   SELECT id, company_id
   FROM accounting_entities

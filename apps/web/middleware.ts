@@ -15,6 +15,7 @@ const publicPaths = [
   "/api/files",
   "/api/public/recovery-requests",
   "/api/i18n-generate",
+  "/api/yeastar",
   "/api/webhooks/dialer",
   "/api/webhooks/channels",
   "/api/global/call-center/incoming/stream",

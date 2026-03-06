@@ -25,11 +25,14 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       NODE_ENV: production
       PORT: 3000
+      DIALER_WEBHOOK_LOG_PATH: /app/apps/web/data/logs/webhook-dialer.log
     ports:
       - "3000:3000"
     volumes:
       - uploads_data:/app/apps/web/data/uploads
+      - logs_data:/app/apps/web/data/logs
 
 volumes:
   postgres_data:
   uploads_data:
+  logs_data:

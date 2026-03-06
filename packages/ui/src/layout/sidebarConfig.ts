@@ -40,6 +40,7 @@ export const SIDEBAR_CONFIG: Record<NavScope, Partial<Record<NavCategory, Sideba
         href: "/global/companies",
         permissionKeys: ["global.companies.list"],
       },
+      { label: "Products", href: "/global/products" },
       { labelKey: "global.nav.documentation", href: "/global/docs" },
       {
         labelKey: "global.nav.settings",
@@ -129,6 +130,7 @@ export const SIDEBAR_TREE: Partial<Record<NavScope, SidebarItem[]>> = {
     { labelKey: "global.nav.userManagement", href: "/global/settings/security/users" },
     { labelKey: "global.nav.rolesAndPermissions", href: "/global/settings/security/roles" },
     { labelKey: "global.nav.companies", href: "/global/companies" },
+    { label: "Products", href: "/global/products" },
     { labelKey: "global.nav.settings", href: "/global/settings" },
     { labelKey: "global.nav.documentation", href: "/global/docs" },
   ],

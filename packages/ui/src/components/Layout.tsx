@@ -87,6 +87,7 @@ type IncomingPopupState = {
   callId: string;
   fromNumber: string;
   toNumber: string;
+  createdAtMs: number;
   customer?: {
     id?: string | null;
     name?: string | null;
@@ -385,6 +386,7 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
           callId,
           fromNumber: safeFromNumber || "Unknown",
           toNumber: toNumber || "Unknown",
+          createdAtMs: Date.now(),
           customer,
         };
         const idx = prev.findIndex((p) => p.callId === callId);
@@ -398,6 +400,7 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
                 ? current.fromNumber
                 : nextItem.fromNumber,
             toNumber: nextItem.toNumber || current.toNumber,
+            createdAtMs: current.createdAtMs || nextItem.createdAtMs,
             customer: nextItem.customer ?? current.customer ?? null,
           };
           return copy;
@@ -442,6 +445,52 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
                 p.callId === incomingCallId ? { ...p, fromNumber: incomingFromNumber } : p
               )
             );
+          } else if (
+            incomingFromNumber &&
+            incomingFromNumber.toLowerCase() !== "unknown" &&
+            incomingToNumber
+          ) {
+            // Yeastar may emit different call IDs across related events. If callId doesn't match,
+            // still enrich the latest unknown popup routed to the same extension.
+            setIncomingPopups((prev) => {
+              const reversed = [...prev].reverse();
+              const reversedMatchIdx = reversed.findIndex(
+                (p) =>
+                  p.toNumber === incomingToNumber &&
+                  (!p.fromNumber || p.fromNumber.toLowerCase() === "unknown")
+              );
+              let idx = -1;
+              if (reversedMatchIdx >= 0) {
+                idx = prev.length - 1 - reversedMatchIdx;
+              } else {
+                // If no extension-level match exists, enrich the most recent unknown popup.
+                const fallbackIdx = reversed.findIndex(
+                  (p) =>
+                    (!p.fromNumber || p.fromNumber.toLowerCase() === "unknown") &&
+                    Date.now() - (p.createdAtMs || 0) <= 120_000
+                );
+                if (fallbackIdx >= 0) idx = prev.length - 1 - fallbackIdx;
+              }
+              if (idx < 0) return prev;
+              const copy = [...prev];
+              copy[idx] = { ...copy[idx], fromNumber: incomingFromNumber };
+              return copy;
+            });
+          } else if (incomingFromNumber && incomingFromNumber.toLowerCase() !== "unknown") {
+            // Last-resort fallback: enrich the most recent unknown popup.
+            // This covers providers that change call IDs and may omit target extension on follow-up events.
+            setIncomingPopups((prev) => {
+              const unknowns = prev
+                .filter(
+                  (p) =>
+                    (!p.fromNumber || p.fromNumber.toLowerCase() === "unknown") &&
+                    Date.now() - (p.createdAtMs || 0) <= 120_000
+                )
+                .sort((a, b) => (b.createdAtMs || 0) - (a.createdAtMs || 0));
+              const target = unknowns[0];
+              if (!target?.callId) return prev;
+              return prev.map((p) => (p.callId === target.callId ? { ...p, fromNumber: incomingFromNumber } : p));
+            });
           }
 
           const isTerminal =
@@ -501,9 +550,13 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
                   setIncomingPopups((prev) =>
                     prev.filter((p) => p.callId !== incomingCallId)
                   );
-                }, 1200);
+                }, 4000);
               } else {
-                setIncomingPopups((prev) => prev.filter((p) => p.callId !== incomingCallId));
+                setTimeout(() => {
+                  setIncomingPopups((prev) =>
+                    prev.filter((p) => p.callId !== incomingCallId)
+                  );
+                }, 60000);
               }
             }
             return;

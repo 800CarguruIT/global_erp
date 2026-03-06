@@ -20,6 +20,7 @@ import "./providers/sendgrid";
 import "./providers/twilio-sms";
 import "./providers/infobip-sms";
 import "./providers/messagebird-sms";
+import "./providers/onexglobal-sms";
 import "./providers/whatsapp-cloud";
 import "./providers/ga4";
 import "./providers/firebase-push";

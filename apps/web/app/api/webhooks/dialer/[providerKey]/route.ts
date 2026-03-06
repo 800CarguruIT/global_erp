@@ -541,6 +541,7 @@ function mapYeastarWebhook(providerKey: string, payload: any): DialerWebhookUpda
   const yeastarType = Number(payload?.type ?? msgObj?.type ?? NaN);
   const operation = String(findFirstDeep(source, ["operation"]) ?? "").toLowerCase();
   const hasRingMember = /"member_status":"RING"/i.test(msgRaw ?? "");
+  const hasAlertMember = /"member_status":"ALERT"/i.test(msgRaw ?? "");
   const hasAnswerMember = /"member_status":"ANSWER"/i.test(msgRaw ?? "");
   const hasByeMember = /"member_status":"BYE"/i.test(msgRaw ?? "");
   const answerExt =
@@ -567,6 +568,8 @@ function mapYeastarWebhook(providerKey: string, payload: any): DialerWebhookUpda
     normalizedStatus = "incoming";
   } else if (yeastarType === 30011 && hasAnswerMember) {
     normalizedStatus = "ANSWERED";
+  } else if (yeastarType === 30011 && hasAlertMember) {
+    normalizedStatus = "ringing";
   } else if (yeastarType === 30011 && hasRingMember) {
     normalizedStatus = "ringing";
   } else if (yeastarType === 30011 && hasByeMember) {
@@ -636,7 +639,7 @@ async function handle(providerKey: string, req: NextRequest) {
     providerKey.toLowerCase() === "yeastar" &&
     update.direction === "inbound" &&
     (!update.fromNumber || !isLikelyExternalNumber(update.fromNumber)) &&
-    /(ring|incoming)/i.test(String(update.status ?? ""));
+    /(ring|incoming|initiated)/i.test(String(update.status ?? ""));
   if (needsLiveFallback) {
     const resolved = await resolveYeastarLiveCaller({
       providerCallId: update.providerCallId,

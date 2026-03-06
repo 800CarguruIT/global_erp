@@ -79,6 +79,12 @@ async function main() {
   }
 
   await sql`
+    INSERT INTO user_roles (user_id, role_id)
+    VALUES (${userId}, ${globalRole.id})
+    ON CONFLICT DO NOTHING
+  `;
+
+  await sql`
     INSERT INTO integration_dialers (
       id,
       provider,
@@ -152,7 +158,7 @@ async function main() {
         ${"company"},
         ${demoCompanyId},
         ${branchDowntownId},
-        ${companyAdminUserId},
+        ${userId},
         ${c.direction},
         ${c.from},
         ${c.to},
@@ -164,71 +170,6 @@ async function main() {
       ON CONFLICT (id) DO NOTHING
     `;
   }
-
-  console.log("Seeding sample invoice for reporting...");
-  const invoiceId = "00000000-0000-0000-0000-000000000401";
-  await sql`
-    INSERT INTO invoices (
-      id,
-      company_id,
-      work_order_id,
-      estimate_id,
-      inspection_id,
-      lead_id,
-      car_id,
-      customer_id,
-      invoice_number,
-      invoice_date,
-      status,
-      total_sale,
-      total_discount,
-      final_amount,
-      vat_rate,
-      vat_amount,
-      grand_total
-    )
-    VALUES (
-      ${invoiceId},
-      ${demoCompanyId},
-      ${workOrderId},
-      ${estimateId},
-      ${inspectionId},
-      ${leadId},
-      ${carId},
-      ${customerId},
-      ${"INV-0001"},
-      ${new Date().toISOString().slice(0, 10)},
-      ${"issued"},
-      ${320},
-      ${0},
-      ${320},
-      ${5},
-      ${16},
-      ${336}
-    )
-    ON CONFLICT (id) DO NOTHING
-  `;
-
-  await sql`
-    INSERT INTO invoice_items (
-      id,
-      invoice_id,
-      work_order_item_id,
-      estimate_item_id,
-      line_no,
-      name,
-      description,
-      quantity,
-      rate,
-      line_sale,
-      line_discount,
-      line_final
-    )
-    VALUES
-      (${randomUUID()}, ${invoiceId}, NULL, ${estimateItem1}, ${1}, ${"Front brake pads"}, ${"Replace front pads"}, ${2}, ${150}, ${300}, ${0}, ${300}),
-      (${randomUUID()}, ${invoiceId}, NULL, ${estimateItem2}, ${2}, ${"Engine oil"}, ${"Oil change"}, ${1}, ${20}, ${20}, ${0}, ${20})
-    ON CONFLICT DO NOTHING
-  `;
 
   console.log("Seed complete.");
 }

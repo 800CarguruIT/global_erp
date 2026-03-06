@@ -398,6 +398,20 @@ export const CHANNEL_PROVIDER_TEMPLATES: ChannelProviderTemplate[] = [
     ],
   },
   {
+    key: "onexglobal-sms",
+    label: "Onexglobal SMS",
+    category: "Messaging",
+    channelType: "sms",
+    defaultAuthType: "apiKey",
+    fields: [
+      { id: "apiKey", label: "API Key", type: "password", required: true, section: "credentials" },
+      { id: "defaultFrom", label: "Default From (Sender ID)", type: "string", required: true, section: "metadata", placeholder: "800CARGURU" },
+      { id: "countryCode", label: "Country Code Prefix", type: "string", section: "metadata", placeholder: "971" },
+      { id: "clientSmsIdPrefix", label: "Client SMS ID Prefix", type: "string", section: "metadata", placeholder: "onex-" },
+      { id: "apiBaseUrl", label: "API Base URL", type: "url", section: "metadata", placeholder: "https://api.int.onexglobal.io" },
+    ],
+  },
+  {
     key: "whatsapp-cloud",
     label: "WhatsApp Cloud API",
     category: "Messaging",

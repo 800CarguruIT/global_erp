@@ -69,7 +69,7 @@ app.prepare().then(() => {
         .flatMap((x) => agentTokenVariants(x))
     );
     const connectedAt = Date.now();
-    const sentCallIds = new Set();
+    const sentCalls = new Map();
 
     const send = (type, data) => {
       if (ws.readyState !== ws.OPEN) return;
@@ -91,8 +91,19 @@ app.prepare().then(() => {
 
       const callId = String(event.providerCallId ?? event.id ?? "").trim();
       if (callId) {
-        if (sentCallIds.has(callId)) return;
-        sentCallIds.add(callId);
+        const prev = sentCalls.get(callId);
+        const fromNumber = String(event.fromNumber ?? "").trim();
+        const toNumberNow = String(event.toNumber ?? "").trim();
+        const statusNow = String(event.status ?? "").toLowerCase();
+        const hasBetterFrom = !!fromNumber && !String(prev?.fromNumber ?? "").trim();
+        const hasBetterTo = !!toNumberNow && !String(prev?.toNumber ?? "").trim();
+        const statusChanged = !!prev && String(prev.status ?? "").toLowerCase() !== statusNow;
+        if (prev && !hasBetterFrom && !hasBetterTo && !statusChanged) return;
+        sentCalls.set(callId, {
+          fromNumber,
+          toNumber: toNumberNow,
+          status: statusNow,
+        });
       }
       send("incoming", event);
     });
@@ -124,10 +135,21 @@ app.prepare().then(() => {
 
         for (const row of rows) {
           const callId = String(row.provider_call_id ?? row.id ?? "").trim();
-          if (!callId || sentCallIds.has(callId)) continue;
+          if (!callId) continue;
           const toNumber = String(row.to_number ?? "").trim();
           if (agentIds.size > 0 && toNumber && !agentMatches(agentIds, toNumber)) continue;
-          sentCallIds.add(callId);
+          const prev = sentCalls.get(callId);
+          const fromNumber = String(row.from_number ?? "").trim();
+          const statusNow = String(row.status ?? "ringing").toLowerCase();
+          const hasBetterFrom = !!fromNumber && !String(prev?.fromNumber ?? "").trim();
+          const hasBetterTo = !!toNumber && !String(prev?.toNumber ?? "").trim();
+          const statusChanged = !!prev && String(prev.status ?? "").toLowerCase() !== statusNow;
+          if (prev && !hasBetterFrom && !hasBetterTo && !statusChanged) continue;
+          sentCalls.set(callId, {
+            fromNumber,
+            toNumber,
+            status: statusNow,
+          });
           send("incoming", {
             id: String(row.id),
             providerCallId: callId,
