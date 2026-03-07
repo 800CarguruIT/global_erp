@@ -104,9 +104,9 @@ export * as MarketingSettings from "./marketing/settings/repository";
 export * as MarketingSegments from "./marketing/segments/repository";
 export * as Push from "./push/service";
 export * as PushTypes from "./push/types";
+export * as EventAutomation from "./event-automation/service";
 
 export { getOpenAIClient } from "./ai/client";
 export { canUseAi } from "./ai/policy";
 export * as Files from "./files/repository";
 export type { FileKind, FileRecord } from "./files/types";
-

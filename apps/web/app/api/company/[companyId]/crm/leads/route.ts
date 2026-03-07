@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Crm, CrmTypes, Leads } from "@repo/ai-core";
+import { Crm, CrmTypes, EventAutomation, Leads } from "@repo/ai-core";
 import { buildScopeContextFromRoute, requirePermission } from "@/lib/auth/permissions";
 import { getCurrentUserIdFromRequest } from "../../../../../../lib/auth/current-user";
 
@@ -110,6 +110,36 @@ export async function POST(req: NextRequest, { params }: Params) {
       },
       actorUserId,
     });
+
+    try {
+      await EventAutomation.publishNotificationEvent({
+        companyId,
+        eventKey: "lead.created",
+        dedupeKey: `lead.created:${lead.id}`,
+        payload: {
+          lead: {
+            id: lead.id,
+            type: leadType,
+            source: leadSource,
+          },
+          customer: {
+            id: customer.id,
+            name: customer.name ?? customerName ?? null,
+            phone: customer.phone ?? customerPhone ?? null,
+            email: customer.email ?? customerEmail ?? null,
+            whatsappPhone: (customer as any).whatsapp_phone ?? whatsappPhone ?? null,
+          },
+          company: {
+            id: companyId,
+          },
+          actor: {
+            userId: actorUserId,
+          },
+        },
+      });
+    } catch (eventError) {
+      console.error("Failed to enqueue lead.created notification event", eventError);
+    }
 
     const enriched = await Leads.getLeadById(companyId, lead.id);
     return NextResponse.json({ data: enriched ?? lead }, { status: 201 });

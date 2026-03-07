@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { ThemeProvider } from "../theme";
 import { I18nProvider, useI18n, LanguageCode } from "../i18n";
 import { SidebarNav } from "../layout/SidebarNav";
@@ -178,6 +178,7 @@ function detectScope(pathname: string): ScopeInfo {
 
 function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRealtime }: LayoutProps) {
   const pathname = usePathname() || "/";
+  const router = useRouter();
   const scopeInfo = forceScope ?? detectScope(pathname);
   const useBranchRoot = scopeInfo.scope === "branch" && pathname.startsWith("/branches/");
   const [companyName, setCompanyName] = useState<string | null>(null);
@@ -651,6 +652,11 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
     }
   }
 
+  async function handleLogout() {
+    await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+    router.push("/auth/login");
+  }
+
   return (
     <div className="min-h-screen flex flex-col">
       <header className="relative z-50 flex flex-col gap-2 px-4 sm:px-8 py-3 sm:py-4 border-b border-white/10 bg-black/20 backdrop-blur-xl overflow-visible sm:flex-row sm:items-center sm:justify-between">
@@ -693,9 +699,13 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
           >
             Settings
           </Link>
-          <Link href="/api/auth/logout" className="rounded-full border border-white/30 px-3 py-1 text-xs sm:text-sm hover:border-white">
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="rounded-full border border-white/30 px-3 py-1 text-xs sm:text-sm hover:border-white"
+          >
             Logout
-          </Link>
+          </button>
 
           {lookupOpen && (
             <div

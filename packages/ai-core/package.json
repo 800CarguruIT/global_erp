@@ -15,7 +15,8 @@
     "check-types": "tsc --noEmit",
     "build": "tsc -p tsconfig.json",
     "migrate": "ts-node --transpile-only --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" scripts/migrate.ts",
-    "seed:docs": "ts-node --transpile-only --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" scripts/seed-docs.ts"
+    "seed:docs": "ts-node --transpile-only --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" scripts/seed-docs.ts",
+    "events:worker": "ts-node --transpile-only --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" scripts/notification-worker.ts"
   },
   "dependencies": {
     "firebase-admin": "^12.3.0",
