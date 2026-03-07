@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { canUseAi, getOpenAIClient, getSql } from "@repo/ai-core";
+import { canUseAi, getOpenAIClientForCompany, getSql } from "@repo/ai-core";
 
 type Params = { params: Promise<{ companyId: string }> };
 
@@ -14,8 +14,8 @@ export async function GET(req: NextRequest, { params }: Params) {
 
   try {
     const allowed = await canUseAi("ai.vendor.summary" as any, { companyId }).catch(() => true);
-    const hasKey = Boolean(process.env.OPENAI_API_KEY);
-    if (!allowed || !hasKey) {
+    const resolved = await getOpenAIClientForCompany(companyId);
+    if (!allowed || !resolved.client) {
       return NextResponse.json({
         suggestions: [],
         appreciation: null,
@@ -51,7 +51,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     `;
     const inactive = Number(inactiveVendorsRow?.[0]?.cnt ?? 0);
 
-    const client = getOpenAIClient();
+    const client = resolved.client;
     const prompt = `
 You are an AI vendor manager. Based on these metrics, suggest 2-4 concise actions and 1 appreciation:
 - Vendors: ${totals.vendors} (inactive: ${inactive})
@@ -81,7 +81,7 @@ Return strict JSON: { "actions": ["..."], "appreciation": "..." } with short, ac
       suggestions: parsed.actions ?? [],
       appreciation: parsed.appreciation ?? null,
       totals,
-      meta: { aiUsed: true },
+      meta: { aiUsed: true, source: resolved.source },
     });
   } catch (err) {
     console.error("GET /api/company/[companyId]/vendors/ai-summary error", err);

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { canUseAi, getOpenAIClient } from "@repo/ai-core";
+import { canUseAi, getOpenAIClientForCompany } from "@repo/ai-core";
 
 type Params = { params: Promise<{ companyId: string }> };
 
@@ -38,9 +38,9 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
   try {
     const allowed = await canUseAi("ai.car.summary" as any, { companyId }).catch(() => true);
-    const hasKey = Boolean(process.env.OPENAI_API_KEY);
+    const resolved = await getOpenAIClientForCompany(companyId);
 
-    if (!allowed || !hasKey) {
+    if (!allowed || !resolved.client) {
       return NextResponse.json({
         suggestions: [],
         appreciation: null,
@@ -49,7 +49,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
       });
     }
 
-    const client = getOpenAIClient();
+    const client = resolved.client;
     const prompt = `
 You are an AI fleet/CRM assistant. Based on the metrics below, propose 2-4 concise actions and 1 short appreciation.
 Metrics:
@@ -78,7 +78,7 @@ Return strict JSON: { "actions": ["..."], "appreciation": "..." } using brief, a
       suggestions: parsed.actions ?? [],
       appreciation: parsed.appreciation ?? null,
       totals,
-      meta: { aiUsed: true },
+      meta: { aiUsed: true, source: resolved.source },
     });
   } catch (err) {
     console.error("GET /api/company/[companyId]/cars/ai-summary error", err);

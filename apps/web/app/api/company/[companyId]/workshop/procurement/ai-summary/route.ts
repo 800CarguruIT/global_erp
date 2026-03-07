@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { canUseAi, getOpenAIClient, getSql } from "@repo/ai-core";
+import { canUseAi, getOpenAIClientForCompany, getSql } from "@repo/ai-core";
 
 type Params = { params: Promise<{ companyId: string }> };
 
@@ -14,8 +14,8 @@ export async function GET(req: NextRequest, { params }: Params) {
 
   try {
     const allowed = await canUseAi("ai.procurement.summary" as any, { companyId }).catch(() => true);
-    const hasKey = Boolean(process.env.OPENAI_API_KEY);
-    if (!allowed || !hasKey) {
+    const resolved = await getOpenAIClientForCompany(companyId);
+    if (!allowed || !resolved.client) {
       return NextResponse.json({
         suggestions: [],
         appreciation: null,
@@ -45,7 +45,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     const cancelledCount = totals["cancelled"]?.count ?? 0;
     const totalPo = Object.values(totals).reduce((sum, v: any) => sum + (v?.count ?? 0), 0);
 
-    const client = getOpenAIClient();
+    const client = resolved.client;
     const prompt = `
 You are an AI procurement planner. Using the metrics below, propose 2-4 short recommended actions and 1 appreciation.
 Metrics:
@@ -74,7 +74,7 @@ Keep sentences concise and actionable.
     return NextResponse.json({
       suggestions: parsed.actions ?? [],
       appreciation: parsed.appreciation ?? null,
-      meta: { aiUsed: true },
+      meta: { aiUsed: true, source: resolved.source },
     });
   } catch (err) {
     console.error("GET /api/company/[companyId]/workshop/procurement/ai-summary error", err);

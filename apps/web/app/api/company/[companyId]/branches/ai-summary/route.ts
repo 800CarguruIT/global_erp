@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { canUseAi, getOpenAIClient, getSql } from "@repo/ai-core";
+import { canUseAi, getOpenAIClientForCompany } from "@repo/ai-core";
 
 type Params = { params: Promise<{ companyId: string }> };
 
@@ -14,16 +14,14 @@ export async function GET(req: NextRequest, { params }: Params) {
 
   try {
     const allowed = await canUseAi("ai.branch.summary" as any, { companyId }).catch(() => true);
-    const hasKey = Boolean(process.env.OPENAI_API_KEY);
-    if (!allowed || !hasKey) {
+    const resolved = await getOpenAIClientForCompany(companyId);
+    if (!allowed || !resolved.client) {
       return NextResponse.json({
         suggestions: [],
         appreciation: null,
         meta: { aiUsed: false, reason: allowed ? "missing-key" : "disabled" },
       });
     }
-
-    const sql = getSql();
 
     const base = process.env.NEXT_PUBLIC_BASE_URL || process.env.BASE_URL || "http://localhost:3000";
     const summaryUrl = new URL(`/api/company/${companyId}/branches/summary`, base).toString();
@@ -39,7 +37,7 @@ export async function GET(req: NextRequest, { params }: Params) {
       checkedInCars: 0,
     };
 
-    const client = getOpenAIClient();
+    const client = resolved.client;
     const prompt = `
 You are an AI ops lead. Using the metrics below, propose 2-4 concise actions and 1 short appreciation.
 Metrics:
@@ -70,7 +68,7 @@ Return strict JSON: { "actions": ["..."], "appreciation": "..." } with brief, ac
       suggestions: parsed.actions ?? [],
       appreciation: parsed.appreciation ?? null,
       totals,
-      meta: { aiUsed: true },
+      meta: { aiUsed: true, source: resolved.source },
     });
   } catch (err) {
     console.error("GET /api/company/[companyId]/branches/ai-summary error", err);

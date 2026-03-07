@@ -1,4 +1,4 @@
-﻿-- 142_notification_event_automation.sql
+-- 142_notification_event_automation.sql
 -- Event-driven outbound notifications (email/sms/whatsapp)
 
 CREATE TABLE IF NOT EXISTS notification_event_rules (

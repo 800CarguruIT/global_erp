@@ -106,7 +106,13 @@ export * as Push from "./push/service";
 export * as PushTypes from "./push/types";
 export * as EventAutomation from "./event-automation/service";
 
-export { getOpenAIClient } from "./ai/client";
+export { getOpenAIClient, getOpenAIClientForCompany } from "./ai/client";
 export { canUseAi } from "./ai/policy";
+export {
+  clearCompanyAiProviderConfig,
+  getCompanyAiProviderConfig,
+  maskApiKey,
+  upsertCompanyAiProviderConfig,
+} from "./ai/providerConfig";
 export * as Files from "./files/repository";
 export type { FileKind, FileRecord } from "./files/types";

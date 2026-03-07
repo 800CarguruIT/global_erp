@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Accounting, canUseAi, getOpenAIClient, getSql } from "@repo/ai-core";
+import { Accounting, canUseAi, getOpenAIClientForCompany, getSql } from "@repo/ai-core";
 import { buildScopeContextFromRoute, requirePermission } from "../../../../../../lib/auth/permissions";
 
 type Params = { params: Promise<{ companyId: string }> };
@@ -12,9 +12,9 @@ export async function GET(req: NextRequest, { params }: Params) {
   if (perm) return perm;
 
   try {
-    const allowed = await canUseAi("ai.accounting.summary", { companyId }).catch(() => true);
-    const hasKey = Boolean(process.env.OPENAI_API_KEY);
-    if (!allowed || !hasKey) {
+    const allowed = await canUseAi("ai.accounting.summary" as any, { companyId }).catch(() => true);
+    const resolved = await getOpenAIClientForCompany(companyId);
+    if (!allowed || !resolved.client) {
       return NextResponse.json({
         suggestions: [],
         appreciation: null,
@@ -61,7 +61,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     const available = cash + bank;
     const currency = entityRow?.base_currency ?? "USD";
 
-    const client = getOpenAIClient();
+    const client = resolved.client;
     const prompt = `
 You are an AI accountant for a company ledger. Using the metrics below, propose 2-4 short recommended actions and 1 appreciation.
 Metrics:
@@ -92,7 +92,7 @@ Keep sentences concise.
     return NextResponse.json({
       suggestions: parsed.actions ?? [],
       appreciation: parsed.appreciation ?? null,
-      meta: { aiUsed: true },
+      meta: { aiUsed: true, source: resolved.source },
     });
   } catch (err) {
     console.error("GET /api/company/[companyId]/accounting/ai-summary error", err);

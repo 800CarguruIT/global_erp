@@ -58,6 +58,7 @@ export const SIDEBAR_CONFIG: Record<NavScope, Partial<Record<NavCategory, Sideba
       { labelKey: "global.nav.hr", href: "/company/[companyId]/hr" },
       { label: "Roles & Permissions", href: "/company/[companyId]/settings/security/roles" },
       { label: "Users", href: "/company/[companyId]/settings/security/users" },
+      { label: "AI Config", href: "/company/[companyId]/settings/ai/config" },
       { labelKey: "global.nav.finance", href: "/company/[companyId]/accounting" },
       { label: "Inventory", href: "/company/[companyId]/inventory" },
       { label: "Procurement", href: "/company/[companyId]/procurement" },
@@ -301,6 +302,7 @@ export const SIDEBAR_TREE: Partial<Record<NavScope, SidebarItem[]>> = {
       ],
     },
     { label: "Roles & Permissions", href: "/company/[companyId]/settings/security/roles", permissionKeys: ["company.roles.manage"] },
+    { label: "AI Config", href: "/company/[companyId]/settings/ai/config" },
     {
       label: "Accounts",
       href: "/company/[companyId]/accounting",
