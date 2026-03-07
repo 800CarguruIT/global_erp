@@ -87,6 +87,8 @@ type IncomingPopupState = {
   callId: string;
   fromNumber: string;
   toNumber: string;
+  aiText?: string | null;
+  pickupHint?: string | null;
   createdAtMs: number;
   customer?: {
     id?: string | null;
@@ -356,6 +358,8 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
       callId: string;
       fromNumber?: string | null;
       toNumber?: string | null;
+      aiText?: string | null;
+      pickupHint?: string | null;
     }) {
       const now = Date.now();
       const dedupeTtlMs = 10 * 1000;
@@ -375,6 +379,8 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
 
       const fromNumber = String(input.fromNumber ?? "").trim();
       const toNumber = String(input.toNumber ?? "").trim();
+      const aiText = String(input.aiText ?? "").trim();
+      const pickupHint = String(input.pickupHint ?? "").trim();
       if (agentTokensRef.current.size > 0 && toNumber && !tokenMatchesAgent(agentTokensRef.current, toNumber)) {
         return;
       }
@@ -387,6 +393,8 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
           callId,
           fromNumber: safeFromNumber || "Unknown",
           toNumber: toNumber || "Unknown",
+          aiText: aiText || null,
+          pickupHint: pickupHint || null,
           createdAtMs: Date.now(),
           customer,
         };
@@ -401,6 +409,8 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
                 ? current.fromNumber
                 : nextItem.fromNumber,
             toNumber: nextItem.toNumber || current.toNumber,
+            aiText: nextItem.aiText ?? current.aiText ?? null,
+            pickupHint: nextItem.pickupHint ?? current.pickupHint ?? null,
             createdAtMs: current.createdAtMs || nextItem.createdAtMs,
             customer: nextItem.customer ?? current.customer ?? null,
           };
@@ -429,6 +439,8 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
           const incomingCallId = String(payload.providerCallId ?? payload.callId ?? "").trim();
           const incomingFromNumber = String(payload.fromNumber ?? "").trim();
           const incomingToNumber = String(payload.toNumber ?? "").trim();
+          const incomingAiText = String(payload.aiText ?? "").trim();
+          const incomingPickupHint = String(payload.pickupHint ?? "").trim();
           const direction = String(payload.direction ?? "").toLowerCase();
           const status = String(payload.status ?? "").toLowerCase();
 
@@ -530,6 +542,8 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
                   ? {
                       ...p,
                       toNumber: incomingToNumber || p.toNumber,
+                      aiText: incomingAiText || p.aiText || null,
+                      pickupHint: incomingPickupHint || p.pickupHint || null,
                       fromNumber:
                         incomingFromNumber && incomingFromNumber.toLowerCase() !== "unknown"
                           ? incomingFromNumber
@@ -569,6 +583,8 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
             callId: incomingCallId,
             fromNumber: payload.fromNumber ?? null,
             toNumber: payload.toNumber ?? null,
+            aiText: payload.aiText ?? null,
+            pickupHint: payload.pickupHint ?? null,
           });
         } catch {
           // ignore parse errors
@@ -831,6 +847,12 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
                   <div className="text-xs text-slate-300">Mobile No: {popup.customer?.phone ?? popup.fromNumber}</div>
                   {popup.customer?.car ? (
                     <div className="text-xs text-slate-300">Car: {popup.customer.car}</div>
+                  ) : null}
+                  {popup.aiText ? (
+                    <div className="mt-1 text-xs text-emerald-200">AI: {popup.aiText}</div>
+                  ) : null}
+                  {popup.pickupHint ? (
+                    <div className="mt-1 text-xs text-amber-200">{popup.pickupHint}</div>
                   ) : null}
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2 text-[11px]">

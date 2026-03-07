@@ -12,6 +12,10 @@ import {
 } from "@repo/ai-core/crm/leads/repository";
 import { getSql } from "@repo/ai-core/db";
 import { buildScopeContextFromRoute, requirePermission } from "@/lib/auth/permissions";
+import {
+  createOrUpdatePreInspectionFormRequest,
+  sendPreInspectionFormRequestIfPending,
+} from "@/lib/pre-inspection-form";
 
 const payloadSchema = z.object({
   carId: z.string().min(1),
@@ -171,6 +175,13 @@ export async function POST(req: NextRequest, routeCtx: ParamsCtx) {
           source: "customer_car_select",
         },
       });
+      await createOrUpdatePreInspectionFormRequest({
+        companyId,
+        leadId: lead.id,
+        appointmentType: "recovery",
+        appointmentAt,
+        recoveryRequestId,
+      });
       return NextResponse.json({ data: lead }, { status: 201 });
     }
 
@@ -191,6 +202,19 @@ export async function POST(req: NextRequest, routeCtx: ParamsCtx) {
       eventType: "appointment_created",
       eventPayload: { appointmentAt, appointmentType, remarks, source: "customer_car_select" },
     });
+    const form = await createOrUpdatePreInspectionFormRequest({
+      companyId,
+      leadId: lead.id,
+      appointmentType: "walkin",
+      appointmentAt,
+    });
+    const appointmentAtMs = new Date(appointmentAt).getTime();
+    if (Number.isFinite(appointmentAtMs) && appointmentAtMs - Date.now() <= 24 * 60 * 60 * 1000) {
+      await sendPreInspectionFormRequestIfPending({
+        formId: form.id,
+        reason: "direct",
+      }).catch(() => undefined);
+    }
     return NextResponse.json({ data: lead }, { status: 201 });
   } catch (error) {
     console.error("POST /api/customers/[id]/cars/select error:", error);

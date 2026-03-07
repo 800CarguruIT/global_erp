@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getSql } from "@repo/ai-core/db";
+import {
+  getPendingMandatoryFormForRecoveryRequest,
+  sendPreInspectionFormRequestIfPending,
+} from "@/lib/pre-inspection-form";
 
 type Params = { params: { requestId: string } | Promise<{ requestId: string }> };
 
@@ -96,6 +100,21 @@ export async function PUT(req: NextRequest, { params }: Params) {
       `;
       break;
     case "reach_pickup":
+      {
+        const pending = await getPendingMandatoryFormForRecoveryRequest({
+          companyId,
+          requestId,
+        });
+        if (pending) {
+          return NextResponse.json(
+            {
+              error: "Pre-inspection form must be submitted before pickup stage.",
+              formUrl: `/pre-inspection/${pending.token}`,
+            },
+            { status: 409 }
+          );
+        }
+      }
       await sql/* sql */ `
         UPDATE recovery_requests
         SET
@@ -144,6 +163,21 @@ export async function PUT(req: NextRequest, { params }: Params) {
       `;
       break;
     case "pickup_done":
+      {
+        const pending = await getPendingMandatoryFormForRecoveryRequest({
+          companyId,
+          requestId,
+        });
+        if (pending) {
+          return NextResponse.json(
+            {
+              error: "Pre-inspection form must be submitted before pickup completion.",
+              formUrl: `/pre-inspection/${pending.token}`,
+            },
+            { status: 409 }
+          );
+        }
+      }
       await sql/* sql */ `
         UPDATE recovery_requests
         SET
@@ -185,6 +219,19 @@ export async function PUT(req: NextRequest, { params }: Params) {
       break;
     default:
       return NextResponse.json({ error: "Unsupported action" }, { status: 400 });
+  }
+
+  if (action === "accept") {
+    const pending = await getPendingMandatoryFormForRecoveryRequest({
+      companyId,
+      requestId,
+    });
+    if (pending) {
+      await sendPreInspectionFormRequestIfPending({
+        formId: pending.id,
+        reason: "recovery_started",
+      }).catch(() => undefined);
+    }
   }
 
   const refreshed =

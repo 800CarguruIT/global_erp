@@ -18,6 +18,10 @@ import {
   createMobileSuccessResponse,
   handleMobileError,
 } from "@/app/api/mobile/utils";
+import {
+  createOrUpdatePreInspectionFormRequest,
+  sendPreInspectionFormRequestIfPending,
+} from "@/lib/pre-inspection-form";
 
 const payloadSchema = z.object({
   carId: z.string().min(1),
@@ -181,6 +185,13 @@ export async function POST(req: NextRequest, { params }: Params) {
           source: "customer_car_select",
         },
       });
+      await createOrUpdatePreInspectionFormRequest({
+        companyId,
+        leadId: lead.id,
+        appointmentType: "recovery",
+        appointmentAt,
+        recoveryRequestId,
+      });
       return createMobileSuccessResponse({ lead }, 201);
     }
 
@@ -201,6 +212,19 @@ export async function POST(req: NextRequest, { params }: Params) {
       eventType: "appointment_created",
       eventPayload: { appointmentAt, appointmentType, remarks, source: "customer_car_select" },
     });
+    const form = await createOrUpdatePreInspectionFormRequest({
+      companyId,
+      leadId: lead.id,
+      appointmentType: "walkin",
+      appointmentAt,
+    });
+    const appointmentAtMs = new Date(appointmentAt).getTime();
+    if (Number.isFinite(appointmentAtMs) && appointmentAtMs - Date.now() <= 24 * 60 * 60 * 1000) {
+      await sendPreInspectionFormRequestIfPending({
+        formId: form.id,
+        reason: "direct",
+      }).catch(() => undefined);
+    }
     return createMobileSuccessResponse({ lead }, 201);
   } catch (error) {
     console.error(

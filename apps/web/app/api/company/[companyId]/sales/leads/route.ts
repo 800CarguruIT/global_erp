@@ -14,6 +14,10 @@ import { createEstimateForLead } from "@repo/ai-core/workshop/estimates/reposito
 import { createWorkOrderFromEstimate, createWorkOrderForInspection } from "@repo/ai-core/workshop/workorders/repository";
 import { getSql } from "@repo/ai-core/db";
 import { normalizeRsaStatus } from "@/lib/leads/rsa-flow";
+import {
+  createOrUpdatePreInspectionFormRequest,
+  sendPreInspectionFormRequestIfPending,
+} from "@/lib/pre-inspection-form";
 
 type Params = { params: Promise<{ companyId: string }> };
 
@@ -272,7 +276,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
   }
 
-    if (isWorkshop && visitType === "pickup" && pickupNote) {
+  if (isWorkshop && visitType === "pickup" && pickupNote) {
       const mapUrl = `https://www.google.com/maps?q=${encodeURIComponent(pickupNote)}`;
       const branchLoc = await getBranchLocation(requestedBranchId);
       const dropoffLocation = branchLoc?.label ?? dropoffTo ?? requestedBranchId ?? null;
@@ -295,6 +299,28 @@ export async function POST(req: NextRequest, { params }: Params) {
     });
     meta.pickupRecoveryLeadId = recoveryLead.id;
     meta.pickupRecoveryLeadLink = mapUrl;
+    await createOrUpdatePreInspectionFormRequest({
+      companyId,
+      leadId: recoveryLead.id,
+      appointmentType: "recovery",
+      appointmentAt: appointmentAt ?? null,
+    });
+  }
+
+  if (isWorkshop && visitType === "walkin" && appointmentAt) {
+    const form = await createOrUpdatePreInspectionFormRequest({
+      companyId,
+      leadId: lead.id,
+      appointmentType: "walkin",
+      appointmentAt,
+    });
+    const appointmentAtMs = new Date(appointmentAt).getTime();
+    if (Number.isFinite(appointmentAtMs) && appointmentAtMs - Date.now() <= 24 * 60 * 60 * 1000) {
+      await sendPreInspectionFormRequestIfPending({
+        formId: form.id,
+        reason: "direct",
+      }).catch(() => undefined);
+    }
   }
 
   if ((normalizedRequestedStatus && normalizedRequestedStatus !== lead.leadStatus) || agentRemark || customerRemark) {

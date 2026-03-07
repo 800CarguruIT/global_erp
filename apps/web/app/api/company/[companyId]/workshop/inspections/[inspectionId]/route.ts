@@ -9,6 +9,7 @@ import {
 import type { InspectionItem } from "@repo/ai-core/workshop/inspections/types";
 import { getCurrentUserIdFromRequest } from "@/lib/auth/current-user";
 import { getSql } from "@repo/ai-core/db";
+import { getPendingMandatoryFormForLead } from "@/lib/pre-inspection-form";
 
 type Params = { params: Promise<{ companyId: string; inspectionId: string }> };
 type VerifyFineInput = { fineCode?: string | null; reason?: string | null; amount?: number | string | null };
@@ -125,6 +126,30 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const current = await getInspectionById(companyId, inspectionId);
   if (!current) {
     return new NextResponse("Not found", { status: 404 });
+  }
+
+  const requestedStatus = String(body?.status ?? "").toLowerCase();
+  const requestStartAt = body?.startAt ?? body?.start_at ?? null;
+  const isInspectionStartIntent =
+    Boolean(requestStartAt) ||
+    requestedStatus === "pending" ||
+    requestedStatus === "in_progress" ||
+    requestedStatus === "in-progress";
+  if (isInspectionStartIntent && current.leadId) {
+    const pendingWalkinForm = await getPendingMandatoryFormForLead({
+      companyId,
+      leadId: current.leadId,
+      appointmentType: "walkin",
+    });
+    if (pendingWalkinForm) {
+      return NextResponse.json(
+        {
+          error: "Pre-inspection form is mandatory before inspection start.",
+          formUrl: `/pre-inspection/${pendingWalkinForm.token}`,
+        },
+        { status: 409 }
+      );
+    }
   }
 
   if (body?.action === "verify") {

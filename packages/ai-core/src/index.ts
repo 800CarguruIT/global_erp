@@ -29,6 +29,8 @@ export * as LeadTypes from "./crm/leads/types";
 export * as LeadJobFlows from "./crm/leads/jobFlows";
 export * as CallCenter from "./call-center/service";
 export * as CallCenterTypes from "./call-center/types";
+export * as CallAiPolicy from "./call-center/aiPolicy";
+export * as CallAiWorkflow from "./call-center/aiWorkflow";
 export * as Vendors from "./vendors/service";
 export * as VendorTypes from "./vendors/types";
 export * as Branches from "./branches/repository";

@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { CallCenter, Dialer, getSql } from "@repo/ai-core";
+import {
+  CallAiPolicy,
+  CallAiWorkflow,
+  CallCenter,
+  Dialer,
+  getOpenAIClientForCompany,
+  getSql,
+} from "@repo/ai-core";
 import { publishIncomingPopupEvent } from "../../../../../lib/call-center/incoming-popup-bus";
 import { appendFile, mkdir } from "node:fs/promises";
 import os from "node:os";
@@ -30,6 +37,8 @@ export const dynamic = "force-dynamic";
 const WEBHOOK_LOG_PATH =
   process.env.DIALER_WEBHOOK_LOG_PATH?.trim() ||
   path.join(os.tmpdir(), "global-erp", "webhook-dialer.log");
+const liveExecutionSeen = new Map<string, number>();
+const yeastarTokenCache = new Map<string, { token: string; expiresAtMs: number }>();
 
 function safeJson(value: unknown): string {
   try {
@@ -66,6 +75,10 @@ function normalizedBaseUrl(rawBaseUrl?: string, rawPath?: string): string | null
   return apiPath ? `${baseUrl}/${apiPath}` : baseUrl;
 }
 
+function getYeastarTokenCacheKey(base: string, mode: "userpass" | "client", identifier: string): string {
+  return `${base}|${mode}|${identifier.trim().toLowerCase()}`;
+}
+
 function normalizeMaybePhone(value: string | null | undefined): string | null {
   if (!value) return null;
   const raw = String(value).trim();
@@ -76,11 +89,345 @@ function normalizeMaybePhone(value: string | null | undefined): string | null {
   return hasPlus ? `+${digits}` : digits;
 }
 
+function normalizeDialToken(value: string | null | undefined): string {
+  const raw = String(value ?? "").trim().toLowerCase();
+  if (!raw) return "";
+  return raw.replace(/[\s\-().]/g, "");
+}
+
 function isLikelyExternalNumber(value: string | null | undefined): boolean {
   const normalized = normalizeMaybePhone(value);
   if (!normalized) return false;
   const digits = normalized.replace(/\D+/g, "");
   return digits.length >= 7;
+}
+
+function coerceStringList(value: unknown): string[] {
+  if (Array.isArray(value)) return value.map((v) => String(v ?? "").trim()).filter(Boolean);
+  if (typeof value === "string") {
+    return value
+      .split(",")
+      .map((v) => v.trim())
+      .filter(Boolean);
+  }
+  if (typeof value === "number") return [String(value)];
+  return [];
+}
+
+function pickIntegrationTokens(
+  credentials: Record<string, unknown> | null | undefined,
+  metadata: Record<string, unknown> | null | undefined
+): string[] {
+  const out = new Set<string>();
+  const keys = [
+    "defaultExtension",
+    "extension",
+    "extensions",
+    "inboundExtension",
+    "inboundExtensions",
+    "did",
+    "didNumber",
+    "didNumbers",
+    "inboundDid",
+    "inboundDids",
+    "toNumber",
+    "toNumbers",
+  ];
+  const sources = [credentials ?? {}, metadata ?? {}];
+  for (const source of sources) {
+    if (!source || typeof source !== "object") continue;
+    const rec = source as Record<string, unknown>;
+    for (const key of keys) {
+      const values = coerceStringList(rec[key]);
+      for (const value of values) {
+        const token = normalizeDialToken(value);
+        if (token) out.add(token);
+      }
+    }
+  }
+  return Array.from(out);
+}
+
+async function resolveCompanyForInbound(args: {
+  providerKey: string;
+  toNumber?: string | null;
+  rawPayload?: unknown;
+}): Promise<string | null> {
+  const sql = getSql();
+  const rows = await sql<
+    {
+      id: string;
+      company_id: string | null;
+      credentials: Record<string, unknown> | null;
+      metadata: Record<string, unknown> | null;
+    }[]
+  >`
+    SELECT id, company_id, credentials, metadata
+    FROM integration_dialers
+    WHERE provider = ${args.providerKey}
+      AND is_active = TRUE
+      AND company_id IS NOT NULL
+    ORDER BY updated_at DESC, created_at DESC
+    LIMIT 200
+  `;
+  const candidates = ((rows as any).rows ?? rows) as Array<{
+    id: string;
+    company_id: string | null;
+    credentials: Record<string, unknown> | null;
+    metadata: Record<string, unknown> | null;
+  }>;
+  if (!candidates.length) return null;
+
+  const uniqueCompanies = Array.from(new Set(candidates.map((r) => String(r.company_id ?? "").trim()).filter(Boolean)));
+  if (uniqueCompanies.length === 1) return uniqueCompanies[0] ?? null;
+
+  const payloadToRaw = findFirstDeep(args.rawPayload, [
+    "to",
+    "to_number",
+    "toNumber",
+    "dst",
+    "dnis",
+    "called_number",
+    "did",
+    "did_number",
+    "extension",
+  ]);
+  const targetTokens = new Set<string>();
+  for (const raw of [args.toNumber ?? null, typeof payloadToRaw === "string" || typeof payloadToRaw === "number" ? String(payloadToRaw) : null]) {
+    const token = normalizeDialToken(raw);
+    if (!token) continue;
+    targetTokens.add(token);
+    const digits = token.replace(/\D+/g, "");
+    if (digits) targetTokens.add(digits);
+  }
+  if (!targetTokens.size) return null;
+
+  for (const candidate of candidates) {
+    const integrationTokens = pickIntegrationTokens(candidate.credentials, candidate.metadata);
+    if (!integrationTokens.length) continue;
+    for (const token of integrationTokens) {
+      const normalized = normalizeDialToken(token);
+      const digits = normalized.replace(/\D+/g, "");
+      if (targetTokens.has(normalized) || (digits && targetTokens.has(digits))) {
+        return candidate.company_id;
+      }
+    }
+  }
+
+  return null;
+}
+
+async function executeLiveInboundAi(args: {
+  companyId: string;
+  providerKey: string;
+  providerCallId: string;
+  fromNumber?: string | null;
+  toNumber?: string | null;
+  policy: {
+    guidance?: {
+      welcomeMessage?: string;
+      systemPrompt?: string;
+      escalationKeywords?: string[];
+    } | null;
+    timezone?: string;
+  } | null;
+}): Promise<{
+  executed: boolean;
+  action: string;
+  reason?: string;
+  replyText?: string;
+  model?: string;
+  source?: "company" | "global" | null;
+}> {
+  const { client, source } = await getOpenAIClientForCompany(args.companyId);
+  if (!client) {
+    return {
+      executed: false,
+      action: "no_client",
+      reason: "No OpenAI client available for company or global fallback",
+      source,
+    };
+  }
+
+  const model = process.env.CALL_AI_MODEL?.trim() || "gpt-4o-mini";
+  const systemPrompt =
+    String(args.policy?.guidance?.systemPrompt ?? "").trim() ||
+    "You are an inbound call AI assistant for an ERP call center. Reply with one short, polite opening sentence and one clarifying question.";
+  const welcomeMessage = String(args.policy?.guidance?.welcomeMessage ?? "").trim();
+  const escalationKeywords = Array.isArray(args.policy?.guidance?.escalationKeywords)
+    ? args.policy?.guidance?.escalationKeywords.join(", ")
+    : "";
+  const userPrompt = [
+    `Call context: provider=${args.providerKey}, callId=${args.providerCallId}`,
+    `Caller: ${String(args.fromNumber ?? "unknown")}`,
+    `Target: ${String(args.toNumber ?? "unknown")}`,
+    `Timezone: ${String(args.policy?.timezone ?? "Asia/Dubai")}`,
+    welcomeMessage ? `Preferred welcome: ${welcomeMessage}` : "",
+    escalationKeywords ? `Escalation keywords: ${escalationKeywords}` : "",
+    "Return plain text only. Max 220 characters.",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const completion = await client.chat.completions.create({
+    model,
+    temperature: 0.2,
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt },
+    ],
+  });
+  const replyText = String(completion.choices?.[0]?.message?.content ?? "").trim();
+  if (!replyText) {
+    return {
+      executed: false,
+      action: "empty_reply",
+      reason: "AI returned empty response",
+      source,
+      model,
+    };
+  }
+
+  // Phase 2 start: live generation path. Provider-side media injection is provider-dependent.
+  return {
+    executed: true,
+    action: "generated_reply",
+    replyText,
+    source,
+    model,
+  };
+}
+
+function shouldRunLiveExecutionOnce(key: string, ttlMs = 120_000): boolean {
+  const now = Date.now();
+  for (const [k, seenAt] of liveExecutionSeen.entries()) {
+    if (now - seenAt > ttlMs) liveExecutionSeen.delete(k);
+  }
+  const seen = liveExecutionSeen.get(key);
+  if (seen && now - seen <= ttlMs) return false;
+  liveExecutionSeen.set(key, now);
+  return true;
+}
+
+async function getYeastarCredentialsForCompany(args: {
+  companyId: string;
+}): Promise<Record<string, any> | null> {
+  const sql = getSql();
+  const rows = await sql<
+    { credentials: Record<string, unknown> | null; company_id: string | null }[]
+  >`
+    SELECT credentials, company_id
+    FROM integration_dialers
+    WHERE provider = 'yeastar'
+      AND is_active = TRUE
+      AND (company_id = ${args.companyId} OR company_id IS NULL)
+    ORDER BY CASE WHEN company_id = ${args.companyId} THEN 0 ELSE 1 END, updated_at DESC, created_at DESC
+    LIMIT 5
+  `;
+  const candidates = ((rows as any).rows ?? rows) as Array<{
+    credentials: Record<string, unknown> | null;
+    company_id: string | null;
+  }>;
+  if (!candidates.length) return null;
+  for (const row of candidates) {
+    if (row.credentials && typeof row.credentials === "object") {
+      return row.credentials;
+    }
+  }
+  return null;
+}
+
+async function tryYeastarAutoPickup(args: {
+  companyId: string;
+  providerCallId: string;
+  toNumber?: string | null;
+}): Promise<{ picked: boolean; endpoint?: string; reason?: string }> {
+  const credentials = await getYeastarCredentialsForCompany({ companyId: args.companyId });
+  if (!credentials) return { picked: false, reason: "No active Yeastar integration credentials" };
+  const base = normalizedBaseUrl(credentials.apiBaseUrl, credentials.apiPath);
+  if (!base) return { picked: false, reason: "Missing Yeastar base URL" };
+  const tokenResult = await getTokenForYeastarDetailed(credentials);
+  if (!tokenResult.token) {
+    return {
+      picked: false,
+      reason: `Failed to get Yeastar token: ${tokenResult.reason ?? "unknown"}`,
+    };
+  }
+  const token = tokenResult.token;
+  const userAgent = String(credentials.userAgent ?? "OpenAPI").trim() || "OpenAPI";
+  const sslVerify = toBool(credentials.sslVerify, true);
+  const extension = String(args.toNumber ?? "").trim();
+
+  const candidates: Array<{ name: string; endpoint: string; body: Record<string, unknown> }> = [
+    {
+      name: "call_answer_ext",
+      endpoint: `${base}/call/answer?access_token=${encodeURIComponent(token)}`,
+      body: { call_id: args.providerCallId, extension },
+    },
+    {
+      name: "call_answer_number",
+      endpoint: `${base}/call/answer?access_token=${encodeURIComponent(token)}`,
+      body: { call_id: args.providerCallId, number: extension },
+    },
+    {
+      name: "call_control_action_answer_ext",
+      endpoint: `${base}/call/control?access_token=${encodeURIComponent(token)}`,
+      body: { call_id: args.providerCallId, action: "answer", extension },
+    },
+    {
+      name: "call_control_action_pickup_ext",
+      endpoint: `${base}/call/control?access_token=${encodeURIComponent(token)}`,
+      body: { call_id: args.providerCallId, action: "pickup", extension },
+    },
+    {
+      name: "call_control_operation_answer_ext",
+      endpoint: `${base}/call/control?access_token=${encodeURIComponent(token)}`,
+      body: { call_id: args.providerCallId, operation: "answer", extension },
+    },
+    {
+      name: "call_control_operation_pickup_ext",
+      endpoint: `${base}/call/control?access_token=${encodeURIComponent(token)}`,
+      body: { call_id: args.providerCallId, operation: "pickup", extension },
+    },
+    {
+      name: "call_operate_answer_ext",
+      endpoint: `${base}/call/operate?access_token=${encodeURIComponent(token)}`,
+      body: { call_id: args.providerCallId, operation: "answer", extension },
+    },
+    {
+      name: "call_operate_pickup_ext",
+      endpoint: `${base}/call/operate?access_token=${encodeURIComponent(token)}`,
+      body: { call_id: args.providerCallId, operation: "pickup", extension },
+    },
+  ];
+
+  const failureDetails: string[] = [];
+  for (const candidate of candidates) {
+    const res = await requestJson({
+      url: candidate.endpoint,
+      method: "POST",
+      sslVerify,
+      headers: {
+        "User-Agent": userAgent,
+        Authorization: token,
+      },
+      body: candidate.body,
+      timeoutMs: 5000,
+    });
+    const errcode = Number(res.json?.errcode ?? 0);
+    if (res.ok && (!Number.isFinite(errcode) || errcode === 0)) {
+      return { picked: true, endpoint: `${candidate.name}:${candidate.endpoint}` };
+    }
+    const errmsg = String(res.json?.errmsg ?? res.error ?? `http_${res.status}`).trim();
+    failureDetails.push(`${candidate.name}[${errcode}]:${errmsg || "rejected"}`);
+  }
+  return {
+    picked: false,
+    reason:
+      failureDetails.length > 0
+        ? `Yeastar call answer endpoints rejected: ${failureDetails.join(" | ")}`
+        : "Yeastar call answer endpoints did not accept request",
+  };
 }
 
 async function requestJson(params: {
@@ -150,9 +497,12 @@ async function requestJson(params: {
   });
 }
 
-async function getTokenForYeastar(credentials: Record<string, any>): Promise<string | null> {
+async function getTokenForYeastarDetailed(credentials: Record<string, any>): Promise<{
+  token: string | null;
+  reason?: string;
+}> {
   const base = normalizedBaseUrl(credentials.apiBaseUrl, credentials.apiPath);
-  if (!base) return null;
+  if (!base) return { token: null, reason: "Missing Yeastar API base URL/apiPath" };
   const username = String(credentials.username ?? "").trim();
   const password = String(credentials.password ?? "").trim();
   const clientId = String(credentials.clientId ?? "").trim();
@@ -160,29 +510,65 @@ async function getTokenForYeastar(credentials: Record<string, any>): Promise<str
   const userAgent = String(credentials.userAgent ?? "OpenAPI").trim() || "OpenAPI";
   const sslVerify = toBool(credentials.sslVerify, true);
 
-  if ((!username || !password) && (!clientId || !clientSecret)) {
-    return null;
-  }
-
-  const payload: Record<string, string> = { user_agent: userAgent };
+  const candidates: Array<{ mode: "userpass" | "client"; payload: Record<string, string> }> = [];
   if (username && password) {
-    payload.username = username;
-    payload.password = password;
-  } else {
-    payload.client_id = clientId;
-    payload.client_secret = clientSecret;
+    candidates.push({
+      mode: "userpass",
+      payload: { user_agent: userAgent, username, password },
+    });
+  }
+  if (clientId && clientSecret) {
+    candidates.push({
+      mode: "client",
+      payload: { user_agent: userAgent, client_id: clientId, client_secret: clientSecret },
+    });
+  }
+  if (!candidates.length) {
+    return {
+      token: null,
+      reason: "Missing Yeastar credentials (need username/password or clientId/clientSecret)",
+    };
   }
 
-  const tokenRes = await requestJson({
-    url: `${base}/get_token`,
-    method: "POST",
-    body: payload,
-    sslVerify,
-    headers: { "User-Agent": userAgent },
-  });
-  const token = String(tokenRes.json?.access_token ?? "").trim();
-  if (!tokenRes.ok || Number(tokenRes.json?.errcode ?? -1) !== 0 || !token) return null;
-  return token;
+  for (const candidate of candidates) {
+    const identifier = candidate.mode === "userpass" ? username : clientId;
+    const cacheKey = getYeastarTokenCacheKey(base, candidate.mode, identifier);
+    const cached = yeastarTokenCache.get(cacheKey);
+    if (cached && cached.expiresAtMs > Date.now() + 60_000) {
+      return { token: cached.token };
+    }
+  }
+
+  const failures: string[] = [];
+  for (const candidate of candidates) {
+    const identifier = candidate.mode === "userpass" ? username : clientId;
+    const cacheKey = getYeastarTokenCacheKey(base, candidate.mode, identifier);
+    const tokenRes = await requestJson({
+      url: `${base}/get_token`,
+      method: "POST",
+      body: candidate.payload,
+      sslVerify,
+      headers: { "User-Agent": userAgent },
+    });
+    const token = String(tokenRes.json?.access_token ?? "").trim();
+    const errcode = Number(tokenRes.json?.errcode ?? -1);
+    if (tokenRes.ok && errcode === 0 && token) {
+      const expiresInSec = Number(tokenRes.json?.expires_in ?? 1800);
+      const expiresAtMs =
+        Date.now() + (Number.isFinite(expiresInSec) ? Math.max(expiresInSec, 120) * 1000 : 1800_000);
+      yeastarTokenCache.set(cacheKey, { token, expiresAtMs });
+      return { token };
+    }
+    const errmsg = String(tokenRes.json?.errmsg ?? tokenRes.error ?? `http_${tokenRes.status}`).trim();
+    failures.push(`${candidate.mode}:${errmsg || "token_failed"}`);
+  }
+
+  return { token: null, reason: failures.join(" | ") || "Yeastar token request failed" };
+}
+
+async function getTokenForYeastar(credentials: Record<string, any>): Promise<string | null> {
+  const result = await getTokenForYeastarDetailed(credentials);
+  return result.token;
 }
 
 async function resolveYeastarLiveCaller(args: {
@@ -671,6 +1057,285 @@ async function handle(providerKey: string, req: NextRequest) {
     toNumber: update.toNumber ?? null,
   });
 
+  let popupAiText: string | null = null;
+  let popupPickupHint: string | null = null;
+
+  if (update.direction === "inbound") {
+    if (!update.companyId) {
+      const inferredCompanyId = await resolveCompanyForInbound({
+        providerKey: update.providerKey,
+        toNumber: update.toNumber ?? null,
+        rawPayload: update.rawPayload,
+      }).catch(() => null);
+      if (inferredCompanyId) {
+        update.companyId = inferredCompanyId;
+        update.scope = "company";
+        await logWebhookLine({
+          ts: new Date().toISOString(),
+          stage: "company_scope_resolved",
+          providerKey,
+          providerCallId: update.providerCallId,
+          companyId: inferredCompanyId,
+          toNumber: update.toNumber ?? null,
+        });
+      }
+    }
+
+    const policyEval = await CallAiPolicy.evaluateInboundCallAiPolicy({
+      companyId: update.companyId ?? null,
+      providerKey: update.providerKey,
+      providerCallId: update.providerCallId,
+      fromNumber: update.fromNumber ?? null,
+      toNumber: update.toNumber ?? null,
+      rawPayload: update.rawPayload,
+    }).catch(() => ({
+      decision: "disabled",
+      reason: "Policy evaluation failed",
+      mode: "dry_run",
+      matchedRule: null,
+      details: {},
+      policy: null,
+    }));
+
+    let liveExec: {
+      executed: boolean;
+      action: string;
+      reason?: string;
+      replyText?: string;
+      model?: string;
+      source?: "company" | "global" | null;
+    } | null = null;
+    let pickupResult:
+      | { picked: boolean; endpoint?: string; reason?: string }
+      | null = null;
+    let automationWorkflow: Awaited<ReturnType<typeof CallAiWorkflow.runCallAiWorkflow>> | null =
+      null;
+    const liveExecKey = `${update.providerKey}:${update.providerCallId}:${update.companyId ?? ""}`;
+    if (
+      policyEval.mode === "live" &&
+      policyEval.decision === "allow_ai" &&
+      update.companyId &&
+      shouldRunLiveExecutionOnce(liveExecKey)
+    ) {
+      if (
+        update.providerKey.toLowerCase() === "yeastar" &&
+        /(ring|incoming|initiated)/i.test(String(update.status ?? ""))
+      ) {
+        pickupResult = await tryYeastarAutoPickup({
+          companyId: update.companyId,
+          providerCallId: update.providerCallId,
+          toNumber: update.toNumber ?? null,
+        }).catch((err) => ({
+          picked: false,
+          reason: err instanceof Error ? err.message : String(err),
+        }));
+      }
+
+      liveExec = await executeLiveInboundAi({
+        companyId: update.companyId,
+        providerKey: update.providerKey,
+        providerCallId: update.providerCallId,
+        fromNumber: update.fromNumber ?? null,
+        toNumber: update.toNumber ?? null,
+        policy: policyEval.policy ?? null,
+      }).catch((err) => ({
+        executed: false,
+        action: "execution_error",
+        reason: err instanceof Error ? err.message : String(err),
+      }));
+      if (liveExec) {
+        liveExec.reason = liveExec.reason
+          ? liveExec.reason
+          : pickupResult
+          ? pickupResult.picked
+            ? `pickup_ok:${pickupResult.endpoint ?? "unknown"}`
+            : `pickup_failed:${pickupResult.reason ?? "unknown"}`
+          : liveExec.reason;
+      }
+    }
+
+    if (policyEval.decision === "allow_ai" && policyEval.policy?.guidance?.automationEnabled) {
+      const simulationMode = Boolean(policyEval.policy?.guidance?.simulationMode);
+      if (!update.companyId) {
+        automationWorkflow = {
+          enabled: true,
+          simulationMode,
+          currentStage: "inquiry",
+          inquiryId: null,
+          leadId: null,
+          inferredOutcome: null,
+          steps: [
+            {
+              key: "inquiry",
+              action: "create_inquiry",
+              status: "failed",
+              payload: {},
+              error: "No company scope for automation workflow",
+            },
+          ],
+        };
+      } else {
+        automationWorkflow = await CallAiWorkflow.runCallAiWorkflow({
+          companyId: update.companyId,
+          providerKey: update.providerKey,
+          providerCallId: update.providerCallId,
+          fromNumber: update.fromNumber ?? null,
+          toNumber: update.toNumber ?? null,
+          aiReply: liveExec?.replyText ?? null,
+          simulationMode,
+        }).catch((err) => ({
+          enabled: true as const,
+          simulationMode,
+          currentStage: "inquiry" as const,
+          inquiryId: null,
+          leadId: null,
+          inferredOutcome: null,
+          steps: [
+            {
+              key: "inquiry" as const,
+              action: "create_inquiry",
+              status: "failed" as const,
+              payload: {},
+              error: err instanceof Error ? err.message : String(err),
+            },
+          ],
+        }));
+      }
+    }
+
+    await CallAiPolicy.logCallAiPolicyDecision({
+      companyId: update.companyId ?? null,
+      providerKey: update.providerKey,
+      providerCallId: update.providerCallId,
+      fromNumber: update.fromNumber ?? null,
+      toNumber: update.toNumber ?? null,
+      decision: policyEval.decision as any,
+      reason: policyEval.reason,
+      mode: policyEval.mode,
+      matchedRule: policyEval.matchedRule,
+      details: {
+        ...policyEval.details,
+        policyEnabled: Boolean(policyEval.policy?.enabled),
+        policyMode: policyEval.policy?.mode ?? null,
+        liveExecution: liveExec
+          ? {
+              executed: liveExec.executed,
+              action: liveExec.action,
+              reason: liveExec.reason ?? null,
+              source: liveExec.source ?? null,
+              model: liveExec.model ?? null,
+              replyPreview: liveExec.replyText ? liveExec.replyText.slice(0, 220) : null,
+            }
+          : null,
+        automationWorkflow,
+      },
+    }).catch(() => undefined);
+
+    update.rawPayload = {
+      ...(typeof update.rawPayload === "object" && update.rawPayload ? (update.rawPayload as any) : {}),
+      __aiPolicyPhase1: {
+        decision: policyEval.decision,
+        reason: policyEval.reason,
+        mode: policyEval.mode,
+        matchedRule: policyEval.matchedRule,
+      },
+      ...(liveExec
+        ? {
+            __aiPolicyPhase2: {
+              executed: liveExec.executed,
+              action: liveExec.action,
+              reason: liveExec.reason ?? null,
+              source: liveExec.source ?? null,
+              model: liveExec.model ?? null,
+              replyText: liveExec.replyText ?? null,
+            },
+          }
+        : {}),
+      ...(automationWorkflow
+        ? {
+            __aiAutomationWorkflow: automationWorkflow,
+          }
+        : {}),
+    };
+
+    await logWebhookLine({
+      ts: new Date().toISOString(),
+      stage: "ai_policy_phase1",
+      providerKey,
+      providerCallId: update.providerCallId,
+      decision: policyEval.decision,
+      reason: policyEval.reason,
+      mode: policyEval.mode,
+      matchedRule: policyEval.matchedRule,
+      companyId: update.companyId ?? null,
+      liveExecution: liveExec
+        ? {
+            executed: liveExec.executed,
+            action: liveExec.action,
+            reason: liveExec.reason ?? null,
+            source: liveExec.source ?? null,
+            model: liveExec.model ?? null,
+            replyPreview: liveExec.replyText ? liveExec.replyText.slice(0, 220) : null,
+          }
+        : null,
+    });
+    if (liveExec) {
+      popupAiText = liveExec.replyText ?? null;
+      if (update.providerKey.toLowerCase() === "yeastar") {
+        popupPickupHint = update.toNumber
+          ? `Pick up from PBX: *4 (group) or *04${update.toNumber} (directed).`
+          : "Pick up from PBX: *4 (group) or *04<extension> (directed).";
+      }
+      await logWebhookLine({
+        ts: new Date().toISOString(),
+        stage: "ai_phase2_pickup",
+        providerKey,
+        providerCallId: update.providerCallId,
+        companyId: update.companyId ?? null,
+        picked: pickupResult?.picked ?? null,
+        endpoint: pickupResult?.endpoint ?? null,
+        reason: pickupResult?.reason ?? null,
+      });
+      await logWebhookLine({
+        ts: new Date().toISOString(),
+        stage: "ai_phase2_live",
+        providerKey,
+        providerCallId: update.providerCallId,
+        companyId: update.companyId ?? null,
+        executed: liveExec.executed,
+        action: liveExec.action,
+        reason: liveExec.reason ?? null,
+        source: liveExec.source ?? null,
+        model: liveExec.model ?? null,
+        replyPreview: liveExec.replyText ? liveExec.replyText.slice(0, 220) : null,
+      });
+    }
+    if (automationWorkflow) {
+      await logWebhookLine({
+        ts: new Date().toISOString(),
+        stage: "ai_workflow_automation",
+        providerKey,
+        providerCallId: update.providerCallId,
+        companyId: update.companyId ?? null,
+        simulationMode: automationWorkflow.simulationMode,
+        steps: automationWorkflow.steps.map((s) => ({
+          key: s.key,
+          action: s.action,
+          status: s.status,
+          error: (s as any).error ?? null,
+          payload: {
+            scenario: (s as any)?.payload?.scenario ?? null,
+            leadType: (s as any)?.payload?.leadType ?? null,
+            leadOutcome: (s as any)?.payload?.leadOutcome ?? null,
+            inquiryId: (s as any)?.payload?.inquiryId ?? null,
+            leadId: (s as any)?.payload?.leadId ?? null,
+            recoveryRequestId: (s as any)?.payload?.recoveryRequestId ?? null,
+          },
+        })),
+      });
+    }
+  }
+
   await CallCenter.handleDialerWebhookUpdate(update);
 
   if (update.direction === "inbound") {
@@ -684,6 +1349,8 @@ async function handle(providerKey: string, req: NextRequest) {
       toNumber: update.toNumber ?? null,
       companyId: update.companyId ?? null,
       branchId: update.branchId ?? null,
+      aiText: popupAiText,
+      pickupHint: popupPickupHint,
       createdAt: new Date().toISOString(),
     });
   }

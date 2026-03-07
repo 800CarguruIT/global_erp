@@ -8,6 +8,8 @@ export type IncomingPopupEvent = {
   toNumber?: string | null;
   companyId?: string | null;
   branchId?: string | null;
+  aiText?: string | null;
+  pickupHint?: string | null;
   createdAt: string;
 };
 

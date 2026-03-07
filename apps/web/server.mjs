@@ -94,14 +94,17 @@ app.prepare().then(() => {
         const prev = sentCalls.get(callId);
         const fromNumber = String(event.fromNumber ?? "").trim();
         const toNumberNow = String(event.toNumber ?? "").trim();
+        const aiTextNow = String(event.aiText ?? "").trim();
         const statusNow = String(event.status ?? "").toLowerCase();
         const hasBetterFrom = !!fromNumber && !String(prev?.fromNumber ?? "").trim();
         const hasBetterTo = !!toNumberNow && !String(prev?.toNumber ?? "").trim();
+        const hasBetterAi = !!aiTextNow && !String(prev?.aiText ?? "").trim();
         const statusChanged = !!prev && String(prev.status ?? "").toLowerCase() !== statusNow;
-        if (prev && !hasBetterFrom && !hasBetterTo && !statusChanged) return;
+        if (prev && !hasBetterFrom && !hasBetterTo && !hasBetterAi && !statusChanged) return;
         sentCalls.set(callId, {
           fromNumber,
           toNumber: toNumberNow,
+          aiText: aiTextNow,
           status: statusNow,
         });
       }
@@ -143,11 +146,13 @@ app.prepare().then(() => {
           const statusNow = String(row.status ?? "ringing").toLowerCase();
           const hasBetterFrom = !!fromNumber && !String(prev?.fromNumber ?? "").trim();
           const hasBetterTo = !!toNumber && !String(prev?.toNumber ?? "").trim();
+          const hasBetterAi = false;
           const statusChanged = !!prev && String(prev.status ?? "").toLowerCase() !== statusNow;
-          if (prev && !hasBetterFrom && !hasBetterTo && !statusChanged) continue;
+          if (prev && !hasBetterFrom && !hasBetterTo && !hasBetterAi && !statusChanged) continue;
           sentCalls.set(callId, {
             fromNumber,
             toNumber,
+            aiText: "",
             status: statusNow,
           });
           send("incoming", {
