@@ -392,3 +392,118 @@ export async function getLatestFormForRecoveryRequest(args: {
   const row = rowsFrom<any>(rows)[0];
   return row ? toFormRow(row) : null;
 }
+
+export async function getLatestFormForLead(args: {
+  companyId: string;
+  leadId: string;
+}): Promise<PreInspectionFormRequest | null> {
+  const sql: any = getSql();
+  const rows = await sql`
+    SELECT *
+    FROM pre_inspection_form_requests
+    WHERE company_id = ${args.companyId}
+      AND lead_id = ${args.leadId}
+    ORDER BY created_at DESC
+    LIMIT 1
+  `;
+  const row = rowsFrom<any>(rows)[0];
+  return row ? toFormRow(row) : null;
+}
+
+export async function getLatestFormForLeadOrRelated(args: {
+  companyId: string;
+  leadId: string;
+}): Promise<PreInspectionFormRequest | null> {
+  const sql: any = getSql();
+  const rows = await sql`
+    WITH target AS (
+      SELECT id, company_id, customer_id, car_id
+      FROM leads
+      WHERE id = ${args.leadId}
+        AND company_id = ${args.companyId}
+      LIMIT 1
+    )
+    SELECT f.*
+    FROM target t
+    JOIN LATERAL (
+      SELECT f.*
+      FROM pre_inspection_form_requests f
+      JOIN leads lf ON lf.id = f.lead_id
+      WHERE f.company_id = t.company_id
+        AND lf.company_id = t.company_id
+        AND (
+          f.lead_id = t.id
+          OR (
+            (
+              t.customer_id IS NOT NULL
+              AND lf.customer_id IS NOT DISTINCT FROM t.customer_id
+            )
+            OR (
+              t.car_id IS NOT NULL
+              AND lf.car_id IS NOT DISTINCT FROM t.car_id
+            )
+          )
+        )
+      ORDER BY
+        CASE WHEN f.lead_id = t.id THEN 0 ELSE 1 END,
+        CASE WHEN f.status = 'submitted' THEN 0 ELSE 1 END,
+        f.created_at DESC
+      LIMIT 1
+    ) f ON TRUE
+  `;
+  const row = rowsFrom<any>(rows)[0];
+  return row ? toFormRow(row) : null;
+}
+
+export async function listLatestFormsForLeads(args: {
+  companyId: string;
+  leadIds: string[];
+}): Promise<Record<string, PreInspectionFormRequest>> {
+  const leadIds = Array.from(new Set(args.leadIds.filter(Boolean)));
+  if (!leadIds.length) return {};
+  const sql: any = getSql();
+  const rows = await sql`
+    WITH target AS (
+      SELECT id, company_id, customer_id, car_id
+      FROM leads
+      WHERE company_id = ${args.companyId}
+        AND id::text = ANY(${sql.array(leadIds, "text")})
+    )
+    SELECT
+      t.id AS target_lead_id,
+      f.*
+    FROM target t
+    JOIN LATERAL (
+      SELECT f.*
+      FROM pre_inspection_form_requests f
+      JOIN leads lf ON lf.id = f.lead_id
+      WHERE f.company_id = t.company_id
+        AND lf.company_id = t.company_id
+        AND (
+          f.lead_id = t.id
+          OR (
+            (
+              t.customer_id IS NOT NULL
+              AND lf.customer_id IS NOT DISTINCT FROM t.customer_id
+            )
+            OR (
+              t.car_id IS NOT NULL
+              AND lf.car_id IS NOT DISTINCT FROM t.car_id
+            )
+          )
+        )
+      ORDER BY
+        CASE WHEN f.lead_id = t.id THEN 0 ELSE 1 END,
+        CASE WHEN f.status = 'submitted' THEN 0 ELSE 1 END,
+        f.created_at DESC
+      LIMIT 1
+    ) f ON TRUE
+  `;
+  const out: Record<string, PreInspectionFormRequest> = {};
+  for (const row of rowsFrom<any>(rows)) {
+    const leadId = String(row?.target_lead_id ?? "");
+    if (!leadId) continue;
+    out[leadId] = toFormRow(row);
+  }
+  return out;
+}

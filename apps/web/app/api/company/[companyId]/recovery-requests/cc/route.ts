@@ -25,6 +25,7 @@ export async function GET(req: NextRequest, { params }: Params) {
       SELECT
         rr.id,
         rr.lead_id,
+        rel.related_lead_id,
         rr.type,
         rr.status,
         rr.stage,
@@ -50,6 +51,17 @@ export async function GET(req: NextRequest, { params }: Params) {
         f.token AS form_token
       FROM recovery_requests rr
       JOIN leads l ON l.id = rr.lead_id
+      LEFT JOIN LATERAL (
+        SELECT lw.id AS related_lead_id
+        FROM leads lw
+        WHERE lw.company_id = l.company_id
+          AND lw.id <> l.id
+          AND lw.lead_type = 'workshop'
+          AND lw.customer_id IS NOT DISTINCT FROM l.customer_id
+          AND lw.car_id IS NOT DISTINCT FROM l.car_id
+        ORDER BY ABS(EXTRACT(EPOCH FROM (lw.created_at - l.created_at))) ASC
+        LIMIT 1
+      ) rel ON TRUE
       LEFT JOIN customers c ON c.id = l.customer_id
       LEFT JOIN cars car ON car.id = l.car_id
       LEFT JOIN pre_inspection_form_requests f
@@ -63,6 +75,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     const list = rows.map((row) => ({
       id: row.id,
       leadId: row.lead_id,
+      relatedLeadId: row.related_lead_id ?? null,
       appointmentAt: row.scheduled_at ?? row.created_at ?? null,
       recoveryDriver: [row.agent_name, row.agent_phone].filter(Boolean).join(" | ") || "-",
       customerDetails: [row.customer_name, row.customer_phone].filter(Boolean).join(" | ") || "-",

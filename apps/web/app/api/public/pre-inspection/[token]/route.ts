@@ -19,7 +19,7 @@ const submitSchema = z.object({
       source: z.enum(["assistant", "fallback"]).optional(),
       generatedAt: z.string().optional(),
     })
-    .optional(),
+    .nullish(),
   answers: z.object({
     q1: z.object({ choice: z.enum(["yes", "no"]), details: z.string().optional().nullable() }),
     q2: z.object({ choice: z.enum(["yes", "no"]), details: z.string().optional().nullable() }),

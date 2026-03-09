@@ -13,6 +13,7 @@ export * as Rbac from "./auth/rbac/service";
 export * as RbacTypes from "./auth/rbac/types";
 export type { ScopeContext } from "./auth/rbac/types";
 export * as Users from "./auth/users/service";
+export * as IntegrationAuth from "./auth/integrations/service";
 export * as Accounting from "./accounting/service";
 export * as AccountingTypes from "./accounting/types";
 export * as AccountingConfig from "./accounting/configRepository";

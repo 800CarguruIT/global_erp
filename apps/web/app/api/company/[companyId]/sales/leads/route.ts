@@ -16,6 +16,7 @@ import { getSql } from "@repo/ai-core/db";
 import { normalizeRsaStatus } from "@/lib/leads/rsa-flow";
 import {
   createOrUpdatePreInspectionFormRequest,
+  listLatestFormsForLeads,
   sendPreInspectionFormRequestIfPending,
 } from "@/lib/pre-inspection-form";
 
@@ -46,9 +47,24 @@ export async function GET(req: NextRequest, { params }: Params) {
   }, {});
   const enriched = filtered.map((lead) => ({
     ...lead,
-    customerWalletAmount: walletMap[lead.customerId] ?? 0,
+    customerWalletAmount: lead.customerId ? walletMap[String(lead.customerId)] ?? 0 : 0,
   }));
-  return NextResponse.json({ data: enriched });
+  const formByLead = await listLatestFormsForLeads({
+    companyId,
+    leadIds: enriched.map((lead) => String(lead.id)),
+  }).catch(() => ({} as Record<string, any>));
+  const withFormStatus = enriched.map((lead) => {
+    const form = formByLead[String(lead.id)];
+    return {
+      ...lead,
+      preInspectionStatus: form?.status ?? null,
+      preInspectionSubmitted: form?.status === "submitted",
+      preInspectionSubmittedAt: form?.submitted_at ?? null,
+      preInspectionAppointmentType: form?.appointment_type ?? null,
+      preInspectionAnswers: form?.answers ?? null,
+    };
+  });
+  return NextResponse.json({ data: withFormStatus });
 }
 
 export async function POST(req: NextRequest, { params }: Params) {

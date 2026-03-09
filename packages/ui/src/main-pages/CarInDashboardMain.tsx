@@ -113,7 +113,7 @@ export function CarInDashboardMain({ companyId, companyName }: CarInDashboardMai
   const load = useCallback(async () => {
     setState({ status: "loading", data: null, error: null });
     try {
-      const res = await fetch(`/api/company/${companyId}/sales/leads`);
+      const res = await fetch(`/api/company/${companyId}/sales/leads`, { cache: "no-store" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
       const leads: Lead[] = json.data ?? [];
@@ -355,6 +355,7 @@ export function CarInDashboardMain({ companyId, companyName }: CarInDashboardMai
         lead.branchName,
         lead.agentName,
         lead.source,
+        (lead as any).preInspectionStatus,
       ]
         .filter(Boolean)
         .join(" ")
@@ -409,6 +410,14 @@ export function CarInDashboardMain({ companyId, companyName }: CarInDashboardMai
       default:
         return "bg-slate-500/15 text-slate-300";
     }
+  }
+
+  function summarizePreInspectionAnswers(answers: any): string {
+    if (!answers || typeof answers !== "object") return "";
+    const keys = ["q1", "q2", "q3", "q4", "q5"];
+    const yesCount = keys.filter((key) => String(answers?.[key]?.choice ?? "").toLowerCase() === "yes").length;
+    if (yesCount <= 0) return "No major issue selected";
+    return `${yesCount} issue${yesCount > 1 ? "s" : ""} highlighted`;
   }
 
   function buildMapEmbedUrl(
@@ -935,6 +944,7 @@ export function CarInDashboardMain({ companyId, companyName }: CarInDashboardMai
                     <th className="py-2 px-4 text-left">Car Location</th>
                     <th className="py-2 px-4 text-left">Lead Remarks</th>
                     <th className="py-2 px-4 text-left">Car In Time</th>
+                    <th className="py-2 px-4 text-left">Pre-Inspection</th>
                     <th className="py-2 px-4 text-left">Inspection</th>
                     <th className="py-2 px-4 text-left">Estimate</th>
                     <th className="py-2 px-4 text-left">Parts Order</th>
@@ -953,6 +963,11 @@ export function CarInDashboardMain({ companyId, companyName }: CarInDashboardMai
                       : null;
                     const carHref = lead.carId ? `/company/${companyId}/cars/${lead.carId}` : null;
                     const inspectionMeta = inspectionByLead[lead.id];
+                    const preInspectionStatus = String((lead as any).preInspectionStatus ?? "").toLowerCase();
+                    const preInspectionSubmitted = Boolean((lead as any).preInspectionSubmitted);
+                    const preInspectionSubmittedAt = (lead as any).preInspectionSubmittedAt ?? null;
+                    const preInspectionAnswers = (lead as any).preInspectionAnswers ?? null;
+                    const preInspectionSummary = summarizePreInspectionAnswers(preInspectionAnswers);
                     const inspectionCompleted = Boolean(inspectionMeta?.completedAt);
                     const inspectionCancelled =
                       String(inspectionMeta?.status ?? "").toLowerCase() === "cancelled" ||
@@ -1115,6 +1130,33 @@ export function CarInDashboardMain({ companyId, companyName }: CarInDashboardMai
                         </td>
                         <td className="py-2 px-4 text-xs text-muted-foreground">
                           {lead.checkinAt ? new Date(lead.checkinAt).toLocaleString() : "N/A"}
+                        </td>
+                        <td className="py-2 px-4 text-xs">
+                          {preInspectionStatus ? (
+                            <>
+                              <span
+                                className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${
+                                  preInspectionSubmitted
+                                    ? "bg-emerald-500/15 text-emerald-400"
+                                    : "bg-amber-500/15 text-amber-400"
+                                }`}
+                              >
+                                {preInspectionSubmitted ? "Submitted" : "Pending"}
+                              </span>
+                              {preInspectionSubmittedAt && (
+                                <div className="mt-1 text-[10px] text-muted-foreground">
+                                  {new Date(preInspectionSubmittedAt).toLocaleString()}
+                                </div>
+                              )}
+                              {preInspectionSubmitted && preInspectionSummary && (
+                                <div className="mt-1 text-[10px] text-muted-foreground">
+                                  {preInspectionSummary}
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            <span className="text-muted-foreground">Not requested</span>
+                          )}
                         </td>
                         <td className="py-2 px-4 text-xs">
                           <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${statusClass(inspectionStatus)}`}>

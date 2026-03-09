@@ -60,6 +60,17 @@ export function LeadsMain({ companyId, companyName, initialTab = "all" }: LeadsM
   const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
   const [aiAppreciation, setAiAppreciation] = useState<string | null>(null);
 
+  function normalizeList(value: unknown): string[] {
+    if (Array.isArray(value)) return value.map((v) => String(v ?? "").trim().toLowerCase()).filter(Boolean);
+    if (typeof value === "string") {
+      return value
+        .split(",")
+        .map((v) => v.trim().toLowerCase())
+        .filter(Boolean);
+    }
+    return [];
+  }
+
   const refreshLeads = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -276,8 +287,8 @@ export function LeadsMain({ companyId, companyName, initialTab = "all" }: LeadsM
       const filtered = list.filter((b: any) => {
         const rawTypes = b.branch_types ?? b.branchTypes ?? [];
         const rawServices = b.service_types ?? b.serviceTypes ?? [];
-        const types = (Array.isArray(rawTypes) ? rawTypes : []).map((t: string) => t.toLowerCase());
-        const services = (Array.isArray(rawServices) ? rawServices : []).map((s: string) => s.toLowerCase());
+        const types = normalizeList(rawTypes);
+        const services = normalizeList(rawServices);
         if (lt === "recovery") {
           const base =
             types.includes("recovery") ||
@@ -311,7 +322,8 @@ export function LeadsMain({ companyId, companyName, initialTab = "all" }: LeadsM
         }
         return true;
       });
-      setAssignBranches(filtered);
+      // Fallback: if branch metadata is incomplete, show all branches instead of empty dropdown.
+      setAssignBranches(filtered.length > 0 ? filtered : list);
     } catch (err: any) {
       setAssignError(err?.message ?? t("leads.assign.loadBranches") ?? "Failed to load branches");
     }
@@ -365,6 +377,30 @@ export function LeadsMain({ companyId, companyName, initialTab = "all" }: LeadsM
       setAssignError(err?.message ?? t("leads.assign.error") ?? "Failed to assign lead");
     } finally {
       setAssignLoading(false);
+    }
+  }
+
+  async function moveLeadToCarIn(leadId: string, lead?: any) {
+    try {
+      const res = await fetch(`/api/company/${companyId}/sales/leads/${leadId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: "car_in",
+          leadStage: "checkin",
+          ensureInspection: true,
+          branchId: lead?.branchId ?? null,
+          assignedUserId: lead?.assignedUserId ?? null,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(String(data?.error ?? "Failed to set Car In"));
+      }
+      setBulkMessage("Lead moved to Car In.");
+      await refreshLeads();
+    } catch (err: any) {
+      setBulkMessage(err?.message ?? "Failed to set Car In.");
     }
   }
 
@@ -486,6 +522,7 @@ export function LeadsMain({ companyId, companyName, initialTab = "all" }: LeadsM
                   selectedIds={selected}
                   onSelectChange={toggleSelect}
                   onAssign={(id, lead) => openAssign(id, lead)}
+                  onCarIn={(id, lead) => void moveLeadToCarIn(id, lead)}
                   onRefresh={refreshLeads}
                   sortKey={sortKey}
                   sortDir={sortDir}

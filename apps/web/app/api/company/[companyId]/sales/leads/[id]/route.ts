@@ -216,6 +216,10 @@ export async function PUT(req: NextRequest, { params }: Params) {
   return NextResponse.json({ data: updated });
 }
 
+export async function PATCH(req: NextRequest, { params }: Params) {
+  return PUT(req, { params });
+}
+
 export async function DELETE(req: NextRequest, { params }: Params) {
   const { companyId, id } = await params;
   const { searchParams } = new URL(req.url);

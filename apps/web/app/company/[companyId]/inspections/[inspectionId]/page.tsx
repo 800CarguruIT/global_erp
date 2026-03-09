@@ -14,6 +14,7 @@ type Params =
 type InspectionData = {
   inspection: any;
   items: any[];
+  preInspection?: any | null;
 };
 type InspectionLogEntry = {
   id: string;
@@ -38,6 +39,14 @@ const checkItems = [
   { key: "infotainment", label: "Infotainment" },
 ];
 
+const preInspectionQuestionLabels: Record<string, string> = {
+  q1: "Any performance issue?",
+  q2: "Any unusual sound or vibration?",
+  q3: "Any warning light on dashboard?",
+  q4: "Any fluid leak noticed?",
+  q5: "Any urgent priority for inspection?",
+};
+
 export function InspectionDetailPageClient({
   params,
   forceWorkshopView = false,
@@ -48,6 +57,7 @@ export function InspectionDetailPageClient({
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [inspectionId, setInspectionId] = useState<string | null>(null);
   const [inspection, setInspection] = useState<any | null>(null);
+  const [preInspection, setPreInspection] = useState<any | null>(null);
   const [customer, setCustomer] = useState<any | null>(null);
   const [car, setCar] = useState<any | null>(null);
   const [leadPlate, setLeadPlate] = useState("");
@@ -120,11 +130,13 @@ export function InspectionDetailPageClient({
     (async () => {
       try {
         const res = await fetch(
-          `/api/company/${companyId}/workshop/inspections/${inspectionId}`
+          `/api/company/${companyId}/workshop/inspections/${inspectionId}`,
+          { cache: "no-store" }
         );
         if (!res.ok) throw new Error("Failed to load inspection");
         const data: { data: InspectionData } = await res.json();
         const payload = data?.data?.inspection ?? null;
+        setPreInspection(data?.data?.preInspection ?? null);
         setInspection(payload);
         setLeadId(payload?.leadId ?? null);
         const draft = payload?.draftPayload ?? {};
@@ -838,6 +850,49 @@ export function InspectionDetailPageClient({
             <div className="flex items-center justify-between border-b border-white/10 pb-2">
               <div className="text-sm font-semibold">Inspection Details</div>
               {loading && <div className="text-xs text-white/60">Loading...</div>}
+            </div>
+            <div className="pt-4">
+              <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-white/70">Pre-Inspection Form</div>
+                  <span
+                    className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${
+                      !preInspection
+                        ? "bg-slate-500/15 text-slate-300"
+                        : preInspection?.status === "submitted"
+                        ? "bg-emerald-500/15 text-emerald-300"
+                        : "bg-amber-500/15 text-amber-300"
+                    }`}
+                  >
+                    {!preInspection ? "Not requested" : preInspection?.status === "submitted" ? "Submitted" : "Pending"}
+                  </span>
+                </div>
+                {preInspection?.submittedAt && (
+                  <div className="mt-1 text-[11px] text-white/60">
+                    Submitted at: {new Date(preInspection.submittedAt).toLocaleString()}
+                  </div>
+                )}
+                {preInspection?.status === "submitted" && preInspection?.answers && (
+                  <div className="mt-3 grid gap-2 lg:grid-cols-2">
+                    {Object.entries(preInspectionQuestionLabels).map(([key, label]) => {
+                      const answer = preInspection?.answers?.[key];
+                      if (!answer) return null;
+                      const choice = String(answer?.choice ?? "").toLowerCase();
+                      return (
+                        <div key={key} className="rounded border border-white/10 bg-black/20 p-2">
+                          <div className="text-[11px] text-white/70">{label}</div>
+                          <div className="mt-1 text-xs font-semibold text-white">
+                            {choice === "yes" ? "Yes" : choice === "no" ? "No" : "-"}
+                          </div>
+                          {String(answer?.details ?? "").trim() && (
+                            <div className="mt-1 text-[11px] text-white/70">{String(answer.details)}</div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
             <div className="grid gap-4 pt-4 lg:grid-cols-2">
               <div className="lg:col-span-2 flex items-center justify-between">

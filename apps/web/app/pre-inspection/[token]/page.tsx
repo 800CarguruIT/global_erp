@@ -86,6 +86,52 @@ function createEmptyFollowUps(): FollowUpValues {
   };
 }
 
+function parseDetailsToFollowUps(key: keyof Answers, details: string): Record<string, string | string[]> {
+  const out: Record<string, string | string[]> = {};
+  const raw = String(details ?? "").trim();
+  if (!raw) return out;
+
+  const chunks = raw
+    .split("|")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const remainingNotes: string[] = [];
+  const defs = FOLLOW_UP_QUESTIONS[key];
+
+  for (const chunk of chunks) {
+    const sep = chunk.indexOf(":");
+    if (sep <= 0) {
+      remainingNotes.push(chunk);
+      continue;
+    }
+    const label = chunk.slice(0, sep).trim().toLowerCase();
+    const value = chunk.slice(sep + 1).trim();
+    const def = defs.find((d) => d.label.toLowerCase() === label);
+    if (!def) {
+      if (label === "additional notes") {
+        out.__note = value;
+      } else {
+        remainingNotes.push(chunk);
+      }
+      continue;
+    }
+    if (def.type === "checkbox") {
+      out[def.id] = value
+        .split(",")
+        .map((v) => v.trim())
+        .filter(Boolean);
+    } else {
+      out[def.id] = value;
+    }
+  }
+
+  if (remainingNotes.length) {
+    const existing = String(out.__note ?? "").trim();
+    out.__note = [existing, remainingNotes.join(" | ")].filter(Boolean).join(" | ");
+  }
+  return out;
+}
+
 function normalizeAnswers(input: any): Answers {
   const result = { ...EMPTY_ANSWERS };
   for (const key of Object.keys(EMPTY_ANSWERS) as Array<keyof Answers>) {
@@ -421,7 +467,7 @@ export default function PreInspectionPublicPage({ params }: Params) {
         const nextFollowUps = createEmptyFollowUps();
         for (const key of Object.keys(normalized) as Array<keyof Answers>) {
           if (normalized[key].choice === "yes" && normalized[key].details.trim()) {
-            nextFollowUps[key] = { __note: normalized[key].details.trim() };
+            nextFollowUps[key] = parseDetailsToFollowUps(key, normalized[key].details);
           }
         }
         setFollowUps(nextFollowUps);
@@ -754,8 +800,11 @@ function SignaturePad({ disabled, onChange }: { disabled?: boolean; onChange: (v
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [drawing, setDrawing] = useState(false);
   const [hasStroke, setHasStroke] = useState(false);
+  const initializedRef = useRef(false);
 
   useEffect(() => {
+    if (initializedRef.current) return;
+    initializedRef.current = true;
     onChange("");
   }, [onChange]);
 

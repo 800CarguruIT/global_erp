@@ -8,6 +8,7 @@ export type LeadsTableProps = {
   companyId: string;
   leads: Lead[];
   onAssign?: (id: string, lead: Lead) => void;
+  onCarIn?: (id: string, lead: Lead) => void;
   renderActions?: (lead: Lead) => React.ReactNode;
   selectable?: boolean;
   selectedIds?: Set<string>;
@@ -23,6 +24,7 @@ export function LeadsTable({
   companyId,
   leads,
   onAssign,
+  onCarIn,
   renderActions,
   selectable = false,
   selectedIds,
@@ -177,6 +179,10 @@ export function LeadsTable({
             const leadType = `${lead.leadType ?? ""}`.toLowerCase();
             const canAssign =
               Boolean(onAssign) && (leadType === "rsa" || leadType === "recovery" || leadType === "workshop");
+            const canCarIn =
+              Boolean(onCarIn) &&
+              leadType === "workshop" &&
+              String(lead.leadStatus ?? "").toLowerCase() !== "car_in";
 
             return (
               <tr key={lead.id} className="hover:bg-muted/20">
@@ -318,13 +324,24 @@ export function LeadsTable({
                   {renderActions ? (
                     renderActions(lead)
                   ) : canAssign ? (
-                    <button
-                      className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-primary hover:shadow-md"
-                      onClick={() => onAssign(lead.id, lead)}
-                      type="button"
-                    >
-                      Assign
-                    </button>
+                    <div className="flex flex-wrap gap-1">
+                      <button
+                        className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-primary hover:shadow-md"
+                        onClick={() => onAssign(lead.id, lead)}
+                        type="button"
+                      >
+                        Assign
+                      </button>
+                      {canCarIn ? (
+                        <button
+                          className="rounded-md border border-emerald-300/60 bg-emerald-500/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-emerald-600 shadow-sm transition hover:bg-emerald-500/20 hover:shadow-md"
+                          onClick={() => onCarIn?.(lead.id, lead)}
+                          type="button"
+                        >
+                          Car In
+                        </button>
+                      ) : null}
+                    </div>
                   ) : (
                     <span className="text-muted-foreground text-xs">-</span>
                   )}

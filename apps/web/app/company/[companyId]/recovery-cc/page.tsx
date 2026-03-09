@@ -9,6 +9,7 @@ type TabKey = "pre_pickup" | "work_progress" | "happiness_check";
 type Row = {
   id: string;
   leadId: string;
+  relatedLeadId: string | null;
   appointmentAt: string | null;
   recoveryDriver: string;
   customerDetails: string;
@@ -174,6 +175,8 @@ export default function RecoveryCcPage({ params }: Params) {
             <table className="w-full text-sm">
               <thead className="bg-white/5 text-left">
                 <tr>
+                  <th className="px-3 py-2">Lead ID</th>
+                  <th className="px-3 py-2">Related Lead ID</th>
                   <th className="px-3 py-2">Appointment Time</th>
                   <th className="px-3 py-2">Recovery Driver</th>
                   <th className="px-3 py-2">Customer Details</th>
@@ -187,13 +190,37 @@ export default function RecoveryCcPage({ params }: Params) {
               <tbody>
                 {visibleRows.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-3 py-4 text-center text-muted-foreground">
+                    <td colSpan={10} className="px-3 py-4 text-center text-muted-foreground">
                       No records.
                     </td>
                   </tr>
                 ) : (
                   visibleRows.map((row) => (
                     <tr key={row.id} className="border-t border-white/10">
+                      <td className="px-3 py-2">
+                        {row.leadId ? (
+                          <a
+                            href={`/company/${companyId}/leads/${row.leadId}`}
+                            className="font-mono text-xs text-primary hover:underline"
+                          >
+                            {row.leadId.slice(0, 8)}
+                          </a>
+                        ) : (
+                          "-"
+                        )}
+                      </td>
+                      <td className="px-3 py-2">
+                        {row.relatedLeadId ? (
+                          <a
+                            href={`/company/${companyId}/leads/${row.relatedLeadId}`}
+                            className="font-mono text-xs text-primary hover:underline"
+                          >
+                            {row.relatedLeadId.slice(0, 8)}
+                          </a>
+                        ) : (
+                          "-"
+                        )}
+                      </td>
                       <td className="px-3 py-2">{row.appointmentAt ? new Date(row.appointmentAt).toLocaleString() : "-"}</td>
                       <td className="px-3 py-2">{row.recoveryDriver}</td>
                       <td className="px-3 py-2">{row.customerDetails}</td>
@@ -216,6 +243,16 @@ export default function RecoveryCcPage({ params }: Params) {
                           >
                             Copy Form URL
                           </button>
+                          {row.formSubmitted && row.formUrl ? (
+                            <a
+                              href={row.formUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="rounded-md border border-emerald-300/40 bg-emerald-500/10 px-2 py-1 text-xs text-emerald-100"
+                            >
+                              View Submitted Form
+                            </a>
+                          ) : null}
                           <button
                             type="button"
                             className="rounded-md border border-white/20 px-2 py-1 text-xs"

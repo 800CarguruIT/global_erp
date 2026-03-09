@@ -9,7 +9,7 @@ import {
 import type { InspectionItem } from "@repo/ai-core/workshop/inspections/types";
 import { getCurrentUserIdFromRequest } from "@/lib/auth/current-user";
 import { getSql } from "@repo/ai-core/db";
-import { getPendingMandatoryFormForLead } from "@/lib/pre-inspection-form";
+import { getLatestFormForLeadOrRelated, getPendingMandatoryFormForLead } from "@/lib/pre-inspection-form";
 
 type Params = { params: Promise<{ companyId: string; inspectionId: string }> };
 type VerifyFineInput = { fineCode?: string | null; reason?: string | null; amount?: number | string | null };
@@ -104,6 +104,12 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
   const items = await listInspectionItems(inspectionId);
   const lineItems = await listInspectionLineItems(inspectionId, { source: "inspection" });
+  const latestPreInspectionForm = inspection.leadId
+    ? await getLatestFormForLeadOrRelated({
+        companyId,
+        leadId: inspection.leadId,
+      }).catch(() => null)
+    : null;
   const earningsRows = await sql/* sql */ `
     SELECT *
     FROM inspection_earnings
@@ -116,7 +122,25 @@ export async function GET(_req: NextRequest, { params }: Params) {
     WHERE company_id = ${companyId} AND inspection_id = ${inspectionId}
     ORDER BY created_at DESC
   `;
-  return NextResponse.json({ data: { inspection: inspectionView, items, lineItems, earnings: earningsRows[0] ?? null, fines } });
+  return NextResponse.json({
+    data: {
+      inspection: inspectionView,
+      items,
+      lineItems,
+      preInspection: latestPreInspectionForm
+        ? {
+            id: latestPreInspectionForm.id,
+            status: latestPreInspectionForm.status,
+            appointmentType: latestPreInspectionForm.appointment_type,
+            submittedAt: latestPreInspectionForm.submitted_at,
+            answers: latestPreInspectionForm.answers ?? null,
+            token: latestPreInspectionForm.token,
+          }
+        : null,
+      earnings: earningsRows[0] ?? null,
+      fines,
+    },
+  });
 }
 
 export async function PATCH(req: NextRequest, { params }: Params) {
