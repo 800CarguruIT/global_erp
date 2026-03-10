@@ -30,6 +30,7 @@ type DialerWebhookUpdate = {
   recordingUrl?: string;
   recordingId?: string;
   recordingDurationSeconds?: number;
+  ringingExtensions?: string[];
   rawPayload?: unknown;
 };
 
@@ -38,7 +39,19 @@ const WEBHOOK_LOG_PATH =
   process.env.DIALER_WEBHOOK_LOG_PATH?.trim() ||
   path.join(os.tmpdir(), "global-erp", "webhook-dialer.log");
 const liveExecutionSeen = new Map<string, number>();
-const yeastarTokenCache = new Map<string, { token: string; expiresAtMs: number }>();
+const yeastarTokenCache = (() => {
+  const key = "__GLOBAL_ERP_YEASTAR_TOKEN_CACHE__";
+  const g = globalThis as any;
+  if (!g[key]) g[key] = new Map<string, { token: string; expiresAtMs: number }>();
+  return g[key] as Map<string, { token: string; expiresAtMs: number }>;
+})();
+const yeastarRecordingRetrySeen = new Map<string, number>();
+const yeastarTokenBackoffUntil = new Map<string, number>();
+const YEASTAR_TOKEN_REFRESH_BUFFER_MS = 5 * 60_000;
+const YEASTAR_TOKEN_MAX_LIMIT_BACKOFF_MS = 60_000;
+const YEASTAR_RECORDING_QUERY_ATTEMPTS = 4;
+const YEASTAR_RECORDING_QUERY_WAIT_MS = 1200;
+const YEASTAR_RECORDING_DEFERRED_DELAYS_MS = [0, 30_000] as const;
 
 function safeJson(value: unknown): string {
   try {
@@ -75,7 +88,11 @@ function normalizedBaseUrl(rawBaseUrl?: string, rawPath?: string): string | null
   return apiPath ? `${baseUrl}/${apiPath}` : baseUrl;
 }
 
-function getYeastarTokenCacheKey(base: string, mode: "userpass" | "client", identifier: string): string {
+function getYeastarTokenCacheKey(
+  base: string,
+  mode: "userpass" | "client" | "access_userpass",
+  identifier: string
+): string {
   return `${base}|${mode}|${identifier.trim().toLowerCase()}`;
 }
 
@@ -93,6 +110,46 @@ function normalizeDialToken(value: string | null | undefined): string {
   const raw = String(value ?? "").trim().toLowerCase();
   if (!raw) return "";
   return raw.replace(/[\s\-().]/g, "");
+}
+
+function extractRingingExtensionsFromPayload(rawPayload: unknown): string[] {
+  const out = new Set<string>();
+  const payload = rawPayload && typeof rawPayload === "object" ? (rawPayload as any) : null;
+  const push = (value: unknown) => {
+    const token = String(value ?? "").trim();
+    if (token) out.add(token);
+  };
+
+  let msgObj: any = null;
+  const msgRaw = typeof payload?.msg === "string" ? payload.msg : null;
+  if (msgRaw) {
+    try {
+      msgObj = JSON.parse(msgRaw);
+    } catch {
+      msgObj = null;
+    }
+  }
+
+  const sources = [
+    payload?.msgParsed,
+    msgObj,
+    payload,
+  ];
+
+  for (const source of sources) {
+    const members = Array.isArray(source?.members) ? source.members : [];
+    for (const member of members) {
+      const extObj = member?.extension ?? {};
+      const extNum = String(extObj?.number ?? "").trim();
+      if (!extNum) continue;
+      const status = String(extObj?.member_status ?? "").trim().toUpperCase();
+      if (!status || ["RING", "ALERT", "RINGING", "INCOMING", "ANSWER"].includes(status)) {
+        push(extNum);
+      }
+    }
+  }
+
+  return Array.from(out);
 }
 
 function isLikelyExternalNumber(value: string | null | undefined): boolean {
@@ -341,6 +398,7 @@ async function tryYeastarAutoPickup(args: {
   companyId: string;
   providerCallId: string;
   toNumber?: string | null;
+  rawPayload?: unknown;
 }): Promise<{ picked: boolean; endpoint?: string; reason?: string }> {
   const credentials = await getYeastarCredentialsForCompany({ companyId: args.companyId });
   if (!credentials) return { picked: false, reason: "No active Yeastar integration credentials" };
@@ -358,48 +416,128 @@ async function tryYeastarAutoPickup(args: {
   const sslVerify = toBool(credentials.sslVerify, true);
   const extension = String(args.toNumber ?? "").trim();
 
-  const candidates: Array<{ name: string; endpoint: string; body: Record<string, unknown> }> = [
-    {
-      name: "call_answer_ext",
-      endpoint: `${base}/call/answer?access_token=${encodeURIComponent(token)}`,
-      body: { call_id: args.providerCallId, extension },
-    },
-    {
-      name: "call_answer_number",
-      endpoint: `${base}/call/answer?access_token=${encodeURIComponent(token)}`,
-      body: { call_id: args.providerCallId, number: extension },
-    },
-    {
-      name: "call_control_action_answer_ext",
-      endpoint: `${base}/call/control?access_token=${encodeURIComponent(token)}`,
-      body: { call_id: args.providerCallId, action: "answer", extension },
-    },
-    {
-      name: "call_control_action_pickup_ext",
-      endpoint: `${base}/call/control?access_token=${encodeURIComponent(token)}`,
-      body: { call_id: args.providerCallId, action: "pickup", extension },
-    },
-    {
-      name: "call_control_operation_answer_ext",
-      endpoint: `${base}/call/control?access_token=${encodeURIComponent(token)}`,
-      body: { call_id: args.providerCallId, operation: "answer", extension },
-    },
-    {
-      name: "call_control_operation_pickup_ext",
-      endpoint: `${base}/call/control?access_token=${encodeURIComponent(token)}`,
-      body: { call_id: args.providerCallId, operation: "pickup", extension },
-    },
-    {
-      name: "call_operate_answer_ext",
-      endpoint: `${base}/call/operate?access_token=${encodeURIComponent(token)}`,
-      body: { call_id: args.providerCallId, operation: "answer", extension },
-    },
-    {
-      name: "call_operate_pickup_ext",
-      endpoint: `${base}/call/operate?access_token=${encodeURIComponent(token)}`,
-      body: { call_id: args.providerCallId, operation: "pickup", extension },
-    },
-  ];
+  const normalizeExt = (value: string | null | undefined): string => String(value ?? "").trim();
+  const targetExt = normalizeExt(extension);
+  const channelCandidates: Array<{ channelId: string; extension?: string }> = [];
+  const pushChannelCandidate = (channelId: unknown, ext?: unknown) => {
+    const cid = String(channelId ?? "").trim();
+    if (!cid) return;
+    if (channelCandidates.some((c) => c.channelId === cid)) return;
+    channelCandidates.push({
+      channelId: cid,
+      extension: ext ? String(ext).trim() : undefined,
+    });
+  };
+
+  // 1) Prefer channel_id from webhook payload (fastest + most accurate while ringing).
+  const payload = (args.rawPayload ?? {}) as any;
+  const msgRaw = typeof payload?.msg === "string" ? payload.msg : null;
+  let msgObj: any = null;
+  if (msgRaw) {
+    try {
+      msgObj = JSON.parse(msgRaw);
+    } catch {
+      msgObj = null;
+    }
+  }
+  const payloadMembers = Array.isArray(msgObj?.members) ? msgObj.members : [];
+  // Prefer target extension first (if provided), but also queue all ringing channels as fallback.
+  for (const member of payloadMembers) {
+    const extObj = member?.extension ?? {};
+    const memberStatus = String(extObj?.member_status ?? "").toUpperCase();
+    if (!["RING", "ALERT"].includes(memberStatus)) continue;
+    const memberExt = normalizeExt(extObj?.number);
+    if (targetExt && memberExt && memberExt === targetExt) {
+      pushChannelCandidate(extObj?.channel_id, memberExt);
+    }
+  }
+  for (const member of payloadMembers) {
+    const extObj = member?.extension ?? {};
+    const memberStatus = String(extObj?.member_status ?? "").toUpperCase();
+    if (!["RING", "ALERT"].includes(memberStatus)) continue;
+    pushChannelCandidate(extObj?.channel_id, extObj?.number);
+  }
+
+  // 2) Fallback to live query lookup if webhook did not include usable channel_id.
+  if (!channelCandidates.length) {
+    const queryUrl = `${base}/call/query?access_token=${encodeURIComponent(token)}&call_id=${encodeURIComponent(
+      args.providerCallId
+    )}`;
+    const queryRes = await requestJson({
+      url: queryUrl,
+      method: "GET",
+      sslVerify,
+      headers: {
+        "User-Agent": userAgent,
+        Authorization: token,
+      },
+      timeoutMs: 5000,
+    });
+    const queryData = Array.isArray(queryRes.json?.data) ? queryRes.json.data : [];
+    const call = queryData[0];
+    const members = Array.isArray(call?.members) ? call.members : [];
+    // Prefer target extension first (if provided), then all ringing channels.
+    for (const member of members) {
+      const extObj = member?.extension ?? {};
+      const memberStatus = String(extObj?.member_status ?? "").toUpperCase();
+      if (!["RING", "ALERT"].includes(memberStatus)) continue;
+      const memberExt = normalizeExt(extObj?.number);
+      if (targetExt && memberExt && memberExt === targetExt) {
+        pushChannelCandidate(extObj?.channel_id, memberExt);
+      }
+    }
+    for (const member of members) {
+      const extObj = member?.extension ?? {};
+      const memberStatus = String(extObj?.member_status ?? "").toUpperCase();
+      if (!["RING", "ALERT"].includes(memberStatus)) continue;
+      pushChannelCandidate(extObj?.channel_id, extObj?.number);
+    }
+  }
+
+  const candidates: Array<{ name: string; endpoint: string; body: Record<string, unknown> }> = channelCandidates.map(
+    (item) => ({
+      name: `call_accept_inbound_${item.extension ?? "any"}`,
+      endpoint: `${base}/call/accept_inbound?access_token=${encodeURIComponent(token)}`,
+      body: { channel_id: item.channelId, inbound: true },
+    })
+  );
+
+  const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+  const verifyAnsweredState = async (): Promise<boolean> => {
+    const queryUrl = `${base}/call/query?access_token=${encodeURIComponent(token)}&call_id=${encodeURIComponent(
+      args.providerCallId
+    )}`;
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      const queryRes = await requestJson({
+        url: queryUrl,
+        method: "GET",
+        sslVerify,
+        headers: {
+          "User-Agent": userAgent,
+          Authorization: token,
+        },
+        timeoutMs: 5000,
+      });
+      const callData = Array.isArray(queryRes.json?.data) ? queryRes.json.data[0] : null;
+      const members = Array.isArray(callData?.members) ? callData.members : [];
+      const statuses = members
+        .map((m: any) =>
+          String(
+            m?.extension?.member_status ??
+              m?.inbound?.member_status ??
+              m?.outbound?.member_status ??
+              m?.member_status ??
+              ""
+          ).toUpperCase()
+        )
+        .filter(Boolean);
+      if (statuses.some((s: string) => ["ANSWER", "ANSWERED", "UP", "TALK"].includes(s))) return true;
+      const stillRinging = statuses.some((s: string) => ["RING", "ALERT", "RINGING"].includes(s));
+      if (!stillRinging) return false;
+      await wait(300);
+    }
+    return false;
+  };
 
   const failureDetails: string[] = [];
   for (const candidate of candidates) {
@@ -415,8 +553,24 @@ async function tryYeastarAutoPickup(args: {
       timeoutMs: 5000,
     });
     const errcode = Number(res.json?.errcode ?? 0);
+    const endpointPath = (() => {
+      try {
+        return new URL(candidate.endpoint).pathname;
+      } catch {
+        return candidate.endpoint;
+      }
+    })();
     if (res.ok && (!Number.isFinite(errcode) || errcode === 0)) {
-      return { picked: true, endpoint: `${candidate.name}:${candidate.endpoint}` };
+      const answered = await verifyAnsweredState();
+      if (answered) {
+        return { picked: true, endpoint: `${candidate.name}:${endpointPath}` };
+      }
+      // Yeastar can acknowledge pickup before query view reflects answered state.
+      return {
+        picked: true,
+        endpoint: `${candidate.name}:${endpointPath}`,
+        reason: "accept_inbound_acknowledged_verify_pending",
+      };
     }
     const errmsg = String(res.json?.errmsg ?? res.error ?? `http_${res.status}`).trim();
     failureDetails.push(`${candidate.name}[${errcode}]:${errmsg || "rejected"}`);
@@ -497,30 +651,80 @@ async function requestJson(params: {
   });
 }
 
-async function getTokenForYeastarDetailed(credentials: Record<string, any>): Promise<{
+async function getTokenForYeastarDetailed(
+  credentials: Record<string, any>,
+  options?: { allowAccessUserpass?: boolean }
+): Promise<{
   token: string | null;
+  mode?: "userpass" | "client" | "access_userpass";
   reason?: string;
 }> {
+  const allowAccessUserpass = options?.allowAccessUserpass ?? true;
   const base = normalizedBaseUrl(credentials.apiBaseUrl, credentials.apiPath);
   if (!base) return { token: null, reason: "Missing Yeastar API base URL/apiPath" };
-  const username = String(credentials.username ?? "").trim();
-  const password = String(credentials.password ?? "").trim();
-  const clientId = String(credentials.clientId ?? "").trim();
-  const clientSecret = String(credentials.clientSecret ?? "").trim();
+  const username = String(
+    credentials.username ??
+      credentials.userName ??
+      credentials.apiUsername ??
+      credentials.api_user_name ??
+      credentials.api_user ??
+      ""
+  ).trim();
+  const password = String(
+    credentials.password ??
+      credentials.passWord ??
+      credentials.apiPassword ??
+      credentials.api_password ??
+      credentials.api_pass ??
+      ""
+  ).trim();
+  const accessId = String(
+    credentials.accessId ??
+      credentials.access_id ??
+      credentials.linkusAccessId ??
+      credentials.linkus_access_id ??
+      ""
+  ).trim();
+  const accessKey = String(
+    credentials.accessKey ??
+      credentials.access_key ??
+      credentials.linkusAccessKey ??
+      credentials.linkus_access_key ??
+      ""
+  ).trim();
+  const clientId = String(credentials.clientId ?? credentials.client_id ?? accessId ?? "").trim();
+  const clientSecret = String(
+    credentials.clientSecret ?? credentials.client_secret ?? accessKey ?? ""
+  ).trim();
   const userAgent = String(credentials.userAgent ?? "OpenAPI").trim() || "OpenAPI";
   const sslVerify = toBool(credentials.sslVerify, true);
 
-  const candidates: Array<{ mode: "userpass" | "client"; payload: Record<string, string> }> = [];
-  if (username && password) {
+  const candidates: Array<{
+    mode: "userpass" | "client" | "access_userpass";
+    payload: Record<string, string>;
+  }> = [];
+  const hasApiUserCreds = username && password;
+  const hasClientCreds = clientId && clientSecret;
+  const hasSdkAccessCreds = accessId && accessKey;
+
+  // For PBX control/query APIs, prefer API user/client credentials.
+  // SDK AccessID/AccessKey is only used as fallback when API credentials are not configured.
+  if (hasApiUserCreds) {
     candidates.push({
       mode: "userpass",
       payload: { user_agent: userAgent, username, password },
     });
   }
-  if (clientId && clientSecret) {
+  if (hasClientCreds) {
     candidates.push({
       mode: "client",
       payload: { user_agent: userAgent, client_id: clientId, client_secret: clientSecret },
+    });
+  }
+  if (hasSdkAccessCreds && allowAccessUserpass) {
+    candidates.push({
+      mode: "access_userpass",
+      payload: { user_agent: userAgent, username: accessId, password: accessKey },
     });
   }
   if (!candidates.length) {
@@ -531,18 +735,33 @@ async function getTokenForYeastarDetailed(credentials: Record<string, any>): Pro
   }
 
   for (const candidate of candidates) {
-    const identifier = candidate.mode === "userpass" ? username : clientId;
+    const identifier =
+      candidate.mode === "client"
+        ? clientId
+        : candidate.mode === "access_userpass"
+        ? accessId
+        : username;
     const cacheKey = getYeastarTokenCacheKey(base, candidate.mode, identifier);
     const cached = yeastarTokenCache.get(cacheKey);
-    if (cached && cached.expiresAtMs > Date.now() + 60_000) {
-      return { token: cached.token };
+    if (cached && cached.expiresAtMs > Date.now() + YEASTAR_TOKEN_REFRESH_BUFFER_MS) {
+      return { token: cached.token, mode: candidate.mode };
     }
   }
 
   const failures: string[] = [];
   for (const candidate of candidates) {
-    const identifier = candidate.mode === "userpass" ? username : clientId;
+    const identifier =
+      candidate.mode === "client"
+        ? clientId
+        : candidate.mode === "access_userpass"
+        ? accessId
+        : username;
     const cacheKey = getYeastarTokenCacheKey(base, candidate.mode, identifier);
+    const retryAt = Number(yeastarTokenBackoffUntil.get(cacheKey) ?? 0);
+    if (retryAt > Date.now()) {
+      failures.push(`${candidate.mode}:backoff_active`);
+      continue;
+    }
     const tokenRes = await requestJson({
       url: `${base}/get_token`,
       method: "POST",
@@ -557,9 +776,13 @@ async function getTokenForYeastarDetailed(credentials: Record<string, any>): Pro
       const expiresAtMs =
         Date.now() + (Number.isFinite(expiresInSec) ? Math.max(expiresInSec, 120) * 1000 : 1800_000);
       yeastarTokenCache.set(cacheKey, { token, expiresAtMs });
-      return { token };
+      yeastarTokenBackoffUntil.delete(cacheKey);
+      return { token, mode: candidate.mode };
     }
     const errmsg = String(tokenRes.json?.errmsg ?? tokenRes.error ?? `http_${tokenRes.status}`).trim();
+    if (/max limitation exceeded/i.test(errmsg)) {
+      yeastarTokenBackoffUntil.set(cacheKey, Date.now() + YEASTAR_TOKEN_MAX_LIMIT_BACKOFF_MS);
+    }
     failures.push(`${candidate.mode}:${errmsg || "token_failed"}`);
   }
 
@@ -569,6 +792,647 @@ async function getTokenForYeastarDetailed(credentials: Record<string, any>): Pro
 async function getTokenForYeastar(credentials: Record<string, any>): Promise<string | null> {
   const result = await getTokenForYeastarDetailed(credentials);
   return result.token;
+}
+
+type RecordingResolveHints = {
+  fromNumber: string | null;
+  toNumber: string | null;
+  startedAt: Date | null;
+  endedAt: Date | null;
+};
+
+async function getRecordingResolveHints(args: {
+  providerCallId: string;
+  companyId?: string | null;
+}): Promise<RecordingResolveHints> {
+  const sql = getSql();
+  const rows = await sql<
+    {
+      from_number: string | null;
+      to_number: string | null;
+      started_at: string | null;
+      ended_at: string | null;
+      created_at: string | null;
+    }[]
+  >`
+    SELECT
+      from_number,
+      to_number,
+      started_at::text,
+      ended_at::text,
+      created_at::text
+    FROM call_sessions
+    WHERE provider_call_id = ${args.providerCallId}
+      ${
+        args.companyId
+          ? sql`AND (company_id = ${args.companyId} OR company_id IS NULL)`
+          : sql``
+      }
+    ORDER BY created_at DESC
+    LIMIT 1
+  `;
+  const row = ((rows as any).rows ?? rows)?.[0];
+  const startedAtRaw = String(row?.started_at ?? row?.created_at ?? "").trim();
+  const endedAtRaw = String(row?.ended_at ?? "").trim();
+  const startedAt = startedAtRaw ? new Date(startedAtRaw) : null;
+  const endedAt = endedAtRaw ? new Date(endedAtRaw) : null;
+  return {
+    fromNumber: normalizeMaybePhone(row?.from_number ?? null),
+    toNumber: normalizeMaybePhone(row?.to_number ?? null),
+    startedAt: startedAt && Number.isFinite(startedAt.getTime()) ? startedAt : null,
+    endedAt: endedAt && Number.isFinite(endedAt.getTime()) ? endedAt : null,
+  };
+}
+
+function flattenObjects(input: unknown): Array<Record<string, unknown>> {
+  const out: Array<Record<string, unknown>> = [];
+  const queue: unknown[] = [input];
+  while (queue.length) {
+    const current = queue.shift();
+    if (!current || typeof current !== "object") continue;
+    if (Array.isArray(current)) {
+      for (const item of current) queue.push(item);
+      continue;
+    }
+    const rec = current as Record<string, unknown>;
+    out.push(rec);
+    for (const value of Object.values(rec)) {
+      if (value && typeof value === "object") queue.push(value);
+    }
+  }
+  return out;
+}
+
+function parseDateLoose(value: unknown): Date | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "number" && Number.isFinite(value)) {
+    const ms = value > 1_000_000_000_000 ? value : value * 1000;
+    const d = new Date(ms);
+    return Number.isFinite(d.getTime()) ? d : null;
+  }
+  const raw = String(value).trim();
+  if (!raw) return null;
+  const numeric = Number(raw);
+  if (Number.isFinite(numeric)) {
+    const ms = numeric > 1_000_000_000_000 ? numeric : numeric * 1000;
+    const d = new Date(ms);
+    if (Number.isFinite(d.getTime())) return d;
+  }
+  const direct = new Date(raw);
+  if (Number.isFinite(direct.getTime())) return direct;
+  const m = raw.match(
+    /^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?$/
+  );
+  if (m) {
+    const day = Number(m[1]);
+    const month = Number(m[2]);
+    const year = Number(m[3]);
+    const hour = Number(m[4]);
+    const minute = Number(m[5]);
+    const second = Number(m[6] ?? "0");
+    const d = new Date(year, month - 1, day, hour, minute, second);
+    if (Number.isFinite(d.getTime())) return d;
+  }
+  return null;
+}
+
+function formatYeastarDateTime(value: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(value.getDate())}/${pad(value.getMonth() + 1)}/${value.getFullYear()} ${pad(
+    value.getHours()
+  )}:${pad(value.getMinutes())}:${pad(value.getSeconds())}`;
+}
+
+function normalizeYeastarRecordingUrl(raw: string | null | undefined, baseOrServerUrl: string): string {
+  const value = String(raw ?? "").trim();
+  if (!value) return "";
+  if (/^https?:\/\//i.test(value)) return value;
+  let origin = "";
+  try {
+    origin = new URL(baseOrServerUrl).origin;
+  } catch {
+    origin = "";
+  }
+  if (!origin) return value;
+  if (value.startsWith("/")) return `${origin}${value}`;
+  if (value.startsWith("files/")) return `${origin}/${value}`;
+  // Yeastar often returns file name only in `record_file`.
+  return `${origin}/files/${encodeURIComponent(value)}`;
+}
+
+function extractRecordingFromObject(rec: Record<string, unknown>): {
+  recordingUrl?: string;
+  recordingId?: string;
+  recordingDurationSeconds?: number;
+  callId?: string;
+  fromNumber?: string;
+  toNumber?: string;
+  at?: Date | null;
+} | null {
+  const recordingUrlRaw = findFirstDeep(rec, [
+    "recording_url",
+    "record_url",
+    "record_file",
+    "record_file_url",
+    "record_path",
+    "recording_path",
+    "monitor_record",
+    "download_url",
+    "play_url",
+    "recordingUrl",
+    "url",
+  ]);
+  const recordingIdRaw = findFirstDeep(rec, [
+    "recording_id",
+    "record_id",
+    "recordingId",
+    "record_uuid",
+    "record_file_id",
+    "id",
+    "uuid",
+  ]);
+  const recordingDurationRaw = findFirstDeep(rec, [
+    "recording_duration",
+    "record_duration",
+    "recordingDuration",
+    "duration",
+    "call_duration",
+  ]);
+  const callIdRaw = findFirstDeep(rec, ["call_id", "callid", "linkedid", "linked_id", "uniqueid"]);
+  const fileRaw = findFirstDeep(rec, ["file", "file_name", "filename", "record_file"]);
+  const fromRaw = findFirstDeep(rec, ["from", "call_from", "from_number", "caller", "caller_number", "src"]);
+  const toRaw = findFirstDeep(rec, ["to", "call_to", "to_number", "called_number", "callee", "dst", "dnis"]);
+  const atRaw = findFirstDeep(rec, ["time", "start_time", "created_at", "record_time", "recording_time", "date"]);
+
+  const fileName = fileRaw ? String(fileRaw).trim() : "";
+  const callIdFromFile = (() => {
+    // Yeastar recording/list often stores call id in filename: ...-1773146999.89222-...
+    const match = fileName.match(/-(\d+\.\d+)-/);
+    return match?.[1] ?? "";
+  })();
+
+  const recordingUrl = recordingUrlRaw ? String(recordingUrlRaw).trim() : "";
+  const recordingId = recordingIdRaw ? String(recordingIdRaw).trim() : "";
+  if (!recordingUrl && !recordingId && !fileName) return null;
+
+  const duration = Number(recordingDurationRaw);
+  return {
+    recordingUrl: recordingUrl || fileName || undefined,
+    recordingId: recordingId || undefined,
+    recordingDurationSeconds: Number.isFinite(duration) ? duration : undefined,
+    callId: callIdRaw ? String(callIdRaw).trim() : callIdFromFile || undefined,
+    fromNumber: normalizeMaybePhone(fromRaw ? String(fromRaw) : null) ?? undefined,
+    toNumber: normalizeMaybePhone(toRaw ? String(toRaw) : null) ?? undefined,
+    at: parseDateLoose(atRaw),
+  };
+}
+
+function scoreRecordingCandidate(
+  candidate: ReturnType<typeof extractRecordingFromObject>,
+  providerCallId: string,
+  hints: RecordingResolveHints
+): number {
+  if (!candidate) return -1;
+  let score = 0;
+  if (candidate.callId && candidate.callId === providerCallId) score += 100;
+  if (hints.fromNumber && candidate.fromNumber && hints.fromNumber === candidate.fromNumber) score += 40;
+  if (hints.toNumber && candidate.toNumber && hints.toNumber === candidate.toNumber) score += 20;
+
+  const hintStartMs = hints.startedAt?.getTime() ?? null;
+  const hintEndMs = hints.endedAt?.getTime() ?? null;
+  const atMs = candidate.at?.getTime() ?? null;
+  if (atMs && hintStartMs) {
+    const diffStart = Math.abs(atMs - hintStartMs);
+    if (diffStart <= 2 * 60_000) score += 35;
+    else if (diffStart <= 10 * 60_000) score += 15;
+  }
+  if (atMs && hintEndMs) {
+    const diffEnd = Math.abs(atMs - hintEndMs);
+    if (diffEnd <= 2 * 60_000) score += 20;
+    else if (diffEnd <= 10 * 60_000) score += 8;
+  }
+
+  // Accept likely match if we have only one signal (from/time) or exact call id.
+  return score;
+}
+
+async function resolveYeastarRecordingFromFallbackApis(args: {
+  base: string;
+  token: string;
+  userAgent: string;
+  sslVerify: boolean;
+  providerCallId: string;
+  integrationId: string;
+  tokenMode?: string;
+  attempt: number;
+  hints: RecordingResolveHints;
+}): Promise<{
+  recordingUrl?: string;
+  recordingId?: string;
+  recordingDurationSeconds?: number;
+} | null> {
+  const endpoints: Array<{ path: string; isList: boolean }> = [
+    { path: "recording/query", isList: false },
+    { path: "recording/list", isList: true },
+    { path: "record/query", isList: false },
+    { path: "record/list", isList: true },
+    { path: "cdr/query", isList: false },
+    { path: "cdr/list", isList: true },
+  ];
+  const startedAtSec = args.hints.startedAt
+    ? Math.floor(args.hints.startedAt.getTime() / 1000)
+    : null;
+  const endedAtSec = args.hints.endedAt
+    ? Math.floor(args.hints.endedAt.getTime() / 1000)
+    : startedAtSec
+    ? startedAtSec + 6 * 60
+    : null;
+
+  let best:
+    | { score: number; recordingUrl?: string; recordingId?: string; recordingDurationSeconds?: number }
+    | null = null;
+
+  for (const endpoint of endpoints) {
+    const buildBaseQuery = () => {
+      const q = new URLSearchParams();
+      q.set("access_token", args.token);
+      q.set("call_id", args.providerCallId);
+      q.set("id", args.providerCallId);
+      if (args.hints.fromNumber) {
+        q.set("call_from", args.hints.fromNumber);
+        q.set("from_number", args.hints.fromNumber);
+        q.set("from", args.hints.fromNumber);
+      }
+      if (args.hints.toNumber) {
+        q.set("call_to", args.hints.toNumber);
+        q.set("to_number", args.hints.toNumber);
+        q.set("to", args.hints.toNumber);
+      }
+      if (startedAtSec) q.set("start_time", String(startedAtSec - 5 * 60));
+      if (endedAtSec) q.set("end_time", String(endedAtSec + 5 * 60));
+      if (args.hints.startedAt) q.set("start_time_str", formatYeastarDateTime(args.hints.startedAt));
+      if (args.hints.endedAt) q.set("end_time_str", formatYeastarDateTime(args.hints.endedAt));
+      return q;
+    };
+
+    const queryPlans: URLSearchParams[] = [];
+    const baseQ = buildBaseQuery();
+    queryPlans.push(baseQ);
+    if (endpoint.isList) {
+      const sortQ = new URLSearchParams(baseQ.toString());
+      // Yeastar list APIs accept order_by as direction (asc/desc) and
+      // sort_by as one of documented fields (e.g. id/time), not "timestamp".
+      sortQ.set("sort", "desc");
+      sortQ.set("order", "desc");
+      sortQ.set("sort_by", "id");
+      sortQ.set("order_by", "desc");
+      sortQ.set("reverse", "1");
+      queryPlans.push(sortQ);
+    }
+
+    for (const plan of queryPlans) {
+      const pages = endpoint.isList ? [1, 2, 3, 4] : [1];
+      for (const page of pages) {
+        const q = new URLSearchParams(plan.toString());
+        q.set("page", String(page));
+        q.set("page_size", "100");
+
+        const url = `${args.base}/${endpoint.path}?${q.toString()}`;
+        const res = await requestJson({
+          url,
+          method: "GET",
+          sslVerify: args.sslVerify,
+          headers: {
+            "User-Agent": args.userAgent,
+            Authorization: args.token,
+          },
+          timeoutMs: 5000,
+        });
+
+        const errcode = Number(res.json?.errcode ?? -1);
+        const errmsg = String(res.json?.errmsg ?? res.error ?? "").trim();
+        await logWebhookLine({
+          ts: new Date().toISOString(),
+          stage: "recording_resolve_fallback_query",
+          providerCallId: args.providerCallId,
+          integrationId: args.integrationId,
+          tokenMode: args.tokenMode ?? null,
+          attempt: args.attempt,
+          endpoint: endpoint.path,
+          page,
+          status: res.status,
+          errcode,
+          errmsg: errmsg || null,
+          raw:
+            endpoint.path === "recording/list" || endpoint.path === "cdr/list"
+              ? String(res.rawBody ?? "").slice(0, 4000)
+              : undefined,
+        });
+
+        if (!res.ok) continue;
+        if (Number.isFinite(errcode) && errcode !== 0) continue;
+
+        const nodes = flattenObjects(res.json);
+        for (const node of nodes) {
+          const extractedRaw = extractRecordingFromObject(node);
+          if (!extractedRaw) continue;
+          const extracted = {
+            ...extractedRaw,
+            recordingUrl: normalizeYeastarRecordingUrl(extractedRaw.recordingUrl, args.base) || undefined,
+          };
+          const score = scoreRecordingCandidate(extracted, args.providerCallId, args.hints);
+          if (score < 30) continue;
+          if (!best || score > best.score) {
+            best = { score, ...extracted };
+          }
+        }
+
+        if (best && best.score >= 100) break;
+      }
+      if (best && best.score >= 100) break;
+    }
+    if (best && best.score >= 100) break;
+  }
+
+  if (!best) return null;
+  return {
+    recordingUrl: best.recordingUrl,
+    recordingId: best.recordingId,
+    recordingDurationSeconds: best.recordingDurationSeconds,
+  };
+}
+
+async function resolveYeastarRecordingForCall(args: {
+  providerCallId: string;
+  companyId?: string | null;
+}): Promise<{
+  recordingUrl?: string;
+  recordingId?: string;
+  recordingDurationSeconds?: number;
+} | null> {
+  const provider = "yeastar";
+  const hints = await getRecordingResolveHints(args).catch(() => ({
+    fromNumber: null,
+    toNumber: null,
+    startedAt: null,
+    endedAt: null,
+  }));
+  await logWebhookLine({
+    ts: new Date().toISOString(),
+    stage: "recording_resolve_start",
+    providerCallId: args.providerCallId,
+    companyId: args.companyId ?? null,
+    fromNumber: hints.fromNumber ?? null,
+    toNumber: hints.toNumber ?? null,
+    startedAt: hints.startedAt?.toISOString() ?? null,
+    endedAt: hints.endedAt?.toISOString() ?? null,
+  });
+  const sql = getSql();
+  const rows = await sql<
+    { id: string; credentials: Record<string, unknown> | null; company_id: string | null }[]
+  >`
+    SELECT id, credentials, company_id
+    FROM integration_dialers
+    WHERE provider = ${provider}
+      AND is_active = TRUE
+      ${
+        args.companyId
+          ? sql`AND (company_id = ${args.companyId} OR company_id IS NULL)`
+          : sql``
+      }
+    ORDER BY CASE WHEN company_id IS NULL THEN 1 ELSE 0 END, created_at DESC
+    LIMIT 20
+  `;
+  const candidates = ((rows as any).rows ?? rows) as Array<{
+    id: string;
+    credentials: Record<string, unknown> | null;
+    company_id: string | null;
+  }>;
+  if (!candidates.length) {
+    await logWebhookLine({
+      ts: new Date().toISOString(),
+      stage: "recording_resolve_no_candidates",
+      providerCallId: args.providerCallId,
+      companyId: args.companyId ?? null,
+    });
+    return null;
+  }
+
+  const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+  for (const integration of candidates) {
+    const credentials =
+      integration.credentials && typeof integration.credentials === "object"
+        ? integration.credentials
+        : {};
+    const base = normalizedBaseUrl(
+      typeof credentials.apiBaseUrl === "string" ? credentials.apiBaseUrl : undefined,
+      typeof credentials.apiPath === "string" ? credentials.apiPath : undefined
+    );
+    if (!base) continue;
+    const tokenResult = await getTokenForYeastarDetailed(credentials, {
+      // CDR/recording APIs should use API credentials, not Linkus SDK access credentials.
+      allowAccessUserpass: false,
+    });
+    const token = tokenResult.token;
+    if (!token) {
+      await logWebhookLine({
+        ts: new Date().toISOString(),
+        stage: "recording_resolve_token_failed",
+        providerCallId: args.providerCallId,
+        integrationId: integration.id,
+        tokenMode: tokenResult.mode ?? null,
+        reason: tokenResult.reason ?? null,
+      });
+      continue;
+    }
+
+    const userAgent = String(credentials.userAgent ?? "OpenAPI").trim() || "OpenAPI";
+    const sslVerify = toBool(credentials.sslVerify, true);
+    for (let attempt = 0; attempt < YEASTAR_RECORDING_QUERY_ATTEMPTS; attempt += 1) {
+      const queryUrl = `${base}/call/query?access_token=${encodeURIComponent(token)}&call_id=${encodeURIComponent(
+        args.providerCallId
+      )}`;
+      const queryRes = await requestJson({
+        url: queryUrl,
+        method: "GET",
+        sslVerify,
+        headers: {
+          "User-Agent": userAgent,
+          Authorization: token,
+        },
+        timeoutMs: 5000,
+      });
+
+      const recordingUrlRaw = findFirstDeep(queryRes.json, [
+        "recording_url",
+        "record_url",
+        "record_file",
+        "record_file_url",
+        "record_path",
+        "recording_path",
+        "monitor_record",
+        "recordingUrl",
+        "url",
+      ]);
+      const recordingIdRaw = findFirstDeep(queryRes.json, [
+        "recording_id",
+        "record_id",
+        "recordingId",
+        "record_uuid",
+        "record_file_id",
+        "uuid",
+      ]);
+      const recordingDurationRaw = findFirstDeep(queryRes.json, [
+        "recording_duration",
+        "record_duration",
+        "recordingDuration",
+        "duration",
+        "call_duration",
+      ]);
+
+      const recordingUrl = normalizeYeastarRecordingUrl(
+        recordingUrlRaw ? String(recordingUrlRaw).trim() : "",
+        base
+      );
+      const recordingId = recordingIdRaw ? String(recordingIdRaw).trim() : "";
+      const recordingDurationSeconds = Number(recordingDurationRaw);
+      if (recordingUrl || recordingId) {
+        await logWebhookLine({
+          ts: new Date().toISOString(),
+          stage: "recording_resolve_query",
+          providerCallId: args.providerCallId,
+          integrationId: integration.id,
+          tokenMode: tokenResult.mode ?? null,
+          attempt: attempt + 1,
+          found: true,
+        });
+        return {
+          recordingUrl: recordingUrl || undefined,
+          recordingId: recordingId || undefined,
+          recordingDurationSeconds: Number.isFinite(recordingDurationSeconds)
+            ? recordingDurationSeconds
+            : undefined,
+        };
+      }
+
+      await logWebhookLine({
+        ts: new Date().toISOString(),
+        stage: "recording_resolve_query",
+        providerCallId: args.providerCallId,
+        integrationId: integration.id,
+        tokenMode: tokenResult.mode ?? null,
+        attempt: attempt + 1,
+        found: false,
+        status: queryRes.status,
+        errcode: Number(queryRes.json?.errcode ?? -1),
+        errmsg: String(queryRes.json?.errmsg ?? queryRes.error ?? "").trim() || null,
+      });
+
+      if (attempt === YEASTAR_RECORDING_QUERY_ATTEMPTS - 1) {
+        const fallbackResolved = await resolveYeastarRecordingFromFallbackApis({
+          base,
+          token,
+          userAgent,
+          sslVerify,
+          providerCallId: args.providerCallId,
+          integrationId: integration.id,
+          tokenMode: tokenResult.mode ?? null,
+          attempt: attempt + 1,
+          hints,
+        }).catch(() => null);
+        if (fallbackResolved?.recordingUrl || fallbackResolved?.recordingId) {
+          await logWebhookLine({
+            ts: new Date().toISOString(),
+            stage: "recording_resolve_fallback_hit",
+            providerCallId: args.providerCallId,
+            integrationId: integration.id,
+            tokenMode: tokenResult.mode ?? null,
+            attempt: attempt + 1,
+            recordingUrl: fallbackResolved.recordingUrl ?? null,
+            recordingId: fallbackResolved.recordingId ?? null,
+          });
+          return fallbackResolved;
+        }
+      }
+
+      if (attempt < YEASTAR_RECORDING_QUERY_ATTEMPTS - 1) await wait(YEASTAR_RECORDING_QUERY_WAIT_MS);
+    }
+  }
+
+  await logWebhookLine({
+    ts: new Date().toISOString(),
+    stage: "recording_resolve_all_candidates_miss",
+    providerCallId: args.providerCallId,
+    companyId: args.companyId ?? null,
+    triedCandidates: candidates.length,
+  });
+  return null;
+}
+
+async function scheduleDeferredYeastarRecordingResolve(args: {
+  providerCallId: string;
+  providerKey: string;
+  companyId?: string | null;
+  status: string;
+}) {
+  const key = `${args.providerKey}|${args.companyId ?? ""}|${args.providerCallId}`;
+  const now = Date.now();
+  const seenAt = yeastarRecordingRetrySeen.get(key);
+  if (seenAt && now - seenAt < 10 * 60_000) return;
+  yeastarRecordingRetrySeen.set(key, now);
+
+  for (const delayMs of YEASTAR_RECORDING_DEFERRED_DELAYS_MS) {
+    setTimeout(async () => {
+      try {
+        const resolved = await resolveYeastarRecordingForCall({
+          providerCallId: args.providerCallId,
+          companyId: args.companyId ?? null,
+        });
+        if (resolved?.recordingUrl || resolved?.recordingId) {
+          await CallCenter.handleDialerWebhookUpdate({
+            providerKey: args.providerKey,
+            providerCallId: args.providerCallId,
+            status: args.status,
+            scope: args.companyId ? "company" : "global",
+            companyId: args.companyId ?? undefined,
+            recordingUrl: resolved.recordingUrl,
+            recordingId: resolved.recordingId,
+            recordingDurationSeconds: resolved.recordingDurationSeconds,
+          });
+          await logWebhookLine({
+            ts: new Date().toISOString(),
+            stage: "recording_resolved_deferred",
+            providerKey: args.providerKey,
+            providerCallId: args.providerCallId,
+            companyId: args.companyId ?? null,
+            delayMs,
+            recordingUrl: resolved.recordingUrl ?? null,
+            recordingId: resolved.recordingId ?? null,
+            recordingDurationSeconds: resolved.recordingDurationSeconds ?? null,
+          });
+          return;
+        }
+        await logWebhookLine({
+          ts: new Date().toISOString(),
+          stage: "recording_resolved_deferred_miss",
+          providerKey: args.providerKey,
+          providerCallId: args.providerCallId,
+          companyId: args.companyId ?? null,
+          delayMs,
+        });
+      } catch (error: any) {
+        await logWebhookLine({
+          ts: new Date().toISOString(),
+          stage: "recording_resolved_deferred_error",
+          providerKey: args.providerKey,
+          providerCallId: args.providerCallId,
+          companyId: args.companyId ?? null,
+          delayMs,
+          error: error?.message ?? String(error),
+        });
+      }
+    }, delayMs);
+  }
 }
 
 async function resolveYeastarLiveCaller(args: {
@@ -605,7 +1469,10 @@ async function resolveYeastarLiveCaller(args: {
       integration.credentials && typeof integration.credentials === "object"
         ? integration.credentials
         : {};
-    const base = normalizedBaseUrl(credentials.apiBaseUrl, credentials.apiPath);
+    const base = normalizedBaseUrl(
+      typeof credentials.apiBaseUrl === "string" ? credentials.apiBaseUrl : undefined,
+      typeof credentials.apiPath === "string" ? credentials.apiPath : undefined
+    );
     if (!base) continue;
     const token = await getTokenForYeastar(credentials);
     if (!token) continue;
@@ -996,6 +1863,49 @@ function mapYeastarWebhook(providerKey: string, payload: any): DialerWebhookUpda
   };
 }
 
+function isUnknownPartyNumber(value: string | undefined | null): boolean {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  return !normalized || normalized === "unknown" || normalized === "null";
+}
+
+function shouldIgnoreYeastarAuxEvent(update: DialerWebhookUpdate): {
+  ignore: boolean;
+  operation?: string;
+  type?: number;
+} {
+  if (update.providerKey.toLowerCase() !== "yeastar") return { ignore: false };
+  const payload = (update.rawPayload ?? {}) as Record<string, unknown>;
+  const eventType = Number(payload?.type ?? NaN);
+  if (eventType !== 30020) return { ignore: false };
+
+  let msg: Record<string, unknown> | null = null;
+  const msgRaw = payload?.msg;
+  if (typeof msgRaw === "string") {
+    try {
+      msg = JSON.parse(msgRaw) as Record<string, unknown>;
+    } catch {
+      msg = null;
+    }
+  } else if (msgRaw && typeof msgRaw === "object") {
+    msg = msgRaw as Record<string, unknown>;
+  }
+
+  const operation = String(
+    findFirstDeep(msg ?? payload, ["operation", "event", "event_name"]) ?? ""
+  ).toLowerCase();
+  if (!["call_start", "call_answer", "call_over"].includes(operation)) {
+    return { ignore: false };
+  }
+
+  const hasKnownFrom = !isUnknownPartyNumber(update.fromNumber ?? null);
+  const hasKnownTo = !isUnknownPartyNumber(update.toNumber ?? null);
+  if (hasKnownFrom || hasKnownTo) {
+    return { ignore: false };
+  }
+
+  return { ignore: true, operation, type: eventType };
+}
+
 async function handle(providerKey: string, req: NextRequest) {
   const headers = Object.fromEntries(req.headers.entries());
   const parsed = await parsePayload(req);
@@ -1020,6 +1930,54 @@ async function handle(providerKey: string, req: NextRequest) {
       ? mapYeastarWebhook(providerKey, payload)
       : mapGenericWebhook(providerKey, payload);
   if (!update) return;
+  update.ringingExtensions = extractRingingExtensionsFromPayload(update.rawPayload);
+  const yeastarAuxFilter = shouldIgnoreYeastarAuxEvent(update);
+  if (yeastarAuxFilter.ignore) {
+    await logWebhookLine({
+      ts: new Date().toISOString(),
+      stage: "yeastar_aux_event_ignored",
+      providerKey,
+      providerCallId: update.providerCallId,
+      eventType: yeastarAuxFilter.type ?? null,
+      operation: yeastarAuxFilter.operation ?? null,
+      fromNumber: update.fromNumber ?? null,
+      toNumber: update.toNumber ?? null,
+    });
+    return;
+  }
+
+  // Fast path: publish inbound ringing popup immediately, before expensive lookups/AI workflow.
+  // This removes perceived UI delay while richer updates continue asynchronously below.
+  const isInboundRingingFastPath =
+    update.direction === "inbound" &&
+    /(ring|incoming|initiated)/i.test(String(update.status ?? ""));
+  if (isInboundRingingFastPath) {
+    publishIncomingPopupEvent({
+      id: `${providerKey}-${update.providerCallId}-${Date.now()}`,
+      providerCallId: update.providerCallId,
+      providerKey,
+      direction: "inbound",
+      status: update.status,
+      fromNumber: update.fromNumber ?? null,
+      toNumber: update.toNumber ?? null,
+      ringingExtensions: update.ringingExtensions ?? null,
+      companyId: update.companyId ?? null,
+      branchId: update.branchId ?? null,
+      aiText: null,
+      pickupHint: null,
+      createdAt: new Date().toISOString(),
+    });
+    await logWebhookLine({
+      ts: new Date().toISOString(),
+      stage: "popup_published_fast",
+      providerKey,
+      providerCallId: update.providerCallId,
+      status: update.status,
+      companyId: update.companyId ?? null,
+      toNumber: update.toNumber ?? null,
+      ringingExtensions: update.ringingExtensions ?? null,
+    });
+  }
 
   const needsLiveFallback =
     providerKey.toLowerCase() === "yeastar" &&
@@ -1060,7 +2018,10 @@ async function handle(providerKey: string, req: NextRequest) {
   let popupAiText: string | null = null;
   let popupPickupHint: string | null = null;
 
-  if (update.direction === "inbound") {
+  const shouldRunInboundAiFlow =
+    update.direction === "inbound" &&
+    /(ring|incoming|initiated)/i.test(String(update.status ?? ""));
+  if (shouldRunInboundAiFlow) {
     if (!update.companyId) {
       const inferredCompanyId = await resolveCompanyForInbound({
         providerKey: update.providerKey,
@@ -1111,28 +2072,33 @@ async function handle(providerKey: string, req: NextRequest) {
     let automationWorkflow: Awaited<ReturnType<typeof CallAiWorkflow.runCallAiWorkflow>> | null =
       null;
     const liveExecKey = `${update.providerKey}:${update.providerCallId}:${update.companyId ?? ""}`;
+    const companyIdForLive = update.companyId ?? null;
+    const canRunOnce =
+      policyEval.decision === "allow_ai" &&
+      Boolean(companyIdForLive) &&
+      shouldRunLiveExecutionOnce(liveExecKey);
+    if (
+      canRunOnce &&
+      update.providerKey.toLowerCase() === "yeastar" &&
+      /(ring|incoming|initiated)/i.test(String(update.status ?? ""))
+    ) {
+      pickupResult = await tryYeastarAutoPickup({
+        companyId: companyIdForLive as string,
+        providerCallId: update.providerCallId,
+        toNumber: update.toNumber ?? null,
+        rawPayload: update.rawPayload,
+      }).catch((err) => ({
+        picked: false,
+        reason: err instanceof Error ? err.message : String(err),
+      }));
+    }
+
     if (
       policyEval.mode === "live" &&
-      policyEval.decision === "allow_ai" &&
-      update.companyId &&
-      shouldRunLiveExecutionOnce(liveExecKey)
+      canRunOnce
     ) {
-      if (
-        update.providerKey.toLowerCase() === "yeastar" &&
-        /(ring|incoming|initiated)/i.test(String(update.status ?? ""))
-      ) {
-        pickupResult = await tryYeastarAutoPickup({
-          companyId: update.companyId,
-          providerCallId: update.providerCallId,
-          toNumber: update.toNumber ?? null,
-        }).catch((err) => ({
-          picked: false,
-          reason: err instanceof Error ? err.message : String(err),
-        }));
-      }
-
       liveExec = await executeLiveInboundAi({
-        companyId: update.companyId,
+        companyId: companyIdForLive as string,
         providerKey: update.providerKey,
         providerCallId: update.providerCallId,
         fromNumber: update.fromNumber ?? null,
@@ -1211,7 +2177,7 @@ async function handle(providerKey: string, req: NextRequest) {
       toNumber: update.toNumber ?? null,
       decision: policyEval.decision as any,
       reason: policyEval.reason,
-      mode: policyEval.mode,
+      mode: policyEval.mode as any,
       matchedRule: policyEval.matchedRule,
       details: {
         ...policyEval.details,
@@ -1336,6 +2302,28 @@ async function handle(providerKey: string, req: NextRequest) {
     }
   }
 
+  const shouldResolveRecordingDeferredOnly =
+    providerKey.toLowerCase() === "yeastar" &&
+    !update.recordingUrl &&
+    /(completed|hangup|bye|over|done|finished|failed|cancelled|canceled)/i.test(
+      String(update.status ?? "")
+    );
+  if (shouldResolveRecordingDeferredOnly) {
+    await logWebhookLine({
+      ts: new Date().toISOString(),
+      stage: "recording_resolve_deferred_queued",
+      providerKey,
+      providerCallId: update.providerCallId,
+      status: update.status,
+    });
+    void scheduleDeferredYeastarRecordingResolve({
+      providerCallId: update.providerCallId,
+      providerKey,
+      companyId: update.companyId ?? null,
+      status: String(update.status ?? "completed"),
+    });
+  }
+
   await CallCenter.handleDialerWebhookUpdate(update);
 
   if (update.direction === "inbound") {
@@ -1347,6 +2335,7 @@ async function handle(providerKey: string, req: NextRequest) {
       status: update.status,
       fromNumber: update.fromNumber ?? null,
       toNumber: update.toNumber ?? null,
+      ringingExtensions: update.ringingExtensions ?? null,
       companyId: update.companyId ?? null,
       branchId: update.branchId ?? null,
       aiText: popupAiText,

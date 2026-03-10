@@ -11,6 +11,9 @@ type Answers = {
   q3: Answer;
   q4: Answer;
   q5: Answer;
+  q6: Answer;
+  q7: Answer;
+  q8: Answer;
 };
 
 type FormDataResponse = {
@@ -26,7 +29,7 @@ type FormDataResponse = {
   carPlate: string | null;
 };
 
-type FollowUpInputType = "radio" | "checkbox" | "text";
+type FollowUpInputType = "radio" | "checkbox" | "text" | "date";
 type FollowUpQuestion = {
   id: string;
   label: string;
@@ -42,6 +45,9 @@ const QUESTION_LABELS: Record<keyof Answers, string> = {
   q3: "Any warning light or service alert?",
   q4: "Any recent incident that triggered this request?",
   q5: "Any urgent priority for inspection?",
+  q6: "Any AC issue?",
+  q7: "Last service",
+  q8: "Last work",
 };
 
 const EMPTY_ANSWERS: Answers = {
@@ -50,31 +56,54 @@ const EMPTY_ANSWERS: Answers = {
   q3: { choice: "no", details: "" },
   q4: { choice: "no", details: "" },
   q5: { choice: "no", details: "" },
+  q6: { choice: "no", details: "" },
+  q7: { choice: "yes", details: "" },
+  q8: { choice: "yes", details: "" },
 };
 
 const FOLLOW_UP_QUESTIONS: Record<keyof Answers, FollowUpQuestion[]> = {
   q1: [
-    { id: "issue_type", label: "Main performance issue", type: "radio", required: true, options: ["Low power", "Slow acceleration", "Overheating", "Poor fuel economy"] },
+    { id: "issue_type", label: "Main performance issue", type: "radio", required: true, options: ["Low power", "Slow acceleration", "Overheating", "Poor fuel economy", "Other"] },
     { id: "issue_when", label: "When did it start?", type: "radio", required: true, options: ["Today", "1-3 days ago", "Within 1 week", "More than 1 week"] },
     { id: "drivable", label: "Vehicle drivable?", type: "radio", required: true, options: ["Yes", "No", "Not sure"] },
   ],
   q2: [
-    { id: "sound_type", label: "Type of sound/vibration", type: "checkbox", required: true, options: ["Knocking", "Grinding", "Squeaking", "Steering vibration", "Braking vibration"] },
-    { id: "sound_when", label: "When is it noticeable?", type: "checkbox", required: true, options: ["Idle", "Acceleration", "Braking", "Turning", "High speed"] },
+    { id: "sound_type", label: "Type of sound/vibration", type: "checkbox", required: true, options: ["Knocking", "Grinding", "Squeaking", "Steering vibration", "Braking vibration", "Other"] },
+    { id: "sound_when", label: "When is it noticeable?", type: "checkbox", required: true, options: ["Idle", "Acceleration", "Braking", "Turning", "High speed", "Other"] },
   ],
   q3: [
     { id: "warning_type", label: "Warning indicator", type: "checkbox", required: true, options: ["Check Engine", "Oil", "Battery", "ABS", "Brake", "Temperature"] },
     { id: "warning_state", label: "Indicator state", type: "radio", required: true, options: ["Always ON", "Flashing", "Intermittent"] },
   ],
   q4: [
-    { id: "incident_type", label: "Incident type", type: "checkbox", required: true, options: ["Minor collision", "Pothole impact", "Flood/rain exposure", "Tire puncture", "Battery drain"] },
+    { id: "incident_type", label: "Incident type", type: "checkbox", required: true, options: ["Minor collision", "Pothole impact", "Flood/rain exposure", "Tire puncture", "Battery drain", "Other"] },
     { id: "incident_date", label: "Incident date/time", type: "text", required: true },
   ],
   q5: [
     { id: "priority_level", label: "Priority level", type: "radio", required: true, options: ["Critical (same day)", "High (within 24h)", "Normal (within 2-3 days)"] },
-    { id: "constraints", label: "Special constraints", type: "checkbox", options: ["Need quick turnaround", "Need pickup support", "Need estimate first", "Need courtesy car"] },
+    { id: "constraints", label: "Special constraints", type: "checkbox", options: ["Need quick turnaround", "Need pickup support", "Need estimate first", "Need courtesy car", "Other"] },
+  ],
+  q6: [
+    { id: "ac_issue_type", label: "AC issue", type: "checkbox", required: true, options: ["Pooling", "Smell"] },
+  ],
+  q7: [
+    { id: "last_service_date", label: "Last service date", type: "date", required: true },
+  ],
+  q8: [
+    { id: "last_work_date", label: "Last work date", type: "date", required: true },
+    { id: "last_work_description", label: "Last work description", type: "text", required: true },
   ],
 };
+
+const OTHER_DETAIL_REQUIRED_FIELDS = new Set([
+  "issue_type",
+  "sound_type",
+  "sound_when",
+  "incident_type",
+  "constraints",
+]);
+
+const ALWAYS_ON_QUESTIONS = new Set<keyof Answers>(["q7", "q8"]);
 
 function createEmptyFollowUps(): FollowUpValues {
   return {
@@ -83,6 +112,9 @@ function createEmptyFollowUps(): FollowUpValues {
     q3: {},
     q4: {},
     q5: {},
+    q6: {},
+    q7: {},
+    q8: {},
   };
 }
 
@@ -106,13 +138,20 @@ function parseDetailsToFollowUps(key: keyof Answers, details: string): Record<st
     }
     const label = chunk.slice(0, sep).trim().toLowerCase();
     const value = chunk.slice(sep + 1).trim();
-    const def = defs.find((d) => d.label.toLowerCase() === label);
+    const otherSuffix = " (other)";
+    const isOtherDetailLine = label.endsWith(otherSuffix);
+    const baseLabel = isOtherDetailLine ? label.slice(0, -otherSuffix.length).trim() : label;
+    const def = defs.find((d) => d.label.toLowerCase() === baseLabel);
     if (!def) {
       if (label === "additional notes") {
         out.__note = value;
       } else {
         remainingNotes.push(chunk);
       }
+      continue;
+    }
+    if (isOtherDetailLine) {
+      out[`${def.id}_other`] = value;
       continue;
     }
     if (def.type === "checkbox") {
@@ -506,6 +545,17 @@ export default function PreInspectionPublicPage({ params }: Params) {
     }));
   }
 
+  function isOtherSelected(key: keyof Answers, fieldId: string): boolean {
+    const question = FOLLOW_UP_QUESTIONS[key].find((q) => q.id === fieldId);
+    if (!question || !OTHER_DETAIL_REQUIRED_FIELDS.has(fieldId)) return false;
+    const raw = followUps[key]?.[fieldId];
+    if (question.type === "checkbox") {
+      const arr = Array.isArray(raw) ? raw : [];
+      return arr.includes("Other");
+    }
+    return String(raw ?? "") === "Other";
+  }
+
   function composeQuestionDetails(key: keyof Answers): string {
     const values = followUps[key] ?? {};
     const questions = FOLLOW_UP_QUESTIONS[key];
@@ -515,10 +565,21 @@ export default function PreInspectionPublicPage({ params }: Params) {
       if (q.type === "checkbox") {
         const arr = Array.isArray(raw) ? raw : [];
         if (arr.length) lines.push(`${q.label}: ${arr.join(", ")}`);
+        if (OTHER_DETAIL_REQUIRED_FIELDS.has(q.id)) {
+          const otherVal = String(values[`${q.id}_other`] ?? "").trim();
+          if (arr.includes("Other") && otherVal) lines.push(`${q.label} (Other): ${otherVal}`);
+        }
         continue;
       }
       const val = String(raw ?? "").trim();
       if (val) lines.push(`${q.label}: ${val}`);
+      if (OTHER_DETAIL_REQUIRED_FIELDS.has(q.id)) {
+        const otherVal = String(values[`${q.id}_other`] ?? "").trim();
+        const hasOther = q.type === "checkbox"
+          ? (Array.isArray(raw) ? raw : []).includes("Other")
+          : val === "Other";
+        if (hasOther && otherVal) lines.push(`${q.label} (Other): ${otherVal}`);
+      }
     }
     const note = String(values.__note ?? "").trim();
     if (note) lines.push(`Additional notes: ${note}`);
@@ -528,7 +589,13 @@ export default function PreInspectionPublicPage({ params }: Params) {
   function buildSubmissionAnswers(): Answers {
     const output = { ...answers };
     for (const key of Object.keys(output) as Array<keyof Answers>) {
-      if (output[key].choice === "yes") {
+      if (ALWAYS_ON_QUESTIONS.has(key)) {
+        output[key] = {
+          ...output[key],
+          choice: "yes",
+          details: composeQuestionDetails(key),
+        };
+      } else if (output[key].choice === "yes") {
         output[key] = {
           ...output[key],
           details: composeQuestionDetails(key),
@@ -543,7 +610,7 @@ export default function PreInspectionPublicPage({ params }: Params) {
   function validateForm(): string | null {
     const submissionAnswers = buildSubmissionAnswers();
     for (const key of Object.keys(submissionAnswers) as Array<keyof Answers>) {
-      if (submissionAnswers[key].choice !== "yes") continue;
+      if (submissionAnswers[key].choice !== "yes" && !ALWAYS_ON_QUESTIONS.has(key)) continue;
       const values = followUps[key] ?? {};
       const questions = FOLLOW_UP_QUESTIONS[key];
       for (const q of questions) {
@@ -555,6 +622,11 @@ export default function PreInspectionPublicPage({ params }: Params) {
           continue;
         }
         if (!String(raw ?? "").trim()) return `${QUESTION_LABELS[key]}: ${q.label} is required.`;
+      }
+      for (const q of questions) {
+        if (!OTHER_DETAIL_REQUIRED_FIELDS.has(q.id) || !isOtherSelected(key, q.id)) continue;
+        const otherVal = String(values[`${q.id}_other`] ?? "").trim();
+        if (!otherVal) return `${QUESTION_LABELS[key]}: ${q.label} other details are required.`;
       }
       if (!submissionAnswers[key].details.trim()) {
         return `${QUESTION_LABELS[key]}: details are required when Yes is selected.`;
@@ -631,36 +703,38 @@ export default function PreInspectionPublicPage({ params }: Params) {
                   {QUESTION_LABELS[key]}
                 </div>
 
-                <div className="mt-3 flex flex-wrap gap-3 text-sm">
-                  <button
-                    type="button"
-                    onClick={() => updateAnswer(key, { choice: "yes" })}
-                    disabled={isSubmitted}
-                    className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 ${
-                      answers[key].choice === "yes"
-                        ? "border-emerald-300/70 bg-emerald-500/15 text-emerald-100"
-                        : "border-white/20 text-slate-200"
-                    }`}
-                  >
-                    <TinyIcon kind="yes" className="h-4 w-4 text-emerald-300" />
-                    Yes
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => updateAnswer(key, { choice: "no", details: "" })}
-                    disabled={isSubmitted}
-                    className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 ${
-                      answers[key].choice === "no"
-                        ? "border-rose-300/70 bg-rose-500/15 text-rose-100"
-                        : "border-white/20 text-slate-200"
-                    }`}
-                  >
-                    <TinyIcon kind="no" className="h-4 w-4 text-rose-300" />
-                    No
-                  </button>
-                </div>
+                {!ALWAYS_ON_QUESTIONS.has(key) ? (
+                  <div className="mt-3 flex flex-wrap gap-3 text-sm">
+                    <button
+                      type="button"
+                      onClick={() => updateAnswer(key, { choice: "yes" })}
+                      disabled={isSubmitted}
+                      className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 ${
+                        answers[key].choice === "yes"
+                          ? "border-emerald-300/70 bg-emerald-500/15 text-emerald-100"
+                          : "border-white/20 text-slate-200"
+                      }`}
+                    >
+                      <TinyIcon kind="yes" className="h-4 w-4 text-emerald-300" />
+                      Yes
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateAnswer(key, { choice: "no", details: "" })}
+                      disabled={isSubmitted}
+                      className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 ${
+                        answers[key].choice === "no"
+                          ? "border-rose-300/70 bg-rose-500/15 text-rose-100"
+                          : "border-white/20 text-slate-200"
+                      }`}
+                    >
+                      <TinyIcon kind="no" className="h-4 w-4 text-rose-300" />
+                      No
+                    </button>
+                  </div>
+                ) : null}
 
-                {answers[key].choice === "yes" ? (
+                {answers[key].choice === "yes" || ALWAYS_ON_QUESTIONS.has(key) ? (
                   <div className="mt-4 space-y-4">
                     {FOLLOW_UP_QUESTIONS[key].map((fq) => (
                       <div key={fq.id}>
@@ -726,13 +800,35 @@ export default function PreInspectionPublicPage({ params }: Params) {
                             })}
                           </div>
                         ) : null}
-                        {fq.type === "text" ? (
+                        {fq.type === "text" || fq.type === "date" ? (
+                          <div className="space-y-2">
+                            <input
+                              type={fq.type === "date" ? "date" : "text"}
+                              className="w-full rounded-xl border border-white/15 bg-slate-950/60 p-3 text-sm outline-none"
+                              placeholder={fq.type === "date" ? undefined : "Enter details"}
+                              value={String(followUps[key]?.[fq.id] ?? "")}
+                              onChange={(e) => setFollowUpValue(key, fq.id, e.target.value)}
+                              disabled={isSubmitted}
+                            />
+                            {OTHER_DETAIL_REQUIRED_FIELDS.has(fq.id) && isOtherSelected(key, fq.id) ? (
+                              <input
+                                type="text"
+                                className="w-full rounded-xl border border-white/15 bg-slate-950/60 p-3 text-sm outline-none"
+                                placeholder="Specify other"
+                                value={String(followUps[key]?.[`${fq.id}_other`] ?? "")}
+                                onChange={(e) => setFollowUpValue(key, `${fq.id}_other`, e.target.value)}
+                                disabled={isSubmitted}
+                              />
+                            ) : null}
+                          </div>
+                        ) : null}
+                        {fq.type !== "text" && OTHER_DETAIL_REQUIRED_FIELDS.has(fq.id) && isOtherSelected(key, fq.id) ? (
                           <input
                             type="text"
-                            className="w-full rounded-xl border border-white/15 bg-slate-950/60 p-3 text-sm outline-none"
-                            placeholder="Enter details"
-                            value={String(followUps[key]?.[fq.id] ?? "")}
-                            onChange={(e) => setFollowUpValue(key, fq.id, e.target.value)}
+                            className="mt-2 w-full rounded-xl border border-white/15 bg-slate-950/60 p-3 text-sm outline-none"
+                            placeholder="Specify other"
+                            value={String(followUps[key]?.[`${fq.id}_other`] ?? "")}
+                            onChange={(e) => setFollowUpValue(key, `${fq.id}_other`, e.target.value)}
                             disabled={isSubmitted}
                           />
                         ) : null}

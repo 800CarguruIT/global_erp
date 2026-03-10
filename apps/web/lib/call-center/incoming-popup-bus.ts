@@ -6,6 +6,7 @@ export type IncomingPopupEvent = {
   status: string;
   fromNumber?: string | null;
   toNumber?: string | null;
+  ringingExtensions?: string[] | null;
   companyId?: string | null;
   branchId?: string | null;
   aiText?: string | null;

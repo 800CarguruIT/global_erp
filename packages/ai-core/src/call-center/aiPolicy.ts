@@ -154,7 +154,7 @@ function parsePolicy(row: PolicyRow): CompanyCallAiPolicy {
       systemPrompt: String(gd.systemPrompt ?? ""),
       escalationKeywords: toStringArray(gd.escalationKeywords),
       automationEnabled: Boolean(gd.automationEnabled),
-      simulationMode: gd.simulationMode === undefined ? true : Boolean(gd.simulationMode),
+      simulationMode: gd.simulationMode === undefined ? false : Boolean(gd.simulationMode),
     },
     updatedByUserId: row.updated_by_user_id,
     updatedAt: row.updated_at,
@@ -222,7 +222,7 @@ export async function upsertCompanyCallAiPolicy(input: {
           systemPrompt: "",
           escalationKeywords: [],
           automationEnabled: false,
-          simulationMode: true,
+          simulationMode: false,
         }
       ) as any}::jsonb,
       ${input.updatedByUserId ?? null}

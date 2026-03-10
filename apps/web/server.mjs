@@ -22,20 +22,37 @@ const handle = app.getRequestHandler();
 const databaseUrl = process.env.DATABASE_URL || "";
 const sql = databaseUrl ? postgres(databaseUrl, { prepare: false }) : null;
 
-function agentTokenVariants(value) {
+function normalizeAgentToken(value) {
   const raw = String(value ?? "").trim();
-  if (!raw) return [];
-  const normalized = raw.replace(/\s+/g, "").toLowerCase();
+  if (!raw) return "";
+  return raw.replace(/\s+/g, "");
+}
+
+function agentTokenVariants(value) {
+  const normalized = normalizeAgentToken(value).toLowerCase();
+  if (!normalized) return [];
   const digits = normalized.replace(/\D+/g, "");
   const out = new Set([normalized]);
   if (digits) out.add(digits);
-  return [...out];
+  return Array.from(out);
 }
 
-function agentMatches(set, value) {
-  if (!set || set.size === 0) return false;
-  const variants = agentTokenVariants(value);
-  return variants.some((token) => set.has(token));
+function buildAgentTokenSet(values) {
+  const set = new Set();
+  for (const value of values) {
+    for (const token of agentTokenVariants(value)) set.add(token);
+  }
+  return set;
+}
+
+function anyTargetMatchesAgent(agentTokens, targets) {
+  if (!agentTokens || agentTokens.size === 0) return true;
+  for (const target of targets) {
+    for (const token of agentTokenVariants(target)) {
+      if (agentTokens.has(token)) return true;
+    }
+  }
+  return false;
 }
 
 app.prepare().then(() => {
@@ -61,12 +78,11 @@ app.prepare().then(() => {
   wss.on("connection", (ws, _req, url) => {
     const companyId = (url.searchParams.get("companyId") || "").trim();
     const rawAgentIds = (url.searchParams.get("agentIds") || "").trim();
-    const agentIds = new Set(
+    const agentTokens = buildAgentTokenSet(
       rawAgentIds
         .split(",")
         .map((x) => x.trim())
         .filter(Boolean)
-        .flatMap((x) => agentTokenVariants(x))
     );
     const connectedAt = Date.now();
     const sentCalls = new Map();
@@ -85,25 +101,37 @@ app.prepare().then(() => {
       }
 
       const status = String(event.status ?? "").toLowerCase();
-      const toNumber = String(event.toNumber ?? "").trim();
-      const isRinging = status.includes("ring") || status.includes("incoming");
-      if (isRinging && agentIds.size > 0 && toNumber && !agentMatches(agentIds, toNumber)) return;
+      const isRinging = status.includes("ring") || status.includes("incoming") || status.includes("initiated");
+      if (isRinging && agentTokens.size > 0) {
+        const targets = [
+          ...(Array.isArray(event.ringingExtensions) ? event.ringingExtensions : []),
+          String(event.toNumber ?? "").trim(),
+        ].filter(Boolean);
+        if (!anyTargetMatchesAgent(agentTokens, targets)) return;
+      }
 
       const callId = String(event.providerCallId ?? event.id ?? "").trim();
       if (callId) {
         const prev = sentCalls.get(callId);
         const fromNumber = String(event.fromNumber ?? "").trim();
         const toNumberNow = String(event.toNumber ?? "").trim();
+        const ringingExtensionsNow = Array.isArray(event.ringingExtensions)
+          ? event.ringingExtensions.map((v) => String(v ?? "").trim()).filter(Boolean).sort().join(",")
+          : "";
         const aiTextNow = String(event.aiText ?? "").trim();
         const statusNow = String(event.status ?? "").toLowerCase();
         const hasBetterFrom = !!fromNumber && !String(prev?.fromNumber ?? "").trim();
         const hasBetterTo = !!toNumberNow && !String(prev?.toNumber ?? "").trim();
+        const hasBetterRingingExtensions =
+          ringingExtensionsNow &&
+          String(prev?.ringingExtensions ?? "").trim() !== ringingExtensionsNow;
         const hasBetterAi = !!aiTextNow && !String(prev?.aiText ?? "").trim();
         const statusChanged = !!prev && String(prev.status ?? "").toLowerCase() !== statusNow;
-        if (prev && !hasBetterFrom && !hasBetterTo && !hasBetterAi && !statusChanged) return;
+        if (prev && !hasBetterFrom && !hasBetterTo && !hasBetterRingingExtensions && !hasBetterAi && !statusChanged) return;
         sentCalls.set(callId, {
           fromNumber,
           toNumber: toNumberNow,
+          ringingExtensions: ringingExtensionsNow,
           aiText: aiTextNow,
           status: statusNow,
         });
@@ -140,7 +168,9 @@ app.prepare().then(() => {
           const callId = String(row.provider_call_id ?? row.id ?? "").trim();
           if (!callId) continue;
           const toNumber = String(row.to_number ?? "").trim();
-          if (agentIds.size > 0 && toNumber && !agentMatches(agentIds, toNumber)) continue;
+          if (agentTokens.size > 0 && toNumber && !anyTargetMatchesAgent(agentTokens, [toNumber])) {
+            continue;
+          }
           const prev = sentCalls.get(callId);
           const fromNumber = String(row.from_number ?? "").trim();
           const statusNow = String(row.status ?? "ringing").toLowerCase();

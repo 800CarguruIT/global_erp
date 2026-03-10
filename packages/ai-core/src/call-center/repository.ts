@@ -179,10 +179,11 @@ export async function updateCallSessionStatusByProviderCallId(
   return row?.id ?? null;
 }
 
-export async function insertInboundCallSession(params: {
+export async function insertWebhookCallSession(params: {
   providerKey: string;
   providerCallId: string;
   status: CallStatus;
+  direction?: CallSession["direction"] | null;
   fromNumber: string;
   toNumber: string;
   scope: CallSession["scope"];
@@ -226,7 +227,7 @@ export async function insertInboundCallSession(params: {
       ${params.scope === "company" ? params.companyId ?? null : null},
       ${params.scope === "company" ? params.branchId ?? null : null},
       ${"00000000-0000-0000-0000-000000000000"},
-      ${"inbound"},
+      ${params.direction === "outbound" ? "outbound" : "inbound"},
       ${params.fromNumber},
       ${params.toNumber},
       NULL,
@@ -244,6 +245,26 @@ export async function insertInboundCallSession(params: {
   const row = rowsFrom(result)[0] as CallSessionRow | undefined;
   if (!row) throw new Error("Failed to insert inbound call session");
   return mapSession(row);
+}
+
+export async function insertInboundCallSession(params: {
+  providerKey: string;
+  providerCallId: string;
+  status: CallStatus;
+  fromNumber: string;
+  toNumber: string;
+  scope: CallSession["scope"];
+  companyId?: string | null;
+  branchId?: string | null;
+  startedAt?: Date | null;
+  endedAt?: Date | null;
+  durationSeconds?: number | null;
+  metadata?: Record<string, unknown>;
+}): Promise<CallSession> {
+  return insertWebhookCallSession({
+    ...params,
+    direction: "inbound",
+  });
 }
 
 export async function listCallSessions(filter: ListCallsFilter): Promise<CallSession[]> {
@@ -402,7 +423,50 @@ export async function insertCallRecording(params: {
   url: string;
   durationSeconds?: number | null;
 }): Promise<CallRecordingRow> {
+  const isPlaceholderUrl = (value: string | null | undefined) => {
+    const normalized = String(value ?? "").trim().toLowerCase();
+    return normalized.length === 0 || normalized === "unknown" || normalized === "null" || normalized === "undefined";
+  };
+  const isAbsolutePlayableUrl = (value: string | null | undefined) => {
+    const normalized = String(value ?? "").trim().toLowerCase();
+    return normalized.startsWith("http://") || normalized.startsWith("https://") || normalized.startsWith("/");
+  };
+
   const sql = getSql();
+  const existing = await sql<CallRecordingRow[]>`
+    SELECT *
+    FROM call_recordings
+    WHERE call_session_id = ${params.callSessionId}
+      AND provider_recording_id = ${params.providerRecordingId}
+    LIMIT 1
+  `;
+  const existingRow = rowsFrom(existing)[0] as CallRecordingRow | undefined;
+  if (existingRow) {
+    const incomingUrl = params.url.trim();
+    const shouldUpgradeUrl =
+      !isPlaceholderUrl(incomingUrl) &&
+      (isPlaceholderUrl(existingRow.url) ||
+        (!isAbsolutePlayableUrl(existingRow.url) && isAbsolutePlayableUrl(incomingUrl)));
+    const shouldUpgradeDuration =
+      (existingRow.duration_seconds === null || existingRow.duration_seconds === undefined) &&
+      params.durationSeconds !== null &&
+      params.durationSeconds !== undefined;
+
+    if (!shouldUpgradeUrl && !shouldUpgradeDuration) return existingRow;
+
+    const updated = await sql<CallRecordingRow[]>`
+      UPDATE call_recordings
+      SET
+        url = ${shouldUpgradeUrl ? incomingUrl : existingRow.url},
+        duration_seconds = ${shouldUpgradeDuration ? params.durationSeconds ?? null : existingRow.duration_seconds ?? null}
+      WHERE id = ${existingRow.id}
+      RETURNING *
+    `;
+    const updatedRow = rowsFrom(updated)[0] as CallRecordingRow | undefined;
+    if (updatedRow) return updatedRow;
+    return existingRow;
+  }
+
   const result = await sql<CallRecordingRow[]>`
     INSERT INTO call_recordings (call_session_id, provider_recording_id, url, duration_seconds)
     VALUES (

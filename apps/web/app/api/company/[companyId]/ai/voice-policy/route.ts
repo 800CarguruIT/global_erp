@@ -92,7 +92,7 @@ export async function GET(req: NextRequest, { params }: Params) {
           systemPrompt: "",
           escalationKeywords: [],
           automationEnabled: false,
-          simulationMode: true,
+          simulationMode: false,
         },
         updatedByUserId: null,
         updatedAt: null,
@@ -131,7 +131,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         systemPrompt: "",
         escalationKeywords: [],
         automationEnabled: false,
-        simulationMode: true,
+        simulationMode: false,
       },
     updatedByUserId: null,
   });

@@ -335,15 +335,20 @@ export function SidebarNav({
 
   const [openMainGroups, setOpenMainGroups] = useState<Record<string, boolean>>({});
 
-  useEffect(() => {
-    if (!mainGroups.length) return;
+  const targetMainGroupKey = useMemo(() => {
+    if (!mainGroups.length) return null;
     const activeGroup = mainGroups.find((group) =>
       group.items.some((entry) => entry.resolvedHref && currentPathname.startsWith(entry.resolvedHref))
     );
-    const targetKey = activeGroup?.key ?? mainGroups[0]?.key;
-    if (!targetKey) return;
-    setOpenMainGroups((prev) => (prev[targetKey] ? prev : { ...prev, [targetKey]: true }));
+    return activeGroup?.key ?? mainGroups[0]?.key ?? null;
   }, [mainGroups, currentPathname]);
+
+  useEffect(() => {
+    if (!targetMainGroupKey) return;
+    setOpenMainGroups((prev) =>
+      prev[targetMainGroupKey] ? prev : { ...prev, [targetMainGroupKey]: true }
+    );
+  }, [targetMainGroupKey]);
 
   const treeItems = SIDEBAR_TREE[scope];
   const filteredTreeItems = useMemo(() => {
@@ -402,11 +407,15 @@ export function SidebarNav({
     };
     walk(filteredTreeItems, "tree");
     setOpenTree((prev) => {
+      let changed = false;
       const next = { ...prev };
       activeKeys.forEach((key) => {
-        if (!next[key]) next[key] = true;
+        if (!next[key]) {
+          next[key] = true;
+          changed = true;
+        }
       });
-      return next;
+      return changed ? next : prev;
     });
   }, [treeItems, currentPathname, companyId, branchId, vendorId]);
 

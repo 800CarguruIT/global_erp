@@ -3,6 +3,11 @@ import { CallCenter, Crm, Users } from "@repo/ai-core";
 
 type ParamsCtx = { params: Promise<{ companyId: string }> };
 
+function isUsableRecordingUrl(url: string | null | undefined): boolean {
+  const normalized = String(url ?? "").trim().toLowerCase();
+  return normalized.length > 0 && normalized !== "unknown" && normalized !== "null" && normalized !== "undefined";
+}
+
 export async function GET(req: NextRequest, ctx: ParamsCtx) {
   const { companyId } = await ctx.params;
   const url = new URL(req.url);
@@ -20,7 +25,10 @@ export async function GET(req: NextRequest, ctx: ParamsCtx) {
     const sessionIds = filtered.map((s) => s.id);
     const recordings = await CallCenter.listRecordingsForSessions(sessionIds);
     const recordingMap = new Map<string, { url: string; durationSeconds: number | null }>();
-    recordings.forEach((r) => recordingMap.set(r.callSessionId, { url: r.url, durationSeconds: r.durationSeconds }));
+    recordings.forEach((r) => {
+      if (!isUsableRecordingUrl(r.url)) return;
+      recordingMap.set(r.callSessionId, { url: r.url, durationSeconds: r.durationSeconds });
+    });
 
     const uniqueUserIds = Array.from(new Set(filtered.map((s) => s.createdByUserId).filter(Boolean)));
     const userMap = new Map<string, { name: string | null; email: string | null }>();
@@ -56,6 +64,8 @@ export async function GET(req: NextRequest, ctx: ParamsCtx) {
 
     const payload = filtered.map((s) => ({
       id: s.id,
+      providerKey: s.providerKey,
+      providerCallId: s.providerCallId,
       direction: s.direction,
       from: s.fromNumber,
       to: s.toNumber,

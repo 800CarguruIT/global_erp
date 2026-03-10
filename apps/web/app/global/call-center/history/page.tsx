@@ -45,6 +45,11 @@ function formatDate(date: string) {
   return dateFormatter.format(new Date(date));
 }
 
+function isUsableRecordingUrl(url: string | null | undefined): boolean {
+  const normalized = String(url ?? "").trim().toLowerCase();
+  return normalized.length > 0 && normalized !== "unknown" && normalized !== "null" && normalized !== "undefined";
+}
+
 export default function CallHistoryPage() {
   return (
     <AppLayout>
@@ -57,15 +62,26 @@ function CallHistoryContent() {
   const [calls, setCalls] = useState<CallRow[]>([]);
   const [tab, setTab] = useState<(typeof tabs)[number]["id"]>("all");
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { theme } = useTheme();
   const { t } = useI18n();
 
-  useEffect(() => {
-    fetchCalls()
+  const reload = async () => {
+    setRefreshing(true);
+    setLoading(true);
+    setError(null);
+    await fetchCalls()
       .then(setCalls)
       .catch(() => setError("Failed to load call history"))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        setLoading(false);
+        setRefreshing(false);
+      });
+  };
+
+  useEffect(() => {
+    void reload();
   }, []);
 
   const filtered = useMemo(() => {
@@ -81,6 +97,14 @@ function CallHistoryContent() {
           <p className="text-sm text-muted-foreground">{t("call.history.subtitle")}</p>
         </div>
         <div className="flex gap-2 text-sm">
+          <button
+            type="button"
+            onClick={() => void reload()}
+            disabled={loading || refreshing}
+            className={`rounded-full border px-3 py-1 disabled:opacity-60 ${theme.cardBorder} ${theme.cardBg}`}
+          >
+            {refreshing ? "Refreshing..." : "Refresh Log"}
+          </button>
           {tabs.map((tabDef) => (
             <button
               key={tabDef.id}
@@ -135,10 +159,13 @@ function CallHistoryContent() {
                       {formatDate(c.startedAt)}
                     </td>
                     <td className="px-3 py-2 text-xs">
-                      {c.recordingUrl ? (
-                        <a href={c.recordingUrl} className="text-primary hover:underline" target="_blank" rel="noreferrer">
-                          {t("call.history.table.recording.link")}
-                        </a>
+                      {isUsableRecordingUrl(c.recordingUrl) ? (
+                        <div className="flex min-w-[220px] flex-col gap-2">
+                          <audio controls preload="none" src={c.recordingUrl!} className="h-8 w-full" />
+                          <a href={c.recordingUrl!} className="text-primary hover:underline" target="_blank" rel="noreferrer">
+                            {t("call.history.table.recording.link")}
+                          </a>
+                        </div>
                       ) : (
                         "-"
                       )}

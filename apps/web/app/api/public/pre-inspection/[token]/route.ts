@@ -26,11 +26,14 @@ const submitSchema = z.object({
     q3: z.object({ choice: z.enum(["yes", "no"]), details: z.string().optional().nullable() }),
     q4: z.object({ choice: z.enum(["yes", "no"]), details: z.string().optional().nullable() }),
     q5: z.object({ choice: z.enum(["yes", "no"]), details: z.string().optional().nullable() }),
+    q6: z.object({ choice: z.enum(["yes", "no"]), details: z.string().optional().nullable() }),
+    q7: z.object({ choice: z.enum(["yes", "no"]), details: z.string().optional().nullable() }),
+    q8: z.object({ choice: z.enum(["yes", "no"]), details: z.string().optional().nullable() }),
   }),
 });
 
 function validateYesNeedsDetails(answers: Record<string, any>): string | null {
-  for (const key of ["q1", "q2", "q3", "q4", "q5"]) {
+  for (const key of ["q1", "q2", "q3", "q4", "q5", "q6", "q7", "q8"]) {
     const answer = answers?.[key];
     if (!answer) return `${key} is required`;
     if (answer.choice === "yes" && !String(answer.details ?? "").trim()) {

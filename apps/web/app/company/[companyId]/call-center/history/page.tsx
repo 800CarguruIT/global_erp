@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { AppLayout, useI18n, useTheme } from "@repo/ui";
 
 type CallHistoryRow = {
   id: string;
+  providerKey?: string;
+  providerCallId?: string | null;
   direction: "inbound" | "outbound";
   from: string;
   to: string;
@@ -23,6 +25,11 @@ const tabs: Array<{ key: "all" | "inbound" | "outbound"; label: string }> = [
   { key: "inbound", label: "call.history.tab.inbound" },
   { key: "outbound", label: "call.history.tab.outbound" },
 ];
+
+function isUsableRecordingUrl(url: string | null | undefined): boolean {
+  const normalized = String(url ?? "").trim().toLowerCase();
+  return normalized.length > 0 && normalized !== "unknown" && normalized !== "null" && normalized !== "undefined";
+}
 
 function formatDuration(totalSeconds: number | null | undefined) {
   if (!totalSeconds) return "—";
@@ -48,10 +55,14 @@ function CallHistoryContent({ companyId }: { companyId: string }) {
   const [direction, setDirection] = useState<"all" | "inbound" | "outbound">("all");
   const [rows, setRows] = useState<CallHistoryRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [resolvingById, setResolvingById] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
 
-  const fetchData = useMemo(
-    () => async () => {
+  const fetchData = useCallback(
+    async (opts?: { background?: boolean }) => {
+      const background = Boolean(opts?.background);
+      if (background) setRefreshing(true);
       setLoading(true);
       setError(null);
       try {
@@ -69,6 +80,7 @@ function CallHistoryContent({ companyId }: { companyId: string }) {
         setError(err?.message ?? t("call.history.error"));
       } finally {
         setLoading(false);
+        if (background) setRefreshing(false);
       }
     },
     [companyId, direction, t]
@@ -78,6 +90,28 @@ function CallHistoryContent({ companyId }: { companyId: string }) {
     fetchData();
   }, [fetchData]);
 
+  async function resolveRecordingNow(row: CallHistoryRow) {
+    const providerCallId = String(row.providerCallId ?? "").trim();
+    if (!providerCallId) return;
+    setResolvingById((prev) => ({ ...prev, [row.id]: true }));
+    try {
+      const res = await fetch(`/api/company/${companyId}/call-center/history/resolve-recording`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ providerCallId }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json?.ok === false) {
+        throw new Error(json?.error ?? "Recording not found yet");
+      }
+      await fetchData({ background: true });
+    } catch (err: any) {
+      setError(err?.message ?? "Failed to resolve recording");
+    } finally {
+      setResolvingById((prev) => ({ ...prev, [row.id]: false }));
+    }
+  }
+
   return (
     <div className="space-y-4 py-4">
       <div className="space-y-1">
@@ -86,6 +120,13 @@ function CallHistoryContent({ companyId }: { companyId: string }) {
       </div>
 
       <div className="flex flex-wrap gap-2">
+        <button
+          onClick={() => void fetchData({ background: true })}
+          disabled={loading || refreshing}
+          className={`rounded-full border px-3 py-1 text-sm font-medium transition disabled:opacity-60 ${cardBorder} ${cardBg}`}
+        >
+          {refreshing ? "Refreshing..." : "Refresh Log"}
+        </button>
         {tabs.map((tab) => {
           const isActive = direction === tab.key;
           return (
@@ -129,6 +170,11 @@ function CallHistoryContent({ companyId }: { companyId: string }) {
                   const started = row.startedAt ? new Date(row.startedAt) : null;
                   const agentLabel = row.agent?.name ?? row.agent?.email ?? row.createdByUserId ?? "—";
                   const customerLabel = row.customer?.name ?? row.customer?.phone ?? "—";
+                  const recordingProxyUrl = isUsableRecordingUrl(row.recording?.url)
+                    ? `/api/company/${companyId}/call-center/history/recording-proxy?recordingUrl=${encodeURIComponent(
+                        String(row.recording?.url ?? "")
+                      )}`
+                    : "";
                   return (
                     <tr key={row.id} className="align-top">
                       <td className="px-3 py-2">
@@ -150,12 +196,25 @@ function CallHistoryContent({ companyId }: { companyId: string }) {
                         {row.agent?.email && <div className="text-xs text-muted-foreground">{row.agent.email}</div>}
                       </td>
                       <td className="px-3 py-2">
-                        {row.recording?.url ? (
-                          <Link href={row.recording.url} className="text-primary hover:underline" target="_blank">
-                            {t("call.history.table.recording.link")}
-                          </Link>
+                        {isUsableRecordingUrl(row.recording?.url) ? (
+                          <div className="flex min-w-[220px] flex-col gap-2">
+                            <audio controls preload="none" src={recordingProxyUrl} className="h-8 w-full" />
+                            <Link href={recordingProxyUrl} className="text-primary hover:underline" target="_blank">
+                              {t("call.history.table.recording.link")}
+                            </Link>
+                          </div>
                         ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
+                          <div className="flex min-w-[220px] items-center gap-2">
+                            <span className="text-xs text-muted-foreground">—</span>
+                            <button
+                              type="button"
+                              onClick={() => void resolveRecordingNow(row)}
+                              disabled={Boolean(resolvingById[row.id]) || !String(row.providerCallId ?? "").trim()}
+                              className={`rounded-full border px-2 py-1 text-xs transition disabled:opacity-60 ${cardBorder} ${cardBg}`}
+                            >
+                              {resolvingById[row.id] ? "Resolving..." : "Resolve Recording Now"}
+                            </button>
+                          </div>
                         )}
                       </td>
                     </tr>

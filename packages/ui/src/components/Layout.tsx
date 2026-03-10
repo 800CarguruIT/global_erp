@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { ThemeProvider } from "../theme";
@@ -8,6 +8,7 @@ import { I18nProvider, useI18n, LanguageCode } from "../i18n";
 import { SidebarNav } from "../layout/SidebarNav";
 import { useGlobalUi } from "../providers/GlobalUiProvider";
 import { CategoryNav } from "../layout/CategoryNav";
+import { getLinkusClient, type LinkusStatus } from "../call-center/linkusClient";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faBars } from "@fortawesome/free-solid-svg-icons";
 
@@ -87,6 +88,9 @@ type IncomingPopupState = {
   callId: string;
   fromNumber: string;
   toNumber: string;
+  ringingExtensions?: string[];
+  answeredByOther?: boolean;
+  answeredByExtension?: string | null;
   aiText?: string | null;
   pickupHint?: string | null;
   createdAtMs: number;
@@ -129,6 +133,16 @@ function tokenMatchesAgent(set: Set<string>, value: string | null | undefined): 
     if (set.has(token)) return true;
   }
   return false;
+}
+
+function normalizeStringList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const out = new Set<string>();
+  for (const item of value) {
+    const token = String(item ?? "").trim();
+    if (token) out.add(token);
+  }
+  return Array.from(out);
 }
 
 function getCookieValue(name: string): string | null {
@@ -192,10 +206,59 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [lookupAttempted, setLookupAttempted] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [aiSimulationEnabled, setAiSimulationEnabled] = useState(false);
+  const [aiSimulationLoading, setAiSimulationLoading] = useState(false);
   const [incomingPopups, setIncomingPopups] = useState<IncomingPopupState[]>([]);
+  const [linkusStatus, setLinkusStatus] = useState<LinkusStatus>({
+    state: "idle",
+    message: null,
+    extension: null,
+  });
   const seenIncomingCallIdsRef = useRef<Map<string, number>>(new Map());
   const incomingPopupsRef = useRef<IncomingPopupState[]>([]);
   const agentTokensRef = useRef<Set<string>>(new Set());
+  const persistedSdkFromRef = useRef<Set<string>>(new Set());
+  const linkusClientRef = useRef(getLinkusClient());
+  const signRefreshRef = useRef<{ key: string; at: number }>({ key: "", at: 0 });
+  const settingsRefreshRef = useRef<{ key: string; at: number }>({ key: "", at: 0 });
+  const answeredPopupHideTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const readLinkusConfig = useCallback(() => {
+    const extension = (() => {
+      try {
+        const raw = window.localStorage.getItem("dialer_agent_extension") ?? "";
+        return (
+          raw
+            .split(",")
+            .map((v) => v.trim())
+            .find(Boolean) ?? ""
+        );
+      } catch {
+        return "";
+      }
+    })();
+    const serverUrl = (() => {
+      try {
+        return window.localStorage.getItem("dialer_linkus_server") ?? "";
+      } catch {
+        return "";
+      }
+    })();
+    const password = (() => {
+      try {
+        return window.localStorage.getItem("dialer_linkus_password") ?? "";
+      } catch {
+        return "";
+      }
+    })();
+    const token = (() => {
+      try {
+        return window.localStorage.getItem("dialer_linkus_token") ?? "";
+      } catch {
+        return "";
+      }
+    })();
+    return { extension, serverUrl, password, token };
+  }, []);
   const branchBase = useBranchRoot
     ? `/branches/${scopeInfo.branchId ?? ""}`
     : `/company/${scopeInfo.companyId ?? ""}/branches/${scopeInfo.branchId ?? ""}`;
@@ -223,6 +286,14 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
       : `GLOBAL ERP - ${companyName ?? scopeInfo.companyId ?? "Company"}`;
 
   const canLookupCustomers = Boolean(scopeInfo.companyId);
+  const simulationCompanyId =
+    scopeInfo.scope === "company" || scopeInfo.scope === "branch" || scopeInfo.scope === "vendor"
+      ? String(scopeInfo.companyId ?? "").trim()
+      : "";
+  const sdkCompanyId =
+    scopeInfo.scope === "company" || scopeInfo.scope === "branch" || scopeInfo.scope === "vendor"
+      ? String(scopeInfo.companyId ?? "").trim()
+      : "";
 
   useEffect(() => {
     const isCompanyScope =
@@ -317,6 +388,186 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
   }, [incomingPopups]);
 
   useEffect(() => {
+    const timer = window.setInterval(() => {
+      const companyId =
+        scopeInfo.scope === "company" || scopeInfo.scope === "branch" || scopeInfo.scope === "vendor"
+          ? String(scopeInfo.companyId ?? "").trim()
+          : "";
+      if (!companyId) return;
+      const open = incomingPopupsRef.current;
+      if (!open.length) return;
+      const updates: Array<{ callId: string; fromNumber: string }> = [];
+      for (const popup of open) {
+        const currentFrom = String(popup.fromNumber ?? "").trim().toLowerCase();
+        if (currentFrom && currentFrom !== "unknown") continue;
+        const fallback = String(
+          linkusClientRef.current.getBestCallerNumber({
+            callId: popup.callId,
+            toNumber: popup.toNumber,
+          }) ?? ""
+        ).trim();
+        if (!fallback) continue;
+        updates.push({ callId: popup.callId, fromNumber: fallback });
+      }
+      if (!updates.length) return;
+      setIncomingPopups((prev) =>
+        prev.map((p) => {
+          const found = updates.find((u) => u.callId === p.callId);
+          if (!found) return p;
+          return { ...p, fromNumber: found.fromNumber };
+        })
+      );
+      for (const item of updates) {
+        const key = `${item.callId}|${item.fromNumber}`;
+        if (persistedSdkFromRef.current.has(key)) continue;
+        persistedSdkFromRef.current.add(key);
+        void fetch(`/api/company/${companyId}/call-center/history/enrich-from`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            providerCallId: item.callId,
+            fromNumber: item.fromNumber,
+          }),
+        }).catch(() => {
+          // ignore background enrich failures
+        });
+      }
+    }, 1000);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [scopeInfo.scope, scopeInfo.companyId]);
+
+  useEffect(() => {
+    let stopped = false;
+    const client = linkusClientRef.current;
+    const unsubscribe = client.subscribe((status) => {
+      if (!stopped) setLinkusStatus(status);
+    });
+    const ensureSdkSign = async (cfg: {
+      extension?: string | null;
+      password?: string | null;
+      token?: string | null;
+      serverUrl?: string | null;
+    }) => {
+      const extension = String(cfg.extension ?? "").trim();
+      const serverUrl = String(cfg.serverUrl ?? "").trim();
+      const token = String(cfg.token ?? "").trim();
+      if (!extension || !sdkCompanyId) return cfg;
+
+      const tokenCreatedAtRaw = window.localStorage.getItem("dialer_linkus_token_created_at") ?? "";
+      const tokenForExt = window.localStorage.getItem("dialer_linkus_token_extension") ?? "";
+      const tokenForServer = window.localStorage.getItem("dialer_linkus_token_server") ?? "";
+      const tokenCreatedAt = Number(tokenCreatedAtRaw || 0);
+      const tokenAgeMs = tokenCreatedAt > 0 ? Date.now() - tokenCreatedAt : Number.POSITIVE_INFINITY;
+      const hasFreshToken =
+        !!token &&
+        tokenForExt === extension &&
+        tokenForServer === serverUrl &&
+        Number.isFinite(tokenAgeMs) &&
+        tokenAgeMs < 25 * 60 * 1000;
+
+      const currentStatus = client.getStatus();
+      const loginFailed =
+        String(currentStatus.state ?? "").toLowerCase() === "error" &&
+        /login failed|init failed|failure/i.test(String(currentStatus.message ?? ""));
+      if (hasFreshToken && !loginFailed) return cfg;
+
+      const refreshKey = `${sdkCompanyId}|${extension}|${serverUrl}`;
+      const now = Date.now();
+      if (
+        signRefreshRef.current.key === refreshKey &&
+        now - signRefreshRef.current.at < 15_000
+      ) {
+        return cfg;
+      }
+      signRefreshRef.current = { key: refreshKey, at: now };
+
+      const signRes = await fetch(`/api/company/${sdkCompanyId}/dialer/linkus-sign`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ extension }),
+      }).catch(() => null);
+      if (!signRes?.ok) return cfg;
+
+      const payload = await signRes.json().catch(() => ({}));
+      const sign = String(payload?.sign ?? "").trim();
+      const serverFromApi = String(payload?.serverUrl ?? "").trim();
+      const resolvedServerUrl = serverUrl || serverFromApi;
+      if (!serverUrl && serverFromApi) {
+        window.localStorage.setItem("dialer_linkus_server", serverFromApi);
+      }
+      if (!sign) return cfg;
+
+      window.localStorage.setItem("dialer_linkus_token", sign);
+      window.localStorage.setItem("dialer_linkus_token_created_at", String(Date.now()));
+      window.localStorage.setItem("dialer_linkus_token_extension", extension);
+      window.localStorage.setItem("dialer_linkus_token_server", resolvedServerUrl);
+      window.localStorage.removeItem("dialer_linkus_password");
+      return {
+        ...cfg,
+        serverUrl: resolvedServerUrl,
+        token: sign,
+        password: "",
+      };
+    };
+    const ensureSdkSettings = async (cfg: {
+      extension?: string | null;
+      password?: string | null;
+      token?: string | null;
+      serverUrl?: string | null;
+    }) => {
+      const extension = String(cfg.extension ?? "").trim();
+      const serverUrl = String(cfg.serverUrl ?? "").trim();
+      if ((!extension || !serverUrl) && sdkCompanyId) {
+        const refreshKey = `settings|${sdkCompanyId}`;
+        const now = Date.now();
+        if (
+          settingsRefreshRef.current.key !== refreshKey ||
+          now - settingsRefreshRef.current.at > 15_000
+        ) {
+          settingsRefreshRef.current = { key: refreshKey, at: now };
+          const res = await fetch(`/api/company/${sdkCompanyId}/dialer/linkus-settings`, {
+            cache: "no-store",
+          }).catch(() => null);
+          if (res?.ok) {
+            const payload = await res.json().catch(() => ({}));
+            const server = String(payload?.serverUrl ?? "").trim();
+            const ext = String(payload?.defaultExtension ?? "").trim();
+            if (!serverUrl && server) {
+              window.localStorage.setItem("dialer_linkus_server", server);
+              cfg = { ...cfg, serverUrl: server };
+            }
+            if (!extension && ext) {
+              window.localStorage.setItem("dialer_agent_extension", ext);
+              cfg = { ...cfg, extension: ext };
+            }
+          }
+        }
+      }
+      return cfg;
+    };
+    const connectFromStorage = async () => {
+      const current = client.getStatus().state;
+      if (current === "connected" || current === "connecting") return;
+      const cfg = await ensureSdkSign(await ensureSdkSettings(readLinkusConfig()));
+      await client.connect(cfg);
+    };
+    void connectFromStorage();
+
+    const timer = window.setInterval(() => {
+      void connectFromStorage();
+    }, 4000);
+
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+      unsubscribe();
+    };
+  }, [readLinkusConfig, sdkCompanyId]);
+
+  useEffect(() => {
     if (disableIncomingCallRealtime) return;
 
     const companyId =
@@ -358,6 +609,7 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
       callId: string;
       fromNumber?: string | null;
       toNumber?: string | null;
+      ringingExtensions?: string[] | null;
       aiText?: string | null;
       pickupHint?: string | null;
     }) {
@@ -379,24 +631,60 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
 
       const fromNumber = String(input.fromNumber ?? "").trim();
       const toNumber = String(input.toNumber ?? "").trim();
-      const aiText = String(input.aiText ?? "").trim();
-      const pickupHint = String(input.pickupHint ?? "").trim();
-      if (agentTokensRef.current.size > 0 && toNumber && !tokenMatchesAgent(agentTokensRef.current, toNumber)) {
+      const sdkFallbackFrom =
+        !fromNumber || fromNumber.toLowerCase() === "unknown"
+          ? String(
+              linkusClientRef.current.getBestCallerNumber({
+                callId,
+                toNumber,
+              }) ?? ""
+            ).trim()
+          : "";
+      const resolvedFromNumber =
+        fromNumber && fromNumber.toLowerCase() !== "unknown"
+          ? fromNumber
+          : sdkFallbackFrom;
+      const ringingExtensions = normalizeStringList(input.ringingExtensions ?? []);
+      const hasAgentTokens = agentTokensRef.current.size > 0;
+      const candidateTargets =
+        ringingExtensions.length > 0 ? ringingExtensions : toNumber ? [toNumber] : [];
+      if (
+        hasAgentTokens &&
+        candidateTargets.length > 0 &&
+        !candidateTargets.some((target) => tokenMatchesAgent(agentTokensRef.current, target))
+      ) {
         return;
       }
-      const customer = fromNumber ? await loadCustomerHintByPhone(fromNumber) : null;
-      if (stopped) return;
-      const safeFromNumber = fromNumber && fromNumber.toLowerCase() !== "unknown" ? fromNumber : "";
+      const aiText = String(input.aiText ?? "").trim();
+      const pickupHint = String(input.pickupHint ?? "").trim();
+      const safeFromNumber = resolvedFromNumber && resolvedFromNumber.toLowerCase() !== "unknown" ? resolvedFromNumber : "";
+      if (safeFromNumber && callId && companyId) {
+        const key = `${callId}|${safeFromNumber}`;
+        if (!persistedSdkFromRef.current.has(key)) {
+          persistedSdkFromRef.current.add(key);
+          void fetch(`/api/company/${companyId}/call-center/history/enrich-from`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              providerCallId: callId,
+              fromNumber: safeFromNumber,
+            }),
+          }).catch(() => {
+            // ignore background enrich failures
+          });
+        }
+      }
 
       setIncomingPopups((prev) => {
         const nextItem: IncomingPopupState = {
           callId,
           fromNumber: safeFromNumber || "Unknown",
           toNumber: toNumber || "Unknown",
+          ringingExtensions,
           aiText: aiText || null,
           pickupHint: pickupHint || null,
           createdAtMs: Date.now(),
-          customer,
+          customer: null,
         };
         const idx = prev.findIndex((p) => p.callId === callId);
         if (idx >= 0) {
@@ -409,6 +697,10 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
                 ? current.fromNumber
                 : nextItem.fromNumber,
             toNumber: nextItem.toNumber || current.toNumber,
+            ringingExtensions:
+              nextItem.ringingExtensions && nextItem.ringingExtensions.length > 0
+                ? nextItem.ringingExtensions
+                : current.ringingExtensions ?? [],
             aiText: nextItem.aiText ?? current.aiText ?? null,
             pickupHint: nextItem.pickupHint ?? current.pickupHint ?? null,
             createdAtMs: current.createdAtMs || nextItem.createdAtMs,
@@ -418,6 +710,19 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
         }
         return [...prev, nextItem].slice(-4);
       });
+
+      if (safeFromNumber) {
+        void loadCustomerHintByPhone(safeFromNumber)
+          .then((customer) => {
+            if (stopped || !customer) return;
+            setIncomingPopups((prev) =>
+              prev.map((p) => (p.callId === callId ? { ...p, customer } : p))
+            );
+          })
+          .catch(() => {
+            // ignore best-effort customer enrichment failures
+          });
+      }
     }
 
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -437,8 +742,18 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
           if (String(message?.type ?? "").toLowerCase() !== "incoming") return;
           const payload = message?.data ?? {};
           const incomingCallId = String(payload.providerCallId ?? payload.callId ?? "").trim();
-          const incomingFromNumber = String(payload.fromNumber ?? "").trim();
+          const incomingFromNumberRaw = String(payload.fromNumber ?? "").trim();
           const incomingToNumber = String(payload.toNumber ?? "").trim();
+          const incomingFromNumber =
+            incomingFromNumberRaw && incomingFromNumberRaw.toLowerCase() !== "unknown"
+              ? incomingFromNumberRaw
+              : String(
+                  linkusClientRef.current.getBestCallerNumber({
+                    callId: incomingCallId,
+                    toNumber: incomingToNumber,
+                  }) ?? ""
+                ).trim();
+          const incomingRingingExtensions = normalizeStringList(payload.ringingExtensions ?? []);
           const incomingAiText = String(payload.aiText ?? "").trim();
           const incomingPickupHint = String(payload.pickupHint ?? "").trim();
           const direction = String(payload.direction ?? "").toLowerCase();
@@ -526,13 +841,50 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
 
           if (isAnswered && incomingCallId) {
             const hasAgentTokens = agentTokensRef.current.size > 0;
+            const answeredToNumber =
+              incomingToNumber ||
+              incomingPopupsRef.current.find((p) => p.callId === incomingCallId)?.toNumber ||
+              "";
+            const answeredTargets =
+              incomingRingingExtensions.length > 0
+                ? incomingRingingExtensions
+                : answeredToNumber
+                ? [answeredToNumber]
+                : [];
             const belongsToCurrentUser =
-              hasAgentTokens && incomingToNumber
-                ? tokenMatchesAgent(agentTokensRef.current, incomingToNumber)
+              hasAgentTokens && answeredTargets.length > 0
+                ? answeredTargets.some((target) => tokenMatchesAgent(agentTokensRef.current, target))
                 : false;
 
-            if (hasAgentTokens && !belongsToCurrentUser) {
-              setIncomingPopups((prev) => prev.filter((p) => p.callId !== incomingCallId));
+            if (hasAgentTokens && answeredTargets.length > 0 && !belongsToCurrentUser) {
+              const answeredByExtension = answeredToNumber || answeredTargets[0] || null;
+              setIncomingPopups((prev) =>
+                prev.map((p) =>
+                  p.callId === incomingCallId
+                    ? {
+                        ...p,
+                        toNumber: incomingToNumber || p.toNumber,
+                        ringingExtensions:
+                          incomingRingingExtensions.length > 0
+                            ? incomingRingingExtensions
+                            : p.ringingExtensions ?? [],
+                        answeredByOther: true,
+                        answeredByExtension,
+                        fromNumber:
+                          incomingFromNumber && incomingFromNumber.toLowerCase() !== "unknown"
+                            ? incomingFromNumber
+                            : p.fromNumber,
+                      }
+                    : p
+                )
+              );
+              const existingTimer = answeredPopupHideTimersRef.current.get(incomingCallId);
+              if (existingTimer) clearTimeout(existingTimer);
+              const hideTimer = setTimeout(() => {
+                setIncomingPopups((prev) => prev.filter((p) => p.callId !== incomingCallId));
+                answeredPopupHideTimersRef.current.delete(incomingCallId);
+              }, 8000);
+              answeredPopupHideTimersRef.current.set(incomingCallId, hideTimer);
               return;
             }
 
@@ -542,6 +894,10 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
                   ? {
                       ...p,
                       toNumber: incomingToNumber || p.toNumber,
+                      ringingExtensions:
+                        incomingRingingExtensions.length > 0
+                          ? incomingRingingExtensions
+                          : p.ringingExtensions ?? [],
                       aiText: incomingAiText || p.aiText || null,
                       pickupHint: incomingPickupHint || p.pickupHint || null,
                       fromNumber:
@@ -583,6 +939,7 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
             callId: incomingCallId,
             fromNumber: payload.fromNumber ?? null,
             toNumber: payload.toNumber ?? null,
+            ringingExtensions: payload.ringingExtensions ?? null,
             aiText: payload.aiText ?? null,
             pickupHint: payload.pickupHint ?? null,
           });
@@ -639,6 +996,10 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
       } catch {
         // ignore
       }
+      for (const timer of answeredPopupHideTimersRef.current.values()) {
+        clearTimeout(timer);
+      }
+      answeredPopupHideTimersRef.current.clear();
     };
   }, [scopeInfo.scope, scopeInfo.companyId, disableIncomingCallRealtime]);
 
@@ -673,6 +1034,117 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
     router.push("/auth/login");
   }
 
+  function canSdkAnswerToNumber(
+    toNumber: string | null | undefined,
+    ringingExtensions?: string[] | null
+  ): boolean {
+    const sdkExtTokens = buildAgentTokenSet([linkusStatus.extension ?? ""]);
+    if (!sdkExtTokens.size) return true;
+    const candidates = [
+      String(toNumber ?? "").trim(),
+      ...normalizeStringList(ringingExtensions ?? []),
+    ].filter(Boolean);
+    if (!candidates.length) return true;
+    return candidates.some((candidate) =>
+      agentTokenVariants(candidate).some((token) => sdkExtTokens.has(token))
+    );
+  }
+
+  async function handleAnswerWithSdk(
+    callId: string,
+    toNumber?: string | null,
+    ringingExtensions?: string[] | null
+  ) {
+    if (!canSdkAnswerToNumber(toNumber, ringingExtensions)) {
+      const target = String(toNumber ?? "").trim() || normalizeStringList(ringingExtensions ?? []).join(", ") || "unknown";
+      setLinkusStatus((prev) => ({
+        ...prev,
+        message: `Cannot answer via SDK: call is ringing on ext ${target}, SDK is on ext ${prev.extension ?? "unknown"}`,
+      }));
+      return;
+    }
+    const ok = await linkusClientRef.current.answer(callId);
+    if (!ok) return;
+    setIncomingPopups((prev) => prev.filter((p) => p.callId !== callId));
+  }
+
+  useEffect(() => {
+    let active = true;
+    if (!simulationCompanyId) {
+      setAiSimulationEnabled(false);
+      return () => {
+        active = false;
+      };
+    }
+    setAiSimulationLoading(true);
+    fetch(`/api/company/${simulationCompanyId}/ai/voice-policy`, { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error("Failed to load AI policy"))))
+      .then((data) => {
+        if (!active) return;
+        setAiSimulationEnabled(Boolean(data?.policy?.guidance?.simulationMode));
+      })
+      .catch(() => {
+        if (!active) return;
+        setAiSimulationEnabled(false);
+      })
+      .finally(() => {
+        if (!active) return;
+        setAiSimulationLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [simulationCompanyId]);
+
+  async function updateSimulationMode(next: boolean) {
+    if (!simulationCompanyId || aiSimulationLoading) return;
+    setAiSimulationLoading(true);
+    try {
+      const currentRes = await fetch(`/api/company/${simulationCompanyId}/ai/voice-policy`, {
+        cache: "no-store",
+      });
+      if (!currentRes.ok) throw new Error("Failed to load AI policy");
+      const currentJson = await currentRes.json().catch(() => ({}));
+      const policy = currentJson?.policy ?? {};
+      const payload = {
+        enabled: Boolean(policy?.enabled),
+        mode: policy?.mode === "live" ? "live" : "dry_run",
+        timezone: String(policy?.timezone ?? "Asia/Dubai"),
+        businessHours: policy?.businessHours ?? {
+          enabled: false,
+          start: "09:00",
+          end: "18:00",
+          days: [1, 2, 3, 4, 5],
+        },
+        restrictions: policy?.restrictions ?? {
+          blockUnknownNumbers: false,
+          blockedPrefixes: [],
+          allowedPrefixes: [],
+        },
+        guidance: {
+          welcomeMessage: String(policy?.guidance?.welcomeMessage ?? ""),
+          systemPrompt: String(policy?.guidance?.systemPrompt ?? ""),
+          escalationKeywords: Array.isArray(policy?.guidance?.escalationKeywords)
+            ? policy.guidance.escalationKeywords
+            : [],
+          automationEnabled: Boolean(policy?.guidance?.automationEnabled),
+          simulationMode: next,
+        },
+      };
+      const patchRes = await fetch(`/api/company/${simulationCompanyId}/ai/voice-policy`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!patchRes.ok) throw new Error("Failed to update simulation mode");
+      setAiSimulationEnabled(next);
+    } catch {
+      // no-op: keep prior state
+    } finally {
+      setAiSimulationLoading(false);
+    }
+  }
+
   return (
     <div className="min-h-screen flex flex-col">
       <header className="relative z-50 flex flex-col gap-2 px-4 sm:px-8 py-3 sm:py-4 border-b border-white/10 bg-black/20 backdrop-blur-xl overflow-visible sm:flex-row sm:items-center sm:justify-between">
@@ -699,6 +1171,18 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
         <div className="relative z-50 flex flex-wrap items-center gap-3 rounded-xl bg-white/5 px-3 py-2 sm:bg-transparent sm:px-0 sm:py-0">
           <LanguageSwitcher />
           <ThemeSwitcher />
+          {simulationCompanyId && (
+            <label className="inline-flex items-center gap-2 rounded-full border border-white/30 px-3 py-1 text-xs sm:text-sm">
+              <span>Simulation</span>
+              <input
+                type="checkbox"
+                checked={aiSimulationEnabled}
+                disabled={aiSimulationLoading}
+                onChange={(e) => updateSimulationMode(e.target.checked)}
+                className="h-4 w-4 rounded"
+              />
+            </label>
+          )}
           <button
             type="button"
             onClick={() => setLookupOpen((prev) => !prev)}
@@ -841,8 +1325,20 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
                 className="w-[22rem] rounded-2xl border border-emerald-400/40 bg-slate-950/95 p-4 shadow-2xl backdrop-blur"
               >
                 <div className="text-xs uppercase tracking-[0.18em] text-emerald-300">Incoming Call</div>
+                <div className="mt-1 text-[10px] uppercase tracking-[0.16em] text-slate-300">
+                  SDK: {linkusStatus.state}
+                  {linkusStatus.extension ? ` (${linkusStatus.extension})` : ""}
+                </div>
+                {linkusStatus.message ? (
+                  <div className="mt-1 text-[10px] text-amber-200/90">{linkusStatus.message}</div>
+                ) : null}
                 <div className="mt-1 text-lg font-semibold">{popup.customer?.name ?? "Unknown Caller"}</div>
                 <div className="mt-1 text-xs text-slate-300">To: {popup.toNumber}</div>
+                {popup.answeredByOther ? (
+                  <div className="mt-1 text-xs text-amber-200">
+                    Answered by ext {popup.answeredByExtension ?? popup.toNumber}
+                  </div>
+                ) : null}
                 <div className="mt-2 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-sm">
                   <div className="text-xs text-slate-300">Mobile No: {popup.customer?.phone ?? popup.fromNumber}</div>
                   {popup.customer?.car ? (
@@ -902,6 +1398,31 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
                   )}
                   <button
                     type="button"
+                    className="rounded-full border border-emerald-300/40 px-3 py-1 text-emerald-200 hover:border-emerald-200/80 disabled:opacity-50"
+                    disabled={
+                      popup.answeredByOther === true ||
+                      linkusStatus.state !== "connected" ||
+                      !canSdkAnswerToNumber(popup.toNumber, popup.ringingExtensions)
+                    }
+                    title={
+                      popup.answeredByOther
+                        ? `Already answered by ext ${popup.answeredByExtension ?? popup.toNumber}`
+                        : canSdkAnswerToNumber(popup.toNumber, popup.ringingExtensions)
+                        ? undefined
+                        : `Call is ringing on ext ${popup.toNumber}; SDK is logged on ext ${linkusStatus.extension ?? "unknown"}`
+                    }
+                    onClick={() =>
+                      void handleAnswerWithSdk(
+                        popup.callId,
+                        popup.toNumber,
+                        popup.ringingExtensions ?? null
+                      )
+                    }
+                  >
+                    Answer (SDK)
+                  </button>
+                  <button
+                    type="button"
                     className="rounded-full border border-white/15 px-3 py-1 opacity-80 hover:opacity-100"
                     onClick={() =>
                       setIncomingPopups((prev) => prev.filter((p) => p.callId !== popup.callId))
@@ -914,6 +1435,37 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
             ))}
           </div>
         )}
+
+      <div
+        className={`fixed right-4 z-[70] ${
+          incomingPopups.length > 0 ? "bottom-[22rem]" : "bottom-4"
+        }`}
+      >
+        <div className="rounded-full border border-white/15 bg-slate-950/90 px-3 py-1.5 text-[11px] shadow-lg backdrop-blur">
+          <span className="mr-2 text-slate-300">SDK</span>
+          <span
+            className={
+              linkusStatus.state === "connected"
+                ? "text-emerald-300"
+                : linkusStatus.state === "connecting"
+                ? "text-amber-300"
+                : linkusStatus.state === "error"
+                ? "text-rose-300"
+                : "text-slate-300"
+            }
+          >
+            {linkusStatus.state || "idle"}
+          </span>
+          {linkusStatus.extension ? (
+            <span className="ml-2 text-slate-400">ext {linkusStatus.extension}</span>
+          ) : null}
+          {linkusStatus.message ? (
+            <span className="ml-2 text-slate-500" title={linkusStatus.message}>
+              i
+            </span>
+          ) : null}
+        </div>
+      </div>
     </div>
   );
 }

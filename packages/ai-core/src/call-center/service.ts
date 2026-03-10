@@ -3,7 +3,7 @@ import type { DialerIntegration, PlaceCallResult } from "../dialer/types";
 import {
   getCallCenterDashboardData,
   getCallSessionById,
-  insertInboundCallSession,
+  insertWebhookCallSession,
   insertCallRecording,
   insertCallSession,
   listCallSessions,
@@ -18,6 +18,11 @@ import type {
   ListCallsFilter,
   StartOutboundCallInput,
 } from "./types";
+
+function isPlaceholderRecordingUrl(url: string): boolean {
+  const normalized = url.trim().toLowerCase();
+  return normalized.length === 0 || normalized === "unknown" || normalized === "null" || normalized === "undefined";
+}
 
 function ensureScope(input: StartOutboundCallInput) {
   if (input.scope === "company" && !input.companyId) {
@@ -121,10 +126,11 @@ export async function handleDialerWebhookUpdate(update: DialerWebhookUpdate): Pr
 
   if (!callSessionId) {
     const scope = update.scope ?? (update.companyId ? "company" : "global");
-    const session = await insertInboundCallSession({
+    const session = await insertWebhookCallSession({
       providerKey: update.providerKey,
       providerCallId: update.providerCallId,
       status: mappedStatus ?? "ringing",
+      direction: update.direction ?? "inbound",
       fromNumber: (update.fromNumber ?? "").trim() || "unknown",
       toNumber: (update.toNumber ?? "").trim() || "unknown",
       scope,
@@ -141,11 +147,14 @@ export async function handleDialerWebhookUpdate(update: DialerWebhookUpdate): Pr
     callSessionId = session.id;
   }
 
-  if (callSessionId && (update.recordingId || update.recordingUrl)) {
+  const normalizedRecordingId = String(update.recordingId ?? "").trim();
+  const normalizedRecordingUrl = String(update.recordingUrl ?? "").trim();
+  if (callSessionId && (normalizedRecordingId || normalizedRecordingUrl)) {
+    const safeRecordingUrl = isPlaceholderRecordingUrl(normalizedRecordingUrl) ? "" : normalizedRecordingUrl;
     await insertCallRecording({
       callSessionId,
-      providerRecordingId: update.recordingId ?? update.recordingUrl ?? "unknown",
-      url: update.recordingUrl ?? "",
+      providerRecordingId: normalizedRecordingId || normalizedRecordingUrl,
+      url: safeRecordingUrl,
       durationSeconds: update.recordingDurationSeconds ?? null,
     });
   }

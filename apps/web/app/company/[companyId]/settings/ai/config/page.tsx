@@ -59,6 +59,13 @@ type VoicePolicyResponse = {
   recentDecisions: DecisionRow[];
 };
 
+type LinkusSettingsResponse = {
+  ok: boolean;
+  integrationId: string;
+  serverUrl: string | null;
+  defaultExtension: string | null;
+};
+
 type Params = { params: { companyId: string } | Promise<{ companyId: string }> };
 
 type TabKey = "provider" | "voice" | "logs";
@@ -83,6 +90,9 @@ export default function CompanyAiConfigPage({ params }: Params) {
   const [baseUrl, setBaseUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [isActive, setIsActive] = useState(true);
+  const [sdkServerUrl, setSdkServerUrl] = useState("");
+  const [sdkDefaultExtension, setSdkDefaultExtension] = useState("");
+  const [sdkSaving, setSdkSaving] = useState(false);
 
   const [policyEnabled, setPolicyEnabled] = useState(false);
   const [policyMode, setPolicyMode] = useState<"dry_run" | "live">("dry_run");
@@ -98,7 +108,7 @@ export default function CompanyAiConfigPage({ params }: Params) {
   const [policySystemPrompt, setPolicySystemPrompt] = useState("");
   const [policyEscalationKeywordsText, setPolicyEscalationKeywordsText] = useState("");
   const [policyAutomationEnabled, setPolicyAutomationEnabled] = useState(false);
-  const [policySimulationMode, setPolicySimulationMode] = useState(true);
+  const [policySimulationMode, setPolicySimulationMode] = useState(false);
   const [recentDecisions, setRecentDecisions] = useState<DecisionRow[]>([]);
 
   useEffect(() => {
@@ -118,9 +128,10 @@ export default function CompanyAiConfigPage({ params }: Params) {
       setPolicyError(null);
       setSuccess(null);
 
-      const [providerRes, policyRes] = await Promise.allSettled([
+      const [providerRes, policyRes, linkusRes] = await Promise.allSettled([
         fetch(`/api/company/${companyId}/ai/provider`, { cache: "no-store" }),
         fetch(`/api/company/${companyId}/ai/voice-policy`, { cache: "no-store" }),
+        fetch(`/api/company/${companyId}/dialer/linkus-settings`, { cache: "no-store" }),
       ]);
 
       if (cancelled) return;
@@ -152,12 +163,18 @@ export default function CompanyAiConfigPage({ params }: Params) {
         setPolicyAutomationEnabled(Boolean(policyJson.policy?.guidance?.automationEnabled));
         setPolicySimulationMode(
           policyJson.policy?.guidance?.simulationMode === undefined
-            ? true
+            ? false
             : Boolean(policyJson.policy?.guidance?.simulationMode)
         );
         setRecentDecisions(policyJson.recentDecisions ?? []);
       } else {
         setPolicyError("Failed to load voice AI policy");
+      }
+
+      if (linkusRes.status === "fulfilled" && linkusRes.value.ok) {
+        const linkusJson: LinkusSettingsResponse = await linkusRes.value.json();
+        setSdkServerUrl(String(linkusJson.serverUrl ?? ""));
+        setSdkDefaultExtension(String(linkusJson.defaultExtension ?? ""));
       }
 
       setLoading(false);
@@ -236,6 +253,33 @@ export default function CompanyAiConfigPage({ params }: Params) {
       setError(err?.message ?? "Failed to save company AI provider config");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function onSaveSdkSettings(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!companyId) return;
+    setSdkSaving(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const res = await fetch(`/api/company/${companyId}/dialer/linkus-settings`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          serverUrl: sdkServerUrl.trim() || null,
+          defaultExtension: sdkDefaultExtension.trim() || null,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to save Linkus SDK settings");
+      const json: LinkusSettingsResponse = await res.json();
+      setSdkServerUrl(String(json.serverUrl ?? ""));
+      setSdkDefaultExtension(String(json.defaultExtension ?? ""));
+      setSuccess("Linkus SDK settings saved.");
+    } catch (err: any) {
+      setError(err?.message ?? "Failed to save Linkus SDK settings");
+    } finally {
+      setSdkSaving(false);
     }
   }
 
@@ -422,6 +466,41 @@ export default function CompanyAiConfigPage({ params }: Params) {
                     {clearing ? "Clearing..." : "Clear"}
                   </button>
                 </div>
+              </form>
+            )}
+
+            {!companyId || loading ? null : (
+              <form onSubmit={onSaveSdkSettings} className="mt-6 space-y-4 border-t border-white/10 pt-4">
+                <div className="text-sm font-semibold">Linkus SDK Credentials</div>
+                <div className="space-y-1">
+                  <label className="text-sm font-medium">PBX Server URL</label>
+                  <input
+                    type="url"
+                    placeholder="https://192.168.50.253:8088"
+                    value={sdkServerUrl}
+                    onChange={(e) => setSdkServerUrl(e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-sm font-medium">Default Agent Extension</label>
+                  <input
+                    placeholder="1001"
+                    value={sdkDefaultExtension}
+                    onChange={(e) => setSdkDefaultExtension(e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+                <div className={`text-xs ${theme.mutedText}`}>
+                  Saved at company level and auto-used for SDK reconnect/sign generation.
+                </div>
+                <button
+                  type="submit"
+                  disabled={sdkSaving || !companyId}
+                  className={primaryButtonClass}
+                >
+                  {sdkSaving ? "Saving..." : "Save SDK Settings"}
+                </button>
               </form>
             )}
           </div>
