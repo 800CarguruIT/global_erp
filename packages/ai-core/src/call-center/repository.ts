@@ -145,13 +145,30 @@ export async function updateCallSessionStatusByProviderCallId(
   const metadataJson = patch.metadataPatch ? JSON.stringify(patch.metadataPatch) : null;
   const fromPatch = (patch.fromNumber ?? "").trim() || null;
   const toPatch = (patch.toNumber ?? "").trim() || null;
+  const patchStartedAt = patch.startedAt ?? null;
+  const patchEndedAt = patch.endedAt ?? null;
+  const patchDurationSeconds = patch.durationSeconds ?? null;
   const result = await sql<{ id: string }[]>`
     UPDATE call_sessions
     SET
       status = COALESCE(${patch.status ?? null}, status),
-      started_at = COALESCE(${patch.startedAt ?? null}, started_at),
-      ended_at = COALESCE(${patch.endedAt ?? null}, ended_at),
-      duration_seconds = COALESCE(${patch.durationSeconds ?? null}, duration_seconds),
+      started_at = COALESCE(${patchStartedAt}::timestamptz, started_at),
+      ended_at = COALESCE(${patchEndedAt}::timestamptz, ended_at),
+      duration_seconds = CASE
+        WHEN ${patchDurationSeconds}::int IS NOT NULL THEN ${patchDurationSeconds}::int
+        WHEN duration_seconds IS NULL
+          AND COALESCE(${patchEndedAt}::timestamptz, ended_at) IS NOT NULL
+          AND COALESCE(${patchStartedAt}::timestamptz, started_at) IS NOT NULL
+          THEN GREATEST(
+            EXTRACT(
+              EPOCH FROM (
+                COALESCE(${patchEndedAt}::timestamptz, ended_at) - COALESCE(${patchStartedAt}::timestamptz, started_at)
+              )
+            ),
+            0
+          )::int
+        ELSE duration_seconds
+      END,
       from_number = CASE
         WHEN ${fromPatch}::text IS NOT NULL
           AND LOWER(BTRIM(COALESCE(from_number, ''))) = 'unknown'

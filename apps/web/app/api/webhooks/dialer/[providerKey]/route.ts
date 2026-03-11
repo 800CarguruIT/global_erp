@@ -1644,6 +1644,13 @@ function findFirstDeep(payload: unknown, keys: string[]): unknown {
   return undefined;
 }
 
+function toScalarString(value: unknown): string | undefined {
+  if (typeof value !== "string" && typeof value !== "number") return undefined;
+  const out = String(value).trim();
+  if (!out || out.toLowerCase() === "[object object]") return undefined;
+  return out ? out : undefined;
+}
+
 function mapGenericWebhook(providerKey: string, payload: any): DialerWebhookUpdate | null {
   const providerCallId =
     payload.CallSid || payload.call_sid || payload.callId || payload.id || payload.call_id || null;
@@ -1778,6 +1785,7 @@ function mapYeastarWebhook(providerKey: string, payload: any): DialerWebhookUpda
     "dst",
     "dnis",
   ]);
+  const explicitExtensionRaw = findFirstDeep(msgObj ?? source, ["extension"]);
   const toFromMembers =
     Array.isArray((msgObj as any)?.members) &&
     (msgObj as any).members.length > 0 &&
@@ -1846,8 +1854,12 @@ function mapYeastarWebhook(providerKey: string, payload: any): DialerWebhookUpda
     providerCallId: String(providerCallId),
     status: normalizedStatus,
     direction,
-    fromNumber: fromRaw ? String(fromRaw) : undefined,
-    toNumber: answerExt ? String(answerExt) : toRaw ? String(toRaw) : toFromMembers,
+    fromNumber: toScalarString(fromRaw),
+    toNumber:
+      toScalarString(answerExt) ??
+      toScalarString(explicitExtensionRaw) ??
+      toScalarString(toRaw) ??
+      toScalarString(toFromMembers),
     scope: companyIdRaw ? "company" : "global",
     companyId: companyIdRaw ? String(companyIdRaw) : undefined,
     branchId: branchIdRaw ? String(branchIdRaw) : undefined,
@@ -2149,6 +2161,7 @@ async function handle(providerKey: string, req: NextRequest) {
           toNumber: update.toNumber ?? null,
           aiReply: liveExec?.replyText ?? null,
           simulationMode,
+          inquiryOnly: true,
         }).catch((err) => ({
           enabled: true as const,
           simulationMode,

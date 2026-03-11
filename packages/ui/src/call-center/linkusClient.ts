@@ -16,6 +16,7 @@ export type LinkusStatus = {
 type LinkusSessionSnapshot = {
   sessionId: string;
   isRing: boolean;
+  isHold: boolean;
   callStatus: string;
   remoteNumber: string | null;
   toNumber: string | null;
@@ -248,17 +249,71 @@ class LinkusClient {
         .find((v) => this.isLikelyExternal(v ?? null)) ?? null;
     const toNumber = toCandidates.map((v) => this.normalizeMaybePhone(v)).find(Boolean) ?? null;
     const isRing = Boolean(status?.isRing);
+    const isHold = Boolean(status?.isHold);
     const callStatus = String(status?.callStatus ?? "").trim().toLowerCase();
     const callStartTime = Number(status?.callStartTime ?? 0) || 0;
     return {
       sessionId,
       isRing,
+      isHold,
       callStatus,
       remoteNumber,
       toNumber,
       callStartTime,
       raw: session,
     };
+  }
+
+  getSessionsSnapshot(): LinkusSessionSnapshot[] {
+    const sessions = this.collectRingingSessions();
+    return sessions.map((session) => this.getSessionSnapshot(session));
+  }
+
+  private normalizeMatchToken(value: string | null | undefined): string {
+    return this.normalizeMaybePhone(value) ?? "";
+  }
+
+  private findSession(callId?: string | null, toNumber?: string | null): any | null {
+    const normalizedCallId = String(callId ?? "").trim();
+    const normalizedTo = this.normalizeMatchToken(toNumber);
+    const sessions = this.collectRingingSessions();
+    if (!sessions.length) return null;
+    if (normalizedCallId) {
+      const direct = sessions.find((session) => this.extractSessionId(session) === normalizedCallId);
+      if (direct) return direct;
+    }
+    if (normalizedTo) {
+      const matchTo = sessions.find((session) => {
+        const snap = this.getSessionSnapshot(session);
+        return this.normalizeMatchToken(snap.toNumber) === normalizedTo;
+      });
+      if (matchTo) return matchTo;
+    }
+    return sessions[0] ?? null;
+  }
+
+  private async callMethod(
+    target: any,
+    methodName: string,
+    argsWithId: Array<unknown>,
+    argsNoId: Array<unknown>
+  ): Promise<boolean> {
+    if (!target || typeof target[methodName] !== "function") return false;
+    try {
+      if (argsWithId.length > 0) {
+        await target[methodName](...argsWithId);
+      } else {
+        await target[methodName](...argsNoId);
+      }
+      return true;
+    } catch {
+      try {
+        await target[methodName](...argsNoId);
+        return true;
+      } catch {
+        return false;
+      }
+    }
   }
 
   getBestCallerNumber(hint?: { toNumber?: string | null; callId?: string | null }): string | null {
@@ -506,6 +561,60 @@ class LinkusClient {
       });
       return false;
     }
+  }
+
+  async hang(callId?: string | null, toNumber?: string | null): Promise<boolean> {
+    if (!this.sdk) return false;
+    const normalizedCallId = String(callId ?? "").trim();
+    const session = this.findSession(normalizedCallId, toNumber);
+    const targets = [session, this.phone, this.operator, this.sdk];
+    const methods = ["terminate", "hangup", "bye", "end", "reject"];
+    for (const target of targets) {
+      for (const methodName of methods) {
+        const ok = await this.callMethod(
+          target,
+          methodName,
+          normalizedCallId ? [normalizedCallId] : [],
+          []
+        );
+        if (ok) return true;
+      }
+    }
+    this.emit({
+      state: "error",
+      message: "SDK hang failed",
+      extension: this.status.extension ?? null,
+    });
+    return false;
+  }
+
+  async setHold(
+    callId?: string | null,
+    toNumber?: string | null,
+    hold = true
+  ): Promise<boolean> {
+    if (!this.sdk) return false;
+    const normalizedCallId = String(callId ?? "").trim();
+    const session = this.findSession(normalizedCallId, toNumber);
+    const targets = [session, this.phone, this.operator, this.sdk];
+    const methods = hold ? ["hold"] : ["unhold", "resume", "unHold"];
+    for (const target of targets) {
+      for (const methodName of methods) {
+        const ok = await this.callMethod(
+          target,
+          methodName,
+          normalizedCallId ? [normalizedCallId] : [],
+          []
+        );
+        if (ok) return true;
+      }
+    }
+    this.emit({
+      state: "error",
+      message: hold ? "SDK hold failed" : "SDK resume failed",
+      extension: this.status.extension ?? null,
+    });
+    return false;
   }
 }
 

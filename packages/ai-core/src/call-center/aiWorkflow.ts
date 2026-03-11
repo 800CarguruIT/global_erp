@@ -321,6 +321,7 @@ export async function runCallAiWorkflow(input: {
   aiReply?: string | null;
   simulationMode: boolean;
   leadOutcome?: CallAiLeadOutcome | null;
+  inquiryOnly?: boolean;
 }): Promise<CallAiWorkflowResult> {
   if (input.simulationMode) {
     const steps: CallAiWorkflowStep[] = [];
@@ -379,6 +380,18 @@ export async function runCallAiWorkflow(input: {
         payload: {},
         error: err?.message ?? "Failed to persist simulation inquiry",
       });
+      return {
+        enabled: true,
+        simulationMode: true,
+        currentStage: "inquiry",
+        inquiryId,
+        leadId,
+        inferredOutcome,
+        steps,
+      };
+    }
+
+    if (input.inquiryOnly) {
       return {
         enabled: true,
         simulationMode: true,
@@ -528,6 +541,18 @@ export async function runCallAiWorkflow(input: {
       payload: {},
       error: err?.message ?? "Failed to create inquiry",
     });
+    return {
+      enabled: true,
+      simulationMode: false,
+      currentStage: "inquiry",
+      inquiryId,
+      leadId,
+      inferredOutcome,
+      steps,
+    };
+  }
+
+  if (input.inquiryOnly) {
     return {
       enabled: true,
       simulationMode: false,

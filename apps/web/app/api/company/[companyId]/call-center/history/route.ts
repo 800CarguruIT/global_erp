@@ -62,7 +62,14 @@ export async function GET(req: NextRequest, ctx: ParamsCtx) {
       })
     );
 
-    const payload = filtered.map((s) => ({
+    const payload = filtered.map((s) => {
+      const computedDurationSeconds =
+        s.durationSeconds ??
+        (s.startedAt && s.endedAt
+          ? Math.max(0, Math.round((s.endedAt.getTime() - s.startedAt.getTime()) / 1000))
+          : null);
+
+      return {
       id: s.id,
       providerKey: s.providerKey,
       providerCallId: s.providerCallId,
@@ -71,7 +78,7 @@ export async function GET(req: NextRequest, ctx: ParamsCtx) {
       to: s.toNumber,
       status: s.status,
       startedAt: s.startedAt ?? s.createdAt,
-      durationSeconds: s.durationSeconds,
+      durationSeconds: computedDurationSeconds,
       createdByUserId: s.createdByUserId,
       agent: userMap.get(s.createdByUserId ?? "") ?? null,
       toEntityType: s.toEntityType,
@@ -79,7 +86,8 @@ export async function GET(req: NextRequest, ctx: ParamsCtx) {
       customer: s.toEntityType === "customer" && s.toEntityId ? customerMap.get(s.toEntityId) ?? null : null,
       recording: recordingMap.get(s.id) ?? null,
       metadata: s.metadata ?? {},
-    }));
+      };
+    });
 
     return NextResponse.json({ data: payload });
   } catch (err) {
