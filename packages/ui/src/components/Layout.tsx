@@ -95,7 +95,10 @@ type IncomingPopupState = {
   pickupHint?: string | null;
   createdAtMs: number;
   stage?: "new" | "connection" | "ringing" | "talking" | "held" | "ended";
+  endReason?: "ended" | "missed" | "answered_other" | null;
   lastStageBeforeEnded?: "new" | "connection" | "ringing" | "talking" | "held" | null;
+  connectionSinceMs?: number | null;
+  syncDelay?: boolean;
   answeredAtMs?: number | null;
   endedAtMs?: number | null;
   lastEventAtMs?: number | null;
@@ -707,11 +710,33 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
             stage === "talking" || stage === "held"
               ? popup.answeredAtMs ?? (snap.callStartTime > 0 ? snap.callStartTime : now)
               : popup.answeredAtMs ?? null;
-          if (stage !== popup.stage || nextAnsweredAt !== (popup.answeredAtMs ?? null)) {
+          const nextConnectionSinceMs =
+            stage === "connection"
+              ? popup.stage === "connection"
+                ? popup.connectionSinceMs ?? now
+                : now
+              : null;
+          const nextSyncDelay =
+            stage === "connection" && nextConnectionSinceMs
+              ? now - nextConnectionSinceMs > 8_000
+              : false;
+          if (nextSyncDelay) {
+            // Force an extra SDK snapshot pull while connection appears stale.
+            void linkusClientRef.current.getSessionsSnapshot();
+          }
+          if (
+            stage !== popup.stage ||
+            nextAnsweredAt !== (popup.answeredAtMs ?? null) ||
+            nextConnectionSinceMs !== (popup.connectionSinceMs ?? null) ||
+            nextSyncDelay !== Boolean(popup.syncDelay)
+          ) {
             changed = true;
             return {
               ...popup,
               stage,
+              endReason: stage === "ended" ? popup.endReason ?? "ended" : null,
+              connectionSinceMs: nextConnectionSinceMs,
+              syncDelay: nextSyncDelay,
               answeredAtMs: nextAnsweredAt,
               endedAtMs: stage === "ended" ? popup.endedAtMs ?? now : popup.endedAtMs ?? null,
               lastEventAtMs: now,
@@ -853,6 +878,9 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
           pickupHint: pickupHint || null,
           createdAtMs: Date.now(),
           stage: "new",
+          endReason: null,
+          connectionSinceMs: null,
+          syncDelay: false,
           answeredAtMs: null,
           endedAtMs: null,
           lastEventAtMs: now,
@@ -1067,7 +1095,7 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
               return;
             }
 
-            setIncomingPopups((prev) =>
+                    setIncomingPopups((prev) =>
               prev.map((p) =>
                 p.callId === targetCallId
                   ? {
@@ -1086,6 +1114,14 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
                             ? "talking"
                             : "connection"
                         ),
+                      endReason: null,
+                      connectionSinceMs:
+                        status.includes("answer") || status.includes("in_progress") || status.includes("in-progress")
+                          ? null
+                          : p.stage === "connection"
+                          ? p.connectionSinceMs ?? Date.now()
+                          : Date.now(),
+                      syncDelay: false,
                       answeredAtMs:
                         status.includes("answer") || status.includes("in_progress") || status.includes("in-progress")
                           ? p.answeredAtMs ?? Date.now()
@@ -1104,11 +1140,39 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
           }
 
           if (isTerminal) {
-            if (incomingCallId) terminalCallsRef.current.set(incomingCallId, Date.now());
-            const hasOpen = incomingPopupsRef.current.some((p) => p.callId === incomingCallId);
-            if (incomingCallId && hasOpen) {
+            const now = Date.now();
+            const isMissedTerminal =
+              status.includes("no answer") ||
+              status.includes("no_answer") ||
+              status.includes("missed") ||
+              status.includes("declin") ||
+              status.includes("reject") ||
+              status.includes("cancel") ||
+              status.includes("failed");
+            if (incomingCallId) terminalCallsRef.current.set(incomingCallId, now);
+            const openByCallId = incomingCallId
+              ? incomingPopupsRef.current.find((p) => p.callId === incomingCallId)
+              : null;
+            const openByToNumber =
+              !openByCallId && incomingToNumber
+                ? [...incomingPopupsRef.current]
+                    .reverse()
+                    .find(
+                      (p) =>
+                        p.toNumber === incomingToNumber &&
+                        p.stage !== "ended" &&
+                        now - (p.createdAtMs || 0) <= 180_000
+                    ) ?? null
+                : null;
+            const targetPopup = openByCallId ?? openByToNumber;
+            const targetCallId = String(targetPopup?.callId ?? incomingCallId ?? "").trim();
+            const hasOpen = targetCallId
+              ? incomingPopupsRef.current.some((p) => p.callId === targetCallId)
+              : false;
+            if (hasOpen && targetCallId) {
+              terminalCallsRef.current.set(targetCallId, now);
               const targetToNumber = String(
-                incomingPopupsRef.current.find((p) => p.callId === incomingCallId)?.toNumber ??
+                incomingPopupsRef.current.find((p) => p.callId === targetCallId)?.toNumber ??
                   incomingToNumber ??
                   ""
               ).trim();
@@ -1117,33 +1181,25 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
               }
               setIncomingPopups((prev) =>
                 prev.map((p) =>
-                  p.callId === incomingCallId
+                  p.callId === targetCallId
                     ? {
                         ...p,
                         stage: "ended",
+                        endReason: isMissedTerminal ? "missed" : "ended",
                         lastStageBeforeEnded:
                           p.stage && p.stage !== "ended" ? p.stage : p.lastStageBeforeEnded ?? null,
+                        connectionSinceMs: null,
+                        syncDelay: false,
                         endedAtMs: Date.now(),
                         lastEventAtMs: Date.now(),
                       }
                     : p
                 )
               );
-              const canShowResolvedNumber =
-                incomingFromNumber && incomingFromNumber.toLowerCase() !== "unknown";
-              if (canShowResolvedNumber) {
-                setTimeout(() => {
-                  setIncomingPopups((prev) =>
-                    prev.filter((p) => p.callId !== incomingCallId)
-                  );
-                }, 4000);
-              } else {
-                setTimeout(() => {
-                  setIncomingPopups((prev) =>
-                    prev.filter((p) => p.callId !== incomingCallId)
-                  );
-                }, 60000);
-              }
+              const closeAfterMs = isMissedTerminal ? 15_000 : 4_000;
+              setTimeout(() => {
+                setIncomingPopups((prev) => prev.filter((p) => p.callId !== targetCallId));
+              }, closeAfterMs);
             }
             return;
           }
@@ -1293,7 +1349,15 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
     setIncomingPopups((prev) =>
       prev.map((p) =>
         p.callId === callId
-          ? { ...p, stage: "connection", answeredAtMs: p.answeredAtMs ?? Date.now(), endedAtMs: null }
+          ? {
+              ...p,
+              stage: "connection",
+              endReason: null,
+              connectionSinceMs: Date.now(),
+              syncDelay: false,
+              answeredAtMs: p.answeredAtMs ?? Date.now(),
+              endedAtMs: null,
+            }
           : p
       )
     );
@@ -1325,8 +1389,11 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
           ? {
               ...p,
               stage: "ended",
+              endReason: "ended",
               lastStageBeforeEnded:
                 p.stage && p.stage !== "ended" ? p.stage : p.lastStageBeforeEnded ?? null,
+              connectionSinceMs: null,
+              syncDelay: false,
               endedAtMs: Date.now(),
               lastEventAtMs: Date.now(),
             }
@@ -1340,7 +1407,7 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
     terminalCallsRef.current.set(callId, Date.now());
     setTimeout(() => {
       setIncomingPopups((prev) => prev.filter((p) => p.callId !== callId));
-    }, 2500);
+    }, 4000);
   }
 
   async function handleHoldToggleWithSdk(callId: string, toNumber?: string | null) {
@@ -1354,6 +1421,9 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
           ? {
               ...p,
               stage: mergeStage(p.stage, shouldHold ? "held" : "talking"),
+              endReason: null,
+              connectionSinceMs: null,
+              syncDelay: false,
               answeredAtMs: p.answeredAtMs ?? Date.now(),
               lastEventAtMs: Date.now(),
             }
@@ -1612,10 +1682,11 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
       {incomingPopups.length > 0 &&
         (scopeInfo.scope === "company" || scopeInfo.scope === "branch" || scopeInfo.scope === "vendor") &&
         scopeInfo.companyId && (
-          <div className="fixed bottom-4 right-4 z-[80] flex max-w-[92vw] flex-col-reverse gap-3">
+          <div className="fixed bottom-4 right-4 z-[9999] flex max-w-[92vw] flex-col-reverse gap-3">
             {incomingPopups.map((popup) => {
               const isActiveCall = popup.stage === "talking" || popup.stage === "held";
               const hasEnded = popup.stage === "ended";
+              const isMissed = hasEnded && popup.endReason === "missed";
               const canControl = !popup.answeredByOther && linkusStatus.state === "connected";
               const canAnswer =
                 popup.answeredByOther !== true &&
@@ -1640,16 +1711,43 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
                 (elapsedMs ?? 0) >= 5000;
               const isExpanded = expandedPopups[popup.callId] ?? false;
               const isCompact = autoCompact && !isExpanded;
-              const isRingingVisual = popup.stage === "new" || popup.stage === "ringing";
+              const toneClasses =
+                hasEnded
+                  ? {
+                      border: "border-slate-500/40",
+                      badge: "border-slate-500/40 text-slate-300",
+                      summary: "border-slate-400/25 bg-slate-700/20 text-slate-200",
+                      timeline: "bg-slate-300/70",
+                      timelineLabel: "text-slate-200",
+                    }
+                  : popup.stage === "held"
+                  ? {
+                      border: "border-amber-300/55 shadow-amber-500/20",
+                      badge: "border-amber-300/60 text-amber-200",
+                      summary: "border-amber-300/20 bg-amber-500/10 text-amber-100",
+                      timeline: "bg-amber-300/90",
+                      timelineLabel: "text-amber-200",
+                    }
+                  : popup.stage === "connection" || popup.stage === "talking"
+                  ? {
+                      border: "border-cyan-300/60 shadow-cyan-500/20",
+                      badge: "border-cyan-300/60 text-cyan-200",
+                      summary: "border-cyan-300/20 bg-cyan-500/10 text-cyan-100",
+                      timeline: "bg-cyan-300/90",
+                      timelineLabel: "text-cyan-200",
+                    }
+                  : {
+                      border: "border-emerald-300/60 shadow-emerald-500/20",
+                      badge: "border-emerald-300/50 text-emerald-200 animate-pulse",
+                      summary: "border-emerald-200/20 bg-emerald-500/10 text-emerald-100",
+                      timeline: "bg-emerald-300/90",
+                      timelineLabel: "text-emerald-200",
+                    };
               return (
               <div
                 key={popup.callId}
-                className={`w-[22rem] rounded-2xl border bg-slate-950/95 p-4 shadow-2xl backdrop-blur transition-all duration-300 ${
-                  hasEnded
-                    ? "border-slate-500/40 opacity-70 translate-y-1 scale-[0.99]"
-                    : isRingingVisual
-                    ? "border-emerald-300/60 shadow-emerald-500/20"
-                    : "border-emerald-400/40"
+                className={`isolate w-[22rem] rounded-2xl border bg-slate-950 p-4 shadow-2xl transition-all duration-300 ${toneClasses.border} ${
+                  hasEnded ? "opacity-70 translate-y-1 scale-[0.99]" : ""
                 }`}
               >
                 <div className="flex items-center justify-between">
@@ -1676,19 +1774,12 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
                 {linkusStatus.message ? (
                   <div className="mt-1 text-[10px] text-amber-200/90">{linkusStatus.message}</div>
                 ) : null}
+                <div className="mt-1 text-[10px] text-slate-400">Call ID: {popup.callId}</div>
                 <div className="mt-1 text-lg font-semibold">{popup.customer?.name ?? "Unknown Caller"}</div>
                 <div className="mt-1 text-xs text-slate-300">To: {popup.toNumber}</div>
                 <div className="mt-1 flex items-center gap-2 text-xs">
                   <span
-                    className={`rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wide ${
-                      hasEnded
-                        ? "border-slate-500/40 text-slate-300"
-                        : isRingingVisual
-                        ? "border-emerald-300/50 text-emerald-200 animate-pulse"
-                        : popup.stage === "held"
-                        ? "border-amber-300/50 text-amber-200"
-                        : "border-cyan-300/50 text-cyan-200"
-                    }`}
+                    className={`rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wide ${toneClasses.badge}`}
                   >
                     {labelForStage(popup.stage)}
                   </span>
@@ -1696,6 +1787,9 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
                     <span className="font-mono text-emerald-200">{formatDuration(elapsedMs)}</span>
                   ) : null}
                 </div>
+                {popup.syncDelay ? (
+                  <div className="mt-1 text-[11px] text-amber-200">Sync delay... forcing status re-check</div>
+                ) : null}
                 <div className="mt-2 grid grid-cols-6 gap-1">
                   {POPUP_TIMELINE.map((step, idx) => {
                     const active = idx <= currentStageOrder;
@@ -1704,10 +1798,10 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
                       <div key={`${popup.callId}-${step.key}`} className="flex flex-col items-center gap-1">
                         <div
                           className={`h-1.5 w-full rounded-full ${
-                            active ? "bg-emerald-300/90" : "bg-white/10"
+                            active ? toneClasses.timeline : "bg-white/10"
                           } ${current && !hasEnded ? "animate-pulse" : ""}`}
                         />
-                        <span className={`text-[9px] ${current ? "text-emerald-200" : "text-slate-400"}`}>
+                        <span className={`text-[9px] ${current ? toneClasses.timelineLabel : "text-slate-400"}`}>
                           {step.label}
                         </span>
                       </div>
@@ -1715,11 +1809,24 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
                   })}
                 </div>
                 {hasEnded ? (
-                  <div className="mt-2 rounded-lg border border-emerald-200/20 bg-emerald-500/10 px-2 py-1 text-[11px]">
-                    <div className="text-emerald-100">Last Status: {lastStageText ?? "Unknown"}</div>
-                    <div className="text-emerald-200/90">
+                  <div className={`mt-2 rounded-lg border px-2 py-1 text-[11px] ${toneClasses.summary}`}>
+                    <div>Last Status: {lastStageText ?? "Unknown"}</div>
+                    <div>
                       Call Count: {elapsedMs !== null ? formatDuration(elapsedMs) : "00:00"}
                     </div>
+                    {isMissed ? (
+                      <Link
+                        href={
+                          popup.fromNumber && popup.fromNumber !== "Unknown"
+                            ? `/company/${scopeInfo.companyId}/leads/new?phone=${encodeURIComponent(popup.fromNumber)}`
+                            : `/company/${scopeInfo.companyId}/leads/new`
+                        }
+                        className="mt-2 inline-flex rounded-full border border-white/30 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide hover:border-white/70"
+                        onClick={() => setIncomingPopups((prev) => prev.filter((p) => p.callId !== popup.callId))}
+                      >
+                        Create Inquiry
+                      </Link>
+                    ) : null}
                   </div>
                 ) : null}
                 {popup.answeredByOther ? (

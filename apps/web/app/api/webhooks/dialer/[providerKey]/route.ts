@@ -2132,7 +2132,25 @@ async function handle(providerKey: string, req: NextRequest) {
       }
     }
 
+    const allowInquiryAutomation = isLikelyExternalNumber(update.fromNumber ?? null);
     if (policyEval.decision === "allow_ai" && policyEval.policy?.guidance?.automationEnabled) {
+      if (!allowInquiryAutomation) {
+        await logWebhookLine({
+          ts: new Date().toISOString(),
+          stage: "ai_workflow_skipped_no_external_caller",
+          providerKey,
+          providerCallId: update.providerCallId,
+          companyId: update.companyId ?? null,
+          fromNumber: update.fromNumber ?? null,
+          toNumber: update.toNumber ?? null,
+        });
+      }
+    }
+    if (
+      policyEval.decision === "allow_ai" &&
+      policyEval.policy?.guidance?.automationEnabled &&
+      allowInquiryAutomation
+    ) {
       const simulationMode = Boolean(policyEval.policy?.guidance?.simulationMode);
       if (!update.companyId) {
         automationWorkflow = {

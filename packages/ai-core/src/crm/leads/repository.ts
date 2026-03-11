@@ -471,6 +471,7 @@ export async function updateLeadPartial(
   companyId: string,
   leadId: string,
   patch: {
+    leadType?: Lead["leadType"];
     leadStatus?: LeadStatus;
     leadStage?: string;
     branchId?: string | null;
@@ -504,10 +505,11 @@ export async function updateLeadPartial(
   }
 
   const archiveStage = patch.isArchived ? "archived" : undefined;
+  const nextLeadType = patch.leadType ?? current.leadType;
   const newStatus = patch.isArchived
     ? "closed"
     : (patch.leadStatus ?? current.leadStatus);
-  const storedStatus = normalizeLeadStatusForStorage(current.leadType, newStatus);
+  const storedStatus = normalizeLeadStatusForStorage(nextLeadType, newStatus);
   const newStage = archiveStage ?? patch.leadStage ?? current.leadStage;
   const newAgentRemark =
     patch.agentRemark !== undefined
@@ -626,6 +628,7 @@ export async function updateLeadPartial(
     await sql /* sql */ `
       UPDATE leads
       SET
+        lead_type = ${nextLeadType},
         lead_status = ${storedStatus},
         lead_stage = ${newStage},
         branch_id = ${newBranchId},
@@ -656,6 +659,7 @@ export async function updateLeadPartial(
     await sql /* sql */ `
       UPDATE leads
       SET
+        lead_type = ${nextLeadType},
         lead_status = ${storedStatus},
         lead_stage = ${newStage},
         agent_remark = ${newAgentRemark},

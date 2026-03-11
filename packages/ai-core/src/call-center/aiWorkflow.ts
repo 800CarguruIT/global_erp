@@ -69,6 +69,96 @@ type SetInquiryOutcomeInput = {
   outcomeReason?: string | null;
 };
 
+type CustomerPhoneMatch = {
+  id: string;
+  name: string | null;
+  phone: string | null;
+};
+
+function normalizePhoneDigits(value?: string | null): string {
+  return String(value ?? "").replace(/\D+/g, "");
+}
+
+function stripLeadingZeros(value: string): string {
+  return value.replace(/^0+/, "");
+}
+
+function buildPhoneSearchCandidates(rawPhone?: string | null): string[] {
+  const digits = normalizePhoneDigits(rawPhone);
+  if (!digits) return [];
+
+  const set = new Set<string>();
+  const add = (candidate: string) => {
+    const normalized = stripLeadingZeros(normalizePhoneDigits(candidate));
+    if (normalized) set.add(normalized);
+  };
+
+  add(digits);
+
+  // UAE-ish transforms:
+  // local 05xxxxxxxx <-> intl 9715xxxxxxxx and raw without leading 0.
+  if (digits.startsWith("0") && digits.length >= 9) {
+    add(digits.slice(1));
+    add(`971${digits.slice(1)}`);
+  }
+  if (digits.startsWith("971") && digits.length >= 11) {
+    const localNoZero = digits.slice(3);
+    add(localNoZero);
+    add(`0${localNoZero}`);
+  }
+  if (!digits.startsWith("0") && !digits.startsWith("971") && digits.length >= 8) {
+    add(`0${digits}`);
+    add(`971${digits}`);
+  }
+
+  return Array.from(set);
+}
+
+function buildPhoneSuffixCandidates(rawPhone?: string | null): string[] {
+  const candidates = buildPhoneSearchCandidates(rawPhone);
+  const suffixes = new Set<string>();
+  for (const candidate of candidates) {
+    const digits = normalizePhoneDigits(candidate);
+    if (digits.length >= 9) suffixes.add(digits.slice(-9));
+  }
+  return Array.from(suffixes);
+}
+
+async function findExistingCustomerByPhone(companyId: string, rawPhone?: string | null): Promise<CustomerPhoneMatch | null> {
+  const candidates = buildPhoneSearchCandidates(rawPhone);
+  const suffixCandidates = buildPhoneSuffixCandidates(rawPhone);
+  if (!candidates.length) return null;
+
+  const sql = getSql();
+  const rows = await sql<{
+    id: string;
+    name: string | null;
+    phone: string | null;
+  }[]>`
+    SELECT id, name, phone
+    FROM customers
+    WHERE company_id = ${companyId}
+      AND (
+        ltrim(regexp_replace(COALESCE(phone, ''), '\D', '', 'g'), '0') = ANY(${candidates}::text[])
+        OR ltrim(regexp_replace(COALESCE(phone_alt, ''), '\D', '', 'g'), '0') = ANY(${candidates}::text[])
+        OR ltrim(regexp_replace(COALESCE(whatsapp_phone, ''), '\D', '', 'g'), '0') = ANY(${candidates}::text[])
+        OR right(ltrim(regexp_replace(COALESCE(phone, ''), '\D', '', 'g'), '0'), 9) = ANY(${suffixCandidates}::text[])
+        OR right(ltrim(regexp_replace(COALESCE(phone_alt, ''), '\D', '', 'g'), '0'), 9) = ANY(${suffixCandidates}::text[])
+        OR right(ltrim(regexp_replace(COALESCE(whatsapp_phone, ''), '\D', '', 'g'), '0'), 9) = ANY(${suffixCandidates}::text[])
+      )
+    ORDER BY updated_at DESC
+    LIMIT 1
+  `;
+
+  const row = rows?.[0];
+  if (!row) return null;
+  return {
+    id: String(row.id),
+    name: row.name ? String(row.name) : null,
+    phone: row.phone ? String(row.phone) : null,
+  };
+}
+
 function mapInquiryRow(row: any): CallAiInquiry {
   return {
     id: String(row.id),
@@ -193,6 +283,29 @@ export async function getInquiryByProviderCall(input: {
 
 export async function createOrGetInquiryFromCall(input: CreateOrGetInquiryInput): Promise<CallAiInquiry> {
   const sql = getSql();
+  const normalizedFromNumber = normalizePhoneDigits(input.fromNumber ?? null);
+  const customerMatch = await findExistingCustomerByPhone(input.companyId, input.fromNumber ?? null);
+  const payload = {
+    ...(input.aiPayload ?? {}),
+    phoneNormalization: {
+      raw: input.fromNumber ?? null,
+      digits: normalizedFromNumber || null,
+      searchCandidates: buildPhoneSearchCandidates(input.fromNumber ?? null),
+    },
+    customerMatch: customerMatch
+      ? {
+          exists: true,
+          customerId: customerMatch.id,
+          customerName: customerMatch.name,
+          customerPhone: customerMatch.phone,
+          matchedAt: new Date().toISOString(),
+        }
+      : {
+          exists: false,
+          matchedAt: new Date().toISOString(),
+        },
+  } as Record<string, unknown>;
+
   const rows = await sql<any[]>`
     INSERT INTO call_ai_inquiries (
       company_id,
@@ -211,7 +324,7 @@ export async function createOrGetInquiryFromCall(input: CreateOrGetInquiryInput)
       ${input.toNumber ?? null},
       'new',
       ${input.inquirySummary ?? null},
-      ${(input.aiPayload ?? {}) as any}::jsonb
+      ${payload as any}::jsonb
     )
     ON CONFLICT (company_id, provider_key, provider_call_id)
     DO UPDATE SET
