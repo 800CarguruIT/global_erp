@@ -36,7 +36,7 @@ export default function CompanyRoleNewPage({
           setLoading(false);
           return;
         }
-        const res = await fetch("/api/auth/permissions");
+        const res = await fetch("/api/auth/permissions?scope=company");
         if (!res.ok) throw new Error("Failed to load permissions");
         const data = await res.json();
         setPerms(data.data ?? data);

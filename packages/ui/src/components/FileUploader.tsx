@@ -3,6 +3,7 @@
 import React, { useCallback, useState } from "react";
 import { DropzoneFileInput } from "./common/DropzoneFileInput";
 import { useTheme } from "../theme";
+import type { Accept } from "react-dropzone";
 
 export type FileKind = "image" | "audio" | "video" | "any";
 
@@ -21,6 +22,11 @@ interface FileUploaderProps {
   previewClassName?: string;
   chooseLabel?: string;
   replaceLabel?: string;
+  maxSizeBytes?: number;
+  acceptMimeTypes?: string[];
+  showFileIdField?: boolean;
+  capture?: "user" | "environment";
+  externalError?: string | null;
 }
 
 export function FileUploader({
@@ -38,13 +44,25 @@ export function FileUploader({
   previewClassName,
   chooseLabel,
   replaceLabel,
+  maxSizeBytes,
+  acceptMimeTypes,
+  showFileIdField = true,
+  capture,
+  externalError,
 }: FileUploaderProps) {
   const { theme } = useTheme();
   const [isUploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<number>(0);
+  const [lastFile, setLastFile] = useState<File | null>(null);
 
-  const accept =
-    kind === "image"
+  const accept: Accept | undefined =
+    acceptMimeTypes && acceptMimeTypes.length
+      ? acceptMimeTypes.reduce<Accept>((acc, mime) => {
+          acc[mime] = [];
+          return acc;
+        }, {})
+      : kind === "image"
       ? { "image/*": [] }
       : kind === "audio"
       ? { "audio/*": [] }
@@ -53,33 +71,66 @@ export function FileUploader({
       : undefined;
 
   const uploadFile = useCallback(
-    async (file: File | null) => {
+    async (file: File | null, keepAsRetry = true) => {
       if (!file) return;
       setError(null);
+      if (keepAsRetry) setLastFile(file);
+      if (acceptMimeTypes?.length && !acceptMimeTypes.includes(file.type)) {
+        setError(`Invalid file type. Allowed: ${acceptMimeTypes.join(", ")}`);
+        return;
+      }
+      if (maxSizeBytes && file.size > maxSizeBytes) {
+        const mb = (maxSizeBytes / (1024 * 1024)).toFixed(0);
+        setError(`File is too large. Max ${mb} MB.`);
+        return;
+      }
       setUploading(true);
+      setProgress(0);
       try {
         const formData = new FormData();
         formData.append("file", file);
         formData.append("kind", kind === "any" ? inferKind(file.type) : kind);
 
-        const res = await fetch("/api/files/upload", {
-          method: "POST",
-          body: formData,
+        const data = await new Promise<any>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open("POST", "/api/files/upload");
+          xhr.upload.onprogress = (event) => {
+            if (!event.lengthComputable) return;
+            setProgress(Math.min(100, Math.round((event.loaded / event.total) * 100)));
+          };
+          xhr.onload = () => {
+            if (xhr.status < 200 || xhr.status >= 300) {
+              let message = "Upload failed";
+              try {
+                const json = JSON.parse(xhr.responseText || "{}");
+                message = json?.error || message;
+              } catch {
+                // ignore parse
+              }
+              reject(new Error(message));
+              return;
+            }
+            try {
+              const json = JSON.parse(xhr.responseText || "{}");
+              resolve(json);
+            } catch {
+              reject(new Error("Invalid upload response"));
+            }
+          };
+          xhr.onerror = () => reject(new Error("Network error while uploading"));
+          xhr.send(formData);
         });
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          throw new Error(data.error || "Upload failed");
-        }
-        const data = await res.json();
         onChange(data.fileId ?? null);
-      } catch (err: any) {
+        setProgress(100);
+      } catch (err: unknown) {
         console.error(err);
-        setError(err?.message ?? "Upload failed");
+        const message = err instanceof Error ? err.message : "Upload failed";
+        setError(message);
       } finally {
         setUploading(false);
       }
     },
-    [kind, onChange]
+    [acceptMimeTypes, kind, maxSizeBytes, onChange]
   );
 
   function inferKind(mime: string): FileKind {
@@ -121,6 +172,8 @@ export function FileUploader({
       </div>
 
       {!buttonOnly && (
+        <>
+        {showFileIdField ? (
         <div className="flex flex-col gap-2 md:flex-row md:items-stretch">
           <input
             value={value ?? ""}
@@ -143,10 +196,21 @@ export function FileUploader({
             </div>
           )}
         </div>
+        ) : value ? (
+          <div className="flex items-center gap-2 text-xs">
+            <span className="inline-flex rounded-full bg-emerald-500/15 px-2 py-0.5 text-emerald-300">Uploaded</span>
+            <a href={previewUrl} target="_blank" rel="noreferrer" className="text-primary hover:underline">
+              Open
+            </a>
+          </div>
+        ) : null}
+        </>
       )}
 
       <DropzoneFileInput
         accept={accept}
+        maxSizeBytes={maxSizeBytes}
+        capture={capture}
         disabled={disabled || isUploading}
         onFileSelect={uploadFile}
         onReject={setError}
@@ -177,8 +241,29 @@ export function FileUploader({
           Open file
         </a>
       )}
-      {isUploading && <p className="text-xs text-muted-foreground">Uploading...</p>}
-      {error && <p className="text-xs text-destructive">{error}</p>}
+      {isUploading && (
+        <div className="space-y-1">
+          <p className="text-xs text-muted-foreground">Uploading... {progress}%</p>
+          <div className="h-1.5 w-full overflow-hidden rounded bg-muted">
+            <div className="h-full bg-primary transition-all" style={{ width: `${progress}%` }} />
+          </div>
+        </div>
+      )}
+      {error && (
+        <div className="flex items-center gap-2">
+          <p className="text-xs text-destructive">{error}</p>
+          {lastFile ? (
+            <button
+              type="button"
+              onClick={() => void uploadFile(lastFile, false)}
+              className="rounded border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide"
+            >
+              Retry
+            </button>
+          ) : null}
+        </div>
+      )}
+      {externalError ? <p className="text-xs text-destructive">{externalError}</p> : null}
     </div>
   );
 }

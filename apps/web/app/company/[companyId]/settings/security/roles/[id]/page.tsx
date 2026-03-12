@@ -48,7 +48,7 @@ export default function CompanyRoleEditPage({ params }: Params) {
     setForbidden(false);
     try {
       const [permRes, roleRes] = await Promise.all([
-        fetch("/api/auth/permissions"),
+        fetch("/api/auth/permissions?scope=company"),
         fetch(`/api/auth/roles/${roleId}?scope=company&companyId=${companyId}`),
       ]);
       if (roleRes.status === 401 || roleRes.status === 403) {

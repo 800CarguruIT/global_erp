@@ -75,6 +75,29 @@ type CustomerPhoneMatch = {
   phone: string | null;
 };
 
+function normalizeAiPayload(value: unknown): Record<string, unknown> {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+  if (Array.isArray(value) && value.length > 0) {
+    const last = value[value.length - 1];
+    if (last && typeof last === "object" && !Array.isArray(last)) {
+      return last as Record<string, unknown>;
+    }
+    if (typeof last === "string") {
+      try {
+        const parsed = JSON.parse(last);
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          return parsed as Record<string, unknown>;
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }
+  return {};
+}
+
 function normalizePhoneDigits(value?: string | null): string {
   return String(value ?? "").replace(/\D+/g, "");
 }
@@ -160,6 +183,7 @@ async function findExistingCustomerByPhone(companyId: string, rawPhone?: string 
 }
 
 function mapInquiryRow(row: any): CallAiInquiry {
+  const aiPayload = normalizeAiPayload(row.ai_payload ?? {});
   return {
     id: String(row.id),
     companyId: String(row.company_id),
@@ -169,7 +193,7 @@ function mapInquiryRow(row: any): CallAiInquiry {
     toNumber: row.to_number ? String(row.to_number) : null,
     inquiryStatus: String(row.inquiry_status) as CallAiInquiryStatus,
     inquirySummary: row.inquiry_summary ? String(row.inquiry_summary) : null,
-    aiPayload: (row.ai_payload ?? {}) as Record<string, unknown>,
+    aiPayload,
     convertedToLeadId: row.converted_to_lead_id ? String(row.converted_to_lead_id) : null,
     conversionStatus: String(row.conversion_status) as CallAiConversionStatus,
     convertedAt: row.converted_at ? new Date(row.converted_at).toISOString() : null,
@@ -358,9 +382,22 @@ export async function convertInquiryToLead(input: ConvertInquiryToLeadInput): Pr
     return { inquiry, leadId: inquiry.convertedToLeadId };
   }
 
+  const payload = normalizeAiPayload(inquiry.aiPayload);
+  const matchedCustomerFromPayload = payload?.customerMatch as
+    | { customerId?: string | null; exists?: boolean }
+    | undefined;
+  let customerId: string | null = matchedCustomerFromPayload?.customerId
+    ? String(matchedCustomerFromPayload.customerId).trim()
+    : null;
+  if (!customerId && inquiry.fromNumber) {
+    const byPhone = await findExistingCustomerByPhone(inquiry.companyId, inquiry.fromNumber);
+    customerId = byPhone?.id ?? null;
+  }
+
   try {
     const lead = await createLead({
       companyId: inquiry.companyId,
+      customerId,
       leadType: input.leadType ?? "workshop",
       source: input.source ?? "call",
       leadStage: input.leadStage ?? "new",

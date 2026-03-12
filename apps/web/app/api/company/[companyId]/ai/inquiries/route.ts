@@ -1,7 +1,48 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSql, CallAiWorkflow, Leads } from "@repo/ai-core";
+import { getSql, CallAiWorkflow, Leads, Crm, getOpenAIClientForCompany } from "@repo/ai-core";
 
 type Params = { params: Promise<{ companyId: string }> };
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+type AnalysisPayload = {
+  caller_name?: string | null;
+  mobile_number?: string | null;
+  plate_number?: string | null;
+  request_type?: string | null;
+  location?: string | null;
+  lead_type?: "rsa" | "recovery" | "workshop" | null;
+  confidence?: number | null;
+  summary?: string | null;
+};
+
+const RSA_DIVISIONS = [
+  "tyre",
+  "battery",
+  "jump_start",
+  "fuel_delivery",
+  "ac_gas",
+  "inspection",
+  "warranty_claimed",
+] as const;
+
+const RECOVERY_DIVISIONS = [
+  "insurance_recovery",
+  "customer_to_customer",
+  "internal_workshop_to_workshop",
+] as const;
+
+const AI_PAYLOAD_OBJECT_SQL = `
+  CASE
+    WHEN jsonb_typeof(ai_payload) = 'object' THEN ai_payload
+    WHEN jsonb_typeof(ai_payload) = 'array' AND jsonb_array_length(ai_payload) > 0 THEN
+      CASE
+        WHEN jsonb_typeof(ai_payload->-1) = 'object' THEN ai_payload->-1
+        ELSE '{}'::jsonb
+      END
+    ELSE '{}'::jsonb
+  END
+`;
 
 function normalizePhoneDigits(value?: string | null): string {
   return String(value ?? "").replace(/\D+/g, "");
@@ -49,6 +90,129 @@ function buildPhoneSuffixCandidates(rawPhone?: string | null): string[] {
   return Array.from(suffixes);
 }
 
+function isUsableRecordingUrl(url: string | null | undefined): boolean {
+  const normalized = String(url ?? "").trim().toLowerCase();
+  return normalized.length > 0 && normalized !== "unknown" && normalized !== "null" && normalized !== "undefined";
+}
+
+function isLeadFinalized(statusRaw: unknown, stageRaw: unknown): boolean {
+  const status = String(statusRaw ?? "").trim().toLowerCase();
+  const stage = String(stageRaw ?? "").trim().toLowerCase();
+  if (["closed", "closed_won", "lost", "done", "completed"].includes(status)) return true;
+  if (stage === "closed") return true;
+  return false;
+}
+
+function toLeadType(value: unknown): "rsa" | "recovery" | "workshop" {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (normalized === "recovery") return "recovery";
+  if (normalized === "workshop" || normalized === "walkin" || normalized === "walk-in") return "workshop";
+  return "rsa";
+}
+
+function cleanText(value: unknown): string | null {
+  const str = String(value ?? "").trim();
+  return str.length ? str : null;
+}
+
+async function fetchRecordingBufferViaProxy(args: {
+  req: NextRequest;
+  companyId: string;
+  recordingUrl: string;
+}): Promise<{ buffer: Buffer; fileName: string }> {
+  const path = `/api/company/${args.companyId}/call-center/history/recording-proxy`;
+  const hostHeader = String(args.req.headers.get("host") ?? "").trim();
+  const port =
+    hostHeader.includes(":") && hostHeader.split(":")[1]
+      ? hostHeader.split(":")[1]
+      : "3000";
+  const candidates = [
+    new URL(path, args.req.nextUrl.origin),
+    new URL(`${path}`, `http://127.0.0.1:${port}`),
+    new URL(`${path}`, `http://localhost:${port}`),
+  ];
+
+  let lastError: string | null = null;
+  for (const proxyUrl of candidates) {
+    proxyUrl.searchParams.set("recordingUrl", args.recordingUrl);
+    try {
+      const res = await fetch(proxyUrl.toString(), {
+        headers: {
+          cookie: args.req.headers.get("cookie") ?? "",
+          authorization: args.req.headers.get("authorization") ?? "",
+        },
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        lastError = `Failed to fetch recording: ${res.status} ${txt || res.statusText}`;
+        continue;
+      }
+      const bytes = Buffer.from(await res.arrayBuffer());
+      if (!bytes.length) {
+        lastError = "Recording is empty";
+        continue;
+      }
+      const fromQuery = String(args.recordingUrl ?? "").trim().split(/[?#]/)[0];
+      const fileName = fromQuery.split("/").filter(Boolean).pop() || "recording.wav";
+      return { buffer: bytes, fileName };
+    } catch (err: any) {
+      lastError = err?.message ?? "fetch failed";
+      continue;
+    }
+  }
+
+  throw new Error(lastError ?? "fetch failed");
+}
+
+async function analyzeTranscriptWithAi(args: {
+  companyId: string;
+  transcript: string;
+  fromNumber: string | null;
+  toNumber: string | null;
+}): Promise<AnalysisPayload> {
+  const { client } = await getOpenAIClientForCompany(args.companyId);
+  if (!client) throw new Error("AI provider is not configured");
+  const model = process.env.CALL_AI_ANALYSIS_MODEL || "gpt-4o-mini";
+  const completion = await client.chat.completions.create({
+    model,
+    temperature: 0.1,
+    response_format: { type: "json_object" },
+    messages: [
+      {
+        role: "system",
+        content:
+          "Extract structured call fields as JSON only. Keys: caller_name, mobile_number, plate_number, request_type, location, lead_type, confidence, summary. lead_type must be one of rsa|recovery|workshop. confidence is 0..1.",
+      },
+      {
+        role: "user",
+        content: JSON.stringify({
+          from_number: args.fromNumber,
+          to_number: args.toNumber,
+          transcript: args.transcript,
+        }),
+      },
+    ],
+  });
+  const raw = completion.choices?.[0]?.message?.content ?? "{}";
+  let parsed: AnalysisPayload = {};
+  try {
+    parsed = JSON.parse(raw) as AnalysisPayload;
+  } catch {
+    parsed = {};
+  }
+  return {
+    caller_name: parsed.caller_name ?? null,
+    mobile_number: parsed.mobile_number ?? null,
+    plate_number: parsed.plate_number ?? null,
+    request_type: parsed.request_type ?? null,
+    location: parsed.location ?? null,
+    lead_type: toLeadType(parsed.lead_type),
+    confidence: Number.isFinite(Number(parsed.confidence)) ? Number(parsed.confidence) : null,
+    summary: parsed.summary ?? null,
+  };
+}
+
 export async function GET(_req: NextRequest, { params }: Params) {
   const { companyId: rawCompanyId } = await params;
   const companyId = String(rawCompanyId || "").trim();
@@ -69,6 +233,9 @@ export async function GET(_req: NextRequest, { params }: Params) {
       conversion_status: string;
       converted_to_lead_id: string | null;
       converted_lead_type: "rsa" | "recovery" | "workshop" | null;
+      converted_division: string | null;
+      converted_lead_status: string | null;
+      converted_lead_stage: string | null;
       lead_outcome: string | null;
       outcome_reason: string | null;
       verified_mobile: boolean;
@@ -78,48 +245,154 @@ export async function GET(_req: NextRequest, { params }: Params) {
       matched_customer_id: string | null;
       matched_customer_name: string | null;
       matched_customer_phone: string | null;
+      matched_customer_location: string | null;
       recording_url: string | null;
       recording_duration_seconds: number | null;
+      verification_location_text: string | null;
+      analysis_analyzed_at: string | null;
+      analysis_auto_convert_eligible: boolean;
+      analysis_confidence: number | null;
+      analysis_lead_type: string | null;
+      analysis_request_type: string | null;
+      analysis_plate_number: string | null;
+      analysis_location: string | null;
+      analysis_caller_name: string | null;
+      analysis_mobile_number: string | null;
+      analysis_summary: string | null;
+      analysis_transcript: string | null;
+      analysis_error: string | null;
+      analysis_attempted_at: string | null;
       created_at: string;
       updated_at: string;
     }[]>`
+      WITH inquiry_rows AS (
+        SELECT
+          call_ai_inquiries.*,
+          ${sql.unsafe(AI_PAYLOAD_OBJECT_SQL)} AS ai_payload_object
+        FROM call_ai_inquiries
+        WHERE call_ai_inquiries.company_id = ${companyId}
+      )
       SELECT
-        call_ai_inquiries.id,
-        call_ai_inquiries.provider_key,
-        call_ai_inquiries.provider_call_id,
-        call_ai_inquiries.from_number,
-        call_ai_inquiries.to_number,
-        call_ai_inquiries.inquiry_status,
-        call_ai_inquiries.inquiry_summary,
-        call_ai_inquiries.conversion_status,
-        call_ai_inquiries.converted_to_lead_id,
+        i.id,
+        i.provider_key,
+        i.provider_call_id,
+        i.from_number,
+        i.to_number,
+        i.inquiry_status,
+        i.inquiry_summary,
+        i.conversion_status,
+        i.converted_to_lead_id,
         l.lead_type AS converted_lead_type,
-        call_ai_inquiries.lead_outcome,
-        call_ai_inquiries.outcome_reason,
-        COALESCE((call_ai_inquiries.ai_payload->'manualVerification'->>'mobile')::boolean, false) AS verified_mobile,
-        COALESCE((call_ai_inquiries.ai_payload->'manualVerification'->>'location')::boolean, false) AS verified_location,
-        (call_ai_inquiries.ai_payload->'manualVerification'->>'notes')::text AS verification_notes,
-        COALESCE((call_ai_inquiries.ai_payload->'customerMatch'->>'exists')::boolean, false) AS customer_exists,
-        (call_ai_inquiries.ai_payload->'customerMatch'->>'customerId')::text AS matched_customer_id,
-        (call_ai_inquiries.ai_payload->'customerMatch'->>'customerName')::text AS matched_customer_name,
-        (call_ai_inquiries.ai_payload->'customerMatch'->>'customerPhone')::text AS matched_customer_phone,
+        l.lead_status AS converted_lead_status,
+        l.lead_stage AS converted_lead_stage,
+        COALESCE(
+          (i.ai_payload_object->'manualLeadType'->>'division')::text,
+          l.service_type
+        ) AS converted_division,
+        i.lead_outcome,
+        i.outcome_reason,
+        COALESCE((i.ai_payload_object->'manualVerification'->>'mobile')::boolean, false) AS verified_mobile,
+        COALESCE((i.ai_payload_object->'manualVerification'->>'location')::boolean, false) AS verified_location,
+        (i.ai_payload_object->'manualVerification'->>'notes')::text AS verification_notes,
+        COALESCE((i.ai_payload_object->'customerMatch'->>'exists')::boolean, false) AS customer_exists,
+        (i.ai_payload_object->'customerMatch'->>'customerId')::text AS matched_customer_id,
+        (i.ai_payload_object->'customerMatch'->>'customerName')::text AS matched_customer_name,
+        (i.ai_payload_object->'customerMatch'->>'customerPhone')::text AS matched_customer_phone,
+        NULLIF(
+          COALESCE(
+            NULLIF((to_jsonb(mc)->>'google_location')::text, ''),
+            NULLIF((to_jsonb(mc)->>'address')::text, ''),
+            NULLIF((to_jsonb(mc)->>'area')::text, ''),
+            NULLIF((to_jsonb(mc)->>'city')::text, '')
+          ),
+          ''
+        )::text AS matched_customer_location,
         rec.url AS recording_url,
         rec.duration_seconds AS recording_duration_seconds,
-        call_ai_inquiries.created_at,
-        call_ai_inquiries.updated_at
-      FROM call_ai_inquiries
-      LEFT JOIN leads l ON l.company_id = call_ai_inquiries.company_id AND l.id = call_ai_inquiries.converted_to_lead_id
+        COALESCE(
+          (i.ai_payload_object->'manualVerification'->>'locationText')::text,
+          (i.ai_payload_object->'aiRecordingAnalysis'->'extracted'->>'location')::text,
+          (i.ai_payload_object->>'analysis_location')::text,
+          NULLIF(
+            COALESCE(
+              NULLIF((to_jsonb(mc)->>'google_location')::text, ''),
+              NULLIF((to_jsonb(mc)->>'address')::text, ''),
+              NULLIF((to_jsonb(mc)->>'area')::text, ''),
+              NULLIF((to_jsonb(mc)->>'city')::text, '')
+            ),
+            ''
+          )::text
+        ) AS verification_location_text,
+        COALESCE(
+          (i.ai_payload_object->'aiRecordingAnalysis'->>'analyzedAt')::text,
+          (i.ai_payload_object->>'analysis_analyzed_at')::text
+        ) AS analysis_analyzed_at,
+        COALESCE(
+          (i.ai_payload_object->'aiRecordingAnalysis'->>'autoConvertEligible')::boolean,
+          (i.ai_payload_object->>'analysis_auto_convert_eligible')::boolean,
+          false
+        ) AS analysis_auto_convert_eligible,
+        COALESCE(
+          (i.ai_payload_object->'aiRecordingAnalysis'->'extracted'->>'confidence')::double precision,
+          (i.ai_payload_object->>'analysis_confidence')::double precision
+        ) AS analysis_confidence,
+        COALESCE(
+          (i.ai_payload_object->'aiRecordingAnalysis'->'extracted'->>'lead_type')::text,
+          (i.ai_payload_object->>'analysis_lead_type')::text
+        ) AS analysis_lead_type,
+        COALESCE(
+          (i.ai_payload_object->'aiRecordingAnalysis'->'extracted'->>'request_type')::text,
+          (i.ai_payload_object->>'analysis_request_type')::text
+        ) AS analysis_request_type,
+        COALESCE(
+          (i.ai_payload_object->'aiRecordingAnalysis'->'extracted'->>'plate_number')::text,
+          (i.ai_payload_object->>'analysis_plate_number')::text
+        ) AS analysis_plate_number,
+        COALESCE(
+          (i.ai_payload_object->'aiRecordingAnalysis'->'extracted'->>'location')::text,
+          (i.ai_payload_object->>'analysis_location')::text
+        ) AS analysis_location,
+        COALESCE(
+          (i.ai_payload_object->'aiRecordingAnalysis'->'extracted'->>'caller_name')::text,
+          (i.ai_payload_object->>'analysis_caller_name')::text
+        ) AS analysis_caller_name,
+        COALESCE(
+          (i.ai_payload_object->'aiRecordingAnalysis'->'extracted'->>'mobile_number')::text,
+          (i.ai_payload_object->>'analysis_mobile_number')::text
+        ) AS analysis_mobile_number,
+        COALESCE(
+          (i.ai_payload_object->'aiRecordingAnalysis'->'extracted'->>'summary')::text,
+          (i.ai_payload_object->>'analysis_summary')::text
+        ) AS analysis_summary,
+        COALESCE(
+          (i.ai_payload_object->'aiRecordingAnalysis'->>'transcript')::text,
+          (i.ai_payload_object->>'analysis_transcript')::text
+        ) AS analysis_transcript,
+        COALESCE(
+          (i.ai_payload_object->'aiRecordingAnalysis'->>'error')::text,
+          (i.ai_payload_object->>'analysis_error')::text
+        ) AS analysis_error,
+        COALESCE(
+          (i.ai_payload_object->'aiRecordingAnalysis'->>'attemptedAt')::text,
+          (i.ai_payload_object->>'analysis_attempted_at')::text
+        ) AS analysis_attempted_at,
+        i.created_at,
+        i.updated_at
+      FROM inquiry_rows i
+      LEFT JOIN leads l ON l.company_id = i.company_id AND l.id = i.converted_to_lead_id
+      LEFT JOIN customers mc
+        ON mc.company_id = i.company_id
+       AND mc.id::text = (i.ai_payload_object->'customerMatch'->>'customerId')::text
       LEFT JOIN LATERAL (
         SELECT cr.url, cr.duration_seconds
         FROM call_sessions cs
         JOIN call_recordings cr ON cr.call_session_id = cs.id
-        WHERE cs.company_id = call_ai_inquiries.company_id
-          AND cs.provider_call_id = call_ai_inquiries.provider_call_id
+        WHERE cs.company_id = i.company_id
+          AND cs.provider_call_id = i.provider_call_id
         ORDER BY cr.created_at DESC
         LIMIT 1
       ) rec ON true
-      WHERE call_ai_inquiries.company_id = ${companyId}
-      ORDER BY call_ai_inquiries.created_at DESC
+      ORDER BY i.created_at DESC
       LIMIT 200
     `;
 
@@ -148,8 +421,21 @@ export async function GET(_req: NextRequest, { params }: Params) {
       phone: string | null;
       phone_alt: string | null;
       whatsapp_phone: string | null;
+      address: string | null;
+      area: string | null;
+      city: string | null;
+      google_location: string | null;
     }[]>`
-      SELECT id, name, phone, phone_alt, whatsapp_phone
+      SELECT
+        id,
+        name,
+        phone,
+        phone_alt,
+        whatsapp_phone,
+        (to_jsonb(customers)->>'address')::text AS address,
+        (to_jsonb(customers)->>'area')::text AS area,
+        (to_jsonb(customers)->>'city')::text AS city,
+        (to_jsonb(customers)->>'google_location')::text AS google_location
       FROM customers
       WHERE company_id = ${companyId}
         AND (
@@ -164,7 +450,10 @@ export async function GET(_req: NextRequest, { params }: Params) {
       LIMIT 500
     `;
 
-    const customerByNormalized = new Map<string, { id: string; name: string | null; phone: string | null }>();
+    const customerByNormalized = new Map<
+      string,
+      { id: string; name: string | null; phone: string | null; location: string | null }
+    >();
     for (const c of customerRows) {
       const normalized = [
         stripLeadingZeros(normalizePhoneDigits(c.phone)),
@@ -177,6 +466,12 @@ export async function GET(_req: NextRequest, { params }: Params) {
             id: String(c.id),
             name: c.name ? String(c.name) : null,
             phone: c.phone ? String(c.phone) : null,
+            location:
+              String(c.google_location ?? "").trim() ||
+              String(c.address ?? "").trim() ||
+              String(c.area ?? "").trim() ||
+              String(c.city ?? "").trim() ||
+              null,
           });
         }
       }
@@ -198,6 +493,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
         matched_customer_id: match.id,
         matched_customer_name: match.name,
         matched_customer_phone: match.phone ?? row.from_number,
+        matched_customer_location: match.location ?? null,
       };
     });
 
@@ -238,23 +534,376 @@ export async function POST(req: NextRequest, { params }: Params) {
   const sql = getSql();
 
   try {
+    const inquiryCtxRows = await sql<{
+      id: string;
+      converted_to_lead_id: string | null;
+      lead_status: string | null;
+      lead_stage: string | null;
+    }[]>`
+      SELECT i.id, i.converted_to_lead_id, l.lead_status, l.lead_stage
+      FROM call_ai_inquiries i
+      LEFT JOIN leads l
+        ON l.company_id = i.company_id
+       AND l.id = i.converted_to_lead_id
+      WHERE i.company_id = ${companyId}
+        AND i.id = ${inquiryId}
+      LIMIT 1
+    `;
+    const inquiryCtx = inquiryCtxRows?.[0];
+    if (!inquiryCtx) {
+      return NextResponse.json({ error: "Inquiry not found" }, { status: 404 });
+    }
+    if (
+      inquiryCtx.converted_to_lead_id &&
+      isLeadFinalized(inquiryCtx.lead_status, inquiryCtx.lead_stage)
+    ) {
+      return NextResponse.json(
+        { error: "Converted lead is closed. Inquiry actions are disabled." },
+        { status: 400 }
+      );
+    }
+
+    if (action === "analyze_recording") {
+      const rows = await sql<{
+        id: string;
+        company_id: string;
+        provider_call_id: string;
+        from_number: string | null;
+        to_number: string | null;
+        converted_to_lead_id: string | null;
+        recording_url: string | null;
+      }[]>`
+        SELECT
+          i.id,
+          i.company_id,
+          i.provider_call_id,
+          i.from_number,
+          i.to_number,
+          i.converted_to_lead_id,
+          rec.url AS recording_url
+        FROM call_ai_inquiries i
+        LEFT JOIN LATERAL (
+          SELECT cr.url
+          FROM call_sessions cs
+          JOIN call_recordings cr ON cr.call_session_id = cs.id
+          WHERE cs.company_id = i.company_id
+            AND cs.provider_call_id = i.provider_call_id
+          ORDER BY cr.created_at DESC
+          LIMIT 1
+        ) rec ON true
+        WHERE i.company_id = ${companyId} AND i.id = ${inquiryId}
+        LIMIT 1
+      `;
+      const row = rows?.[0];
+      if (!row) return NextResponse.json({ error: "Inquiry not found" }, { status: 404 });
+      const saveAnalysisError = async (errorMessage: string) => {
+        const failedPatch = {
+          aiRecordingAnalysis: {
+            attemptedAt: new Date().toISOString(),
+            error: errorMessage,
+          },
+          analysis_attempted_at: new Date().toISOString(),
+          analysis_error: errorMessage,
+        };
+        await sql`
+          UPDATE call_ai_inquiries
+          SET
+          ai_payload = (${sql.unsafe(AI_PAYLOAD_OBJECT_SQL)}) || ${JSON.stringify(failedPatch)}::jsonb,
+          updated_at = now()
+        WHERE company_id = ${companyId} AND id = ${inquiryId}
+      `;
+      };
+
+      try {
+        if (!isUsableRecordingUrl(row.recording_url)) {
+          await saveAnalysisError("Recording not available for this inquiry yet");
+          return NextResponse.json({ error: "Recording not available for this inquiry yet" }, { status: 400 });
+        }
+
+        const { client } = await getOpenAIClientForCompany(companyId);
+        if (!client) {
+          await saveAnalysisError("AI provider is not configured for this company");
+          return NextResponse.json({ error: "AI provider is not configured for this company" }, { status: 400 });
+        }
+
+        const { buffer, fileName } = await fetchRecordingBufferViaProxy({
+          req,
+          companyId,
+          recordingUrl: String(row.recording_url),
+        });
+        const file = new File([buffer], fileName, { type: "audio/wav" });
+        const tx = await client.audio.transcriptions.create({
+          model: process.env.CALL_AI_TRANSCRIBE_MODEL || "whisper-1",
+          file,
+        });
+        const transcript = String((tx as any)?.text ?? "").trim();
+        if (!transcript) {
+          await saveAnalysisError("Transcription is empty");
+          return NextResponse.json({ error: "Transcription is empty" }, { status: 400 });
+        }
+
+        const extracted = await analyzeTranscriptWithAi({
+          companyId,
+          transcript,
+          fromNumber: row.from_number,
+          toNumber: row.to_number,
+        });
+
+        const mobileCandidates = buildPhoneCandidates(extracted.mobile_number ?? row.from_number ?? null);
+        const mobileSuffixCandidates = buildPhoneSuffixCandidates(extracted.mobile_number ?? row.from_number ?? null);
+        const matchedCustomers = mobileCandidates.length
+          ? await sql<{
+            id: string;
+            name: string | null;
+            phone: string | null;
+            phone_alt: string | null;
+            whatsapp_phone: string | null;
+            google_location: string | null;
+            address: string | null;
+          }[]>`
+            SELECT
+              id,
+              name,
+              phone,
+              phone_alt,
+              whatsapp_phone,
+              (to_jsonb(customers)->>'google_location')::text AS google_location,
+              (to_jsonb(customers)->>'address')::text AS address
+            FROM customers
+            WHERE company_id = ${companyId}
+              AND (
+                ltrim(regexp_replace(COALESCE(phone, ''), '\D', '', 'g'), '0') = ANY(${mobileCandidates}::text[])
+                OR ltrim(regexp_replace(COALESCE(phone_alt, ''), '\D', '', 'g'), '0') = ANY(${mobileCandidates}::text[])
+                OR ltrim(regexp_replace(COALESCE(whatsapp_phone, ''), '\D', '', 'g'), '0') = ANY(${mobileCandidates}::text[])
+                OR right(ltrim(regexp_replace(COALESCE(phone, ''), '\D', '', 'g'), '0'), 9) = ANY(${mobileSuffixCandidates}::text[])
+                OR right(ltrim(regexp_replace(COALESCE(phone_alt, ''), '\D', '', 'g'), '0'), 9) = ANY(${mobileSuffixCandidates}::text[])
+                OR right(ltrim(regexp_replace(COALESCE(whatsapp_phone, ''), '\D', '', 'g'), '0'), 9) = ANY(${mobileSuffixCandidates}::text[])
+              )
+            ORDER BY updated_at DESC
+            LIMIT 1
+          `
+          : [];
+        const analysisName = cleanText(extracted.caller_name);
+        const analysisLocation = cleanText(extracted.location);
+        const preferredMobile = cleanText(extracted.mobile_number) ?? cleanText(row.from_number);
+        let matchedCustomer = matchedCustomers?.[0] ?? null;
+
+        if (!matchedCustomer && preferredMobile) {
+          const createdCustomer = await Crm.createCustomer({
+            companyId,
+            customerType: "individual",
+            name: analysisName ?? "Customer",
+            phone: preferredMobile,
+            whatsappPhone: preferredMobile,
+            address: analysisLocation,
+            notes: `Auto-created from AI inquiry analysis (${inquiryId})`,
+          });
+          matchedCustomer = {
+            id: String(createdCustomer.id),
+            name: createdCustomer.name ?? analysisName ?? "Customer",
+            phone: createdCustomer.phone ?? preferredMobile,
+            phone_alt: createdCustomer.phone_alt ?? null,
+            whatsapp_phone: createdCustomer.whatsapp_phone ?? null,
+            google_location: (createdCustomer as any).google_location ?? null,
+            address: createdCustomer.address ?? analysisLocation,
+          };
+        }
+
+        // If analysis extracted extra details, backfill missing customer fields.
+        if (matchedCustomer) {
+          const nameMissing = !cleanText(matchedCustomer.name) || String(matchedCustomer.name).trim().toLowerCase() === "customer";
+          const phoneMissing =
+            !cleanText(matchedCustomer.phone) && !cleanText(matchedCustomer.phone_alt) && !cleanText(matchedCustomer.whatsapp_phone);
+          const locationMissing = !cleanText(matchedCustomer.google_location) && !cleanText(matchedCustomer.address);
+          const patch: Record<string, string> = {};
+          if (nameMissing && analysisName) patch.name = analysisName;
+          if (phoneMissing && preferredMobile) {
+            patch.phone = preferredMobile;
+            patch.whatsappPhone = preferredMobile;
+          }
+          if (locationMissing && analysisLocation) {
+            patch.address = analysisLocation;
+          }
+          if (Object.keys(patch).length > 0) {
+            await Crm.updateCustomerRecord(String(matchedCustomer.id), patch as any);
+            matchedCustomer = {
+              ...matchedCustomer,
+              name: patch.name ?? matchedCustomer.name,
+              phone: patch.phone ?? matchedCustomer.phone,
+              whatsapp_phone: patch.whatsappPhone ?? matchedCustomer.whatsapp_phone,
+              address: patch.address ?? matchedCustomer.address,
+            };
+          }
+        }
+
+        const matchedCustomerId = matchedCustomer ? String(matchedCustomer.id) : null;
+        const matchedCustomerName = matchedCustomer?.name ? String(matchedCustomer.name) : null;
+        const matchedCustomerPhone = matchedCustomer?.phone ? String(matchedCustomer.phone) : preferredMobile;
+        const extractedSummary = extracted.summary ? String(extracted.summary) : null;
+        const mobileVerified = Boolean(mobileCandidates.length > 0);
+        const locationVerified = String(extracted.location ?? "").trim().length >= 3;
+        const confidence = Number(extracted.confidence ?? 0);
+        const shouldAutoConvert =
+          !row.converted_to_lead_id &&
+          mobileVerified &&
+          locationVerified &&
+          confidence >= Number(process.env.CALL_AI_AUTO_CONVERT_CONFIDENCE ?? "0.75");
+        const analyzedAtIso = new Date().toISOString();
+        const attemptedAtIso = analyzedAtIso;
+        const extractedJson = JSON.stringify(extracted);
+
+        const updatedRows = await sql<{ id: string }[]>`
+        UPDATE call_ai_inquiries
+        SET
+          inquiry_summary = COALESCE(${extractedSummary}::text, inquiry_summary),
+          inquiry_status = ${mobileVerified && locationVerified ? "qualified" : "new"},
+          ai_payload = (${sql.unsafe(AI_PAYLOAD_OBJECT_SQL)}) || jsonb_build_object(
+            'manualVerification',
+            jsonb_build_object(
+              'mobile', ${mobileVerified},
+              'location', ${locationVerified},
+              'notes', ${"Verified by AI from recording"}::text,
+              'verifiedAt', ${analyzedAtIso}::text
+            ),
+            'customerMatch',
+            jsonb_build_object(
+              'exists', ${Boolean(matchedCustomer)},
+              'customerId', ${matchedCustomerId}::text,
+              'customerName', ${matchedCustomerName}::text,
+              'customerPhone', ${matchedCustomerPhone}::text,
+              'matchedAt', ${analyzedAtIso}::text
+            ),
+            'aiRecordingAnalysis',
+            jsonb_build_object(
+              'transcript', ${transcript}::text,
+              'extracted', ${extractedJson}::jsonb,
+              'analyzedAt', ${analyzedAtIso}::text,
+              'attemptedAt', ${attemptedAtIso}::text,
+              'error', ${null}::text,
+              'autoConvertEligible', ${shouldAutoConvert}
+            ),
+            'analysis_analyzed_at', ${analyzedAtIso}::text,
+            'analysis_attempted_at', ${attemptedAtIso}::text,
+            'analysis_error', ${null}::text,
+            'analysis_auto_convert_eligible', ${shouldAutoConvert},
+            'analysis_confidence', ${extracted.confidence ?? null}::double precision,
+            'analysis_lead_type', ${extracted.lead_type ?? null}::text,
+            'analysis_request_type', ${extracted.request_type ?? null}::text,
+            'analysis_plate_number', ${extracted.plate_number ?? null}::text,
+            'analysis_location', ${extracted.location ?? null}::text,
+            'analysis_caller_name', ${extracted.caller_name ?? null}::text,
+            'analysis_mobile_number', ${extracted.mobile_number ?? null}::text,
+            'analysis_summary', ${extracted.summary ?? null}::text,
+            'analysis_transcript', ${transcript}::text
+          ),
+          updated_at = now()
+        WHERE company_id = ${companyId} AND id = ${inquiryId}
+        RETURNING id
+      `;
+        if (!updatedRows?.[0]?.id) {
+          throw new Error("Failed to persist analysis payload");
+        }
+        const analysisSavedAt = analyzedAtIso;
+
+        let leadId: string | null = row.converted_to_lead_id ? String(row.converted_to_lead_id) : null;
+        if (shouldAutoConvert) {
+          const converted = await CallAiWorkflow.convertInquiryToLead({
+            inquiryId,
+            source: "ai_recording_analysis",
+            leadType: toLeadType(extracted.lead_type),
+            leadStage: "pending_type_selection",
+          });
+          leadId = converted.leadId;
+        }
+        if (leadId) {
+          await Leads.updateLeadPartial(companyId, leadId, {
+            leadType: toLeadType(extracted.lead_type),
+          });
+        }
+
+        return NextResponse.json({
+          ok: true,
+          action: "analyze_recording",
+          inquiryId,
+          analysisSavedAt,
+          transcriptLength: transcript.length,
+          extracted,
+          verification: {
+            mobile: mobileVerified,
+            location: locationVerified,
+            customerExists: Boolean(matchedCustomer),
+          },
+          autoConverted: Boolean(shouldAutoConvert),
+          leadId,
+        });
+      } catch (err: any) {
+        const message = String(err?.message ?? "Analyze recording failed");
+        await saveAnalysisError(message);
+        return NextResponse.json({ error: message }, { status: 500 });
+      }
+    }
+
     if (action === "verify") {
       const verifiedMobile = Boolean(body?.verifiedMobile);
-      const verifiedLocation = Boolean(body?.verifiedLocation);
+      const verificationLocationRaw = String(body?.verificationLocation ?? "").trim();
       const notes = String(body?.verificationNotes ?? "").trim();
+      const inquiryRows = await sql<{ ai_payload_object: any }[]>`
+        SELECT ${sql.unsafe(AI_PAYLOAD_OBJECT_SQL)} AS ai_payload_object
+        FROM call_ai_inquiries
+        WHERE company_id = ${companyId} AND id = ${inquiryId}
+        LIMIT 1
+      `;
+      if (!inquiryRows?.[0]) {
+        return NextResponse.json({ error: "Inquiry not found" }, { status: 404 });
+      }
+      const matchedCustomerId = String(
+        inquiryRows[0]?.ai_payload_object?.customerMatch?.customerId ??
+          inquiryRows[0]?.ai_payload_object?.customerMatch?.id ??
+          ""
+      ).trim();
+      let inferredLocation = "";
+      if (matchedCustomerId) {
+        const customerRows = await sql<{
+          google_location: string | null;
+          address: string | null;
+          area: string | null;
+          city: string | null;
+        }[]>`
+          SELECT
+            (to_jsonb(customers)->>'google_location')::text AS google_location,
+            (to_jsonb(customers)->>'address')::text AS address,
+            (to_jsonb(customers)->>'area')::text AS area,
+            (to_jsonb(customers)->>'city')::text AS city
+          FROM customers
+          WHERE company_id = ${companyId} AND id = ${matchedCustomerId}
+          LIMIT 1
+        `;
+        const c = customerRows?.[0];
+        inferredLocation =
+          String(c?.google_location ?? "").trim() ||
+          String(c?.address ?? "").trim() ||
+          String(c?.area ?? "").trim() ||
+          String(c?.city ?? "").trim() ||
+          "";
+      }
+      const verificationLocation = verificationLocationRaw || inferredLocation;
+      const verifiedLocation =
+        (body?.verifiedLocation === undefined ? true : Boolean(body?.verifiedLocation)) &&
+        verificationLocation.length >= 3;
       const nextInquiryStatus = verifiedMobile && verifiedLocation ? "qualified" : "new";
 
       const rows = await sql<any[]>`
         UPDATE call_ai_inquiries
         SET
           inquiry_status = ${nextInquiryStatus},
-          ai_payload = COALESCE(ai_payload, '{}'::jsonb) || jsonb_build_object(
+          ai_payload = (${sql.unsafe(AI_PAYLOAD_OBJECT_SQL)}) || jsonb_build_object(
             'manualVerification',
             jsonb_build_object(
-              'mobile', ${verifiedMobile},
-              'location', ${verifiedLocation},
-              'notes', ${notes || null},
-              'verifiedAt', ${new Date().toISOString()}
+              'mobile', ${verifiedMobile}::boolean,
+              'location', ${verifiedLocation}::boolean,
+              'locationText', ${verificationLocation || null}::text,
+              'notes', ${notes || null}::text,
+              'verifiedAt', ${new Date().toISOString()}::text
             )
           ),
           updated_at = now()
@@ -297,6 +946,20 @@ export async function POST(req: NextRequest, { params }: Params) {
       if (!["rsa", "recovery", "workshop"].includes(leadTypeRaw)) {
         return NextResponse.json({ error: "leadType must be one of rsa|recovery|workshop" }, { status: 400 });
       }
+      const divisionRaw = String(body?.division ?? "").trim().toLowerCase();
+      const validDivisions =
+        leadTypeRaw === "rsa"
+          ? RSA_DIVISIONS
+          : leadTypeRaw === "recovery"
+            ? RECOVERY_DIVISIONS
+            : ([] as readonly string[]);
+      if (validDivisions.length > 0 && !divisionRaw) {
+        return NextResponse.json({ error: "Division is required for selected lead type" }, { status: 400 });
+      }
+      if (divisionRaw && validDivisions.length > 0 && !validDivisions.includes(divisionRaw as any)) {
+        return NextResponse.json({ error: "Invalid division for selected lead type" }, { status: 400 });
+      }
+      const division = validDivisions.length > 0 ? (divisionRaw || null) : null;
 
       const inquiryRows = await sql<{ converted_to_lead_id: string | null }[]>`
         SELECT converted_to_lead_id
@@ -311,16 +974,19 @@ export async function POST(req: NextRequest, { params }: Params) {
 
       await Leads.updateLeadPartial(companyId, leadId, {
         leadType: leadTypeRaw as "rsa" | "recovery" | "workshop",
+        serviceType: division,
+        leadStage: "new",
       });
 
       await sql`
         UPDATE call_ai_inquiries
         SET
-          ai_payload = COALESCE(ai_payload, '{}'::jsonb) || jsonb_build_object(
+          ai_payload = (${sql.unsafe(AI_PAYLOAD_OBJECT_SQL)}) || jsonb_build_object(
             'manualLeadType',
             jsonb_build_object(
-              'value', ${leadTypeRaw},
-              'updatedAt', ${new Date().toISOString()}
+              'value', ${leadTypeRaw}::text,
+              'division', ${division}::text,
+              'updatedAt', ${new Date().toISOString()}::text
             )
           ),
           updated_at = now()
@@ -333,6 +999,7 @@ export async function POST(req: NextRequest, { params }: Params) {
         inquiryId,
         leadId,
         leadType: leadTypeRaw,
+        division,
       });
     }
 

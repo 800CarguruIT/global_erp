@@ -16,7 +16,7 @@ export default function VendorRoleNewPage({
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch("/api/auth/permissions");
+        const res = await fetch("/api/auth/permissions?scope=vendor");
         if (!res.ok) throw new Error("Failed to load permissions");
         const data = await res.json();
         setPerms(data.data ?? data);
@@ -48,7 +48,7 @@ export default function VendorRoleNewPage({
         ) : (
           <RoleForm
             mode="create"
-            scope={{ scope: "company", companyId }}
+            scope={{ scope: "vendor", companyId, vendorId }}
             availablePermissions={perms}
             onSaved={() =>
               (window.location.href = `/company/${companyId}/vendors/${vendorId}/settings/security/roles`)

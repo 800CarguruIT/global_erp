@@ -19,8 +19,8 @@ export default function VendorRoleEditPage({
     setLoading(true);
     try {
       const [permRes, roleRes] = await Promise.all([
-        fetch("/api/auth/permissions"),
-        fetch(`/api/auth/roles/${id}?scope=company&companyId=${companyId}`),
+        fetch("/api/auth/permissions?scope=vendor"),
+        fetch(`/api/auth/roles/${id}?scope=vendor&companyId=${companyId}&vendorId=${vendorId}`),
       ]);
       if (!permRes.ok) throw new Error("Failed to load permissions");
       if (!roleRes.ok) throw new Error("Failed to load role");
@@ -59,7 +59,7 @@ export default function VendorRoleEditPage({
         ) : (
           <RoleForm
             mode="edit"
-            scope={{ scope: "company", companyId }}
+            scope={{ scope: "vendor", companyId, vendorId }}
             initial={role}
             availablePermissions={perms}
             onSaved={() =>
