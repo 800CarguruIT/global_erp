@@ -46,7 +46,8 @@ async function ensureLeadAssignmentColumns(): Promise<boolean> {
           'dropoff_to',
           'pickup_google_location',
           'dropoff_google_location',
-          'checkin_at'
+          'checkin_at',
+          'workflow_required'
         )
     `;
     const names = (res as any)?.map((r: any) => r.column_name) ?? [];
@@ -64,6 +65,7 @@ async function ensureLeadAssignmentColumns(): Promise<boolean> {
       "pickup_google_location",
       "dropoff_google_location",
       "checkin_at",
+      "workflow_required",
     ].filter((c) => !names.includes(c));
     if (missing.length) {
       // add columns if they don't exist; keep null defaults to avoid migrations blocking
@@ -81,7 +83,8 @@ async function ensureLeadAssignmentColumns(): Promise<boolean> {
         ADD COLUMN IF NOT EXISTS dropoff_to text NULL,
         ADD COLUMN IF NOT EXISTS pickup_google_location text NULL,
         ADD COLUMN IF NOT EXISTS dropoff_google_location text NULL,
-        ADD COLUMN IF NOT EXISTS checkin_at timestamptz NULL
+        ADD COLUMN IF NOT EXISTS checkin_at timestamptz NULL,
+        ADD COLUMN IF NOT EXISTS workflow_required jsonb NULL
       `;
     }
     leadAssignmentColumnsSupported = true;
@@ -216,7 +219,8 @@ export async function createLead(input: CreateLeadInput): Promise<Lead> {
           lead_status,
           lead_stage,
           source,
-          is_locked
+          is_locked,
+          workflow_required
         )
         VALUES (
           ${input.companyId},
@@ -239,7 +243,8 @@ export async function createLead(input: CreateLeadInput): Promise<Lead> {
           ${leadStatus},
           ${leadStage},
           ${input.source ?? null},
-          ${false}
+          ${false},
+          ${null}
         )
         RETURNING *
       `
@@ -311,6 +316,7 @@ function mapLeadRow(row: any): Lead {
     leadStatus: normalizedStatus,
     leadStage: row.lead_stage,
     source: row.source,
+    workflowRequired: row.workflow_required ?? null,
     slaMinutes: row.sla_minutes,
     firstResponseAt: row.first_response_at,
     lastActivityAt: row.last_activity_at,
@@ -493,6 +499,7 @@ export async function updateLeadPartial(
     checkinAt?: string | null;
     carInVideo?: string | null;
     carOutVideo?: string | null;
+    workflowRequired?: Record<string, unknown> | null;
   },
 ): Promise<void> {
   const supportsAssignments = await ensureLeadAssignmentColumns();
@@ -610,6 +617,10 @@ export async function updateLeadPartial(
     patch.carOutVideo !== undefined
       ? patch.carOutVideo
       : ((current as any).carOutVideo ?? null);
+  const newWorkflowRequired =
+    patch.workflowRequired !== undefined
+      ? patch.workflowRequired
+      : ((current as any).workflowRequired ?? null);
 
   const newClosedAt =
     storedStatus === "closed_won" || storedStatus === "lost"
@@ -650,6 +661,7 @@ export async function updateLeadPartial(
         checkin_at = ${newCheckinAt},
         carin_video = ${newCarInVideo},
         carout_video = ${newCarOutVideo},
+        workflow_required = ${newWorkflowRequired},
         closed_at = ${newClosedAt},
         health_score = ${healthScore},
         updated_at = now()

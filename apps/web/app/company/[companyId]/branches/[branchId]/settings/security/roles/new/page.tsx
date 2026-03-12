@@ -16,7 +16,7 @@ export default function BranchRoleNewPage({
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch("/api/auth/permissions");
+        const res = await fetch("/api/auth/permissions?scope=branch");
         if (!res.ok) throw new Error("Failed to load permissions");
         const data = await res.json();
         setPerms(data.data ?? data);

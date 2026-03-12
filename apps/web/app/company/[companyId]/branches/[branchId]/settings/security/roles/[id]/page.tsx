@@ -19,7 +19,7 @@ export default function BranchRoleEditPage({
     setLoading(true);
     try {
       const [permRes, roleRes] = await Promise.all([
-        fetch("/api/auth/permissions"),
+        fetch("/api/auth/permissions?scope=branch"),
         fetch(`/api/auth/roles/${id}?scope=branch&companyId=${companyId}&branchId=${branchId}`),
       ]);
       if (!permRes.ok) throw new Error("Failed to load permissions");

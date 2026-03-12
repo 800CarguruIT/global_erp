@@ -5,6 +5,8 @@ import { useDropzone, type Accept } from "react-dropzone";
 
 export interface DropzoneFileInputProps {
   accept?: Accept;
+  maxSizeBytes?: number;
+  capture?: "user" | "environment";
   disabled?: boolean;
   onFileSelect: (file: File | null) => void;
   onReject?: (message: string) => void;
@@ -19,6 +21,8 @@ export interface DropzoneFileInputProps {
 
 export function DropzoneFileInput({
   accept,
+  maxSizeBytes,
+  capture,
   disabled,
   onFileSelect,
   onReject,
@@ -32,6 +36,7 @@ export function DropzoneFileInput({
 }: DropzoneFileInputProps) {
   const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
     accept,
+    maxSize: maxSizeBytes,
     multiple: false,
     maxFiles: 1,
     noClick: true,
@@ -52,7 +57,7 @@ export function DropzoneFileInput({
 
   return (
     <div {...getRootProps({ className: rootClassName })}>
-      <input {...getInputProps()} />
+      <input {...getInputProps({ capture })} />
       <span className={textClassName ?? "text-muted-foreground"}>
         {selectedFileName || (isDragActive ? activeText : idleText)}
       </span>

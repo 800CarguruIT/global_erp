@@ -44,6 +44,19 @@ type InquiryRow = {
   matched_customer_phone: string | null;
   recording_url: string | null;
   recording_duration_seconds: number | null;
+  analysis_analyzed_at: string | null;
+  analysis_auto_convert_eligible: boolean;
+  analysis_confidence: number | null;
+  analysis_lead_type: string | null;
+  analysis_request_type: string | null;
+  analysis_plate_number: string | null;
+  analysis_location: string | null;
+  analysis_caller_name: string | null;
+  analysis_mobile_number: string | null;
+  analysis_summary: string | null;
+  analysis_transcript: string | null;
+  analysis_error: string | null;
+  analysis_attempted_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -64,6 +77,11 @@ function formatDuration(totalSeconds: number | null | undefined) {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+function formatConfidence(value: number | null | undefined): string {
+  if (value === null || value === undefined || Number.isNaN(value)) return "-";
+  return `${(Math.max(0, Math.min(1, Number(value))) * 100).toFixed(0)}%`;
 }
 
 export default function CallHistoryPage({ params }: Params) {
@@ -335,7 +353,7 @@ function LeadInquiriesPanel({ companyId }: { companyId: string }) {
     setError(null);
     setWarning(null);
     try {
-      const res = await fetch(`/api/company/${companyId}/ai/inquiries`, { cache: "no-store" });
+      const res = await fetch(`/api/company/${companyId}/ai/inquiries?_=${Date.now()}`, { cache: "no-store" });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(String(json?.error ?? "Failed to load lead inquiries"));
       setItems(Array.isArray(json?.inquiries) ? json.inquiries : []);
@@ -419,6 +437,21 @@ function LeadInquiriesPanel({ companyId }: { companyId: string }) {
     }
   }
 
+  async function analyzeRecording(row: InquiryRow) {
+    setRowBusy(row.id, "analyze");
+    try {
+      await runInquiryAction(
+        row.id,
+        { action: "analyze_recording" },
+        "Failed to analyze recording"
+      );
+    } catch (err: any) {
+      setError(err?.message ?? "Failed to analyze recording");
+    } finally {
+      setRowBusy(row.id, null);
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="space-y-1">
@@ -489,6 +522,7 @@ function LeadInquiriesPanel({ companyId }: { companyId: string }) {
                 <th className="py-2 pr-3">Conversion</th>
                 <th className="py-2 pr-3">Lead Type</th>
                 <th className="py-2 pr-3">Recording</th>
+                <th className="py-2 pr-3">AI Analysis</th>
                 <th className="py-2 pr-3">Outcome</th>
                 <th className="py-2 pr-3">Actions</th>
               </tr>
@@ -564,6 +598,33 @@ function LeadInquiriesPanel({ companyId }: { companyId: string }) {
                       "-"
                     )}
                   </td>
+                  <td className="py-2 pr-3">
+                    {row.analysis_analyzed_at ? (
+                      <div className="min-w-[260px] text-xs">
+                        <div>Analyzed: {new Date(row.analysis_analyzed_at).toLocaleString()}</div>
+                        <div>Confidence: {formatConfidence(row.analysis_confidence)}</div>
+                        <div>Eligible: {row.analysis_auto_convert_eligible ? "yes" : "no"}</div>
+                        <div>Lead type: {row.analysis_lead_type ?? "-"}</div>
+                        <div>Request: {row.analysis_request_type ?? "-"}</div>
+                        <div>Plate: {row.analysis_plate_number ?? "-"}</div>
+                        <div>Location: {row.analysis_location ?? "-"}</div>
+                        <div>Caller: {row.analysis_caller_name ?? "-"}</div>
+                        <div>Mobile: {row.analysis_mobile_number ?? "-"}</div>
+                        <div className="truncate">Summary: {row.analysis_summary ?? "-"}</div>
+                        <div className="truncate text-muted-foreground">Transcript: {row.analysis_transcript ?? "-"}</div>
+                      </div>
+                    ) : row.analysis_error ? (
+                      <div className="min-w-[260px] text-xs">
+                        <div className="text-amber-300">Last attempt failed</div>
+                        <div className="text-muted-foreground">
+                          {row.analysis_attempted_at ? new Date(row.analysis_attempted_at).toLocaleString() : "-"}
+                        </div>
+                        <div className="break-words text-red-300">{row.analysis_error}</div>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Not analyzed</span>
+                    )}
+                  </td>
                   <td className="py-2 pr-3">{row.lead_outcome ?? "-"}</td>
                   <td className="py-2 pr-3">
                     <div className="flex flex-wrap gap-2">
@@ -574,6 +635,14 @@ function LeadInquiriesPanel({ companyId }: { companyId: string }) {
                         className={`rounded border px-2 py-1 text-xs disabled:opacity-50 ${theme.surfaceSubtle} ${theme.cardBorder}`}
                       >
                         {actionById[row.id] === "verify" ? "Verifying..." : row.verified_mobile && row.verified_location ? "Verified" : "Verify"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void analyzeRecording(row)}
+                        disabled={Boolean(actionById[row.id]) || !isUsableRecordingUrl(row.recording_url)}
+                        className={`rounded border px-2 py-1 text-xs disabled:opacity-50 ${theme.surfaceSubtle} ${theme.cardBorder}`}
+                      >
+                        {actionById[row.id] === "analyze" ? "Analyzing..." : "Analyze (AI)"}
                       </button>
                       <button
                         type="button"

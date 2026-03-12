@@ -22,6 +22,17 @@ export type LeadStage =
 
 export type LeadSource = "call" | "website" | "ads" | "whatsapp" | "walk_in" | "referral" | "other";
 
+export type LeadWorkflowRequired = {
+  acceptLeadConfirmed?: boolean;
+  startStepConfirmed?: boolean;
+  reachedStepConfirmed?: boolean;
+  preServiceSignatureConfirmed?: boolean;
+  postServiceSignatureConfirmed?: boolean;
+  preServiceNotes?: string | null;
+  postServiceNotes?: string | null;
+  updatedAt?: string | null;
+};
+
 export interface Lead {
   id: string;
   companyId: string;
@@ -41,8 +52,7 @@ export interface Lead {
   serviceType?: string | null;
   assignedUserId?: string | null;
   assignedAt?: string | null;
-  recoveryDirection?: "pickup" | "dropoff" | null;
-  recoveryFlow?: "customer_to_branch" | "customer_to_customer" | "branch_to_branch" | "branch_to_customer" | null;
+  workflowRequired?: LeadWorkflowRequired | null;
   source: string | null;
   slaMinutes: number | null;
   firstResponseAt: string | null;

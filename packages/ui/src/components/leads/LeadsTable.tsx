@@ -323,15 +323,23 @@ export function LeadsTable({
                 <td className="px-4 py-3 border-b border-border/30 text-sm">
                   {renderActions ? (
                     renderActions(lead)
-                  ) : canAssign ? (
+                  ) : (
                     <div className="flex flex-wrap gap-1">
-                      <button
+                      <a
+                        href={detailHref}
                         className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-primary hover:shadow-md"
-                        onClick={() => onAssign(lead.id, lead)}
-                        type="button"
                       >
-                        Assign
-                      </button>
+                        Open
+                      </a>
+                      {canAssign ? (
+                        <button
+                          className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-primary hover:shadow-md"
+                          onClick={() => onAssign(lead.id, lead)}
+                          type="button"
+                        >
+                          Assign
+                        </button>
+                      ) : null}
                       {canCarIn ? (
                         <button
                           className="rounded-md border border-emerald-300/60 bg-emerald-500/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-emerald-600 shadow-sm transition hover:bg-emerald-500/20 hover:shadow-md"
@@ -342,8 +350,6 @@ export function LeadsTable({
                         </button>
                       ) : null}
                     </div>
-                  ) : (
-                    <span className="text-muted-foreground text-xs">-</span>
                   )}
                 </td>
               </tr>

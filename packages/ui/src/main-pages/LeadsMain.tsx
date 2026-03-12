@@ -9,7 +9,9 @@ import { Card } from "../components/Card";
 export type LeadsMainProps = {
   companyId: string;
   companyName?: string;
-  initialTab?: "all" | "rsa" | "recovery" | "workshop";
+  initialTab?: "all" | "rsa" | "recovery" | "workshop" | "closed";
+  initialStatus?: string;
+  initialAssignedOnly?: boolean;
 };
 
 type SortKey =
@@ -30,12 +32,18 @@ function normalize(value: string | number | null | undefined) {
   return (value ?? "").toString().trim().toLowerCase();
 }
 
-export function LeadsMain({ companyId, companyName, initialTab = "all" }: LeadsMainProps) {
+export function LeadsMain({
+  companyId,
+  companyName,
+  initialTab = "all",
+  initialStatus,
+  initialAssignedOnly = false,
+}: LeadsMainProps) {
   const { t } = useI18n();
   const [leads, setLeads] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<"all" | "rsa" | "recovery" | "workshop">(initialTab);
+  const [tab, setTab] = useState<"all" | "rsa" | "recovery" | "workshop" | "closed">(initialTab);
   const [query, setQuery] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("created");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
@@ -96,7 +104,59 @@ export function LeadsMain({ companyId, companyName, initialTab = "all" }: LeadsM
 
   const filteredLeads = useMemo(() => {
     const term = normalize(query);
-    let rows = tab === "all" ? leads : leads.filter((l) => l.leadType === tab);
+    const isClosedLead = (lead: any) => {
+      const status = String(lead?.leadStatus ?? "").trim().toLowerCase();
+      const stage = String(lead?.leadStage ?? "").trim().toLowerCase();
+      return (
+        status === "closed" ||
+        status === "closed_won" ||
+        status === "done" ||
+        status === "completed" ||
+        stage === "closed"
+      );
+    };
+    const isRsaDoneLead = (lead: any) => {
+      if (String(lead?.leadType ?? "").trim().toLowerCase() !== "rsa") return false;
+      const status = String(lead?.leadStatus ?? "").trim().toLowerCase();
+      const stage = String(lead?.leadStage ?? "").trim().toLowerCase();
+      return (
+        status === "done" ||
+        status === "closed" ||
+        status === "closed_won" ||
+        status === "completed" ||
+        stage === "completed" ||
+        stage === "post_service_signed" ||
+        stage === "closed"
+      );
+    };
+    let rows = tab === "all" ? leads : tab === "closed" ? leads.filter((l) => isClosedLead(l)) : leads.filter((l) => l.leadType === tab);
+    if (tab === "rsa") {
+      rows = rows.filter((l) => !isRsaDoneLead(l));
+    }
+    if (initialStatus) {
+      const expected = initialStatus.trim().toLowerCase();
+      rows = rows.filter((l) => String(l?.leadStatus ?? "").trim().toLowerCase() === expected);
+    }
+    if (initialAssignedOnly) {
+      rows = rows.filter((l) => {
+        const stage = String(l?.leadStage ?? "")
+          .trim()
+          .toLowerCase();
+        const stageLooksAssigned =
+          stage === "assigned" ||
+          stage === "dispatched" ||
+          stage === "enroute" ||
+          stage === "processing" ||
+          stage === "car_in";
+        return Boolean(
+          l?.assignedUserId ??
+            l?.agentEmployeeId ??
+            l?.branchId ??
+            l?.assignedAt ??
+            stageLooksAssigned
+        );
+      });
+    }
 
     if (!term) return rows;
 
@@ -121,7 +181,7 @@ export function LeadsMain({ companyId, companyName, initialTab = "all" }: LeadsM
         .join(" ");
       return haystack.includes(term);
     });
-  }, [leads, query, tab]);
+  }, [leads, query, tab, initialStatus, initialAssignedOnly]);
 
   const sortedLeads = useMemo(() => {
     const rows = [...filteredLeads];
@@ -171,6 +231,7 @@ export function LeadsMain({ companyId, companyName, initialTab = "all" }: LeadsM
         { key: "rsa", label: t("leads.tab.rsa") ?? "RSA" },
         { key: "recovery", label: t("leads.tab.recovery") ?? "Recovery" },
         { key: "workshop", label: t("leads.tab.workshop") ?? "Workshop" },
+        { key: "closed", label: t("leads.tab.closed") ?? "Closed" },
       ] as const,
     [t]
   );
@@ -279,6 +340,16 @@ export function LeadsMain({ companyId, companyName, initialTab = "all" }: LeadsM
     setAssignUsers([]);
     setAssignBranchId(null);
     setAssignUserId(null);
+    if (lt === "rsa") {
+      try {
+        const res = await fetch(`/api/company/${companyId}/admin/users`);
+        if (!res.ok) throw new Error(t("leads.assign.loadUsers") ?? "Failed to load users");
+        const data = await res.json();
+        setAssignUsers(data.data ?? data ?? []);
+      } catch (err: any) {
+        setAssignError(err?.message ?? t("leads.assign.loadUsers") ?? "Failed to load users");
+      }
+    }
     try {
       const res = await fetch(`/api/company/${companyId}/branches`);
       if (!res.ok) throw new Error(t("leads.assign.loadBranches") ?? "Failed to load branches");
@@ -342,7 +413,8 @@ export function LeadsMain({ companyId, companyName, initialTab = "all" }: LeadsM
   }
 
   async function assignLead() {
-    if (!assignLeadId || !assignBranchId) return;
+    if (!assignLeadId) return;
+    if (assignLeadType !== "rsa" && !assignBranchId) return;
     if (assignLeadType === "recovery" && (!assignRecoveryDirection || !assignRecoveryFlow)) return;
     if ((assignLeadType === "rsa" || assignLeadType === "workshop") && !assignUserId && assignLeadType !== "workshop") return;
     setAssignLoading(true);
@@ -354,7 +426,7 @@ export function LeadsMain({ companyId, companyName, initialTab = "all" }: LeadsM
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          branchId: assignBranchId,
+          branchId: assignLeadType === "rsa" ? null : assignBranchId,
           assignedUserId: assignLeadType === "workshop" ? null : assignUserId,
           serviceType: assignServiceType || (currentLead?.serviceType as any) || null,
           leadStage: assignLeadType === "workshop" ? currentLead?.leadStage ?? "assigned" : "assigned",
@@ -599,24 +671,26 @@ export function LeadsMain({ companyId, companyName, initialTab = "all" }: LeadsM
                       </button>
                     </div>
                     <div className="flex flex-wrap items-center gap-2 text-white">
-                      <select
-                        className="rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60"
-                        value={assignBranchId ?? ""}
-                        onChange={(e) => {
-                          const val = e.target.value || null;
-                          setAssignBranchId(val);
-                          setAssignUserId(null);
-                          if (val) loadAssignUsers(val);
-                          else setAssignUsers([]);
-                        }}
-                      >
-                        <option value="">{t("leads.assign.selectBranch")}</option>
-                        {assignBranches.map((b) => (
-                          <option key={b.id} value={b.id}>
-                            {b.display_name || b.name || b.code || b.id.slice(0, 8)}
-                          </option>
-                        ))}
-                      </select>
+                      {assignLeadType !== "rsa" && (
+                        <select
+                          className="rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60"
+                          value={assignBranchId ?? ""}
+                          onChange={(e) => {
+                            const val = e.target.value || null;
+                            setAssignBranchId(val);
+                            setAssignUserId(null);
+                            if (val) loadAssignUsers(val);
+                            else setAssignUsers([]);
+                          }}
+                        >
+                          <option value="">{t("leads.assign.selectBranch")}</option>
+                          {assignBranches.map((b) => (
+                            <option key={b.id} value={b.id}>
+                              {b.display_name || b.name || b.code || b.id.slice(0, 8)}
+                            </option>
+                          ))}
+                        </select>
+                      )}
                       {assignLeadType !== "workshop" && (
                         <select
                           className="rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60"
@@ -636,7 +710,7 @@ export function LeadsMain({ companyId, companyName, initialTab = "all" }: LeadsM
                         className="rounded bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-60"
                         onClick={() => assignLead()}
                         disabled={
-                          !assignBranchId ||
+                          (assignLeadType !== "rsa" && !assignBranchId) ||
                           assignLoading ||
                           (assignLeadType !== "workshop" && assignLeadType !== "recovery" && !assignUserId) ||
                           (assignLeadType === "recovery" && (!assignRecoveryDirection || !assignRecoveryFlow))
