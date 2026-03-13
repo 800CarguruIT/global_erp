@@ -14,6 +14,8 @@ type VinCatalogPartInput = {
 
 type VinCatalogCarInput = {
   id?: string;
+  make?: string;
+  title?: string;
   model?: string;
   year?: string;
   description?: string;
@@ -31,6 +33,25 @@ type UpsertVinCatalogParams = {
   car: VinCatalogCarInput;
   parts: VinCatalogPartInput[];
   partsBrand?: unknown;
+};
+
+type VinCatalogSnapshot = {
+  vin: string;
+  car: {
+    id: string;
+    make: string;
+    model: string;
+    year: string;
+    description: string;
+    title: string;
+  };
+  partsBrand: any;
+  parts: Array<{
+    code: string;
+    name: string;
+    groups: Array<{ id: string; level: number; name: string }>;
+  }>;
+  partsCount: number;
 };
 
 function normalizeText(value: unknown): string {
@@ -54,77 +75,119 @@ function parseDescriptionMap(description: string) {
   return out;
 }
 
+function buildCarUpsertPayload(car: VinCatalogCarInput, partsBrand?: unknown) {
+  const sourceCarId = normalizeText(car?.id);
+  if (!sourceCarId) throw new Error("source car id is required");
+  const model = normalizeText(car?.model);
+  const title = normalizeText(car?.info?.title || car?.title);
+  const make = normalizeText(car?.brand?.name || car?.make);
+  const combinedDescription = normalizeText(car?.info?.description || car?.description);
+  const descriptionMap = parseDescriptionMap(combinedDescription);
+  const yearRaw = normalizeText(car?.year);
+  const year = /^\d{4}$/.test(yearRaw) ? Number(yearRaw) : null;
+  return {
+    sourceCarId,
+    title,
+    model,
+    make,
+    combinedDescription,
+    year,
+    descriptionMap,
+    rawJson: { car, partsBrand: partsBrand ?? null } as any,
+  };
+}
+
+async function upsertCarRow(
+  trx: any,
+  vin: string,
+  car: VinCatalogCarInput,
+  partsBrand?: unknown
+): Promise<{ carRefId: string }> {
+  const payload = buildCarUpsertPayload(car, partsBrand);
+  const carRows = await trx<{ id: string }[]>/* sql */ `
+    INSERT INTO vin_catalog_cars (
+      vin,
+      source_car_id,
+      title,
+      name,
+      make,
+      model,
+      year,
+      description,
+      engine,
+      drive,
+      dest,
+      grade,
+      trans,
+      raw_json,
+      updated_at
+    )
+    VALUES (
+      ${vin},
+      ${payload.sourceCarId},
+      ${payload.title || null},
+      ${payload.model || null},
+      ${payload.make || null},
+      ${payload.model || null},
+      ${payload.year},
+      ${payload.combinedDescription || null},
+      ${payload.descriptionMap.ENGINE ?? null},
+      ${payload.descriptionMap.DRIVE ?? null},
+      ${payload.descriptionMap.DEST ?? null},
+      ${payload.descriptionMap.GRADE ?? null},
+      ${payload.descriptionMap.TRANS ?? null},
+      ${payload.rawJson},
+      now()
+    )
+    ON CONFLICT (vin, source_car_id)
+    DO UPDATE SET
+      title = EXCLUDED.title,
+      name = EXCLUDED.name,
+      make = EXCLUDED.make,
+      model = EXCLUDED.model,
+      year = EXCLUDED.year,
+      description = EXCLUDED.description,
+      engine = EXCLUDED.engine,
+      drive = EXCLUDED.drive,
+      dest = EXCLUDED.dest,
+      grade = EXCLUDED.grade,
+      trans = EXCLUDED.trans,
+      raw_json = EXCLUDED.raw_json,
+      updated_at = now()
+    RETURNING id
+  `;
+  const carRefId = normalizeText(carRows[0]?.id);
+  if (!carRefId) throw new Error("failed to upsert VIN catalog car");
+  return { carRefId };
+}
+
+export async function upsertVinCatalogCars(params: {
+  vin: string;
+  cars: VinCatalogCarInput[];
+  partsBrand?: unknown;
+}): Promise<{ carRefIds: string[] }> {
+  const vin = normalizeText(params.vin).toUpperCase();
+  if (!vin) throw new Error("VIN is required");
+  const cars = Array.isArray(params.cars) ? params.cars : [];
+  if (!cars.length) return { carRefIds: [] };
+  const sql = getSql();
+  return sql.begin(async (trx) => {
+    const carRefIds: string[] = [];
+    for (const car of cars) {
+      if (!normalizeText(car?.id)) continue;
+      const { carRefId } = await upsertCarRow(trx, vin, car, params.partsBrand);
+      carRefIds.push(carRefId);
+    }
+    return { carRefIds };
+  });
+}
+
 export async function upsertVinCatalogSnapshot(params: UpsertVinCatalogParams): Promise<{ carRefId: string }> {
   const vin = normalizeText(params.vin).toUpperCase();
   if (!vin) throw new Error("VIN is required");
-  const sourceCarId = normalizeText(params.car?.id);
-  if (!sourceCarId) throw new Error("source car id is required");
-
-  const model = normalizeText(params.car?.model);
-  const title = normalizeText(params.car?.info?.title);
-  const make = normalizeText(params.car?.brand?.name);
-  const combinedDescription = normalizeText(params.car?.info?.description || params.car?.description);
-  const descriptionMap = parseDescriptionMap(combinedDescription);
-  const yearRaw = normalizeText(params.car?.year);
-  const year = /^\d{4}$/.test(yearRaw) ? Number(yearRaw) : null;
-
   const sql = getSql();
   return sql.begin(async (trx) => {
-    const carRows = await trx<{ id: string }[]>/* sql */ `
-      INSERT INTO vin_catalog_cars (
-        vin,
-        source_car_id,
-        title,
-        name,
-        make,
-        model,
-        year,
-        description,
-        engine,
-        drive,
-        dest,
-        grade,
-        trans,
-        raw_json,
-        updated_at
-      )
-      VALUES (
-        ${vin},
-        ${sourceCarId},
-        ${title || null},
-        ${model || null},
-        ${make || null},
-        ${model || null},
-        ${year},
-        ${combinedDescription || null},
-        ${descriptionMap.ENGINE ?? null},
-        ${descriptionMap.DRIVE ?? null},
-        ${descriptionMap.DEST ?? null},
-        ${descriptionMap.GRADE ?? null},
-        ${descriptionMap.TRANS ?? null},
-        ${{ car: params.car, partsBrand: params.partsBrand ?? null } as any},
-        now()
-      )
-      ON CONFLICT (vin, source_car_id)
-      DO UPDATE SET
-        title = EXCLUDED.title,
-        name = EXCLUDED.name,
-        make = EXCLUDED.make,
-        model = EXCLUDED.model,
-        year = EXCLUDED.year,
-        description = EXCLUDED.description,
-        engine = EXCLUDED.engine,
-        drive = EXCLUDED.drive,
-        dest = EXCLUDED.dest,
-        grade = EXCLUDED.grade,
-        trans = EXCLUDED.trans,
-        raw_json = EXCLUDED.raw_json,
-        updated_at = now()
-      RETURNING id
-    `;
-
-    const carRefId = String(carRows[0]?.id ?? "");
-    if (!carRefId) throw new Error("failed to upsert VIN catalog car");
+    const { carRefId } = await upsertCarRow(trx, vin, params.car, params.partsBrand);
 
     // Replace parts/groups snapshot for this exact car variant.
     await trx/* sql */ `
@@ -199,32 +262,53 @@ export async function upsertVinCatalogSnapshot(params: UpsertVinCatalogParams): 
   });
 }
 
-export async function getVinCatalogSnapshotByVin(vinInput: string): Promise<{
-  vin: string;
-  car: {
+export async function getVinCatalogCarsByVin(vinInput: string): Promise<
+  Array<{
     id: string;
     make: string;
     model: string;
     year: string;
     description: string;
     title: string;
-  };
-  partsBrand: any;
-  parts: Array<{
-    code: string;
-    name: string;
-    groups: Array<{ id: string; level: number; name: string }>;
-  }>;
-  partsCount: number;
-} | null> {
+  }>
+> {
   const vin = normalizeText(vinInput).toUpperCase();
-  if (!vin) return null;
+  if (!vin) return [];
   const sql = getSql();
+  const rows = await sql<any[]>/* sql */ `
+    SELECT *
+    FROM vin_catalog_cars
+    WHERE vin = ${vin}
+    ORDER BY updated_at DESC, created_at DESC
+  `;
 
+  return rows.map((row) => {
+    const sourceRaw = (row.raw_json ?? null) as any;
+    const sourceCar = sourceRaw?.car ?? sourceRaw ?? {};
+    return {
+      id: normalizeText(row.source_car_id),
+      make: normalizeText(row.make),
+      model: normalizeText(row.model || row.name),
+      year: row.year == null ? "" : String(row.year),
+      description: normalizeText(row.description),
+      title: normalizeText(row.title || sourceCar?.info?.title),
+    };
+  });
+}
+
+export async function getVinCatalogSnapshotByVinAndCarId(
+  vinInput: string,
+  sourceCarIdInput: string
+): Promise<VinCatalogSnapshot | null> {
+  const vin = normalizeText(vinInput).toUpperCase();
+  const sourceCarId = normalizeText(sourceCarIdInput);
+  if (!vin || !sourceCarId) return null;
+  const sql = getSql();
   const carRows = await sql<any[]>/* sql */ `
     SELECT *
     FROM vin_catalog_cars
     WHERE vin = ${vin}
+      AND source_car_id = ${sourceCarId}
     ORDER BY updated_at DESC
     LIMIT 1
   `;
@@ -286,4 +370,20 @@ export async function getVinCatalogSnapshotByVin(vinInput: string): Promise<{
     parts,
     partsCount: parts.length,
   };
+}
+
+export async function getVinCatalogSnapshotByVin(vinInput: string): Promise<VinCatalogSnapshot | null> {
+  const vin = normalizeText(vinInput).toUpperCase();
+  if (!vin) return null;
+  const sql = getSql();
+  const row = await sql<{ source_car_id: string }[]>/* sql */ `
+    SELECT source_car_id
+    FROM vin_catalog_cars
+    WHERE vin = ${vin}
+    ORDER BY updated_at DESC, created_at DESC
+    LIMIT 1
+  `;
+  const sourceCarId = normalizeText(row[0]?.source_car_id);
+  if (!sourceCarId) return null;
+  return getVinCatalogSnapshotByVinAndCarId(vin, sourceCarId);
 }

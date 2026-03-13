@@ -9,6 +9,7 @@ export type LeadsTableProps = {
   leads: Lead[];
   onAssign?: (id: string, lead: Lead) => void;
   onCarIn?: (id: string, lead: Lead) => void;
+  onRequestRecovery?: (id: string, lead: Lead) => void;
   renderActions?: (lead: Lead) => React.ReactNode;
   selectable?: boolean;
   selectedIds?: Set<string>;
@@ -25,6 +26,7 @@ export function LeadsTable({
   leads,
   onAssign,
   onCarIn,
+  onRequestRecovery,
   renderActions,
   selectable = false,
   selectedIds,
@@ -183,6 +185,11 @@ export function LeadsTable({
               Boolean(onCarIn) &&
               leadType === "workshop" &&
               String(lead.leadStatus ?? "").toLowerCase() !== "car_in";
+            const leadStatus = String(lead.leadStatus ?? "").trim().toLowerCase();
+            const canRequestRecovery =
+              Boolean(onRequestRecovery) &&
+              leadType === "rsa" &&
+              !["closed", "closed_won", "lost", "done", "completed"].includes(leadStatus);
 
             return (
               <tr key={lead.id} className="hover:bg-muted/20">
@@ -269,7 +276,14 @@ export function LeadsTable({
                   )}
                 </td>
                 <td className="px-4 py-3 border-b border-border/30 text-sm">
-                  {lead.agentName || <span className="text-xs text-muted-foreground">Unassigned</span>}
+                  {lead.agentName ? (
+                    <div className="flex flex-col gap-0.5">
+                      <span>{lead.agentName}</span>
+                      <span className="text-[11px] text-muted-foreground">Assigned to</span>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">Unassigned</span>
+                  )}
                 </td>
                 <td className="px-4 py-3 border-b border-border/30 text-xs capitalize">
                   {lead.serviceType ? (
@@ -281,9 +295,21 @@ export function LeadsTable({
                           {lead.recoveryFlow ? `(${lead.recoveryFlow.replace(/_/g, " ")})` : ""}
                         </span>
                       )}
+                      {lead.pickupFrom ? (
+                        <span className="text-[11px] normal-case text-muted-foreground">
+                          Location: {lead.pickupFrom}
+                        </span>
+                      ) : null}
                     </div>
                   ) : (
-                    <span className="text-muted-foreground">-</span>
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-muted-foreground">-</span>
+                      {lead.pickupFrom ? (
+                        <span className="text-[11px] normal-case text-muted-foreground">
+                          Location: {lead.pickupFrom}
+                        </span>
+                      ) : null}
+                    </div>
                   )}
                 </td>
                 <td className="px-4 py-3 border-b border-border/30 text-xs">
@@ -347,6 +373,15 @@ export function LeadsTable({
                           type="button"
                         >
                           Car In
+                        </button>
+                      ) : null}
+                      {canRequestRecovery ? (
+                        <button
+                          className="rounded-md border border-cyan-300/60 bg-cyan-500/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-cyan-600 shadow-sm transition hover:bg-cyan-500/20 hover:shadow-md"
+                          onClick={() => onRequestRecovery?.(lead.id, lead)}
+                          type="button"
+                        >
+                          Request Recovery
                         </button>
                       ) : null}
                     </div>

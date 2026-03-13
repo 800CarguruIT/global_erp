@@ -106,7 +106,7 @@ export async function listLeadsForCompany(companyId: string): Promise<Lead[]> {
         car.plate_number AS car_plate_number,
         car.model AS car_model,
         COALESCE(b.display_name, b.name, b.code) AS branch_name,
-        e.full_name AS agent_name,
+        COALESCE(e.full_name, au.full_name, au.email) AS agent_name,
         l.customer_details_requested,
         l.customer_details_approved,
         l.recovery_direction,
@@ -118,6 +118,7 @@ export async function listLeadsForCompany(companyId: string): Promise<Lead[]> {
       LEFT JOIN cars car ON car.id = l.car_id
       LEFT JOIN branches b ON b.id = l.branch_id
       LEFT JOIN employees e ON e.id = l.agent_employee_id
+      LEFT JOIN users au ON au.id = l.assigned_user_id
       WHERE l.company_id = ${companyId}
       ORDER BY l.created_at DESC
     `;
@@ -139,7 +140,7 @@ export async function listLeadsForCustomer(
         car.plate_number AS car_plate_number,
         car.model AS car_model,
         COALESCE(b.display_name, b.name, b.code) AS branch_name,
-        e.full_name AS agent_name,
+        COALESCE(e.full_name, au.full_name, au.email) AS agent_name,
         l.customer_details_requested,
         l.customer_details_approved,
         l.recovery_direction,
@@ -151,6 +152,7 @@ export async function listLeadsForCustomer(
       LEFT JOIN cars car ON car.id = l.car_id
       LEFT JOIN branches b ON b.id = l.branch_id
       LEFT JOIN employees e ON e.id = l.agent_employee_id
+      LEFT JOIN users au ON au.id = l.assigned_user_id
       WHERE l.company_id = ${companyId} AND l.customer_id = ${customerId}
       ORDER BY l.created_at DESC
     `;
@@ -171,7 +173,7 @@ export async function getLeadById(
         car.plate_number AS car_plate_number,
         car.model AS car_model,
         COALESCE(b.display_name, b.name, b.code) AS branch_name,
-        e.full_name AS agent_name,
+        COALESCE(e.full_name, au.full_name, au.email) AS agent_name,
         l.customer_details_requested,
         l.customer_details_approved,
         l.recovery_direction,
@@ -183,6 +185,7 @@ export async function getLeadById(
       LEFT JOIN cars car ON car.id = l.car_id
       LEFT JOIN branches b ON b.id = l.branch_id
       LEFT JOIN employees e ON e.id = l.agent_employee_id
+      LEFT JOIN users au ON au.id = l.assigned_user_id
       WHERE l.company_id = ${companyId} AND l.id = ${leadId}
       LIMIT 1
     `;
