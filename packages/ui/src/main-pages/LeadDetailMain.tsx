@@ -39,6 +39,18 @@ type ProcessJobLineItem = {
   quantity: string;
   price: string;
   pictureFileId: string;
+  scrapEnabled: boolean;
+  scrapPictureFileId: string;
+  scrapNotes: string;
+};
+
+type VinLookupCarOption = {
+  id: string;
+  make: string;
+  model: string;
+  year: string;
+  title: string;
+  description: string;
 };
 
 const TYRE_SIZE_OPTIONS = [
@@ -118,6 +130,85 @@ function formatTyreSize(frontRaw: string, rearRaw: string): string {
   if (!front && !rear) return "";
   if (!rear || rear === front) return front;
   return `${front} | ${rear}`;
+}
+
+function extractEmbedSrc(value: string | null | undefined): string | null {
+  const trimmed = String(value ?? "").trim();
+  if (!trimmed) return null;
+  if (trimmed.includes("<iframe")) {
+    const match = trimmed.match(/src=["']([^"']+)["']/i);
+    return match?.[1] ?? null;
+  }
+  return trimmed.startsWith("http") ? trimmed : null;
+}
+
+function looksLikeUrl(value: string | null | undefined): boolean {
+  const text = String(value ?? "").trim();
+  if (!text) return false;
+  try {
+    const withProtocol = /^https?:\/\//i.test(text) ? text : `https://${text}`;
+    const parsed = new URL(withProtocol);
+    return Boolean(parsed.hostname);
+  } catch {
+    return false;
+  }
+}
+
+function normalizeUrl(value: string | null | undefined): string | null {
+  const text = String(value ?? "").trim();
+  if (!text) return null;
+  try {
+    const withProtocol = /^https?:\/\//i.test(text) ? text : `https://${text}`;
+    const parsed = new URL(withProtocol);
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
+function unwrapNavigationUrl(value: string | null | undefined): string | null {
+  const normalized = normalizeUrl(value);
+  if (!normalized) return null;
+  try {
+    const parsed = new URL(normalized);
+    const host = parsed.hostname.toLowerCase();
+
+    const nestedCandidates = [
+      parsed.searchParams.get("q"),
+      parsed.searchParams.get("query"),
+      parsed.searchParams.get("destination"),
+      parsed.searchParams.get("daddr"),
+    ]
+      .map((v) => normalizeUrl(v))
+      .filter(Boolean) as string[];
+
+    if (nestedCandidates.length > 0) {
+      const preferredShort = nestedCandidates.find((candidate) => {
+        try {
+          const nested = new URL(candidate);
+          const nestedHost = nested.hostname.toLowerCase();
+          return nestedHost === "maps.app.goo.gl" || nestedHost === "goo.gl";
+        } catch {
+          return false;
+        }
+      });
+      if (preferredShort) return preferredShort;
+      return nestedCandidates[0];
+    }
+
+    if (
+      host === "maps.app.goo.gl" ||
+      host === "goo.gl" ||
+      host.includes("google.com") ||
+      host.includes("google.")
+    ) {
+      return normalized;
+    }
+
+    return normalized;
+  } catch {
+    return normalized;
+  }
 }
 
 function parseAutoAgentNotes(raw: string | null | undefined): { cleanedRemark: string; notes: ParsedAutoNotes } {
@@ -374,7 +465,6 @@ export function LeadDetailMain({
   const [postServiceChecklistCleaned, setPostServiceChecklistCleaned] = useState(false);
   const [postServiceChecklistExplained, setPostServiceChecklistExplained] = useState(false);
   const [postServiceChecklistRoadTested, setPostServiceChecklistRoadTested] = useState(false);
-  const [postServiceCarStatus, setPostServiceCarStatus] = useState("");
   const [postServiceNotes, setPostServiceNotes] = useState("");
   const [inspectionPhotoFront, setInspectionPhotoFront] = useState("");
   const [inspectionPhotoLeft, setInspectionPhotoLeft] = useState("");
@@ -392,6 +482,8 @@ export function LeadDetailMain({
   const [inspectionMileage, setInspectionMileage] = useState("");
   const [inspectionFieldErrors, setInspectionFieldErrors] = useState<InspectionFieldErrors>({});
   const [inspectionAutoFillNote, setInspectionAutoFillNote] = useState<string | null>(null);
+  const [vinCarOptions, setVinCarOptions] = useState<VinLookupCarOption[]>([]);
+  const [selectedVinCarId, setSelectedVinCarId] = useState("");
   const [isVinLookupLoading, setIsVinLookupLoading] = useState(false);
   const [inspectionLiveValidationState, setInspectionLiveValidationState] =
     useState<"idle" | "checking" | "pass" | "warn" | "fail">("idle");
@@ -456,6 +548,9 @@ export function LeadDetailMain({
           quantity: String(item?.quantity ?? ""),
           price: String(item?.price ?? ""),
           pictureFileId: String(item?.pictureFileId ?? ""),
+          scrapEnabled: Boolean(item?.scrapEnabled),
+          scrapPictureFileId: String(item?.scrapPictureFileId ?? ""),
+          scrapNotes: String(item?.scrapNotes ?? ""),
         }))
       : [];
     setProcessJobLineItems(savedProcessItems);
@@ -473,7 +568,6 @@ export function LeadDetailMain({
     setPostServiceChecklistCleaned(Boolean(required?.postServiceChecklistCleaned));
     setPostServiceChecklistExplained(Boolean(required?.postServiceChecklistExplained));
     setPostServiceChecklistRoadTested(Boolean(required?.postServiceChecklistRoadTested));
-    setPostServiceCarStatus(String(required?.postServiceCarStatus ?? ""));
     setPreServiceNotes(String(required?.preServiceNotes ?? ""));
     setPostServiceNotes(String(required?.postServiceNotes ?? ""));
     setInspectionPhotoFront(fileIdOrEmpty(required?.inspectionPhotoFront));
@@ -1409,6 +1503,27 @@ export function LeadDetailMain({
     });
   };
 
+  const applyVinCarToInspectionFields = (car: VinLookupCarOption | null): number => {
+    if (!car) return 0;
+    let changed = 0;
+    const apiMake = String(car.make ?? "").trim();
+    const apiModel = String(car.model ?? "").trim();
+    const apiYear = String(car.year ?? "").trim();
+    if (!inspectionMake.trim() && apiMake) {
+      setInspectionMake(apiMake);
+      changed += 1;
+    }
+    if (!inspectionModel.trim() && apiModel) {
+      setInspectionModel(apiModel);
+      changed += 1;
+    }
+    if (apiYear && inspectionYear.trim() !== apiYear) {
+      setInspectionYear(apiYear);
+      changed += 1;
+    }
+    return changed;
+  };
+
   const autoFillVehicleFromVin = async () => {
     const vin = inspectionVin.trim().toUpperCase();
     if (!vin) {
@@ -1418,6 +1533,7 @@ export function LeadDetailMain({
 
     let changed = 0;
     let partsCount: number | null = null;
+    let canFallbackToLocalDecode = true;
     setIsVinLookupLoading(true);
     try {
       const res = await fetch(
@@ -1429,35 +1545,31 @@ export function LeadDetailMain({
         throw new Error(String(err?.error ?? "VIN lookup failed"));
       }
       const json = await res.json().catch(() => ({}));
-      const car = json?.data?.car ?? null;
+      const data = json?.data ?? {};
+      const cars = Array.isArray(data?.cars) ? (data.cars as VinLookupCarOption[]) : [];
+      const car = (data?.car as VinLookupCarOption | null) ?? null;
+      if (Boolean(data?.requiresCarSelection) && cars.length > 1) {
+        setVinCarOptions(cars);
+        setSelectedVinCarId((prev) => prev || String(cars[0]?.id ?? ""));
+        setInspectionAutoFillNote(`Found ${cars.length} cars for this VIN. Select one, then fetch parts catalogue.`);
+        canFallbackToLocalDecode = false;
+        return;
+      }
+      setVinCarOptions(cars.length > 1 ? cars : []);
+      if (car?.id) setSelectedVinCarId(String(car.id));
       partsCount =
-        typeof json?.data?.partsCount === "number" && Number.isFinite(json.data.partsCount)
-          ? json.data.partsCount
+        typeof data?.partsCount === "number" && Number.isFinite(data.partsCount)
+          ? data.partsCount
           : null;
-
-      const apiMake = String(car?.make ?? "").trim();
-      const apiModel = String(car?.model ?? "").trim();
-      const apiYear = String(car?.year ?? "").trim();
-
-      if (!inspectionMake.trim() && apiMake) {
-        setInspectionMake(apiMake);
-        changed += 1;
-      }
-      if (!inspectionModel.trim() && apiModel) {
-        setInspectionModel(apiModel);
-        changed += 1;
-      }
-      if (apiYear && inspectionYear.trim() !== apiYear) {
-        setInspectionYear(apiYear);
-        changed += 1;
-      }
+      changed += applyVinCarToInspectionFields(car);
+      canFallbackToLocalDecode = !car;
     } catch {
       // Fallback to local decode if temporary VIN API is unavailable.
     } finally {
       setIsVinLookupLoading(false);
     }
 
-    if (changed === 0) {
+    if (changed === 0 && canFallbackToLocalDecode) {
       const decoded = decodeVinDetails(vin);
       if (!inspectionMake.trim() && decoded.make) {
         setInspectionMake(decoded.make);
@@ -1481,6 +1593,54 @@ export function LeadDetailMain({
       );
     } else {
       setInspectionAutoFillNote(`VIN auto-fill updated ${changed} field${changed > 1 ? "s" : ""}.`);
+    }
+  };
+
+  const fetchPartsCatalogueFromSelectedVinCar = async () => {
+    const vin = inspectionVin.trim().toUpperCase();
+    if (!vin) {
+      setInspectionAutoFillNote("Enter VIN before fetching parts.");
+      return;
+    }
+    if (!selectedVinCarId) {
+      setInspectionAutoFillNote("Select a car first.");
+      return;
+    }
+
+    setIsVinLookupLoading(true);
+    try {
+      const res = await fetch(
+        `/api/company/${companyId}/sales/leads/${leadId}/vin-lookup?vin=${encodeURIComponent(vin)}&carId=${encodeURIComponent(selectedVinCarId)}`,
+        { cache: "no-store" }
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(String(err?.error ?? "VIN parts fetch failed"));
+      }
+      const json = await res.json().catch(() => ({}));
+      const data = json?.data ?? {};
+      const cars = Array.isArray(data?.cars) ? (data.cars as VinLookupCarOption[]) : [];
+      const car = (data?.car as VinLookupCarOption | null) ?? null;
+      const partsCount =
+        typeof data?.partsCount === "number" && Number.isFinite(data.partsCount) ? data.partsCount : null;
+
+      if (cars.length > 1) setVinCarOptions(cars);
+      if (car?.id) setSelectedVinCarId(String(car.id));
+
+      const changed = applyVinCarToInspectionFields(car);
+      if (partsCount !== null) {
+        setInspectionAutoFillNote(
+          `Loaded ${partsCount} catalog parts${changed ? ` and updated ${changed} field${changed > 1 ? "s" : ""}` : ""}.`
+        );
+      } else if (changed > 0) {
+        setInspectionAutoFillNote(`Updated ${changed} field${changed > 1 ? "s" : ""}.`);
+      } else {
+        setInspectionAutoFillNote("Parts catalogue fetched.");
+      }
+    } catch {
+      setInspectionAutoFillNote("Failed to fetch parts catalogue for selected car.");
+    } finally {
+      setIsVinLookupLoading(false);
     }
   };
 
@@ -1534,6 +1694,29 @@ export function LeadDetailMain({
     () => processJobSubTotal + processJobVatAmount,
     [processJobSubTotal, processJobVatAmount]
   );
+  const callerLocationLabel = useMemo(
+    () => String(autoNotes?.location || lead?.pickupFrom || lead?.dropoffTo || "").trim(),
+    [autoNotes?.location, lead?.pickupFrom, lead?.dropoffTo]
+  );
+  const callerMapRawLocation = useMemo(
+    () => extractEmbedSrc(String(lead?.pickupGoogleLocation ?? "")),
+    [lead?.pickupGoogleLocation]
+  );
+  const callerNavigationUrl = useMemo(
+    () => {
+      if (callerMapRawLocation && looksLikeUrl(callerMapRawLocation)) {
+        return unwrapNavigationUrl(callerMapRawLocation) ?? normalizeUrl(callerMapRawLocation) ?? callerMapRawLocation;
+      }
+      if (callerLocationLabel && looksLikeUrl(callerLocationLabel)) {
+        return unwrapNavigationUrl(callerLocationLabel) ?? normalizeUrl(callerLocationLabel) ?? callerLocationLabel;
+      }
+      if (callerLocationLabel) {
+        return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(callerLocationLabel)}`;
+      }
+      return null;
+    },
+    [callerMapRawLocation, callerLocationLabel]
+  );
 
   const addProcessJobLineItem = () => {
     setProcessJobLineItems((prev) => [
@@ -1544,6 +1727,9 @@ export function LeadDetailMain({
         quantity: "1",
         price: "",
         pictureFileId: "",
+        scrapEnabled: false,
+        scrapPictureFileId: "",
+        scrapNotes: "",
       },
     ]);
   };
@@ -1688,6 +1874,9 @@ export function LeadDetailMain({
           quantity: Number(item.quantity),
           price: Number(item.price),
           pictureFileId: item.pictureFileId.trim(),
+          scrapEnabled: Boolean(item.scrapEnabled),
+          scrapPictureFileId: item.scrapPictureFileId.trim(),
+          scrapNotes: item.scrapNotes.trim() || null,
         }))
         .filter(
           (item) =>
@@ -1700,6 +1889,10 @@ export function LeadDetailMain({
         );
       if (!normalizedItems.length) {
         setWorkflowError("Add at least one valid line item (name, picture, qty, price).");
+        return;
+      }
+      if (normalizedItems.some((item) => item.scrapEnabled && item.scrapPictureFileId.length === 0)) {
+        setWorkflowError("Upload scrap picture for each item where scrap is enabled.");
         return;
       }
       if (!processJobPaymentProofFileId.trim()) {
@@ -1742,10 +1935,6 @@ export function LeadDetailMain({
         setWorkflowError("Complete the customer post-service checklist before continuing.");
         return;
       }
-      if (!postServiceCarStatus.trim()) {
-        setWorkflowError("Select car status before continuing.");
-        return;
-      }
       if (!postServiceSignature.trim()) {
         setWorkflowError("Capture customer signature before continuing.");
         return;
@@ -1760,14 +1949,12 @@ export function LeadDetailMain({
           postServiceChecklistCleaned,
           postServiceChecklistExplained,
           postServiceChecklistRoadTested,
-          postServiceCarStatus: postServiceCarStatus.trim(),
           postServiceNotes: postServiceNotes.trim() || null,
           updatedAt: new Date().toISOString(),
         },
         customerRemark: [
           customerRemark,
           postServiceNotes ? `Post-Service: ${postServiceNotes}` : null,
-          `Car Status: ${postServiceCarStatus.trim()}`,
           "Post-Service Signature: Captured",
         ].filter(Boolean).join(" | "),
       });
@@ -1939,17 +2126,25 @@ export function LeadDetailMain({
                         I confirm technician has reached customer location
                       </label>
                       <div className="mt-2 rounded-md border border-dashed border-white/20 bg-white/5 p-3">
-                        <div className="text-xs font-medium text-foreground">Map (Placeholder)</div>
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="text-xs font-medium text-foreground">Caller Location</div>
+                          {callerNavigationUrl ? (
+                            <a
+                              href={callerNavigationUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="rounded border border-white/20 bg-white/10 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-white hover:bg-white/20"
+                            >
+                              Open Navigation
+                            </a>
+                          ) : null}
+                        </div>
                         <div className="mt-1 text-[11px] text-muted-foreground">
-                          Live map/location pin will appear here.
+                          Use this to navigate to customer location.
                         </div>
-                        <div className="mt-2 h-32 rounded-md border border-white/10 bg-gradient-to-br from-slate-900/70 to-slate-800/40 p-2">
-                          <div className="flex h-full items-center justify-center text-[11px] text-slate-300">
-                            No live GPS connected yet
-                          </div>
-                        </div>
-                        <div className="mt-2 text-[11px] text-muted-foreground">
-                          Caller/lead location: {autoNotes?.location || lead.pickupFrom || lead.dropoffTo || "-"}
+                        <div className="mt-2 rounded-md border border-white/10 bg-slate-900/40 px-3 py-2 text-[12px] text-slate-200">
+                          <div className="text-[11px] uppercase tracking-wide text-slate-400">Location Details</div>
+                          <div className="mt-1 break-all">{callerLocationLabel || callerMapRawLocation || "-"}</div>
                         </div>
                       </div>
                     </div>
@@ -2082,6 +2277,8 @@ export function LeadDetailMain({
                               setInspectionVin(e.target.value.toUpperCase());
                               clearInspectionFieldError("vin");
                               setInspectionAutoFillNote(null);
+                              setVinCarOptions([]);
+                              setSelectedVinCarId("");
                             }}
                             placeholder="4. Enter Car VIN"
                             className="h-10 w-full rounded-md border border-white/20 bg-slate-950/60 px-3 text-xs text-slate-100 placeholder:text-slate-500"
@@ -2099,6 +2296,32 @@ export function LeadDetailMain({
                           </button>
                           {inspectionAutoFillNote ? <span className="text-xs text-muted-foreground">{inspectionAutoFillNote}</span> : null}
                         </div>
+                        {vinCarOptions.length > 1 ? (
+                          <>
+                            <select
+                              value={selectedVinCarId}
+                              onChange={(e) => setSelectedVinCarId(e.target.value)}
+                              className="h-10 w-full rounded-md border border-white/20 bg-slate-950/60 px-3 text-xs text-slate-100 md:col-span-1"
+                            >
+                              <option value="">Select matched car</option>
+                              {vinCarOptions.map((car) => (
+                                <option key={car.id} value={car.id}>
+                                  {[car.make, car.model, car.year, car.title].filter(Boolean).join(" | ")}
+                                </option>
+                              ))}
+                            </select>
+                            <div className="flex items-center">
+                              <button
+                                type="button"
+                                onClick={fetchPartsCatalogueFromSelectedVinCar}
+                                disabled={isVinLookupLoading || !selectedVinCarId}
+                                className="rounded-md border px-3 py-2 text-xs font-semibold uppercase tracking-wide hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                {isVinLookupLoading ? "Fetching..." : "Fetch Parts Catalogue"}
+                              </button>
+                            </div>
+                          </>
+                        ) : null}
                         <input
                           id="inspection-make"
                           value={inspectionMake}
@@ -2372,6 +2595,44 @@ export function LeadDetailMain({
                                   acceptMimeTypes={INSPECTION_IMAGE_MIME_TYPES}
                                   helperText="Required evidence picture"
                                 />
+                                <div className="md:col-span-2 rounded-md border border-white/15 bg-slate-950/40 p-2">
+                                  <label className="flex items-center gap-2 text-xs text-slate-200">
+                                    <input
+                                      type="checkbox"
+                                      checked={item.scrapEnabled}
+                                      onChange={(e) =>
+                                        updateProcessJobLineItem(item.id, {
+                                          scrapEnabled: e.target.checked,
+                                          scrapPictureFileId: e.target.checked ? item.scrapPictureFileId : "",
+                                          scrapNotes: e.target.checked ? item.scrapNotes : "",
+                                        })
+                                      }
+                                    />
+                                    Scrap for this item
+                                  </label>
+                                  {item.scrapEnabled ? (
+                                    <div className="mt-2 grid gap-2 md:grid-cols-2">
+                                      <FileUploader
+                                        label={`Scrap Picture ${item.scrapPictureFileId ? "?" : ""}`}
+                                        kind="image"
+                                        value={item.scrapPictureFileId || null}
+                                        onChange={(v) => updateProcessJobLineItem(item.id, { scrapPictureFileId: v ?? "" })}
+                                        showPreview
+                                        showFileIdField={false}
+                                        capture="environment"
+                                        maxSizeBytes={INSPECTION_IMAGE_MAX_SIZE_BYTES}
+                                        acceptMimeTypes={INSPECTION_IMAGE_MIME_TYPES}
+                                        helperText="Scrap evidence picture"
+                                      />
+                                      <textarea
+                                        value={item.scrapNotes}
+                                        onChange={(e) => updateProcessJobLineItem(item.id, { scrapNotes: e.target.value })}
+                                        placeholder="Scrap notes (optional)"
+                                        className="h-20 w-full rounded-md border border-white/20 bg-slate-950/60 p-2 text-xs text-slate-100 placeholder:text-slate-500"
+                                      />
+                                    </div>
+                                  ) : null}
+                                </div>
                               </div>
                             </div>
                           ))}
@@ -2491,16 +2752,6 @@ export function LeadDetailMain({
                           </label>
                         </div>
                       </div>
-                      <select
-                        value={postServiceCarStatus}
-                        onChange={(e) => setPostServiceCarStatus(e.target.value)}
-                        className="h-10 w-full rounded-md border border-white/20 bg-slate-950/60 px-3 text-xs text-slate-100"
-                      >
-                        <option value="">Select Car Status</option>
-                        <option value="ready_for_delivery">Ready for delivery</option>
-                        <option value="delivered_to_customer">Delivered to customer</option>
-                        <option value="needs_attention">Needs attention / rework</option>
-                      </select>
                       <div className="space-y-1">
                         <div className="text-xs font-medium">Customer Signature</div>
                         <SignaturePad value={postServiceSignature} onChange={setPostServiceSignature} />
@@ -2838,6 +3089,8 @@ export function LeadDetailMain({
                               setInspectionVin(e.target.value.toUpperCase());
                               clearInspectionFieldError("vin");
                               setInspectionAutoFillNote(null);
+                              setVinCarOptions([]);
+                              setSelectedVinCarId("");
                             }}
                             placeholder="4. Enter Car VIN"
                             className="h-10 w-full rounded-md border border-white/20 bg-slate-950/60 px-3 text-xs text-slate-100 placeholder:text-slate-500"
@@ -2855,6 +3108,32 @@ export function LeadDetailMain({
                           </button>
                           {inspectionAutoFillNote ? <span className="text-xs text-muted-foreground">{inspectionAutoFillNote}</span> : null}
                         </div>
+                        {vinCarOptions.length > 1 ? (
+                          <>
+                            <select
+                              value={selectedVinCarId}
+                              onChange={(e) => setSelectedVinCarId(e.target.value)}
+                              className="h-10 w-full rounded-md border border-white/20 bg-slate-950/60 px-3 text-xs text-slate-100 md:col-span-1"
+                            >
+                              <option value="">Select matched car</option>
+                              {vinCarOptions.map((car) => (
+                                <option key={car.id} value={car.id}>
+                                  {[car.make, car.model, car.year, car.title].filter(Boolean).join(" | ")}
+                                </option>
+                              ))}
+                            </select>
+                            <div className="flex items-center">
+                              <button
+                                type="button"
+                                onClick={fetchPartsCatalogueFromSelectedVinCar}
+                                disabled={isVinLookupLoading || !selectedVinCarId}
+                                className="rounded-md border px-3 py-2 text-xs font-semibold uppercase tracking-wide hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                {isVinLookupLoading ? "Fetching..." : "Fetch Parts Catalogue"}
+                              </button>
+                            </div>
+                          </>
+                        ) : null}
                         <input
                           value={inspectionMake}
                           onChange={(e) => {
@@ -3102,16 +3381,6 @@ export function LeadDetailMain({
                           </label>
                         </div>
                       </div>
-                      <select
-                        value={postServiceCarStatus}
-                        onChange={(e) => setPostServiceCarStatus(e.target.value)}
-                        className="h-10 w-full rounded-md border border-white/20 bg-slate-950/60 px-3 text-xs text-slate-100"
-                      >
-                        <option value="">Select Car Status</option>
-                        <option value="ready_for_delivery">Ready for delivery</option>
-                        <option value="delivered_to_customer">Delivered to customer</option>
-                        <option value="needs_attention">Needs attention / rework</option>
-                      </select>
                       <div className="space-y-1">
                         <div className="text-xs font-medium">Customer Signature</div>
                         <SignaturePad value={postServiceSignature} onChange={setPostServiceSignature} />

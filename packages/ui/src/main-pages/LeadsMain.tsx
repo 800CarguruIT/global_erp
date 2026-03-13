@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LeadsTable } from "../components/leads/LeadsTable";
 import { MainPageShell } from "./MainPageShell";
 import { useI18n } from "../i18n";
@@ -30,6 +30,102 @@ const collator = new Intl.Collator("en", { numeric: true, sensitivity: "base" })
 
 function normalize(value: string | number | null | undefined) {
   return (value ?? "").toString().trim().toLowerCase();
+}
+
+function extractEmbedSrc(value?: string | null) {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (trimmed.includes("<iframe")) {
+    const match = trimmed.match(/src=["']([^"']+)["']/i);
+    return match?.[1] ?? null;
+  }
+  return trimmed;
+}
+
+function buildSearchEmbedUrl(query?: string | null) {
+  const q = String(query ?? "").trim();
+  if (!q) return "https://www.google.com/maps?q=24.4539,54.3773&z=11&output=embed";
+  return `https://www.google.com/maps?q=${encodeURIComponent(q)}&output=embed`;
+}
+
+function buildCoordinateEmbedUrl(center?: string | null) {
+  const c = String(center ?? "").trim();
+  if (!/^-?\d+(?:\.\d+)?,-?\d+(?:\.\d+)?$/.test(c)) return null;
+  return `https://www.google.com/maps?q=${encodeURIComponent(`loc:${c}`)}&z=17&output=embed`;
+}
+
+function buildGoogleEmbedUrl(apiKey: string, opts: { placeId?: string; query?: string }) {
+  if (opts.placeId) {
+    return `https://www.google.com/maps/embed/v1/place?key=${encodeURIComponent(apiKey)}&q=place_id:${encodeURIComponent(opts.placeId)}`;
+  }
+  if (opts.query) {
+    return `https://www.google.com/maps/embed/v1/place?key=${encodeURIComponent(apiKey)}&q=${encodeURIComponent(opts.query)}`;
+  }
+  return null;
+}
+
+function extractUrlFromMapInput(rawInput: string): string {
+  const raw = String(rawInput ?? "").trim();
+  if (!raw) return "";
+  if (raw.toLowerCase().includes("<iframe")) {
+    const srcMatch = raw.match(/src=["']([^"']+)["']/i);
+    return String(srcMatch?.[1] ?? "").trim();
+  }
+  return raw;
+}
+
+function isGoogleShortMapUrl(rawInput: string): boolean {
+  const raw = extractUrlFromMapInput(rawInput);
+  if (!raw) return false;
+  const candidate = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+  try {
+    const parsed = new URL(candidate);
+    const host = parsed.hostname.toLowerCase();
+    return host === "maps.app.goo.gl" || host === "goo.gl";
+  } catch {
+    return false;
+  }
+}
+
+function tryParseGoogleMapsUrl(rawInput: string): { embedUrl: string | null; label: string } {
+  const raw = extractUrlFromMapInput(rawInput);
+  if (!raw) return { embedUrl: null, label: "" };
+  const candidate = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+  try {
+    const parsed = new URL(candidate);
+    const host = parsed.hostname.toLowerCase();
+    const isGoogleMapHost =
+      host.includes("google.com") || host.includes("google.") || host.includes("maps.app.goo.gl") || host.includes("goo.gl");
+    if (!isGoogleMapHost) return { embedUrl: null, label: "" };
+
+    const qParam =
+      parsed.searchParams.get("q") ||
+      parsed.searchParams.get("query") ||
+      parsed.searchParams.get("destination") ||
+      parsed.searchParams.get("daddr") ||
+      "";
+    const llParam = parsed.searchParams.get("ll") || "";
+    const pbParam = parsed.searchParams.get("pb") || "";
+    const placePathMatch = parsed.pathname.match(/\/place\/([^/]+)/i);
+    const latLngMatch = `${parsed.pathname}${parsed.search}`.match(/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/);
+    const pbLatLngMatch = pbParam.match(/!2d(-?\d+(?:\.\d+)?)!3d(-?\d+(?:\.\d+)?)/);
+    const label = decodeURIComponent((qParam || placePathMatch?.[1] || "").replace(/\+/g, " ")).trim();
+    if (label) return { embedUrl: buildSearchEmbedUrl(label), label };
+    if (llParam) return { embedUrl: buildCoordinateEmbedUrl(llParam) ?? buildSearchEmbedUrl(llParam), label: llParam };
+    if (latLngMatch) {
+      const center = `${latLngMatch[1]},${latLngMatch[2]}`;
+      return { embedUrl: buildCoordinateEmbedUrl(center) ?? buildSearchEmbedUrl(center), label: center };
+    }
+    if (pbLatLngMatch?.[1] && pbLatLngMatch?.[2]) {
+      // pb packs longitude as !2d and latitude as !3d
+      const center = `${pbLatLngMatch[2]},${pbLatLngMatch[1]}`;
+      return { embedUrl: buildCoordinateEmbedUrl(center) ?? buildSearchEmbedUrl(center), label: center };
+    }
+    return { embedUrl: null, label: "" };
+  } catch {
+    return { embedUrl: null, label: "" };
+  }
 }
 
 export function LeadsMain({
@@ -62,9 +158,40 @@ export function LeadsMain({
   const [assignRecoveryFlow, setAssignRecoveryFlow] = useState<
     "customer_to_branch" | "customer_to_customer" | "branch_to_branch" | "branch_to_customer" | ""
   >("");
+  const [googleMapsApiKey, setGoogleMapsApiKey] = useState<string | null>(null);
+  const [mapsReady, setMapsReady] = useState(false);
+  const [assignLocationText, setAssignLocationText] = useState("");
+  const [assignLocationSearch, setAssignLocationSearch] = useState("");
+  const [assignGoogleLocation, setAssignGoogleLocation] = useState("");
+  const [assignLocationSuggestions, setAssignLocationSuggestions] = useState<Array<{ placeId: string; label: string }>>([]);
+  const [assignLocationSuggestionsOpen, setAssignLocationSuggestionsOpen] = useState(false);
+  const assignLocationSearchRef = useRef<HTMLInputElement | null>(null);
   const [assignLoading, setAssignLoading] = useState(false);
   const [assignError, setAssignError] = useState<string | null>(null);
   const [assignSuccess, setAssignSuccess] = useState<string | null>(null);
+  const [requestRecoveryLead, setRequestRecoveryLead] = useState<any | null>(null);
+  const [requestRecoverySaving, setRequestRecoverySaving] = useState(false);
+  const [requestRecoveryError, setRequestRecoveryError] = useState<string | null>(null);
+  const [requestPickupLocationText, setRequestPickupLocationText] = useState("");
+  const [requestPickupLocationSearch, setRequestPickupLocationSearch] = useState("");
+  const [requestPickupGoogleLocation, setRequestPickupGoogleLocation] = useState("");
+  const [requestPickupMapUrlInput, setRequestPickupMapUrlInput] = useState("");
+  const [requestPickupMapUrlParsing, setRequestPickupMapUrlParsing] = useState(false);
+  const [requestPickupSuggestions, setRequestPickupSuggestions] = useState<Array<{ placeId: string; label: string }>>([]);
+  const [requestPickupSuggestionsOpen, setRequestPickupSuggestionsOpen] = useState(false);
+  const [requestDropoffLocationText, setRequestDropoffLocationText] = useState("");
+  const [requestDropoffLocationSearch, setRequestDropoffLocationSearch] = useState("");
+  const [requestDropoffGoogleLocation, setRequestDropoffGoogleLocation] = useState("");
+  const [requestDropoffMapUrlInput, setRequestDropoffMapUrlInput] = useState("");
+  const [requestDropoffMapUrlParsing, setRequestDropoffMapUrlParsing] = useState(false);
+  const [requestDropoffSuggestions, setRequestDropoffSuggestions] = useState<Array<{ placeId: string; label: string }>>([]);
+  const [requestDropoffSuggestionsOpen, setRequestDropoffSuggestionsOpen] = useState(false);
+  const [requestRecoveryScheduledAt, setRequestRecoveryScheduledAt] = useState("");
+  const [requestRecoveryRemarks, setRequestRecoveryRemarks] = useState("");
+  const requestPickupSearchRef = useRef<HTMLInputElement | null>(null);
+  const requestDropoffSearchRef = useRef<HTMLInputElement | null>(null);
+  const requestPickupDropdownRef = useRef<HTMLDivElement | null>(null);
+  const requestDropoffDropdownRef = useRef<HTMLDivElement | null>(null);
   const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
   const [aiAppreciation, setAiAppreciation] = useState<string | null>(null);
 
@@ -97,6 +224,158 @@ export function LeadsMain({
   useEffect(() => {
     refreshLeads();
   }, [refreshLeads]);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const res = await fetch(`/api/company/${companyId}/profile`, { cache: "no-store" });
+        if (!res.ok) return;
+        const data = await res.json().catch(() => ({}));
+        const company = data?.data?.company ?? data?.data ?? data;
+        if (active) setGoogleMapsApiKey(company?.googleMapsApiKey ?? null);
+      } catch {
+        if (active) setGoogleMapsApiKey(null);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [companyId]);
+
+  useEffect(() => {
+    const needsPlaces =
+      (Boolean(assignLeadId) && assignLeadType === "rsa") || Boolean(requestRecoveryLead);
+    if (!googleMapsApiKey || typeof window === "undefined" || !needsPlaces) return;
+    const existing = document.querySelector("script[data-google-maps='leads-assign-places']");
+    if (existing) {
+      if ((window as any).google?.maps?.places) setMapsReady(true);
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(googleMapsApiKey)}&libraries=places`;
+    script.async = true;
+    script.defer = true;
+    script.setAttribute("data-google-maps", "leads-assign-places");
+    script.onload = () => setMapsReady(true);
+    script.onerror = () => setMapsReady(false);
+    document.head.appendChild(script);
+  }, [googleMapsApiKey, assignLeadId, assignLeadType, requestRecoveryLead]);
+
+  useEffect(() => {
+    if (!mapsReady || !googleMapsApiKey || !assignLeadId || assignLeadType !== "rsa") return;
+    const term = assignLocationSearch.trim();
+    if (term.length < 2) {
+      setAssignLocationSuggestions([]);
+      return;
+    }
+    const google = (window as any).google;
+    const service = google?.maps?.places ? new google.maps.places.AutocompleteService() : null;
+    if (!service) return;
+    const timer = window.setTimeout(() => {
+      service.getPlacePredictions(
+        { input: term },
+        (predictions: Array<{ place_id?: string; description?: string }> | null, status: string) => {
+          if (status !== "OK" || !Array.isArray(predictions)) {
+            setAssignLocationSuggestions([]);
+            return;
+          }
+          setAssignLocationSuggestions(
+            predictions
+              .map((p) => ({ placeId: String(p.place_id ?? "").trim(), label: String(p.description ?? "").trim() }))
+              .filter((p) => p.placeId && p.label)
+              .slice(0, 6)
+          );
+          setAssignLocationSuggestionsOpen(true);
+        }
+      );
+    }, 220);
+    return () => window.clearTimeout(timer);
+  }, [mapsReady, googleMapsApiKey, assignLeadId, assignLeadType, assignLocationSearch]);
+
+  useEffect(() => {
+    if (!mapsReady || !googleMapsApiKey || !requestRecoveryLead) return;
+    const term = requestPickupLocationSearch.trim();
+    if (term.length < 2) {
+      setRequestPickupSuggestions([]);
+      return;
+    }
+    const google = (window as any).google;
+    const service = google?.maps?.places ? new google.maps.places.AutocompleteService() : null;
+    if (!service) return;
+    const timer = window.setTimeout(() => {
+      service.getPlacePredictions(
+        { input: term },
+        (predictions: Array<{ place_id?: string; description?: string }> | null, status: string) => {
+          if (status !== "OK" || !Array.isArray(predictions)) {
+            setRequestPickupSuggestions([]);
+            return;
+          }
+          setRequestPickupSuggestions(
+            predictions
+              .map((p) => ({ placeId: String(p.place_id ?? "").trim(), label: String(p.description ?? "").trim() }))
+              .filter((p) => p.placeId && p.label)
+              .slice(0, 6)
+          );
+          setRequestPickupSuggestionsOpen(true);
+        }
+      );
+    }, 220);
+    return () => window.clearTimeout(timer);
+  }, [mapsReady, googleMapsApiKey, requestRecoveryLead, requestPickupLocationSearch]);
+
+  useEffect(() => {
+    if (!mapsReady || !googleMapsApiKey || !requestRecoveryLead) return;
+    const term = requestDropoffLocationSearch.trim();
+    if (term.length < 2) {
+      setRequestDropoffSuggestions([]);
+      return;
+    }
+    const google = (window as any).google;
+    const service = google?.maps?.places ? new google.maps.places.AutocompleteService() : null;
+    if (!service) return;
+    const timer = window.setTimeout(() => {
+      service.getPlacePredictions(
+        { input: term },
+        (predictions: Array<{ place_id?: string; description?: string }> | null, status: string) => {
+          if (status !== "OK" || !Array.isArray(predictions)) {
+            setRequestDropoffSuggestions([]);
+            return;
+          }
+          setRequestDropoffSuggestions(
+            predictions
+              .map((p) => ({ placeId: String(p.place_id ?? "").trim(), label: String(p.description ?? "").trim() }))
+              .filter((p) => p.placeId && p.label)
+              .slice(0, 6)
+          );
+          setRequestDropoffSuggestionsOpen(true);
+        }
+      );
+    }, 220);
+    return () => window.clearTimeout(timer);
+  }, [mapsReady, googleMapsApiKey, requestRecoveryLead, requestDropoffLocationSearch]);
+
+  useEffect(() => {
+    if (!requestRecoveryLead) return;
+    const onDocMouseDown = (event: MouseEvent) => {
+      const target = event.target as Node | null;
+      if (!target) return;
+      if (
+        requestPickupDropdownRef.current &&
+        !requestPickupDropdownRef.current.contains(target)
+      ) {
+        setRequestPickupSuggestionsOpen(false);
+      }
+      if (
+        requestDropoffDropdownRef.current &&
+        !requestDropoffDropdownRef.current.contains(target)
+      ) {
+        setRequestDropoffSuggestionsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDocMouseDown);
+    return () => document.removeEventListener("mousedown", onDocMouseDown);
+  }, [requestRecoveryLead]);
 
   useEffect(() => {
     setTab(initialTab);
@@ -334,6 +613,9 @@ export function LeadsMain({
     setAssignServiceType(lead?.serviceType ?? "");
     setAssignRecoveryDirection((lead?.recoveryDirection as any) ?? (lt === "recovery" ? "pickup" : ""));
     setAssignRecoveryFlow((lead?.recoveryFlow as any) ?? (lt === "recovery" ? "customer_to_branch" : ""));
+    setAssignLocationText(String(lead?.pickupFrom ?? ""));
+    setAssignGoogleLocation(extractEmbedSrc(String(lead?.pickupGoogleLocation ?? "")) ?? "");
+    setAssignLocationSearch(String(lead?.pickupFrom ?? ""));
     setAssignError(null);
     setAssignSuccess(null);
     setAssignBranches([]);
@@ -432,13 +714,34 @@ export function LeadsMain({
           leadStage: assignLeadType === "workshop" ? currentLead?.leadStage ?? "assigned" : "assigned",
           recoveryDirection: assignLeadType === "recovery" ? assignRecoveryDirection : undefined,
           recoveryFlow: assignLeadType === "recovery" ? assignRecoveryFlow : undefined,
+          pickupFrom: assignLeadType === "rsa" ? (assignLocationText.trim() || null) : undefined,
+          pickupGoogleLocation:
+            assignLeadType === "rsa"
+              ? (assignGoogleLocation.trim() || buildSearchEmbedUrl(assignLocationText) || null)
+              : undefined,
         }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data?.error ?? "Failed to assign lead");
       }
-      setAssignSuccess(t("leads.assign.success") ?? "Lead assigned");
+      const assignedUserLabel =
+        assignLeadType === "workshop"
+          ? null
+          : assignUsers.find((u) => String(u?.id ?? "") === String(assignUserId ?? ""))?.full_name ??
+            assignUsers.find((u) => String(u?.id ?? "") === String(assignUserId ?? ""))?.email ??
+            null;
+      const assignedBranchLabel =
+        assignBranches.find((b) => String(b?.id ?? "") === String(assignBranchId ?? ""))?.display_name ??
+        assignBranches.find((b) => String(b?.id ?? "") === String(assignBranchId ?? ""))?.name ??
+        null;
+      if (assignedUserLabel) {
+        setAssignSuccess(`Lead assigned to ${assignedUserLabel}`);
+      } else if (assignedBranchLabel) {
+        setAssignSuccess(`Lead assigned to ${assignedBranchLabel}`);
+      } else {
+        setAssignSuccess(t("leads.assign.success") ?? "Lead assigned");
+      }
       // refresh leads
       const refreshed = await fetch(`/api/company/${companyId}/sales/leads`);
       if (refreshed.ok) {
@@ -476,6 +779,144 @@ export function LeadsMain({
     }
   }
 
+  async function requestRecoveryForLead(leadId: string, lead?: any) {
+    const nextLead = lead ?? leads.find((l) => l.id === leadId) ?? null;
+    const pickupDefault =
+      String(nextLead?.pickupFrom ?? "").trim() ||
+      [String(nextLead?.customerName ?? "").trim(), String(nextLead?.customerPhone ?? "").trim()]
+        .filter(Boolean)
+        .join(" - ");
+    const dropoffDefault = String(nextLead?.dropoffTo ?? "").trim();
+    setRequestRecoveryLead(nextLead);
+    setRequestRecoveryError(null);
+    setRequestPickupLocationText(pickupDefault);
+    setRequestPickupLocationSearch(pickupDefault);
+    setRequestPickupGoogleLocation(extractEmbedSrc(String(nextLead?.pickupGoogleLocation ?? "")) ?? "");
+    setRequestPickupMapUrlInput(extractEmbedSrc(String(nextLead?.pickupGoogleLocation ?? "")) ?? "");
+    setRequestPickupSuggestions([]);
+    setRequestPickupSuggestionsOpen(false);
+    setRequestDropoffLocationText(dropoffDefault);
+    setRequestDropoffLocationSearch(dropoffDefault);
+    setRequestDropoffGoogleLocation(extractEmbedSrc(String(nextLead?.dropoffGoogleLocation ?? "")) ?? "");
+    setRequestDropoffMapUrlInput(extractEmbedSrc(String(nextLead?.dropoffGoogleLocation ?? "")) ?? "");
+    setRequestDropoffSuggestions([]);
+    setRequestDropoffSuggestionsOpen(false);
+    setRequestRecoveryScheduledAt("");
+    setRequestRecoveryRemarks("");
+    setRequestPickupMapUrlParsing(false);
+    setRequestDropoffMapUrlParsing(false);
+  }
+
+  async function submitRecoveryRequest() {
+    if (!requestRecoveryLead?.id) return;
+    const pickupLocation = requestPickupLocationText.trim();
+    const dropoffLocation = requestDropoffLocationText.trim();
+    const scheduledAt = requestRecoveryScheduledAt.trim();
+    const remarks = requestRecoveryRemarks.trim();
+    if (!pickupLocation || !dropoffLocation || !scheduledAt) {
+      setRequestRecoveryError("Pickup, dropoff, and date/time are required.");
+      return;
+    }
+
+    setRequestRecoverySaving(true);
+    setRequestRecoveryError(null);
+    setBulkMessage(null);
+    try {
+      const recoveryLeadRes = await fetch(`/api/company/${companyId}/sales/leads`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customerId: requestRecoveryLead.customerId ?? null,
+          leadType: "recovery",
+          division: "recovery",
+          serviceType: requestRecoveryLead.serviceType ?? "recovery",
+          recoveryDirection: "pickup",
+          recoveryFlow: "customer_to_branch",
+          pickupFrom: pickupLocation,
+          pickupGoogleLocation:
+            requestPickupGoogleLocation.trim() || buildSearchEmbedUrl(pickupLocation) || null,
+          dropoffTo: dropoffLocation,
+          dropoffGoogleLocation:
+            requestDropoffGoogleLocation.trim() || buildSearchEmbedUrl(dropoffLocation) || null,
+          source: "rsa_recovery_request",
+          car: requestRecoveryLead.carId
+            ? { id: requestRecoveryLead.carId }
+            : undefined,
+          agentRemarks: `Recovery requested from RSA lead ${String(requestRecoveryLead.id).slice(0, 8)}.`,
+        }),
+      });
+      const recoveryLeadJson = await recoveryLeadRes.json().catch(() => ({}));
+      if (!recoveryLeadRes.ok) {
+        throw new Error(String(recoveryLeadJson?.error ?? "Failed to create recovery lead"));
+      }
+      const newRecoveryLeadId = String(recoveryLeadJson?.data?.id ?? "").trim();
+      if (!newRecoveryLeadId) {
+        throw new Error("Recovery lead created without id.");
+      }
+
+      const requestRes = await fetch(`/api/company/${companyId}/recovery-requests`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          leadId: newRecoveryLeadId,
+          type: "dropoff",
+          pickupLocation,
+          dropoffLocation,
+          scheduledAt,
+          remarks: remarks || null,
+        }),
+      });
+      const data = await requestRes.json().catch(() => ({}));
+      if (!requestRes.ok) {
+        throw new Error(String(data?.error ?? "Failed to create recovery request"));
+      }
+
+      setBulkMessage(`Recovery lead created and request submitted (${newRecoveryLeadId.slice(0, 8)}).`);
+      setRequestRecoveryLead(null);
+      await refreshLeads();
+    } catch (err: any) {
+      setRequestRecoveryError(err?.message ?? "Failed to create recovery request.");
+    } finally {
+      setRequestRecoverySaving(false);
+    }
+  }
+
+  async function resolveMapUrl(input: string): Promise<{ url: string; label: string; center: string }> {
+    const res = await fetch(
+      `/api/company/${companyId}/maps/resolve?url=${encodeURIComponent(input)}`,
+      { cache: "no-store" }
+    );
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(String(json?.error ?? "Failed to resolve map URL"));
+    }
+    return {
+      url: String(json?.data?.url ?? "").trim() || input,
+      label: String(json?.data?.label ?? "").trim(),
+      center: String(json?.data?.center ?? "").trim(),
+    };
+  }
+
+  function resetRecoveryRequest() {
+    setRequestRecoveryLead(null);
+    setRequestRecoverySaving(false);
+    setRequestRecoveryError(null);
+    setRequestPickupLocationText("");
+    setRequestPickupLocationSearch("");
+    setRequestPickupGoogleLocation("");
+    setRequestPickupMapUrlInput("");
+    setRequestPickupSuggestions([]);
+    setRequestPickupSuggestionsOpen(false);
+    setRequestDropoffLocationText("");
+    setRequestDropoffLocationSearch("");
+    setRequestDropoffGoogleLocation("");
+    setRequestDropoffMapUrlInput("");
+    setRequestDropoffSuggestions([]);
+    setRequestDropoffSuggestionsOpen(false);
+    setRequestRecoveryScheduledAt("");
+    setRequestRecoveryRemarks("");
+  }
+
   function resetAssign() {
     setAssignLeadId(null);
     setAssignLeadType(null);
@@ -487,11 +928,34 @@ export function LeadsMain({
     setAssignSuccess(null);
     setAssignRecoveryDirection("");
     setAssignRecoveryFlow("");
+    setAssignLocationText("");
+    setAssignLocationSearch("");
+    setAssignGoogleLocation("");
+    setAssignLocationSuggestions([]);
+    setAssignLocationSuggestionsOpen(false);
   }
 
   useEffect(() => {
     setPage(1);
   }, [query, tab, sortKey, sortDir]);
+
+  const assignMapPreviewSrc = useMemo(() => {
+    const savedSrc = extractEmbedSrc(assignGoogleLocation);
+    if (savedSrc) return savedSrc;
+    return buildSearchEmbedUrl(assignLocationSearch || assignLocationText);
+  }, [assignGoogleLocation, assignLocationSearch, assignLocationText]);
+
+  const requestPickupMapPreviewSrc = useMemo(() => {
+    const savedSrc = extractEmbedSrc(requestPickupGoogleLocation);
+    if (savedSrc) return savedSrc;
+    return buildSearchEmbedUrl(requestPickupLocationSearch || requestPickupLocationText);
+  }, [requestPickupGoogleLocation, requestPickupLocationSearch, requestPickupLocationText]);
+
+  const requestDropoffMapPreviewSrc = useMemo(() => {
+    const savedSrc = extractEmbedSrc(requestDropoffGoogleLocation);
+    if (savedSrc) return savedSrc;
+    return buildSearchEmbedUrl(requestDropoffLocationSearch || requestDropoffLocationText);
+  }, [requestDropoffGoogleLocation, requestDropoffLocationSearch, requestDropoffLocationText]);
 
   return (
     <MainPageShell
@@ -595,6 +1059,7 @@ export function LeadsMain({
                   onSelectChange={toggleSelect}
                   onAssign={(id, lead) => openAssign(id, lead)}
                   onCarIn={(id, lead) => void moveLeadToCarIn(id, lead)}
+                  onRequestRecovery={(id, lead) => void requestRecoveryForLead(id, lead)}
                   onRefresh={refreshLeads}
                   sortKey={sortKey}
                   sortDir={sortDir}
@@ -645,6 +1110,339 @@ export function LeadsMain({
                   </button>
                 </div>
               </div>
+              {requestRecoveryLead && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+                  <Card className="w-full max-w-4xl space-y-4 rounded-2xl border border-white/10 bg-slate-950 text-white shadow-xl">
+                    <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                      <div>
+                        <div className="text-sm font-semibold text-white">Request Recovery</div>
+                        <div className="text-xs text-white/70">
+                          Add pickup/dropoff map locations, datetime, and remarks.
+                        </div>
+                      </div>
+                      <button
+                        className="inline-flex items-center rounded-md border border-white/20 bg-white/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-white shadow-sm transition hover:bg-white/20 hover:shadow-md"
+                        onClick={() => resetRecoveryRequest()}
+                        disabled={requestRecoverySaving}
+                      >
+                        Close
+                      </button>
+                    </div>
+                    {requestRecoveryError ? <p className="text-sm text-red-400">{requestRecoveryError}</p> : null}
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2 rounded-lg border border-white/15 bg-white/5 p-3">
+                        <div className="text-xs font-semibold uppercase tracking-wide text-white/80">Pickup Location (Google Map)</div>
+                        <input
+                          value={requestPickupLocationText}
+                          onChange={(e) => setRequestPickupLocationText(e.target.value)}
+                          placeholder="Pickup location label"
+                          className="w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60"
+                        />
+                        <div className="flex gap-2">
+                          <div ref={requestPickupDropdownRef} className="relative w-full">
+                            <input
+                              ref={requestPickupSearchRef}
+                              value={requestPickupLocationSearch}
+                              onChange={(e) => setRequestPickupLocationSearch(e.target.value)}
+                              onFocus={() => {
+                                if (requestPickupSuggestions.length > 0) setRequestPickupSuggestionsOpen(true);
+                              }}
+                              onBlur={() => {
+                                window.setTimeout(() => setRequestPickupSuggestionsOpen(false), 120);
+                              }}
+                              placeholder="Search pickup location"
+                              className="w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60"
+                            />
+                            {requestPickupSuggestionsOpen && requestPickupSuggestions.length > 0 ? (
+                              <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-[120] max-h-44 overflow-auto rounded border border-white/20 bg-slate-900 shadow-xl">
+                                {requestPickupSuggestions.map((s) => (
+                                  <button
+                                    key={s.placeId}
+                                    type="button"
+                                    onMouseDown={(e) => e.preventDefault()}
+                                    onClick={() => {
+                                      setRequestPickupLocationSearch(s.label);
+                                      if (!requestPickupLocationText.trim()) setRequestPickupLocationText(s.label);
+                                      const embedUrl = googleMapsApiKey
+                                        ? buildGoogleEmbedUrl(googleMapsApiKey, { placeId: s.placeId }) ?? buildSearchEmbedUrl(s.label)
+                                        : buildSearchEmbedUrl(s.label);
+                                      if (embedUrl) {
+                                        setRequestPickupGoogleLocation(embedUrl);
+                                        setRequestPickupMapUrlInput(embedUrl);
+                                      }
+                                      setRequestPickupSuggestions([]);
+                                      setRequestPickupSuggestionsOpen(false);
+                                    }}
+                                    className="block w-full border-b border-white/10 px-3 py-2 text-left text-xs text-white hover:bg-white/10"
+                                  >
+                                    {s.label}
+                                  </button>
+                                ))}
+                              </div>
+                            ) : null}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const embedUrl = googleMapsApiKey
+                                ? buildGoogleEmbedUrl(googleMapsApiKey, { query: requestPickupLocationSearch }) ??
+                                  buildSearchEmbedUrl(requestPickupLocationSearch)
+                                : buildSearchEmbedUrl(requestPickupLocationSearch);
+                              if (!embedUrl) return;
+                              setRequestPickupGoogleLocation(embedUrl);
+                              setRequestPickupMapUrlInput(embedUrl);
+                              if (!requestPickupLocationText.trim()) setRequestPickupLocationText(requestPickupLocationSearch.trim());
+                            }}
+                            className="rounded border border-white/20 bg-white/10 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-white hover:bg-white/20"
+                          >
+                            Search
+                          </button>
+                        </div>
+                        <div className="flex gap-2">
+                          <input
+                            value={requestPickupMapUrlInput}
+                            onChange={(e) => setRequestPickupMapUrlInput(e.target.value)}
+                            placeholder="Paste Google Maps URL (e.g. https://maps.app.goo.gl/...)"
+                            className="w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60"
+                          />
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const originalInput = requestPickupMapUrlInput.trim();
+                              let input = originalInput;
+                              let resolvedLabel = "";
+                              let resolvedCenter = "";
+                              if (!input) {
+                                setRequestRecoveryError("Enter Google Maps URL for pickup location.");
+                                return;
+                              }
+                              setRequestPickupMapUrlParsing(true);
+                              try {
+                                if (isGoogleShortMapUrl(input)) {
+                                  const resolved = await resolveMapUrl(input);
+                                  input = resolved.url;
+                                  resolvedLabel = resolved.label;
+                                  resolvedCenter = resolved.center;
+                                }
+                                const parsed = tryParseGoogleMapsUrl(input);
+                                const finalLabel =
+                                  parsed.label ||
+                                  resolvedLabel ||
+                                  requestPickupLocationText.trim() ||
+                                  requestPickupLocationSearch.trim();
+                                const finalEmbedUrl =
+                                  (resolvedCenter ? buildCoordinateEmbedUrl(resolvedCenter) : null) ||
+                                  parsed.embedUrl ||
+                                  (finalLabel ? buildSearchEmbedUrl(finalLabel) : null);
+                                if (!finalEmbedUrl) {
+                                  setRequestRecoveryError("Invalid Google Maps URL for pickup location.");
+                                  return;
+                                }
+                                setRequestRecoveryError(null);
+                                setRequestPickupGoogleLocation(finalEmbedUrl);
+                                setRequestPickupMapUrlInput(finalEmbedUrl);
+                                if (finalLabel && !requestPickupLocationText.trim()) setRequestPickupLocationText(finalLabel);
+                                if (!finalLabel && resolvedCenter && !requestPickupLocationText.trim()) {
+                                  setRequestPickupLocationText(resolvedCenter);
+                                }
+                                if (finalLabel) setRequestPickupLocationSearch(finalLabel);
+                                else if (resolvedCenter) setRequestPickupLocationSearch(resolvedCenter);
+                                setRequestPickupSuggestions([]);
+                                setRequestPickupSuggestionsOpen(false);
+                              } catch (err: any) {
+                                setRequestRecoveryError(err?.message ?? "Failed to resolve pickup map URL.");
+                              } finally {
+                                setRequestPickupMapUrlParsing(false);
+                              }
+                            }}
+                            disabled={requestPickupMapUrlParsing}
+                            className="rounded border border-white/20 bg-white/10 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-white hover:bg-white/20 disabled:opacity-60"
+                          >
+                            {requestPickupMapUrlParsing ? "Parsing..." : "Use URL"}
+                          </button>
+                        </div>
+                        <iframe
+                          title="Recovery pickup map preview"
+                          src={requestPickupMapPreviewSrc}
+                          className="h-44 w-full rounded border border-white/20"
+                          loading="lazy"
+                        />
+                      </div>
+
+                      <div className="space-y-2 rounded-lg border border-white/15 bg-white/5 p-3">
+                        <div className="text-xs font-semibold uppercase tracking-wide text-white/80">Dropoff Location (Google Map)</div>
+                        <input
+                          value={requestDropoffLocationText}
+                          onChange={(e) => setRequestDropoffLocationText(e.target.value)}
+                          placeholder="Dropoff location label"
+                          className="w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60"
+                        />
+                        <div className="flex gap-2">
+                          <div ref={requestDropoffDropdownRef} className="relative w-full">
+                            <input
+                              ref={requestDropoffSearchRef}
+                              value={requestDropoffLocationSearch}
+                              onChange={(e) => setRequestDropoffLocationSearch(e.target.value)}
+                              onFocus={() => {
+                                if (requestDropoffSuggestions.length > 0) setRequestDropoffSuggestionsOpen(true);
+                              }}
+                              onBlur={() => {
+                                window.setTimeout(() => setRequestDropoffSuggestionsOpen(false), 120);
+                              }}
+                              placeholder="Search dropoff location"
+                              className="w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60"
+                            />
+                            {requestDropoffSuggestionsOpen && requestDropoffSuggestions.length > 0 ? (
+                              <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-[120] max-h-44 overflow-auto rounded border border-white/20 bg-slate-900 shadow-xl">
+                                {requestDropoffSuggestions.map((s) => (
+                                  <button
+                                    key={s.placeId}
+                                    type="button"
+                                    onMouseDown={(e) => e.preventDefault()}
+                                    onClick={() => {
+                                      setRequestDropoffLocationSearch(s.label);
+                                      if (!requestDropoffLocationText.trim()) setRequestDropoffLocationText(s.label);
+                                      const embedUrl = googleMapsApiKey
+                                        ? buildGoogleEmbedUrl(googleMapsApiKey, { placeId: s.placeId }) ?? buildSearchEmbedUrl(s.label)
+                                        : buildSearchEmbedUrl(s.label);
+                                      if (embedUrl) {
+                                        setRequestDropoffGoogleLocation(embedUrl);
+                                        setRequestDropoffMapUrlInput(embedUrl);
+                                      }
+                                      setRequestDropoffSuggestions([]);
+                                      setRequestDropoffSuggestionsOpen(false);
+                                    }}
+                                    className="block w-full border-b border-white/10 px-3 py-2 text-left text-xs text-white hover:bg-white/10"
+                                  >
+                                    {s.label}
+                                  </button>
+                                ))}
+                              </div>
+                            ) : null}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const embedUrl = googleMapsApiKey
+                                ? buildGoogleEmbedUrl(googleMapsApiKey, { query: requestDropoffLocationSearch }) ??
+                                  buildSearchEmbedUrl(requestDropoffLocationSearch)
+                                : buildSearchEmbedUrl(requestDropoffLocationSearch);
+                              if (!embedUrl) return;
+                              setRequestDropoffGoogleLocation(embedUrl);
+                              setRequestDropoffMapUrlInput(embedUrl);
+                              if (!requestDropoffLocationText.trim()) setRequestDropoffLocationText(requestDropoffLocationSearch.trim());
+                            }}
+                            className="rounded border border-white/20 bg-white/10 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-white hover:bg-white/20"
+                          >
+                            Search
+                          </button>
+                        </div>
+                        <div className="flex gap-2">
+                          <input
+                            value={requestDropoffMapUrlInput}
+                            onChange={(e) => setRequestDropoffMapUrlInput(e.target.value)}
+                            placeholder="Paste Google Maps URL (e.g. https://maps.app.goo.gl/...)"
+                            className="w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60"
+                          />
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const originalInput = requestDropoffMapUrlInput.trim();
+                              let input = originalInput;
+                              let resolvedLabel = "";
+                              let resolvedCenter = "";
+                              if (!input) {
+                                setRequestRecoveryError("Enter Google Maps URL for dropoff location.");
+                                return;
+                              }
+                              setRequestDropoffMapUrlParsing(true);
+                              try {
+                                if (isGoogleShortMapUrl(input)) {
+                                  const resolved = await resolveMapUrl(input);
+                                  input = resolved.url;
+                                  resolvedLabel = resolved.label;
+                                  resolvedCenter = resolved.center;
+                                }
+                                const parsed = tryParseGoogleMapsUrl(input);
+                                const finalLabel =
+                                  parsed.label ||
+                                  resolvedLabel ||
+                                  requestDropoffLocationText.trim() ||
+                                  requestDropoffLocationSearch.trim();
+                                const finalEmbedUrl =
+                                  (resolvedCenter ? buildCoordinateEmbedUrl(resolvedCenter) : null) ||
+                                  parsed.embedUrl ||
+                                  (finalLabel ? buildSearchEmbedUrl(finalLabel) : null);
+                                if (!finalEmbedUrl) {
+                                  setRequestRecoveryError("Invalid Google Maps URL for dropoff location.");
+                                  return;
+                                }
+                                setRequestRecoveryError(null);
+                                setRequestDropoffGoogleLocation(finalEmbedUrl);
+                                setRequestDropoffMapUrlInput(finalEmbedUrl);
+                                if (finalLabel && !requestDropoffLocationText.trim()) setRequestDropoffLocationText(finalLabel);
+                                if (!finalLabel && resolvedCenter && !requestDropoffLocationText.trim()) {
+                                  setRequestDropoffLocationText(resolvedCenter);
+                                }
+                                if (finalLabel) setRequestDropoffLocationSearch(finalLabel);
+                                else if (resolvedCenter) setRequestDropoffLocationSearch(resolvedCenter);
+                                setRequestDropoffSuggestions([]);
+                                setRequestDropoffSuggestionsOpen(false);
+                              } catch (err: any) {
+                                setRequestRecoveryError(err?.message ?? "Failed to resolve dropoff map URL.");
+                              } finally {
+                                setRequestDropoffMapUrlParsing(false);
+                              }
+                            }}
+                            disabled={requestDropoffMapUrlParsing}
+                            className="rounded border border-white/20 bg-white/10 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-white hover:bg-white/20 disabled:opacity-60"
+                          >
+                            {requestDropoffMapUrlParsing ? "Parsing..." : "Use URL"}
+                          </button>
+                        </div>
+                        <iframe
+                          title="Recovery dropoff map preview"
+                          src={requestDropoffMapPreviewSrc}
+                          className="h-44 w-full rounded border border-white/20"
+                          loading="lazy"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <input
+                        type="datetime-local"
+                        value={requestRecoveryScheduledAt}
+                        onChange={(e) => setRequestRecoveryScheduledAt(e.target.value)}
+                        className="w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white"
+                      />
+                      <textarea
+                        value={requestRecoveryRemarks}
+                        onChange={(e) => setRequestRecoveryRemarks(e.target.value)}
+                        placeholder="Remarks"
+                        className="h-20 w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60"
+                      />
+                    </div>
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => resetRecoveryRequest()}
+                        disabled={requestRecoverySaving}
+                        className="rounded border border-white/20 bg-white/10 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-white hover:bg-white/20 disabled:opacity-60"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void submitRecoveryRequest()}
+                        disabled={requestRecoverySaving}
+                        className="rounded bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-60"
+                      >
+                        {requestRecoverySaving ? "Submitting..." : "Submit Recovery Request"}
+                      </button>
+                    </div>
+                  </Card>
+                </div>
+              )}
               {assignLeadId && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
                   <Card className="w-full max-w-2xl space-y-4 rounded-2xl border border-white/10 bg-slate-950 text-white shadow-xl">
@@ -706,6 +1504,86 @@ export function LeadsMain({
                           ))}
                         </select>
                       )}
+                      {assignLeadType === "rsa" ? (
+                        <div className="w-full space-y-2 rounded-lg border border-white/15 bg-white/5 p-3">
+                          <div className="text-xs font-semibold uppercase tracking-wide text-white/80">Pickup Location (Google Map)</div>
+                          <input
+                            value={assignLocationText}
+                            onChange={(e) => setAssignLocationText(e.target.value)}
+                            placeholder="Location label (e.g. Mohammed Bin Zayed City)"
+                            className="w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60"
+                          />
+                          <div className="flex gap-2">
+                            <div className="relative w-full">
+                              <input
+                                ref={assignLocationSearchRef}
+                                value={assignLocationSearch}
+                                onChange={(e) => setAssignLocationSearch(e.target.value)}
+                                onFocus={() => {
+                                  if (assignLocationSuggestions.length > 0) setAssignLocationSuggestionsOpen(true);
+                                }}
+                                onBlur={() => {
+                                  window.setTimeout(() => setAssignLocationSuggestionsOpen(false), 120);
+                                }}
+                                placeholder="Search location for map URL"
+                                className="w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60"
+                              />
+                              {assignLocationSuggestionsOpen && assignLocationSuggestions.length > 0 ? (
+                                <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-[120] max-h-44 overflow-auto rounded border border-white/20 bg-slate-900 shadow-xl">
+                                  {assignLocationSuggestions.map((s) => (
+                                    <button
+                                      key={s.placeId}
+                                      type="button"
+                                      onMouseDown={(e) => e.preventDefault()}
+                                      onClick={() => {
+                                        setAssignLocationSearch(s.label);
+                                        if (!assignLocationText.trim()) setAssignLocationText(s.label);
+                                        const embedUrl = googleMapsApiKey
+                                          ? buildGoogleEmbedUrl(googleMapsApiKey, { placeId: s.placeId }) ?? buildSearchEmbedUrl(s.label)
+                                          : buildSearchEmbedUrl(s.label);
+                                        if (embedUrl) setAssignGoogleLocation(embedUrl);
+                                        setAssignLocationSuggestionsOpen(false);
+                                      }}
+                                      className="block w-full border-b border-white/10 px-3 py-2 text-left text-xs text-white hover:bg-white/10"
+                                    >
+                                      {s.label}
+                                    </button>
+                                  ))}
+                                </div>
+                              ) : null}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const embedUrl = googleMapsApiKey
+                                  ? buildGoogleEmbedUrl(googleMapsApiKey, { query: assignLocationSearch }) ??
+                                    buildSearchEmbedUrl(assignLocationSearch)
+                                  : buildSearchEmbedUrl(assignLocationSearch);
+                                if (!embedUrl) return;
+                                setAssignGoogleLocation(embedUrl);
+                                if (!assignLocationText.trim()) setAssignLocationText(assignLocationSearch.trim());
+                              }}
+                              className="rounded border border-white/20 bg-white/10 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-white hover:bg-white/20"
+                            >
+                              Search
+                            </button>
+                          </div>
+                          <div className="text-[11px] text-white/60">
+                            {assignGoogleLocation
+                              ? "Location URL will be saved to this lead."
+                              : "Search and select location to save map URL."}
+                          </div>
+                          <div className="space-y-2">
+                            <div className="text-[11px] text-white/70">Google Map Preview</div>
+                            <iframe
+                              title="RSA pickup map live preview"
+                              src={assignMapPreviewSrc}
+                              className="h-44 w-full rounded border border-white/20"
+                              loading="lazy"
+                            />
+                          </div>
+                        </div>
+                      ) : null}
                       <button
                         className="rounded bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-60"
                         onClick={() => assignLead()}
@@ -713,7 +1591,8 @@ export function LeadsMain({
                           (assignLeadType !== "rsa" && !assignBranchId) ||
                           assignLoading ||
                           (assignLeadType !== "workshop" && assignLeadType !== "recovery" && !assignUserId) ||
-                          (assignLeadType === "recovery" && (!assignRecoveryDirection || !assignRecoveryFlow))
+                          (assignLeadType === "recovery" && (!assignRecoveryDirection || !assignRecoveryFlow)) ||
+                          (assignLeadType === "rsa" && !assignLocationText.trim())
                         }
                       >
                         {assignLoading ? t("leads.assign.working") : t("leads.assign.submit")}
