@@ -14,6 +14,7 @@ const publicPaths = [
   "/api/cars",
   "/api/files",
   "/api/public/recovery-requests",
+  "/api/public/estimate-approval",
   "/api/i18n-generate",
   "/api/yeastar",
   "/api/webhooks/dialer",
@@ -24,6 +25,7 @@ const publicPaths = [
   "/favicon.ico",
   "/_next",
   "/assets",
+  "/estimate-approval",
 ];
 
 function isPublicPath(pathname: string): boolean {

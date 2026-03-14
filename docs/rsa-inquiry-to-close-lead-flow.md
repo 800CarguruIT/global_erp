@@ -233,3 +233,256 @@ Map flow supports:
 8. Verify estimate and invoice are created, and invoice is paid.
 9. Verify inquiry actions are disabled after converted lead is closed.
 
+## 13. Premium Inspection Conversion Blueprint
+
+This section converts the premium inspection proposal into an implementation-ready structure for the current RSA/Workshop flow.
+
+### 13.1 Target Step Structure (Inspection Multi-Step)
+
+Use this finalized sequence for inspection workflow:
+
+1. Check-In Verification (Fast Gate)
+2. Start Inspection
+3. Checks & Notes
+4. Vehicle Intelligence (VIN + Specs)
+5. Inspection Items (catalog-driven findings/line items)
+6. Review & Complete Report
+
+Step goals:
+
+- Step 1 is mandatory before inspector can proceed.
+- Step 4 must lock vehicle mapping and parts context.
+- Step 5 is optimized for fast issue capture with evidence.
+- Step 6 generates premium customer-facing report.
+
+### 13.2 Inspector UI/UX Changes (Fast, Low-Click)
+
+#### A. Step 1: Check-In Verification
+
+Required verify/update fields:
+
+- Check-in photos: front/rear/left/right + 360 video
+- VIN
+- Tyre size
+- Current mileage
+
+Required behavior:
+
+- `Verify` and `Reject` per media item
+- If `Reject`, enforce upload of replacement media while preserving old media history
+- If visible damage found, allow immediate `Add Damage Evidence` (photo + note)
+
+#### B. Step 3: Checks & Notes
+
+- Keep only essential checks (oil, battery, tyre, OBD) + issue notes
+- For checks marked `ISSUE`, show required description and allow multi-photo upload
+- Notes/evidence must persist across refresh (autosave + server persistence)
+
+#### C. Step 4: Vehicle Intelligence
+
+Field order:
+
+1. VIN
+2. Make
+3. Model
+4. Year
+5. Trim
+6. Engine/Drivetrain
+7. Tyre size (dropdowns)
+8. Mileage
+
+Behavior:
+
+- VIN decode autofills vehicle profile
+- If VIN matches multiple cars, enforce selection
+- Lock parts catalog to selected VIN/car mapping
+
+#### D. Step 5: Catalog-Driven Inspection Items
+
+Keep line-item flow as:
+
+- Select group first
+- Show parts from selected group
+- Add one or multiple parts quickly
+- Each added issue has:
+  - severity
+  - evidence photos
+  - AI questions/answers
+  - recommendation text
+
+### 13.3 Data Model Additions/Normalization
+
+Use current line-items persistence and extend as needed:
+
+- `line_items`
+  - `category_key` (group key)
+  - `part_number`
+  - `severity` (`Safety Risk`, `Mandatory`, `Recommended`, `Optional`)
+  - `observed_condition`
+  - `why_it_matters`
+  - `recommended_action`
+  - `evidence_files` (array/json)
+  - `ai_questions` (json)
+  - `ai_answers` (json)
+  - `ai_recommendation`
+  - `health_impact_score` (numeric)
+
+Inspection-level draft/report payload:
+
+- `inspection_payload.checkinVerification`
+- `inspection_payload.vinVehicleProfile`
+- `inspection_payload.categoryHealth`
+- `inspection_payload.overallHealth`
+- `inspection_payload.reportSummary`
+
+### 13.4 API/Service Responsibilities
+
+#### A. VIN Intelligence
+
+- `GET /api/company/{companyId}/sales/leads/{leadId}/vin-lookup`
+- Decode VIN and return exact car profile + parts catalog mapping
+- Return confidence + requires selection when multiple matches exist
+
+#### B. Catalog & Suggestions
+
+- `GET /api/company/{companyId}/workshop/inspections/catalog?vin=...`
+- `POST /api/company/{companyId}/workshop/inspections/related-suggestions`
+  - input: selected issue/part/category
+  - output: related items + reason + confidence
+
+#### C. Report Generation
+
+- `POST /api/company/{companyId}/workshop/inspections/{inspectionId}/generate-report`
+  - compiles premium report sections
+  - groups findings by severity
+  - includes layman-friendly explanations
+
+### 13.5 Smart Suggestion Logic (Rule-First + AI Text)
+
+Implement in two layers:
+
+1. Rule engine (mandatory baseline)
+- deterministic mapping to avoid misses
+- examples:
+  - brake pads -> discs, brake fluid, wear sensor
+  - uneven tyre wear -> alignment, bearing, suspension arm
+  - oil leak -> seals, gaskets, contamination checks
+
+2. AI enhancement (optional)
+- generate short plain-language reason
+- prioritize suggestions by context/severity/history
+
+Inspector actions:
+
+- Accept all
+- Accept single
+- Dismiss single
+
+### 13.6 Health Score Logic (Percent-Based)
+
+Scoring outputs:
+
+- Overall health (%)
+- Category health (%)
+
+Proposed method:
+
+- Start each category at 100
+- Deduct by severity + component criticality + issue count
+- Example severity base weights:
+  - Safety Risk: -30
+  - Mandatory: -15
+  - Recommended: -7
+  - Optional: -3
+
+Criticality multipliers:
+
+- Brakes/Steering/Suspension/Tyres: 1.4
+- Engine/Transmission: 1.2
+- Others: 1.0
+
+Clamp:
+
+- category score min 0, max 100
+- overall = weighted average of category scores
+
+### 13.7 Premium Customer Report Layout
+
+#### A. Vehicle Overview
+
+- Customer name
+- Vehicle details (make/model/year/trim/engine/drivetrain)
+- VIN
+- Mileage
+- Inspection date
+- Inspector name
+- Key photos
+
+#### B. Overall Health Summary
+
+- Large overall health score
+- Category-wise health table
+
+#### C. Priority Summary by Severity
+
+- Safety Risk
+- Mandatory
+- Recommended
+- Optional
+
+#### D. Detailed Findings
+
+For each issue:
+
+- Part/item name
+- Category
+- Severity
+- Observed condition
+- Why it matters (plain language)
+- Recommended action
+- Supporting photos (overview, close-up, optional annotated)
+
+#### E. End-of-Report Summary
+
+- Final grouped decision list by severity
+- Clear, scannable "what to do now" summary
+
+### 13.8 Performance and Reliability Rules
+
+- Autosave on field changes and step transitions
+- Save on `Next Step` mandatory
+- Persist active step and restore on refresh
+- Keep UI responsive with optimistic updates where safe
+- Block final completion on missing critical evidence
+
+### 13.9 Rollout Plan (Low-Risk)
+
+Phase 1 (workflow hardening):
+
+- Step 1 verification gate
+- Step 4 VIN lock and catalog lock
+- severity standardization
+- autosave + next-step save enforcement
+
+Phase 2 (inspection intelligence):
+
+- catalog-first issue selection
+- related suggestions
+- evidence-first issue cards
+- category/overall health scoring
+
+Phase 3 (premium reporting):
+
+- final report generator
+- layman-friendly explanations
+- customer-ready PDF/web report layout
+
+### 13.10 UAT Additions for Premium Flow
+
+1. Verify reject/reupload flow preserves old media and saves new media.
+2. Validate VIN mismatch prevention and forced car selection when needed.
+3. Confirm parts catalog changes when VIN/car selection changes.
+4. Validate related suggestion relevance for 5 common scenarios.
+5. Confirm health score changes when severity changes.
+6. Verify every issue in report includes evidence + plain-language explanation.
+7. Validate end-of-report grouped decision summary is complete and scannable.

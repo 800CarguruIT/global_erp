@@ -17,6 +17,13 @@ type EstimateDetailMainProps = {
   companyId: string;
   estimateId: string;
 };
+type ProductOption = {
+  id: string;
+  name: string;
+  label: string;
+  partNumber?: string | null;
+  type?: string | null;
+};
 
 type LoadState<T> =
   | { status: "loading"; data: null; error: null }
@@ -82,10 +89,145 @@ type PersistedNewJobLineItemDraft = {
   gpPercent?: number | null;
 };
 type PersistedNewJobDraftMap = Record<string, PersistedNewJobLineItemDraft>;
+type CostType = EstimateItemCostType;
+type MarketPricingResponse = {
+  averages?: Partial<Record<CostType, number | null>>;
+  threshold?: {
+    basisType?: CostType;
+    basisCost?: number;
+    minSale?: number;
+    targetSale?: number;
+    maxSale?: number;
+  };
+  sampleSize?: number;
+  source?: string;
+  confidence?: "low" | "medium" | "high";
+  note?: string | null;
+};
+type MarketPricingInsight = {
+  averages: Partial<Record<CostType, number>>;
+  threshold: {
+    basisType: CostType;
+    basisCost: number;
+    minSale: number;
+    targetSale: number;
+    maxSale: number;
+  };
+  sampleSize: number;
+  source: string;
+  confidence?: "low" | "medium" | "high";
+  note?: string | null;
+};
+type PersistedMarketPricingMap = Record<
+  string,
+  {
+    averages?: Partial<Record<CostType, number | null>>;
+    threshold?: {
+      basisType?: CostType;
+      basisCost?: number;
+      minSale?: number;
+      targetSale?: number;
+      maxSale?: number;
+    };
+    sampleSize?: number;
+    source?: string;
+    confidence?: "low" | "medium" | "high";
+    note?: string | null;
+  }
+>;
 
 const toFiniteNumberOrNull = (value: unknown): number | null => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+};
+const roundTo2 = (value: number) => Math.round(value * 100) / 100;
+const SALE_RATIO_BY_TYPE: Record<CostType, { min: number; target: number; max: number }> = {
+  oe: { min: 1.2, target: 1.35, max: 1.6 },
+  oem: { min: 1.18, target: 1.3, max: 1.55 },
+  aftm: { min: 1.15, target: 1.25, max: 1.45 },
+  used: { min: 1.1, target: 1.2, max: 1.35 },
+};
+const extractPartNumber = (item: ItemDraft): string => {
+  const direct = String(item.description ?? "").trim();
+  if (/^[A-Za-z0-9-]{5,}$/.test(direct)) return direct;
+  const candidate = `${String(item.partName ?? "")} ${String(item.description ?? "")}`;
+  const matched = candidate.match(/\b[A-Za-z0-9-]{5,}\b/g);
+  return matched?.[0] ?? "";
+};
+const buildMarketPricingKey = (scope: "main" | "new", item: ItemDraft, index: number) =>
+  `${scope}:${String(item.inspectionItemId ?? item.id ?? `${item.partName}-${index}`)}`;
+const normalizeThresholdStatus = (
+  sale: number,
+  threshold: MarketPricingInsight["threshold"] | null
+): "below" | "within" | "above" | "none" => {
+  if (!threshold) return "none";
+  if (sale < threshold.minSale) return "below";
+  if (sale > threshold.maxSale) return "above";
+  return "within";
+};
+const getPersistentLineItemId = (item: ItemDraft): string =>
+  String(item.inspectionItemId ?? item.id ?? "").trim();
+const getLineSaleTotal = (item: Pick<ItemDraft, "sale" | "approvedSale">): number =>
+  Number(item.sale ?? item.approvedSale) || 0;
+const getSelectedTypeMinSubtotal = (
+  item: Pick<ItemDraft, "approvedType" | "quoteCosts" | "cost" | "quantity">
+): number => {
+  const type = item.approvedType;
+  if (!type) return 0;
+  const qty = Number(item.quantity) || 0;
+  if (qty <= 0) return 0;
+  const unitCost = Number(item.quoteCosts?.[type] ?? item.cost) || 0;
+  if (unitCost <= 0) return 0;
+  return roundTo2(unitCost * SALE_RATIO_BY_TYPE[type].min * qty);
+};
+const requiresDiscountApproval = (
+  item: Pick<ItemDraft, "approvedType" | "quoteCosts" | "cost" | "quantity" | "sale" | "approvedSale" | "discount">
+): boolean => {
+  const discount = Number(item.discount) || 0;
+  if (discount <= 0) return false;
+  const minSubtotal = getSelectedTypeMinSubtotal(item);
+  if (minSubtotal <= 0) return false;
+  const subTotal = Math.max(0, getLineSaleTotal(item) - discount);
+  return subTotal < minSubtotal;
+};
+
+const normalizePersistedMarketPricing = (value: unknown): PersistedMarketPricingMap => {
+  if (!value || typeof value !== "object") return {};
+  const map: PersistedMarketPricingMap = {};
+  for (const [rawId, rawInsight] of Object.entries(value as Record<string, unknown>)) {
+    const id = String(rawId ?? "").trim();
+    if (!id) continue;
+    const insight = (rawInsight ?? {}) as Record<string, unknown>;
+    const averages: Partial<Record<CostType, number | null>> = {};
+    for (const key of ["oe", "oem", "aftm", "used"] as const) {
+      const n = toFiniteNumberOrNull((insight.averages as any)?.[key]);
+      if (n != null) averages[key] = roundTo2(n);
+    }
+    const t = (insight.threshold ?? {}) as Record<string, unknown>;
+    const basisType = String(t.basisType ?? "").toLowerCase();
+    const threshold =
+      basisType === "oe" || basisType === "oem" || basisType === "aftm" || basisType === "used"
+        ? {
+            basisType: basisType as CostType,
+            basisCost: toFiniteNumberOrNull(t.basisCost) ?? undefined,
+            minSale: toFiniteNumberOrNull(t.minSale) ?? undefined,
+            targetSale: toFiniteNumberOrNull(t.targetSale) ?? undefined,
+            maxSale: toFiniteNumberOrNull(t.maxSale) ?? undefined,
+          }
+        : undefined;
+    map[id] = {
+      averages,
+      threshold,
+      sampleSize: toFiniteNumberOrNull(insight.sampleSize) ?? undefined,
+      source: String(insight.source ?? "").trim() || undefined,
+      confidence:
+        insight.confidence === "low" || insight.confidence === "medium" || insight.confidence === "high"
+          ? (insight.confidence as "low" | "medium" | "high")
+          : undefined,
+      note: String(insight.note ?? "").trim() || undefined,
+    };
+  }
+  return map;
 };
 
 const getPersistedNewJobDraftMap = (meta: any): PersistedNewJobDraftMap => {
@@ -125,8 +267,8 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
   const [car, setCar] = useState<any | null>(null);
   const [lead, setLead] = useState<any | null>(null);
   const [inspection, setInspection] = useState<any | null>(null);
-  const [products, setProducts] = useState<Array<{ id: number; name: string; type?: string }>>([]);
-  const [productResults, setProductResults] = useState<Array<{ id: number; name: string; type?: string }>>([]);
+  const [products, setProducts] = useState<ProductOption[]>([]);
+  const [productResults, setProductResults] = useState<ProductOption[]>([]);
   const [productOpenIndex, setProductOpenIndex] = useState<number | null>(null);
   const [productAnchor, setProductAnchor] = useState<{
     top: number;
@@ -142,6 +284,9 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
   const [toastMessage, setToastMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [jobCardMessage, setJobCardMessage] = useState<string | null>(null);
+  const [customerApprovalUrl, setCustomerApprovalUrl] = useState<string | null>(null);
+  const [customerApprovalStatus, setCustomerApprovalStatus] = useState<string | null>(null);
+  const [isSharingCustomerApproval, setIsSharingCustomerApproval] = useState(false);
   const [activeJobCardId, setActiveJobCardId] = useState<string | null>(null);
   const [jobCards, setJobCards] = useState<JobCardSummary[]>([]);
   const [inspectionLineItems, setInspectionLineItems] = useState<any[]>([]);
@@ -149,12 +294,121 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [invoiceConvertError, setInvoiceConvertError] = useState<string | null>(null);
   const [isConvertingInvoice, setIsConvertingInvoice] = useState(false);
+  const [marketPricingByKey, setMarketPricingByKey] = useState<Record<string, MarketPricingInsight>>({});
+  const [marketPricingLoadingByKey, setMarketPricingLoadingByKey] = useState<Record<string, boolean>>({});
+  const [isApplyingMarketPricingAll, setIsApplyingMarketPricingAll] = useState(false);
+  const [persistedMarketPricingByLineItemId, setPersistedMarketPricingByLineItemId] =
+    useState<PersistedMarketPricingMap>({});
+  const autoPricingAttemptedRef = useRef<Set<string>>(new Set());
+  const [discountModeByKey] = useState<Record<string, "amount" | "percent">>({});
+  const [invoiceDiscountMode, setInvoiceDiscountMode] = useState<"amount" | "percent">("amount");
+  const [invoiceDiscountPercent, setInvoiceDiscountPercent] = useState(0);
+  const isEstimateClosed =
+    (loadState.status === "loaded" && loadState.data?.estimate?.status === "invoiced") ||
+    (loadState.status === "loaded" &&
+      String(loadState.data?.estimate?.meta?.legacy_source ?? "").trim().toLowerCase() === "carguru2.estimates" &&
+      String(loadState.data?.estimate?.meta?.legacy_invoice_status ?? "").trim().toLowerCase() === "invoiced");
+  const estimateVin = useMemo(() => {
+    const meta = loadState.status === "loaded" ? loadState.data?.estimate?.meta ?? {} : {};
+    const candidates = [
+      inspection?.draftPayload?.inspectionVin,
+      inspection?.draftPayload?.inspection_vin,
+      inspection?.inspectionVin,
+      inspection?.inspection_vin,
+      inspection?.vin,
+      car?.vin,
+      lead?.vin,
+      meta?.inspectionVin,
+      meta?.inspection_vin,
+      meta?.carVin,
+      meta?.car_vin,
+      meta?.vin,
+    ];
+    for (const value of candidates) {
+      const vin = String(value ?? "").trim().toUpperCase();
+      if (vin) return vin;
+    }
+    return "";
+  }, [loadState, inspection, car, lead]);
+
+  const hydrateMarketPricingState = (
+    mainItems: ItemDraft[],
+    addItems: ItemDraft[],
+    persisted: PersistedMarketPricingMap
+  ) => {
+    const next: Record<string, MarketPricingInsight> = {};
+    mainItems.forEach((item, index) => {
+      const id = getPersistentLineItemId(item);
+      const persistedInsight = id ? persisted[id] : null;
+      if (!persistedInsight?.threshold) return;
+      next[buildMarketPricingKey("main", item, index)] = {
+        averages: (persistedInsight.averages ?? {}) as Partial<Record<CostType, number>>,
+        threshold: {
+          basisType: persistedInsight.threshold.basisType ?? "oem",
+          basisCost: Number(persistedInsight.threshold.basisCost ?? 0),
+          minSale: Number(persistedInsight.threshold.minSale ?? 0),
+          targetSale: Number(persistedInsight.threshold.targetSale ?? 0),
+          maxSale: Number(persistedInsight.threshold.maxSale ?? 0),
+        },
+        sampleSize: Number(persistedInsight.sampleSize ?? 0),
+        source: String(persistedInsight.source ?? "saved"),
+        confidence: persistedInsight.confidence,
+        note: persistedInsight.note ?? null,
+      };
+    });
+    addItems.forEach((item, index) => {
+      const id = getPersistentLineItemId(item);
+      const persistedInsight = id ? persisted[id] : null;
+      if (!persistedInsight?.threshold) return;
+      next[buildMarketPricingKey("new", item, index)] = {
+        averages: (persistedInsight.averages ?? {}) as Partial<Record<CostType, number>>,
+        threshold: {
+          basisType: persistedInsight.threshold.basisType ?? "oem",
+          basisCost: Number(persistedInsight.threshold.basisCost ?? 0),
+          minSale: Number(persistedInsight.threshold.minSale ?? 0),
+          targetSale: Number(persistedInsight.threshold.targetSale ?? 0),
+          maxSale: Number(persistedInsight.threshold.maxSale ?? 0),
+        },
+        sampleSize: Number(persistedInsight.sampleSize ?? 0),
+        source: String(persistedInsight.source ?? "saved"),
+        confidence: persistedInsight.confidence,
+        note: persistedInsight.note ?? null,
+      };
+    });
+    setMarketPricingByKey(next);
+    setPersistedMarketPricingByLineItemId(persisted);
+  };
 
   useEffect(() => {
     if (!toastMessage) return;
     const timer = window.setTimeout(() => setToastMessage(null), 2500);
     return () => window.clearTimeout(timer);
   }, [toastMessage]);
+
+  useEffect(() => {
+    if (loadState.status !== "loaded") return;
+    let cancelled = false;
+    const run = async () => {
+      try {
+        const res = await fetch(
+          `/api/company/${companyId}/workshop/estimates/${estimateId}/customer-approval`
+        );
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || cancelled) return;
+        const url = String(json?.data?.url ?? "").trim();
+        if (url) {
+          setCustomerApprovalUrl(url);
+          setCustomerApprovalStatus(String(json?.data?.status ?? "").trim() || null);
+        }
+      } catch {
+        // ignore optional load
+      }
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [companyId, estimateId, loadState.status]);
 
   const renderOrderBadge = (item: ItemDraft) => {
     if (item.status !== "approved") {
@@ -370,6 +624,34 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
           items = items.filter((item: any) => !item?.inspectionItemId && !item?.inspection_item_id);
         }
         if (!cancelled) {
+          const persistedPricing = normalizePersistedMarketPricing(estimate?.meta?.aiMarketPricingByLineItemId);
+          const mappedMainItems = items.map((i) => {
+            const itemId = String((i as any).inspectionItemId ?? (i as any).inspection_item_id ?? i.id ?? "").trim();
+            const persistedCosts = itemId ? (persistedPricing[itemId]?.averages as EstimateItemQuoteCosts | undefined) : undefined;
+            return {
+              id: i.id,
+              lineNo: i.lineNo,
+              partName: i.partName ?? "",
+              description: i.description ?? "",
+              type: i.type,
+              productType: (i as any).productType ?? (i as any).product_type ?? null,
+              inspectionItemId: (i as any).inspectionItemId ?? (i as any).inspection_item_id ?? null,
+              quantity: i.quantity ?? 1,
+              cost: i.cost ?? 0,
+              sale: i.sale ?? 0,
+              approvedSale: (i as any).approvedSale ?? i.sale ?? 0,
+              discount: (i as any).discount ?? 0,
+              discountPercent: (i as any).discountPercent ?? 0,
+              gpPercent: i.gpPercent ?? null,
+              status: i.status,
+              source: i.inspectionItemId ? "inspection" : "estimate",
+              partOrdered: i.inspectionItemId ? lineItemOrderMap[i.inspectionItemId] ?? 0 : 0,
+              orderStatus: i.inspectionItemId ? lineItemOrderStatusMap[i.inspectionItemId] ?? null : null,
+              quoteCosts: i.quoteCosts ?? persistedCosts,
+              approvedType: i.approvedType ?? null,
+              approvedCost: i.approvedCost ?? null,
+            };
+          });
           setLoadState({ status: "loaded", data: { estimate, items }, error: null });
           setDraft({
             status: estimate.status,
@@ -377,33 +659,10 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
             discountAmount: estimate.totalDiscount ?? 0,
             customerComplain: estimate.meta?.customerComplain ?? "",
             inspectorRemarks: estimate.meta?.inspectorRemarks ?? "",
-            items: items.map((i) => {
-              return {
-                id: i.id,
-                lineNo: i.lineNo,
-                partName: i.partName ?? "",
-                description: i.description ?? "",
-                type: i.type,
-                productType: (i as any).productType ?? (i as any).product_type ?? null,
-                inspectionItemId: (i as any).inspectionItemId ?? (i as any).inspection_item_id ?? null,
-                quantity: i.quantity ?? 1,
-                cost: i.cost ?? 0,
-                sale: i.sale ?? 0,
-                approvedSale: (i as any).approvedSale ?? i.sale ?? 0,
-                discount: (i as any).discount ?? 0,
-                discountPercent: (i as any).discountPercent ?? 0,
-                gpPercent: i.gpPercent ?? null,
-                status: i.status,
-                source: i.inspectionItemId ? "inspection" : "estimate",
-                partOrdered: i.inspectionItemId ? lineItemOrderMap[i.inspectionItemId] ?? 0 : 0,
-                orderStatus: i.inspectionItemId ? lineItemOrderStatusMap[i.inspectionItemId] ?? null : null,
-                quoteCosts: i.quoteCosts,
-                approvedType: i.approvedType ?? null,
-                approvedCost: i.approvedCost ?? null,
-              };
-            }),
+            items: mappedMainItems,
           });
           setNewJobItems(additionalNewJobItems);
+          hydrateMarketPricingState(mappedMainItems, additionalNewJobItems, persistedPricing);
           setCustomer(null);
           setCar(null);
           setLead(null);
@@ -479,14 +738,26 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
   }, [companyId, estimateId, inspection?.id, loadState.data?.estimate?.inspectionId]);
 
   useEffect(() => {
-    fetch("/api/products")
+    if (loadState.status !== "loaded") return;
+    if (!estimateVin) {
+      setProducts([]);
+      return;
+    }
+    const url = `/api/company/${companyId}/workshop/estimates/${estimateId}/vin-parts?vin=${encodeURIComponent(
+      estimateVin
+    )}`;
+    fetch(url)
       .then((res) => (res.ok ? res.json() : Promise.reject()))
-      .then((data) => setProducts(data?.data ?? []))
+      .then((data) => setProducts(Array.isArray(data?.data) ? data.data : []))
       .catch(() => setProducts([]));
-  }, []);
+  }, [companyId, estimateId, estimateVin, loadState.status]);
 
   useEffect(() => {
     if (productOpenIndex === null) {
+      setProductResults([]);
+      return;
+    }
+    if (!estimateVin) {
       setProductResults([]);
       return;
     }
@@ -497,12 +768,15 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
       : draft?.items[queryIndex]?.partName?.trim() ?? "";
     let active = true;
     const timer = setTimeout(() => {
-      const url = query ? `/api/products?search=${encodeURIComponent(query)}` : "/api/products";
+      const params = new URLSearchParams();
+      params.set("vin", estimateVin);
+      if (query) params.set("search", query);
+      const url = `/api/company/${companyId}/workshop/estimates/${estimateId}/vin-parts?${params.toString()}`;
       fetch(url)
         .then((res) => (res.ok ? res.json() : Promise.reject()))
         .then((data) => {
           if (!active) return;
-          setProductResults(data?.data ?? []);
+          setProductResults(Array.isArray(data?.data) ? data.data : []);
         })
         .catch(() => {
           if (!active) return;
@@ -513,7 +787,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
       active = false;
       clearTimeout(timer);
     };
-  }, [productOpenIndex, draft, newJobItems]);
+  }, [productOpenIndex, draft, newJobItems, companyId, estimateId, estimateVin]);
 
   useEffect(() => {
     if (!draft || productTypeByName.size === 0) return;
@@ -682,6 +956,48 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
         };
         return acc;
       }, {} as PersistedNewJobDraftMap);
+      const persistedMarketPricing: PersistedMarketPricingMap = {};
+      draft.items.forEach((item, idx) => {
+        const id = getPersistentLineItemId(item);
+        if (!id) return;
+        const key = buildMarketPricingKey("main", item, idx);
+        const insight = marketPricingByKey[key];
+        if (!insight) return;
+        persistedMarketPricing[id] = {
+          averages: {
+            oe: insight.averages.oe ?? null,
+            oem: insight.averages.oem ?? null,
+            aftm: insight.averages.aftm ?? null,
+            used: insight.averages.used ?? null,
+          },
+          threshold: { ...insight.threshold },
+          sampleSize: insight.sampleSize,
+          source: insight.source,
+          confidence: insight.confidence,
+          note: insight.note ?? null,
+        };
+      });
+      savedNewJobItems.forEach((item, idx) => {
+        const id = getPersistentLineItemId(item);
+        if (!id) return;
+        const key = buildMarketPricingKey("new", item, idx);
+        const insight = marketPricingByKey[key];
+        if (!insight) return;
+        persistedMarketPricing[id] = {
+          averages: {
+            oe: insight.averages.oe ?? null,
+            oem: insight.averages.oem ?? null,
+            aftm: insight.averages.aftm ?? null,
+            used: insight.averages.used ?? null,
+          },
+          threshold: { ...insight.threshold },
+          sampleSize: insight.sampleSize,
+          source: insight.source,
+          confidence: insight.confidence,
+          note: insight.note ?? null,
+        };
+      });
+      nextMeta.aiMarketPricingByLineItemId = persistedMarketPricing;
       const body = {
         status: draft.status,
         vatRate: draft.vatRate,
@@ -696,12 +1012,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
           type: i.type,
           quantity: i.quantity ?? 1,
           cost: i.cost ?? 0,
-          sale:
-            i.status === "approved"
-              ? i.approvedSale && i.approvedSale > 0
-                ? i.approvedSale
-                : i.sale ?? 0
-              : i.sale ?? 0,
+          sale: i.sale ?? i.approvedSale ?? 0,
           gpPercent: i.gpPercent ?? null,
           status: i.status ?? "pending",
           approvedType: i.approvedType ?? null,
@@ -728,6 +1039,9 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
               },
             }
           : prev
+      );
+      setPersistedMarketPricingByLineItemId(
+        normalizePersistedMarketPricing(nextMeta.aiMarketPricingByLineItemId)
       );
       setNewJobItems(savedNewJobItems);
       setLastSavedAt(new Date());
@@ -800,6 +1114,63 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
     return () => clearTimeout(timer);
   }, [jobCardMessage]);
 
+  useEffect(() => {
+    if (!draft || isEstimateClosed || isSaving) return;
+    let cancelled = false;
+    const hasAnyCost = (item: ItemDraft) =>
+      Boolean(
+        (item.quoteCosts?.oe ?? 0) > 0 ||
+          (item.quoteCosts?.oem ?? 0) > 0 ||
+          (item.quoteCosts?.aftm ?? 0) > 0 ||
+          (item.quoteCosts?.used ?? 0) > 0
+      );
+    const run = async () => {
+      const mainTargets = draft.items
+        .map((item, index) => ({ scope: "main" as const, item, index }))
+        .filter(({ item, index }) => {
+          if (!item.partName.trim()) return false;
+          if (isLineItemLocked(item)) return false;
+          const persistedId = getPersistentLineItemId(item);
+          if (persistedId && persistedMarketPricingByLineItemId[persistedId]) return false;
+          if (hasAnyCost(item)) return false;
+          const rowKey = buildMarketPricingKey("main", item, index);
+          if (autoPricingAttemptedRef.current.has(rowKey)) return false;
+          return true;
+        });
+      const newTargets = newJobItems
+        .map((item, index) => ({ scope: "new" as const, item, index }))
+        .filter(({ item, index }) => {
+          if (!item.partName.trim()) return false;
+          if (isLineItemLocked(item)) return false;
+          const persistedId = getPersistentLineItemId(item);
+          if (persistedId && persistedMarketPricingByLineItemId[persistedId]) return false;
+          if (hasAnyCost(item)) return false;
+          const rowKey = buildMarketPricingKey("new", item, index);
+          if (autoPricingAttemptedRef.current.has(rowKey)) return false;
+          return true;
+        });
+      const targets = [...mainTargets, ...newTargets];
+      if (!targets.length) return;
+      for (const target of targets) {
+        const rowKey = buildMarketPricingKey(target.scope, target.item, target.index);
+        autoPricingAttemptedRef.current.add(rowKey);
+      }
+      let appliedAny = false;
+      for (const target of targets) {
+        // Sequential by design to avoid API bursts.
+        await fetchAndApplyMarketPricing(target.scope, target.index, { silent: true, skipIfSaved: true });
+        appliedAny = true;
+      }
+      if (appliedAny && !cancelled) {
+        await saveEstimate();
+      }
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [draft, newJobItems, isEstimateClosed, isSaving, persistedMarketPricingByLineItemId]);
+
   const totals = useMemo(() => {
     if (!draft) return null;
     const isPendingLike = (status: EstimateItemStatus) => status === "pending" || status === "inquiry";
@@ -810,7 +1181,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
       const approvedCost = Number.isFinite(approvedCostRaw) ? approvedCostRaw : baseCost * qty;
       const saleValue = Number(item.sale) || 0;
       const approvedValue = Number(item.approvedSale) || 0;
-      const saleBase = approvedValue > 0 ? approvedValue : saleValue;
+      const saleBase = saleValue > 0 ? saleValue : approvedValue;
       const discountAmount = Number(item.discount) || 0;
       const costTotal = approvedCost;
       const saleTotal = saleBase;
@@ -871,16 +1242,20 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
       const oem = Number(item.quoteCosts?.oem) || 0;
       const aftm = Number(item.quoteCosts?.aftm) || 0;
       const used = Number(item.quoteCosts?.used) || 0;
+      const oeSale = oe * SALE_RATIO_BY_TYPE.oe.target;
+      const oemSale = oem * SALE_RATIO_BY_TYPE.oem.target;
+      const aftmSale = aftm * SALE_RATIO_BY_TYPE.aftm.target;
+      const usedSale = used * SALE_RATIO_BY_TYPE.used.target;
       const approvedCostRaw = Number(item.approvedCost);
       const approvedCost = Number.isFinite(approvedCostRaw) ? approvedCostRaw : (Number(item.cost) || 0) * qty;
-      const approvedSale = Number(item.approvedSale ?? item.sale) || 0;
+      const approvedSale = Number(item.sale ?? item.approvedSale) || 0;
       const lineSale = approvedSale;
       const lineDiscount = Number(item.discount) || 0;
       summary.qty += qty;
-      summary.oe += oe * qty;
-      summary.oem += oem * qty;
-      summary.aftm += aftm * qty;
-      summary.used += used * qty;
+      summary.oe += oeSale * qty;
+      summary.oem += oemSale * qty;
+      summary.aftm += aftmSale * qty;
+      summary.used += usedSale * qty;
       summary.approvedCost += approvedCost;
       summary.approvedSale += lineSale;
       summary.discount += lineDiscount;
@@ -958,7 +1333,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
       if (isLineItemLocked(current) && !isAllowedLockedFinancialPatch(patch)) {
         return prev;
       }
-        const updated: ItemDraft = {
+        let updated: ItemDraft = {
           ...current,
           ...patch,
           partName: patch.partName ?? current.partName ?? "",
@@ -977,6 +1352,9 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
           approvedType: patch.approvedType ?? current.approvedType ?? null,
           approvedCost: patch.approvedCost ?? current.approvedCost ?? null,
         };
+      if (requiresDiscountApproval(updated)) {
+        updated = { ...updated, status: "pending" };
+      }
       next[index] = updated;
       return { ...prev, items: next };
     });
@@ -1131,6 +1509,34 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
           lineItemOrderStatusMap = {};
         }
       }
+      const persistedPricing = normalizePersistedMarketPricing(refreshedEstimate?.meta?.aiMarketPricingByLineItemId);
+      const mappedMainItems = refreshedItems.map((i) => {
+        const itemId = String((i as any).inspectionItemId ?? (i as any).inspection_item_id ?? i.id ?? "").trim();
+        const persistedCosts = itemId ? (persistedPricing[itemId]?.averages as EstimateItemQuoteCosts | undefined) : undefined;
+        return {
+          id: i.id,
+          lineNo: i.lineNo,
+          partName: i.partName ?? "",
+          description: i.description ?? "",
+          type: i.type,
+          productType: (i as any).productType ?? (i as any).product_type ?? null,
+          inspectionItemId: (i as any).inspectionItemId ?? (i as any).inspection_item_id ?? null,
+          quantity: i.quantity ?? 1,
+          cost: i.cost ?? 0,
+          sale: i.sale ?? 0,
+          approvedSale: (i as any).approvedSale ?? i.sale ?? 0,
+          discount: (i as any).discount ?? 0,
+          discountPercent: (i as any).discountPercent ?? 0,
+          gpPercent: i.gpPercent ?? null,
+          status: i.status,
+          source: i.inspectionItemId ? "inspection" : "estimate",
+          partOrdered: i.inspectionItemId ? lineItemOrderMap[i.inspectionItemId] ?? 0 : 0,
+          orderStatus: i.inspectionItemId ? lineItemOrderStatusMap[i.inspectionItemId] ?? null : null,
+          quoteCosts: i.quoteCosts ?? persistedCosts,
+          approvedType: i.approvedType ?? null,
+          approvedCost: i.approvedCost ?? null,
+        };
+      });
       setLoadState({ status: "loaded", data: { estimate: refreshedEstimate, items: refreshedItems }, error: null });
       setDraft({
         status: refreshedEstimate.status,
@@ -1138,33 +1544,10 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
         discountAmount: refreshedEstimate.totalDiscount ?? 0,
         customerComplain: refreshedEstimate.meta?.customerComplain ?? "",
         inspectorRemarks: refreshedEstimate.meta?.inspectorRemarks ?? "",
-        items: refreshedItems.map((i) => {
-          return {
-            id: i.id,
-            lineNo: i.lineNo,
-            partName: i.partName ?? "",
-            description: i.description ?? "",
-            type: i.type,
-            productType: (i as any).productType ?? (i as any).product_type ?? null,
-            inspectionItemId: (i as any).inspectionItemId ?? (i as any).inspection_item_id ?? null,
-            quantity: i.quantity ?? 1,
-            cost: i.cost ?? 0,
-            sale: i.sale ?? 0,
-            approvedSale: (i as any).approvedSale ?? i.sale ?? 0,
-            discount: (i as any).discount ?? 0,
-            discountPercent: (i as any).discountPercent ?? 0,
-            gpPercent: i.gpPercent ?? null,
-            status: i.status,
-            source: i.inspectionItemId ? "inspection" : "estimate",
-            partOrdered: i.inspectionItemId ? lineItemOrderMap[i.inspectionItemId] ?? 0 : 0,
-            orderStatus: i.inspectionItemId ? lineItemOrderStatusMap[i.inspectionItemId] ?? null : null,
-            quoteCosts: i.quoteCosts,
-            approvedType: i.approvedType ?? null,
-            approvedCost: i.approvedCost ?? null,
-          };
-        }),
+        items: mappedMainItems,
       });
       setNewJobItems(additionalNewJobItems);
+      hydrateMarketPricingState(mappedMainItems, additionalNewJobItems, persistedPricing);
       setInspection(inspectionSnapshot);
     } catch (err) {
       console.error("Failed to refresh quotes", err);
@@ -1200,7 +1583,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
       prev.map((item, idx) => {
         if (idx !== index) return item;
         if (isLineItemLocked(item) && !isAllowedLockedFinancialPatch(patch)) return item;
-        return {
+        let updated: ItemDraft = {
           ...item,
           ...patch,
           partName: patch.partName ?? item.partName ?? "",
@@ -1219,12 +1602,162 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
           approvedType: patch.approvedType ?? item.approvedType ?? null,
           approvedCost: patch.approvedCost ?? item.approvedCost ?? null,
         };
+        if (requiresDiscountApproval(updated)) {
+          updated = { ...updated, status: "pending" };
+        }
+        return updated;
       })
     );
   }
 
   function removeNewJobItem(index: number) {
     setNewJobItems((prev) => prev.filter((_, idx) => idx !== index));
+  }
+
+  async function fetchAndApplyMarketPricing(
+    scope: "main" | "new",
+    index: number,
+    opts?: { silent?: boolean; skipIfSaved?: boolean }
+  ) {
+    const item = scope === "main" ? draft.items[index] : newJobItems[index];
+    if (!item) return;
+    const persistedId = getPersistentLineItemId(item);
+    if (opts?.skipIfSaved && persistedId && persistedMarketPricingByLineItemId[persistedId]) return;
+    const rowKey = buildMarketPricingKey(scope, item, index);
+    setMarketPricingLoadingByKey((prev) => ({ ...prev, [rowKey]: true }));
+    try {
+      const partNumber = extractPartNumber(item);
+      const res = await fetch(`/api/company/${companyId}/workshop/estimates/ai-market-pricing`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          estimateId,
+          lineItem: {
+            partName: item.partName,
+            description: item.description ?? "",
+            partNumber,
+            quantity: item.quantity,
+            approvedType: item.approvedType ?? null,
+            currentCosts: item.quoteCosts ?? {},
+          },
+        }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const payload = (await res.json()) as MarketPricingResponse;
+      const averages: Partial<Record<CostType, number>> = {};
+      for (const key of ["oe", "oem", "aftm", "used"] as const) {
+        const value = Number(payload?.averages?.[key]);
+        if (Number.isFinite(value) && value > 0) averages[key] = roundTo2(value);
+      }
+      const pickBasis = (
+        source: Partial<Record<CostType, number>>,
+        preferred: CostType | null | undefined
+      ): { type: CostType; cost: number } | null => {
+        const order: CostType[] = preferred
+          ? [preferred, "oe", "oem", "aftm", "used"].filter(
+              (v, idx, arr) => arr.indexOf(v as CostType) === idx
+            ) as CostType[]
+          : ["oe", "oem", "aftm", "used"];
+        for (const type of order) {
+          const value = Number(source[type] ?? 0);
+          if (value > 0) return { type, cost: value };
+        }
+        return null;
+      };
+      const basis = pickBasis(averages, item.approvedType ?? null);
+      const threshold = (() => {
+        const incoming = payload?.threshold;
+        const hasIncoming =
+          incoming &&
+          (incoming.basisType === "oe" ||
+            incoming.basisType === "oem" ||
+            incoming.basisType === "aftm" ||
+            incoming.basisType === "used") &&
+          Number.isFinite(Number(incoming.minSale)) &&
+          Number.isFinite(Number(incoming.targetSale)) &&
+          Number.isFinite(Number(incoming.maxSale));
+        if (hasIncoming) {
+          return {
+            basisType: incoming.basisType as CostType,
+            basisCost: roundTo2(Number(incoming.basisCost ?? basis?.cost ?? 0)),
+            minSale: roundTo2(Number(incoming.minSale)),
+            targetSale: roundTo2(Number(incoming.targetSale)),
+            maxSale: roundTo2(Number(incoming.maxSale)),
+          };
+        }
+        if (!basis) return null;
+        const ratios: Record<CostType, { min: number; target: number; max: number }> = {
+          oe: { min: 1.2, target: 1.35, max: 1.6 },
+          oem: { min: 1.18, target: 1.3, max: 1.55 },
+          aftm: { min: 1.15, target: 1.25, max: 1.45 },
+          used: { min: 1.1, target: 1.2, max: 1.35 },
+        };
+        const ratio = ratios[basis.type];
+        return {
+          basisType: basis.type,
+          basisCost: roundTo2(basis.cost),
+          minSale: roundTo2(basis.cost * ratio.min),
+          targetSale: roundTo2(basis.cost * ratio.target),
+          maxSale: roundTo2(basis.cost * ratio.max),
+        };
+      })();
+
+      if (!threshold) throw new Error("No threshold returned");
+      const insight: MarketPricingInsight = {
+        averages,
+        threshold,
+        sampleSize: Number(payload?.sampleSize ?? 0) || 0,
+        source: String(payload?.source ?? "ai").trim() || "ai",
+        confidence: payload?.confidence,
+        note: payload?.note ?? null,
+      };
+      setMarketPricingByKey((prev) => ({ ...prev, [rowKey]: insight }));
+
+      const nextQuoteCosts: EstimateItemQuoteCosts = {
+        ...(item.quoteCosts ?? {}),
+        ...averages,
+      };
+      const patch: Partial<ItemDraft> = { quoteCosts: nextQuoteCosts };
+      if (item.approvedType && averages[item.approvedType] != null) {
+        const nextUnitCost = Number(averages[item.approvedType]) || 0;
+        patch.cost = nextUnitCost;
+        patch.approvedCost = roundTo2(nextUnitCost * (Number(item.quantity) || 0));
+      }
+      if (scope === "main") {
+        updateItem(index, patch);
+      } else {
+        updateNewJobItem(index, patch);
+      }
+      if (!opts?.silent) {
+        setToastMessage({ type: "success", text: "AI market pricing applied." });
+      }
+    } catch {
+      if (!opts?.silent) {
+        setToastMessage({ type: "error", text: "Failed to fetch AI market pricing." });
+      }
+    } finally {
+      setMarketPricingLoadingByKey((prev) => ({ ...prev, [rowKey]: false }));
+    }
+  }
+
+  async function applyMarketPricingToAllMainItems() {
+    if (isApplyingMarketPricingAll) return;
+    const targets = draft.items
+      .map((item, index) => ({ item, index }))
+      .filter(({ item }) => !isEstimateClosed && !isLineItemLocked(item) && item.partName.trim());
+    if (!targets.length) {
+      setToastMessage({ type: "error", text: "No editable line items to apply AI pricing." });
+      return;
+    }
+    setIsApplyingMarketPricingAll(true);
+    try {
+      for (const target of targets) {
+        // Sequential calls avoid rate-limit bursts on the AI endpoint.
+        await fetchAndApplyMarketPricing("main", target.index);
+      }
+    } finally {
+      setIsApplyingMarketPricingAll(false);
+    }
   }
 
   async function createAdditionalJobCard() {
@@ -1287,6 +1820,11 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
     setInvoiceConvertError(null);
     setIsConvertingInvoice(true);
     try {
+      const saved = await saveEstimate();
+      if (!saved && !isEstimateClosed) {
+        setInvoiceConvertError("Please save estimate changes before converting.");
+        return;
+      }
       const res = await fetch(`/api/company/${companyId}/workshop/invoices`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1305,10 +1843,44 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
       setIsConvertingInvoice(false);
     }
   }
+
+  async function shareEstimateToCustomer(regenerate = false) {
+    setIsSharingCustomerApproval(true);
+    try {
+      const res = await fetch(
+        `/api/company/${companyId}/workshop/estimates/${estimateId}/customer-approval`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ regenerate }),
+        }
+      );
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(String(json?.error ?? `HTTP ${res.status}`));
+      const url = String(json?.data?.url ?? "").trim();
+      const status = String(json?.data?.status ?? "").trim();
+      if (!url) throw new Error("Customer approval URL was not returned.");
+      setCustomerApprovalUrl(url);
+      setCustomerApprovalStatus(status || null);
+      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+        setToastMessage({ type: "success", text: "Customer approval link copied." });
+      } else {
+        setToastMessage({ type: "success", text: "Customer approval link generated." });
+      }
+    } catch (err: any) {
+      setToastMessage({
+        type: "error",
+        text: String(err?.message ?? "Failed to share estimate with customer."),
+      });
+    } finally {
+      setIsSharingCustomerApproval(false);
+    }
+  }
   function applyApprovedTypeToAll(type: EstimateItemCostType, checked: boolean) {
     setDraft((prev) => {
       if (!prev) return prev;
-      const nextItems = prev.items.map((item) => {
+      const nextItems = prev.items.map((item, index) => {
         const isLocked = isLineItemLocked(item);
         if (isLocked) return item;
         if (!checked) {
@@ -1319,14 +1891,25 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
         const currentApprovedCost = Number(item.approvedCost ?? item.cost ?? 0);
         const qty = Number(item.quantity) || 0;
         const approvedCost = costByType * qty;
-        if (item.approvedType === type && currentApprovedCost === approvedCost) {
+        const nextSale = roundTo2(costByType * SALE_RATIO_BY_TYPE[type].target * qty);
+        if (item.approvedType === type && currentApprovedCost === approvedCost && Number(item.sale) === nextSale) {
           return item;
         }
+        const discountPercent = Number(item.discountPercent ?? 0) || 0;
+        const rowKey = buildMarketPricingKey("main", item, index);
+        const isPercentMode =
+          discountModeByKey[rowKey] === "percent" || isLegacyEstimate || discountPercent > 0;
         return {
           ...item,
           approvedType: type,
           approvedCost,
           cost: costByType,
+          sale: nextSale,
+          ...(isPercentMode
+            ? {
+                discount: Number(((nextSale * discountPercent) / 100).toFixed(2)),
+              }
+            : {}),
         };
       });
       return { ...prev, items: nextItems };
@@ -1335,7 +1918,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
 
   function applyApprovedTypeToAllNewJob(type: EstimateItemCostType, checked: boolean) {
     setNewJobItems((prev) =>
-      prev.map((item) => {
+      prev.map((item, index) => {
         const isLocked = isLineItemLocked(item);
         if (isLocked) return item;
         if (!checked) {
@@ -1346,14 +1929,25 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
         const currentApprovedCost = Number(item.approvedCost ?? item.cost ?? 0);
         const qty = Number(item.quantity) || 0;
         const approvedCost = costByType * qty;
-        if (item.approvedType === type && currentApprovedCost === approvedCost) {
+        const nextSale = roundTo2(costByType * SALE_RATIO_BY_TYPE[type].target * qty);
+        if (item.approvedType === type && currentApprovedCost === approvedCost && Number(item.sale) === nextSale) {
           return item;
         }
+        const discountPercent = Number(item.discountPercent ?? 0) || 0;
+        const rowKey = buildMarketPricingKey("new", item, index);
+        const isPercentMode =
+          discountModeByKey[rowKey] === "percent" || isLegacyEstimate || discountPercent > 0;
         return {
           ...item,
           approvedType: type,
           approvedCost,
           cost: costByType,
+          sale: nextSale,
+          ...(isPercentMode
+            ? {
+                discount: Number(((nextSale * discountPercent) / 100).toFixed(2)),
+              }
+            : {}),
         };
       })
     );
@@ -1421,15 +2015,19 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
       const oem = Number(item.quoteCosts?.oem) || 0;
       const aftm = Number(item.quoteCosts?.aftm) || 0;
       const used = Number(item.quoteCosts?.used) || 0;
+      const oeSale = oe * SALE_RATIO_BY_TYPE.oe.target;
+      const oemSale = oem * SALE_RATIO_BY_TYPE.oem.target;
+      const aftmSale = aftm * SALE_RATIO_BY_TYPE.aftm.target;
+      const usedSale = used * SALE_RATIO_BY_TYPE.used.target;
       const approvedCostRaw = Number(item.approvedCost);
       const approvedCost = Number.isFinite(approvedCostRaw) ? approvedCostRaw : (Number(item.cost) || 0) * qty;
-      const approvedSale = Number(item.approvedSale ?? item.sale) || 0;
+      const approvedSale = Number(item.sale ?? item.approvedSale) || 0;
       const lineDiscount = Number(item.discount) || 0;
       summary.qty += qty;
-      summary.oe += oe * qty;
-      summary.oem += oem * qty;
-      summary.aftm += aftm * qty;
-      summary.used += used * qty;
+      summary.oe += oeSale * qty;
+      summary.oem += oemSale * qty;
+      summary.aftm += aftmSale * qty;
+      summary.used += usedSale * qty;
       summary.approvedCost += approvedCost;
       summary.approvedSale += approvedSale;
       summary.discount += lineDiscount;
@@ -1468,7 +2066,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
       const approvedCost = Number.isFinite(approvedCostRaw) ? approvedCostRaw : baseCost * qty;
       const saleValue = Number(item.sale) || 0;
       const approvedValue = Number(item.approvedSale) || 0;
-      const saleBase = approvedValue > 0 ? approvedValue : saleValue;
+      const saleBase = saleValue > 0 ? saleValue : approvedValue;
       const discountAmount = Number(item.discount) || 0;
       const subTotal = Math.max(0, saleBase - discountAmount);
       const hasApprovedPricing = saleBase > 0;
@@ -1510,9 +2108,16 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
   const legacySource = String(estimate.meta?.legacy_source ?? "").trim().toLowerCase();
   const legacyInvoiceStatus = String(estimate.meta?.legacy_invoice_status ?? "").trim().toLowerCase();
   const isLegacyEstimate = legacySource === "carguru2.estimates";
-  const isEstimateClosed =
-    estimate.status === "invoiced" ||
-    (legacySource === "carguru2.estimates" && legacyInvoiceStatus === "invoiced");
+  const computeDiscountAmountFromPercent = (saleTotal: number, percent: number) =>
+    Number(((Math.max(0, saleTotal) * Math.max(0, percent)) / 100).toFixed(2));
+  const derivePercentFromAmount = (saleTotal: number, amount: number) =>
+    saleTotal > 0 ? Number(((Math.max(0, amount) / saleTotal) * 100).toFixed(2)) : 0;
+  const getDiscountMode = (rowKey: string, item: ItemDraft): "amount" | "percent" => {
+    const explicit = discountModeByKey[rowKey];
+    if (explicit) return explicit;
+    if (isLegacyEstimate) return "percent";
+    return Number(item.discountPercent ?? 0) > 0 ? "percent" : "amount";
+  };
   const openJobCards = jobCards.filter((job) => {
     const s = String(job.status ?? "").toLowerCase();
     return s === "pending" || s === "re-assigned";
@@ -1552,15 +2157,19 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
     const total = relatedLineItems.reduce((acc, li) => {
       const mapped = estimateItemByInspectionId.get(String(li.id));
       if (!mapped) return acc;
-      const sale = Number(mapped.approvedSale ?? mapped.sale ?? 0);
-      const discount = Number(mapped.discount ?? 0);
-      return acc + Math.max(0, sale - discount);
+      const sale = Number(mapped.sale ?? mapped.approvedSale ?? 0);
+      return acc + Math.max(0, sale);
     }, 0);
     return { jobId: job.id, status: job.status ?? "", total };
   });
   const invoiceSubTotalPreview = jobCardTotals.reduce((sum, row) => sum + row.total, 0);
-  const invoiceVatPreview = (invoiceSubTotalPreview * (Number(draft.vatRate) || 0)) / 100;
-  const invoiceGrandTotalPreview = invoiceSubTotalPreview + invoiceVatPreview;
+  const invoiceDiscountAmountPreview =
+    invoiceDiscountMode === "percent"
+      ? Number(((invoiceSubTotalPreview * Math.max(0, invoiceDiscountPercent)) / 100).toFixed(2))
+      : Number(draft.discountAmount || 0);
+  const invoiceNetSubTotalPreview = Math.max(0, invoiceSubTotalPreview - invoiceDiscountAmountPreview);
+  const invoiceVatPreview = (invoiceNetSubTotalPreview * (Number(draft.vatRate) || 0)) / 100;
+  const invoiceGrandTotalPreview = invoiceNetSubTotalPreview + invoiceVatPreview;
 
   return (
     <MainPageShell
@@ -1595,6 +2204,32 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
           >
             View Inspection
           </button>
+          <button
+            type="button"
+            onClick={() => void shareEstimateToCustomer(false)}
+            disabled={isSharingCustomerApproval}
+            className="rounded-md border border-cyan-400/50 bg-cyan-500/15 px-3 py-1.5 text-xs font-semibold text-cyan-200 shadow-sm transition hover:bg-cyan-500/25 disabled:opacity-60"
+          >
+            {isSharingCustomerApproval ? "Sharing..." : "Copy Customer Approval Link"}
+          </button>
+          <button
+            type="button"
+            onClick={() => void shareEstimateToCustomer(true)}
+            disabled={isSharingCustomerApproval}
+            className="rounded-md border border-cyan-400/30 bg-cyan-500/5 px-3 py-1.5 text-xs font-semibold text-cyan-200 shadow-sm transition hover:bg-cyan-500/20 disabled:opacity-60"
+          >
+            Regenerate Link
+          </button>
+          {customerApprovalUrl ? (
+            <a
+              href={customerApprovalUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-md border border-cyan-500/50 bg-cyan-500/10 px-3 py-1.5 text-xs font-semibold text-cyan-100 shadow-sm transition hover:bg-cyan-500/25"
+            >
+              Open Customer View{customerApprovalStatus ? ` (${customerApprovalStatus})` : ""}
+            </a>
+          ) : null}
         </div>
       }
       secondaryActions={null}
@@ -1689,7 +2324,15 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                   />
                 </div>
               </div>
-              <div className="flex items-center justify-end">
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={applyMarketPricingToAllMainItems}
+                  className="rounded-md border border-cyan-500/60 bg-cyan-500/10 px-3 py-1.5 text-xs font-semibold text-cyan-200"
+                  disabled={isApplyingMarketPricingAll || isEstimateClosed}
+                >
+                  {isApplyingMarketPricingAll ? "Applying AI..." : "AI Market Pricing (All)"}
+                </button>
                 <button
                   type="button"
                   onClick={refreshQuoteUpdates}
@@ -1700,7 +2343,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                 </button>
               </div>
               <div className="rounded-md border border-slate-600/60 bg-slate-900/20 px-3 py-2 text-[11px] text-slate-300">
-                Step flow: Select cost type, confirm approved cost, enter approved sale and discount, then set status.
+                Step flow: Review AI type-sale thresholds, select type, edit type sale, then set status. Final discount is set in Invoice Summary.
               </div>
               <div className="overflow-x-auto rounded-lg border border-slate-600/60">
                 <table className="min-w-full text-xs">
@@ -1709,14 +2352,10 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                       <th className="px-2 py-1 text-left">Part Name</th>
                       <th className="px-2 py-1 text-left">Description</th>
                       <th className="px-2 py-1 text-left">Qty</th>
-                      <th className="px-2 py-1 text-left">OE Cost</th>
-                      <th className="px-2 py-1 text-left">OEM Cost</th>
-                      <th className="px-2 py-1 text-left">AFTM Cost</th>
-                      <th className="px-2 py-1 text-left">Used Cost</th>
-                      <th className="px-2 py-1 text-left">Approved Cost</th>
-                      <th className="px-2 py-1 text-left">GP</th>
-                      <th className="px-2 py-1 text-left">Approved Sale</th>
-                      <th className="px-2 py-1 text-left">{isLegacyEstimate ? "Discount %" : "Discount"}</th>
+                      <th className="px-2 py-1 text-left">OE Sale</th>
+                      <th className="px-2 py-1 text-left">OEM Sale</th>
+                      <th className="px-2 py-1 text-left">AFTM Sale</th>
+                      <th className="px-2 py-1 text-left">Used Sale</th>
                       <th className="px-2 py-1 text-left">Sub Total</th>
                       <th className="px-2 py-1 text-left">Status</th>
                     </tr>
@@ -1724,7 +2363,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                   <tbody>
                     {draft.items.length === 0 ? (
                       <tr>
-                        <td colSpan={13} className="px-3 py-3 text-xs text-muted-foreground">
+                        <td colSpan={9} className="px-3 py-3 text-xs text-muted-foreground">
                           No items added yet.
                         </td>
                       </tr>
@@ -1735,22 +2374,23 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                         const oemCost = Number(item.quoteCosts?.oem) || 0;
                         const aftmCost = Number(item.quoteCosts?.aftm) || 0;
                         const usedCost = Number(item.quoteCosts?.used) || 0;
-                        const baseCost = Number(item.cost) || 0;
                         const discountAmount = Number(item.discount) || 0;
-                        const approvedCostRaw = Number(item.approvedCost);
-                        const approvedCostValue = Number.isFinite(approvedCostRaw) ? approvedCostRaw : baseCost * qty;
-                        const saleBase = Number(item.approvedSale ?? item.sale) || 0;
+                        const saleBase = Number(item.sale ?? item.approvedSale) || 0;
                         const lineSale = saleBase;
                         const subTotal = Math.max(0, lineSale - discountAmount);
-                        const lineCost = approvedCostValue;
-                        const gpPercent =
-                          subTotal > 0 ? ((subTotal - lineCost) / subTotal) * 100 : 0;
                         const isLocked = isEstimateClosed || (item.partOrdered === 1 && item.status === "approved");
                         const selectedApprovedType = item.approvedType ?? null;
+                        const marketPricingKey = buildMarketPricingKey("main", item, idx);
+                        const discountMode = getDiscountMode(marketPricingKey, item);
+                        const marketPricingInsight = marketPricingByKey[marketPricingKey] ?? null;
+                        const marketPricingLoading = Boolean(marketPricingLoadingByKey[marketPricingKey]);
+                        const thresholdStatus = normalizeThresholdStatus(lineSale, marketPricingInsight?.threshold ?? null);
+                        const minAllowedSubtotal = getSelectedTypeMinSubtotal(item);
+                        const needsApproval = requiresDiscountApproval(item);
                         return (
                           <tr key={idx} className="border-b border-slate-600/60 transition-colors odd:bg-slate-900/15 hover:bg-slate-800/25 last:border-0">
                             <td className="px-2 py-1">
-                              <div className="relative">
+                              <div className="relative space-y-1">
                                 <input
                                   ref={(el) => {
                                     productInputRefs.current[idx] = el;
@@ -1762,6 +2402,19 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                                   placeholder="Part name"
                                   onFocus={() => setProductOpenIndex(idx)}
                                 />
+                                <div className="flex items-center justify-between gap-2">
+                                  <button
+                                    type="button"
+                                    className="rounded-md border border-cyan-500/60 bg-cyan-500/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-cyan-200 disabled:cursor-not-allowed disabled:opacity-60"
+                                    disabled={isLocked || marketPricingLoading || !item.partName.trim()}
+                                    onClick={() => void fetchAndApplyMarketPricing("main", idx)}
+                                  >
+                                    {marketPricingLoading ? "AI..." : "AI Avg"}
+                                  </button>
+                                  {marketPricingInsight?.source ? (
+                                    <span className="text-[9px] text-slate-400 uppercase">{marketPricingInsight.source}</span>
+                                  ) : null}
+                                </div>
                               </div>
                             </td>
                             <td className="px-2 py-1">
@@ -1784,9 +2437,20 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                                   const nextQty = Number(e.target.value) || 0;
                                   const selectedType = item.approvedType ?? null;
                                   const selectedUnitCost = selectedType ? Number(item.quoteCosts?.[selectedType]) || 0 : 0;
+                                  const selectedUnitSale = selectedType
+                                    ? qty > 0
+                                      ? lineSale / qty
+                                      : roundTo2(selectedUnitCost * SALE_RATIO_BY_TYPE[selectedType].target)
+                                    : 0;
+                                  const nextSale = selectedType ? roundTo2(selectedUnitSale * nextQty) : item.sale;
+                                  const discountPercent = Number(item.discountPercent ?? 0) || 0;
                                   updateItem(idx, {
                                     quantity: nextQty,
                                     approvedCost: selectedType ? selectedUnitCost * nextQty : item.approvedCost,
+                                    sale: nextSale,
+                                    ...(discountMode === "percent"
+                                      ? { discount: computeDiscountAmountFromPercent(nextSale, discountPercent) }
+                                      : {}),
                                   });
                                 }}
                               />
@@ -1794,14 +2458,55 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                             {COST_DISPLAY_ORDER.map(({ key }) => {
                               const costByType =
                                 key === "oe" ? oeCost : key === "oem" ? oemCost : key === "aftm" ? aftmCost : usedCost;
+                              const thresholdByType = {
+                                minSale: roundTo2(costByType * SALE_RATIO_BY_TYPE[key].min),
+                                targetSale: roundTo2(costByType * SALE_RATIO_BY_TYPE[key].target),
+                                maxSale: roundTo2(costByType * SALE_RATIO_BY_TYPE[key].max),
+                              };
                               const isChecked = selectedApprovedType === key;
                               const hasQuoteForType = item.quoteCosts?.[key] != null;
                               return (
                                 <td key={`${idx}-${key}`} className="px-2 py-1">
-                                  <div className="flex flex-col items-start gap-1">
-                                    <span className="inline-flex min-w-[74px] justify-end rounded-md border border-slate-500/60 bg-slate-100/80 px-2 py-1 font-semibold text-slate-900 dark:border-slate-600/50 dark:bg-slate-900/60 dark:text-slate-100">
-                                      {formatCostValue(costByType)}
-                                    </span>
+                                  <div className="flex min-w-[112px] flex-col items-stretch gap-1">
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      className={`${theme.input} h-8 w-full text-xs`}
+                                      value={
+                                        isChecked
+                                          ? formatCostValue(qty > 0 ? lineSale / qty : thresholdByType.targetSale)
+                                          : formatCostValue(thresholdByType.targetSale)
+                                      }
+                                      min={thresholdByType.minSale}
+                                      disabled={isLocked}
+                                      onChange={(e) => {
+                                        const nextUnitSale = Number(e.target.value) || 0;
+                                        const nextTotalSale = roundTo2(nextUnitSale * qty);
+                                        const approvedCost = costByType * qty;
+                                        const discountPercent = Number(item.discountPercent ?? 0) || 0;
+                                        updateItem(idx, {
+                                          approvedType: key,
+                                          approvedCost,
+                                          cost: costByType,
+                                          sale: nextTotalSale,
+                                          ...(discountMode === "percent"
+                                            ? {
+                                                discount: computeDiscountAmountFromPercent(nextTotalSale, discountPercent),
+                                              }
+                                            : {}),
+                                        });
+                                      }}
+                                    />
+                                    <div className="grid grid-cols-2 gap-1 text-[9px]">
+                                      <div className="rounded border border-slate-600/60 bg-slate-900/25 px-1 py-0.5 text-center">
+                                        <div className="text-[8px] uppercase text-slate-400">Min</div>
+                                        <div className="font-semibold text-slate-200">{thresholdByType.minSale.toFixed(2)}</div>
+                                      </div>
+                                      <div className="rounded border border-cyan-500/40 bg-cyan-500/10 px-1 py-0.5 text-center">
+                                        <div className="text-[8px] uppercase text-cyan-300">Avg</div>
+                                        <div className="font-semibold text-cyan-100">{thresholdByType.targetSale.toFixed(2)}</div>
+                                      </div>
+                                    </div>
                                     <label className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
                                     <input
                                       type="checkbox"
@@ -1814,94 +2519,44 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                                         }
                                         const approvedType = key;
                                         const approvedCost = costByType * qty;
+                                        const nextTotalSale = roundTo2(thresholdByType.targetSale * qty);
+                                        const discountPercent = Number(item.discountPercent ?? 0) || 0;
                                         updateItem(idx, {
                                           approvedType,
                                           approvedCost,
                                           cost: costByType,
+                                          sale: nextTotalSale,
+                                          ...(discountMode === "percent"
+                                            ? {
+                                                discount: computeDiscountAmountFromPercent(nextTotalSale, discountPercent),
+                                              }
+                                            : {}),
                                         });
                                       }}
                                     />
-                                      <span className={isChecked ? "text-emerald-300" : ""}>{isChecked ? "Selected" : "Select"}</span>
+                                      <span className={isChecked ? "font-semibold text-emerald-300" : ""}>{isChecked ? "Using this type" : "Use type"}</span>
                                     </label>
+                                    {isChecked && marketPricingInsight?.threshold ? (
+                                      <div
+                                        className={`text-[9px] ${
+                                          thresholdStatus === "below"
+                                            ? "text-amber-300"
+                                            : thresholdStatus === "above"
+                                            ? "text-sky-300"
+                                            : "text-emerald-300"
+                                        }`}
+                                      >
+                                        {thresholdStatus === "below"
+                                          ? "Below threshold"
+                                          : thresholdStatus === "above"
+                                          ? "Above threshold"
+                                          : "Within threshold"}
+                                      </div>
+                                    ) : null}
                                   </div>
                                 </td>
                               );
                             })}
-                            <td className="px-2 py-1">
-                              <input
-                                type="number"
-                                step="0.01"
-                                className={`${theme.input} h-8 w-24 text-xs`}
-                                value={item.approvedCost ?? ""}
-                                disabled={isLocked}
-                                onChange={(e) => {
-                                  const raw = e.target.value;
-                                  const approvedCost =
-                                    raw === "" ? null : Number(raw);
-                                  updateItem(idx, {
-                                    approvedCost,
-                                  });
-                                }}
-                              />
-                            </td>
-                            <td className="px-2 py-1">
-                              <input
-                                type="number"
-                                step="0.01"
-                                className={`${theme.input} h-8 w-20 text-xs`}
-                                value={Number.isFinite(gpPercent) ? gpPercent.toFixed(2) : "0.00"}
-                                disabled={isLocked}
-                                onChange={(e) => {
-                                  const gp = Number(e.target.value);
-                                  updateItem(idx, {
-                                    gpPercent: gp,
-                                  });
-                                }}
-                              />
-                            </td>
-                            <td className="px-2 py-1">
-                              <div className="space-y-1">
-                                <input
-                                  type="number"
-                                  step="0.01"
-                                  className={`${theme.input} h-8 w-24 text-xs`}
-                                  value={item.approvedSale}
-                                  disabled={isLocked}
-                                  onChange={(e) => {
-                                    const approvedSale = Number(e.target.value) || 0;
-                                    if (isLegacyEstimate) {
-                                      const discountPercent = Number(item.discountPercent ?? 0) || 0;
-                                      const discountAmount = Number(((approvedSale * discountPercent) / 100).toFixed(2));
-                                      updateItem(idx, {
-                                        approvedSale,
-                                        discount: discountAmount,
-                                      });
-                                      return;
-                                    }
-                                    updateItem(idx, { approvedSale });
-                                  }}
-                                />
-                              </div>
-                            </td>
-                            <td className="px-2 py-1">
-                              <input
-                                type="number"
-                                step="0.01"
-                                className={`${theme.input} h-8 w-20 text-xs`}
-                                value={isLegacyEstimate ? item.discountPercent ?? 0 : item.discount}
-                                disabled={isLocked}
-                                onChange={(e) => {
-                                  const value = Number(e.target.value) || 0;
-                                  if (isLegacyEstimate) {
-                                    const saleBase = Number(item.approvedSale ?? item.sale) || 0;
-                                    const discountAmount = Number(((saleBase * value) / 100).toFixed(2));
-                                    updateItem(idx, { discountPercent: value, discount: discountAmount });
-                                    return;
-                                  }
-                                  updateItem(idx, { discount: value });
-                                }}
-                              />
-                            </td>
                             <td className="px-2 py-1 text-xs">{subTotal.toFixed(2)}</td>
                             <td className="px-2 py-1">
                               <div className="flex flex-col items-start gap-1">
@@ -1910,14 +2565,26 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                                   value={item.status}
                                   disabled={isLocked || item.partOrdered === 1}
                                   onChange={(e) =>
-                                    updateItem(idx, { status: e.target.value as EstimateItemStatus })
+                                    updateItem(idx, {
+                                      status:
+                                        needsApproval && e.target.value === "approved"
+                                          ? "pending"
+                                          : (e.target.value as EstimateItemStatus),
+                                    })
                                   }
                                 >
                                   <option value="pending">Pending</option>
                                   <option value="inquiry">Inquiry</option>
-                                  <option value="approved">Approved</option>
+                                  <option value="approved" disabled={needsApproval}>
+                                    Approved
+                                  </option>
                                   <option value="rejected">Rejected</option>
                                 </select>
+                                {needsApproval ? (
+                                  <div className="text-[9px] text-amber-300">
+                                    Approval needed: subtotal {subTotal.toFixed(2)} below min {minAllowedSubtotal.toFixed(2)}
+                                  </div>
+                                ) : null}
                                 {renderOrderBadge(item)}
                               </div>
                             </td>
@@ -1976,17 +2643,6 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                             <span>{lineItemTableTotals.used.toFixed(2)}</span>
                           </label>
                         </td>
-                        <td className="px-2 py-2 text-left">{lineItemTableTotals.approvedCost.toFixed(2)}</td>
-                        <td className="px-2 py-2 text-left">
-                          {lineItemTableTotals.subTotal > 0
-                            ? (((lineItemTableTotals.subTotal - lineItemTableTotals.approvedCost) /
-                                lineItemTableTotals.subTotal) *
-                                100
-                              ).toFixed(2)
-                            : "0.00"}
-                        </td>
-                        <td className="px-2 py-2 text-left">{lineItemTableTotals.approvedSale.toFixed(2)}</td>
-                        <td className="px-2 py-2 text-left">{lineItemTableTotals.discount.toFixed(2)}</td>
                         <td className="px-2 py-2 text-left">{lineItemTableTotals.subTotal.toFixed(2)}</td>
                         <td className="px-2 py-2 text-left">-</td>
                       </tr>
@@ -2165,7 +2821,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
               <div className="space-y-3 p-4">
                 <div className="text-xs font-semibold text-slate-200">New Job Line Items</div>
                 <div className="rounded-md border border-slate-600/60 bg-slate-900/20 px-3 py-2 text-[11px] text-slate-300">
-                  Same process as main job card. Keep status `Pending` until advisor confirms.
+                  Same process as main job card with type-sale thresholds. Final discount is set in Invoice Summary.
                 </div>
                 <div className="overflow-x-auto rounded-lg border border-slate-600/60">
                   <table className="min-w-full text-xs">
@@ -2174,14 +2830,10 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                         <th className="px-2 py-1 text-left">Part Name</th>
                         <th className="px-2 py-1 text-left">Description</th>
                         <th className="px-2 py-1 text-left">Qty</th>
-                        <th className="px-2 py-1 text-left">OE Cost</th>
-                        <th className="px-2 py-1 text-left">OEM Cost</th>
-                        <th className="px-2 py-1 text-left">AFTM Cost</th>
-                        <th className="px-2 py-1 text-left">Used Cost</th>
-                        <th className="px-2 py-1 text-left">Approved Cost</th>
-                        <th className="px-2 py-1 text-left">GP</th>
-                        <th className="px-2 py-1 text-left">Approved Sale</th>
-                        <th className="px-2 py-1 text-left">Discount</th>
+                        <th className="px-2 py-1 text-left">OE Sale</th>
+                        <th className="px-2 py-1 text-left">OEM Sale</th>
+                        <th className="px-2 py-1 text-left">AFTM Sale</th>
+                        <th className="px-2 py-1 text-left">Used Sale</th>
                         <th className="px-2 py-1 text-left">Sub Total</th>
                         <th className="px-2 py-1 text-left">Status</th>
                       </tr>
@@ -2194,31 +2846,47 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                         const aftmCost = Number(item.quoteCosts?.aftm) || 0;
                         const usedCost = Number(item.quoteCosts?.used) || 0;
                         const discountAmount = Number(item.discount) || 0;
-                        const approvedCostRaw = Number(item.approvedCost);
-                        const approvedCostValue = Number.isFinite(approvedCostRaw)
-                          ? approvedCostRaw
-                          : (Number(item.cost) || 0) * qty;
-                        const lineSale = Number(item.approvedSale ?? item.sale) || 0;
+                        const lineSale = Number(item.sale ?? item.approvedSale) || 0;
                         const subTotal = Math.max(0, lineSale - discountAmount);
-                        const lineCost = approvedCostValue;
-                        const gpPercent = subTotal > 0 ? ((subTotal - lineCost) / subTotal) * 100 : 0;
                         const selectedApprovedType = item.approvedType ?? null;
                         const isLocked = isEstimateClosed || isLineItemLocked(item);
+                        const marketPricingKey = buildMarketPricingKey("new", item, idx);
+                        const discountMode = getDiscountMode(marketPricingKey, item);
+                        const marketPricingInsight = marketPricingByKey[marketPricingKey] ?? null;
+                        const marketPricingLoading = Boolean(marketPricingLoadingByKey[marketPricingKey]);
+                        const thresholdStatus = normalizeThresholdStatus(lineSale, marketPricingInsight?.threshold ?? null);
+                        const minAllowedSubtotal = getSelectedTypeMinSubtotal(item);
+                        const needsApproval = requiresDiscountApproval(item);
 
                         return (
                           <tr key={`new-job-${idx}`} className="border-b border-slate-600/60 transition-colors odd:bg-slate-900/15 hover:bg-slate-800/25 last:border-0">
                             <td className="px-2 py-1">
-                              <input
-                                ref={(el) => {
-                                  productInputRefs.current[NEW_JOB_PRODUCT_INDEX_OFFSET + idx] = el;
-                                }}
-                                className={`${theme.input} h-8 text-xs`}
-                                value={item.partName}
-                                disabled={isLocked}
-                                onChange={(e) => updateNewJobItem(idx, { partName: e.target.value })}
-                                placeholder="Part Name"
-                                onFocus={() => setProductOpenIndex(NEW_JOB_PRODUCT_INDEX_OFFSET + idx)}
-                              />
+                              <div className="space-y-1">
+                                <input
+                                  ref={(el) => {
+                                    productInputRefs.current[NEW_JOB_PRODUCT_INDEX_OFFSET + idx] = el;
+                                  }}
+                                  className={`${theme.input} h-8 text-xs`}
+                                  value={item.partName}
+                                  disabled={isLocked}
+                                  onChange={(e) => updateNewJobItem(idx, { partName: e.target.value })}
+                                  placeholder="Part Name"
+                                  onFocus={() => setProductOpenIndex(NEW_JOB_PRODUCT_INDEX_OFFSET + idx)}
+                                />
+                                <div className="flex items-center justify-between gap-2">
+                                  <button
+                                    type="button"
+                                    className="rounded-md border border-cyan-500/60 bg-cyan-500/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-cyan-200 disabled:cursor-not-allowed disabled:opacity-60"
+                                    disabled={isLocked || marketPricingLoading || !item.partName.trim()}
+                                    onClick={() => void fetchAndApplyMarketPricing("new", idx)}
+                                  >
+                                    {marketPricingLoading ? "AI..." : "AI Avg"}
+                                  </button>
+                                  {marketPricingInsight?.source ? (
+                                    <span className="text-[9px] text-slate-400 uppercase">{marketPricingInsight.source}</span>
+                                  ) : null}
+                                </div>
+                              </div>
                             </td>
                             <td className="px-2 py-1">
                               <input
@@ -2239,9 +2907,20 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                                   const nextQty = Number(e.target.value) || 0;
                                   const selectedType = item.approvedType ?? null;
                                   const selectedUnitCost = selectedType ? Number(item.quoteCosts?.[selectedType]) || 0 : 0;
+                                  const selectedUnitSale = selectedType
+                                    ? qty > 0
+                                      ? lineSale / qty
+                                      : roundTo2(selectedUnitCost * SALE_RATIO_BY_TYPE[selectedType].target)
+                                    : 0;
+                                  const nextSale = selectedType ? roundTo2(selectedUnitSale * nextQty) : item.sale;
+                                  const discountPercent = Number(item.discountPercent ?? 0) || 0;
                                   updateNewJobItem(idx, {
                                     quantity: nextQty,
                                     approvedCost: selectedType ? selectedUnitCost * nextQty : item.approvedCost,
+                                    sale: nextSale,
+                                    ...(discountMode === "percent"
+                                      ? { discount: computeDiscountAmountFromPercent(nextSale, discountPercent) }
+                                      : {}),
                                   });
                                 }}
                               />
@@ -2249,14 +2928,55 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                             {COST_DISPLAY_ORDER.map(({ key }) => {
                               const costByType =
                                 key === "oe" ? oeCost : key === "oem" ? oemCost : key === "aftm" ? aftmCost : usedCost;
+                              const thresholdByType = {
+                                minSale: roundTo2(costByType * SALE_RATIO_BY_TYPE[key].min),
+                                targetSale: roundTo2(costByType * SALE_RATIO_BY_TYPE[key].target),
+                                maxSale: roundTo2(costByType * SALE_RATIO_BY_TYPE[key].max),
+                              };
                               const isChecked = selectedApprovedType === key;
                               const hasQuoteForType = item.quoteCosts?.[key] != null;
                               return (
                                 <td key={`new-${idx}-${key}`} className="px-2 py-1">
-                                  <div className="flex flex-col items-start gap-1">
-                                    <span className="inline-flex min-w-[74px] justify-end rounded-md border border-slate-500/60 bg-slate-100/80 px-2 py-1 font-semibold text-slate-900 dark:border-slate-600/50 dark:bg-slate-900/60 dark:text-slate-100">
-                                      {formatCostValue(costByType)}
-                                    </span>
+                                  <div className="flex min-w-[112px] flex-col items-stretch gap-1">
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      className={`${theme.input} h-8 w-full text-xs`}
+                                      value={
+                                        isChecked
+                                          ? formatCostValue(qty > 0 ? lineSale / qty : thresholdByType.targetSale)
+                                          : formatCostValue(thresholdByType.targetSale)
+                                      }
+                                      min={thresholdByType.minSale}
+                                      disabled={isLocked}
+                                      onChange={(e) => {
+                                        const nextUnitSale = Number(e.target.value) || 0;
+                                        const nextTotalSale = roundTo2(nextUnitSale * qty);
+                                        const approvedCost = costByType * qty;
+                                        const discountPercent = Number(item.discountPercent ?? 0) || 0;
+                                        updateNewJobItem(idx, {
+                                          approvedType: key,
+                                          approvedCost,
+                                          cost: costByType,
+                                          sale: nextTotalSale,
+                                          ...(discountMode === "percent"
+                                            ? {
+                                                discount: computeDiscountAmountFromPercent(nextTotalSale, discountPercent),
+                                              }
+                                            : {}),
+                                        });
+                                      }}
+                                    />
+                                    <div className="grid grid-cols-2 gap-1 text-[9px]">
+                                      <div className="rounded border border-slate-600/60 bg-slate-900/25 px-1 py-0.5 text-center">
+                                        <div className="text-[8px] uppercase text-slate-400">Min</div>
+                                        <div className="font-semibold text-slate-200">{thresholdByType.minSale.toFixed(2)}</div>
+                                      </div>
+                                      <div className="rounded border border-cyan-500/40 bg-cyan-500/10 px-1 py-0.5 text-center">
+                                        <div className="text-[8px] uppercase text-cyan-300">Avg</div>
+                                        <div className="font-semibold text-cyan-100">{thresholdByType.targetSale.toFixed(2)}</div>
+                                      </div>
+                                    </div>
                                     <label className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
                                     <input
                                       type="checkbox"
@@ -2269,60 +2989,44 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                                         }
                                         const approvedType = key;
                                         const approvedCost = costByType * qty;
+                                        const nextTotalSale = roundTo2(thresholdByType.targetSale * qty);
+                                        const discountPercent = Number(item.discountPercent ?? 0) || 0;
                                         updateNewJobItem(idx, {
                                           approvedType,
                                           approvedCost,
                                           cost: costByType,
+                                          sale: nextTotalSale,
+                                          ...(discountMode === "percent"
+                                            ? {
+                                                discount: computeDiscountAmountFromPercent(nextTotalSale, discountPercent),
+                                              }
+                                            : {}),
                                         });
                                       }}
                                     />
-                                      <span className={isChecked ? "text-emerald-300" : ""}>{isChecked ? "Selected" : "Select"}</span>
+                                      <span className={isChecked ? "font-semibold text-emerald-300" : ""}>{isChecked ? "Using this type" : "Use type"}</span>
                                     </label>
+                                    {isChecked && marketPricingInsight?.threshold ? (
+                                      <div
+                                        className={`text-[9px] ${
+                                          thresholdStatus === "below"
+                                            ? "text-amber-300"
+                                            : thresholdStatus === "above"
+                                            ? "text-sky-300"
+                                            : "text-emerald-300"
+                                        }`}
+                                      >
+                                        {thresholdStatus === "below"
+                                          ? "Below threshold"
+                                          : thresholdStatus === "above"
+                                          ? "Above threshold"
+                                          : "Within threshold"}
+                                      </div>
+                                    ) : null}
                                   </div>
                                 </td>
                               );
                             })}
-                            <td className="px-2 py-1">
-                              <input
-                                type="number"
-                                className={`${theme.input} h-8 w-24 text-xs`}
-                                value={item.approvedCost ?? ""}
-                                disabled={isLocked}
-                                onChange={(e) => {
-                                  const raw = e.target.value;
-                                  const approvedCost = raw === "" ? null : Number(raw);
-                                  updateNewJobItem(idx, { approvedCost });
-                                }}
-                              />
-                            </td>
-                            <td className="px-2 py-1">
-                              <input
-                                type="number"
-                                step="0.01"
-                                className={`${theme.input} h-8 w-20 text-xs`}
-                                value={Number.isFinite(gpPercent) ? gpPercent.toFixed(2) : "0.00"}
-                                disabled={isLocked}
-                                onChange={(e) => updateNewJobItem(idx, { gpPercent: Number(e.target.value) || 0 })}
-                              />
-                            </td>
-                            <td className="px-2 py-1">
-                              <input
-                                type="number"
-                                className={`${theme.input} h-8 w-24 text-xs`}
-                                value={item.approvedSale}
-                                disabled={isLocked}
-                                onChange={(e) => updateNewJobItem(idx, { approvedSale: Number(e.target.value) || 0 })}
-                              />
-                            </td>
-                            <td className="px-2 py-1">
-                              <input
-                                type="number"
-                                className={`${theme.input} h-8 w-20 text-xs`}
-                                value={item.discount}
-                                disabled={isLocked}
-                                onChange={(e) => updateNewJobItem(idx, { discount: Number(e.target.value) || 0 })}
-                              />
-                            </td>
                             <td className="px-2 py-1 text-xs">{subTotal.toFixed(2)}</td>
                             <td className="px-2 py-1">
                               <div className="flex items-center gap-1">
@@ -2330,13 +3034,27 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                                   className={`${theme.input} h-8 w-24 text-xs`}
                                   value={item.status}
                                   disabled={isLocked}
-                                  onChange={(e) => updateNewJobItem(idx, { status: e.target.value as EstimateItemStatus })}
+                                  onChange={(e) =>
+                                    updateNewJobItem(idx, {
+                                      status:
+                                        needsApproval && e.target.value === "approved"
+                                          ? "pending"
+                                          : (e.target.value as EstimateItemStatus),
+                                    })
+                                  }
                                 >
                                   <option value="pending">Pending</option>
                                   <option value="inquiry">Inquiry</option>
-                                  <option value="approved">Approved</option>
+                                  <option value="approved" disabled={needsApproval}>
+                                    Approved
+                                  </option>
                                   <option value="rejected">Rejected</option>
                                 </select>
+                                {needsApproval ? (
+                                  <span className="text-[9px] text-amber-300">
+                                    Approval: {subTotal.toFixed(2)} &lt; {minAllowedSubtotal.toFixed(2)}
+                                  </span>
+                                ) : null}
                                 <button
                                   type="button"
                                   className="rounded-md bg-rose-600 px-2 py-1 text-[10px] font-semibold text-white"
@@ -2401,17 +3119,6 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                               <span>{newJobLineItemTableTotals.used.toFixed(2)}</span>
                             </label>
                           </td>
-                          <td className="px-2 py-2 text-left">{newJobLineItemTableTotals.approvedCost.toFixed(2)}</td>
-                          <td className="px-2 py-2 text-left">
-                            {newJobLineItemTableTotals.subTotal > 0
-                              ? (((newJobLineItemTableTotals.subTotal - newJobLineItemTableTotals.approvedCost) /
-                                  newJobLineItemTableTotals.subTotal) *
-                                  100
-                                ).toFixed(2)
-                              : "0.00"}
-                          </td>
-                          <td className="px-2 py-2 text-left">{newJobLineItemTableTotals.approvedSale.toFixed(2)}</td>
-                          <td className="px-2 py-2 text-left">{newJobLineItemTableTotals.discount.toFixed(2)}</td>
                           <td className="px-2 py-2 text-left">{newJobLineItemTableTotals.subTotal.toFixed(2)}</td>
                           <td className="px-2 py-2 text-left">-</td>
                         </tr>
@@ -2628,6 +3335,79 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                   <span className="text-muted-foreground">Subtotal</span>
                   <span>AED {invoiceSubTotalPreview.toFixed(2)}</span>
                 </div>
+                <div className="mt-2 rounded-md border border-slate-600/60 bg-slate-900/30 p-2">
+                  <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-300">Invoice Discount</div>
+                  <div className="flex items-center gap-1">
+                    <select
+                      className={`${theme.input} h-8 w-[74px] text-xs`}
+                      value={invoiceDiscountMode}
+                      onChange={(e) => {
+                        const mode = e.target.value as "amount" | "percent";
+                        setInvoiceDiscountMode(mode);
+                        if (mode === "percent") {
+                          const pct = derivePercentFromAmount(invoiceSubTotalPreview, Number(draft.discountAmount || 0));
+                          setInvoiceDiscountPercent(pct);
+                          setDraft((prev) =>
+                            prev
+                              ? {
+                                  ...prev,
+                                  discountAmount: Number(
+                                    ((invoiceSubTotalPreview * Math.max(0, pct)) / 100).toFixed(2)
+                                  ),
+                                }
+                              : prev
+                          );
+                        } else {
+                          setDraft((prev) =>
+                            prev
+                              ? {
+                                  ...prev,
+                                  discountAmount: Number(
+                                    ((invoiceSubTotalPreview * Math.max(0, invoiceDiscountPercent)) / 100).toFixed(2)
+                                  ),
+                                }
+                              : prev
+                          );
+                        }
+                      }}
+                    >
+                      <option value="amount">Amount</option>
+                      <option value="percent">%</option>
+                    </select>
+                    <input
+                      type="number"
+                      step="0.01"
+                      className={`${theme.input} h-8 flex-1 text-xs`}
+                      value={invoiceDiscountMode === "percent" ? invoiceDiscountPercent : Number(draft.discountAmount || 0)}
+                      onChange={(e) => {
+                        const value = Number(e.target.value) || 0;
+                        if (invoiceDiscountMode === "percent") {
+                          setInvoiceDiscountPercent(value);
+                          setDraft((prev) =>
+                            prev
+                              ? {
+                                  ...prev,
+                                  discountAmount: Number(
+                                    ((invoiceSubTotalPreview * Math.max(0, value)) / 100).toFixed(2)
+                                  ),
+                                }
+                              : prev
+                          );
+                          return;
+                        }
+                        setDraft((prev) => (prev ? { ...prev, discountAmount: value } : prev));
+                      }}
+                    />
+                  </div>
+                </div>
+                <div className="mt-1 flex items-center justify-between text-[11px]">
+                  <span className="text-muted-foreground">Discount</span>
+                  <span>AED {invoiceDiscountAmountPreview.toFixed(2)}</span>
+                </div>
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-muted-foreground">Net Subtotal</span>
+                  <span>AED {invoiceNetSubTotalPreview.toFixed(2)}</span>
+                </div>
                 <div className="flex items-center justify-between text-[11px]">
                   <span className="text-muted-foreground">VAT ({Number(draft.vatRate || 0).toFixed(2)}%)</span>
                   <span>AED {invoiceVatPreview.toFixed(2)}</span>
@@ -2703,6 +3483,14 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                   <div className="flex items-center justify-between text-[11px]">
                     <span className="text-muted-foreground">Subtotal</span>
                     <span>AED {invoiceSubTotalPreview.toFixed(2)}</span>
+                  </div>
+                  <div className="mt-1 flex items-center justify-between text-[11px]">
+                    <span className="text-muted-foreground">Discount</span>
+                    <span>AED {invoiceDiscountAmountPreview.toFixed(2)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-muted-foreground">Net Subtotal</span>
+                    <span>AED {invoiceNetSubTotalPreview.toFixed(2)}</span>
                   </div>
                   <div className="flex items-center justify-between text-[11px]">
                     <span className="text-muted-foreground">VAT ({Number(draft.vatRate || 0).toFixed(2)}%)</span>
@@ -2783,20 +3571,24 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                   onClick={() => {
                     if (productOpenIndex >= NEW_JOB_PRODUCT_INDEX_OFFSET) {
                       const newJobIdx = productOpenIndex - NEW_JOB_PRODUCT_INDEX_OFFSET;
+                      const currentDescription = String(newJobItems[newJobIdx]?.description ?? "").trim();
                       updateNewJobItem(newJobIdx, {
                         partName: product.name,
+                        description: currentDescription || product.partNumber || undefined,
                         productType: product.type ?? null,
                       });
                     } else {
+                      const currentDescription = String(draft?.items[productOpenIndex]?.description ?? "").trim();
                       updateItem(productOpenIndex, {
                         partName: product.name,
+                        description: currentDescription || product.partNumber || undefined,
                         productType: product.type ?? null,
                       });
                     }
                     setProductOpenIndex(null);
                   }}
                 >
-                  <span className="font-semibold">{product.name}</span>
+                  <span className="font-semibold">{product.label || product.name}</span>
                   {product.type && <span className="text-[10px] text-white/50">{product.type}</span>}
                 </button>
               ))}

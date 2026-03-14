@@ -75,11 +75,10 @@ type LineItemAiContext = {
   description: string;
   status: string;
 };
-type LineItemDiagramState = {
-  loading: boolean;
-  url: string;
-  message: string;
-  source?: string;
+type SmartFaultSuggestion = {
+  id: string;
+  label: string;
+  reason: string;
 };
 
 type CheckValue = "good" | "avg" | "bad" | "";
@@ -107,6 +106,18 @@ const processCheckItems: Array<{ key: ProcessCheckKey; label: string }> = [
   { key: "tyre", label: "Tyre Check" },
   { key: "obd", label: "OBD Check" },
 ];
+const REPORT_CATEGORY_WEIGHTS: Record<string, number> = {
+  Engine: 15,
+  Transmission: 12,
+  Brakes: 16,
+  Suspension: 12,
+  Steering: 10,
+  "Tires & Wheels": 10,
+  Electrical: 10,
+  "Body & Exterior": 7,
+  Interior: 4,
+  "Fluids / Maintenance": 4,
+};
 const lineItemStatusOptions = ["Safety Risk", "Mandatory", "Recommended", "Optional"] as const;
 const TYRE_SIZE_OPTIONS = [
   "195/65R15",
@@ -365,7 +376,10 @@ export function InspectionDetailPageClient({
   const [lineItemAiQuestionsByRow, setLineItemAiQuestionsByRow] = useState<Record<string, LineItemAiQuestion[]>>({});
   const [lineItemAiRecommendationByRow, setLineItemAiRecommendationByRow] = useState<Record<string, string>>({});
   const [lineItemAiLoadingByRow, setLineItemAiLoadingByRow] = useState<Record<string, boolean>>({});
-  const [lineItemDiagramByRow, setLineItemDiagramByRow] = useState<Record<string, LineItemDiagramState>>({});
+  const [lineItemSmartSuggestionsByRow, setLineItemSmartSuggestionsByRow] = useState<Record<string, SmartFaultSuggestion[]>>({});
+  const [lineItemSmartSuggestionsLoadingByRow, setLineItemSmartSuggestionsLoadingByRow] = useState<Record<string, boolean>>({});
+  const [lineItemSmartSuggestionsFetchedByRow, setLineItemSmartSuggestionsFetchedByRow] = useState<Record<string, boolean>>({});
+  const [dismissedSmartSuggestionsByRow, setDismissedSmartSuggestionsByRow] = useState<Record<string, string[]>>({});
   const [bulkAddGroupKey, setBulkAddGroupKey] = useState("");
   const [bulkAddPartCodes, setBulkAddPartCodes] = useState<string[]>([]);
   const [bulkPartSearch, setBulkPartSearch] = useState("");
@@ -769,7 +783,10 @@ export function InspectionDetailPageClient({
   const collectCarLatestReview = collectCar?.latestReview ?? null;
   const collectCarCompleted = Boolean(collectCarLatestReview?.completed);
   const collectCarSourceType = collectCar?.sourceType ?? "unknown";
-  const collectCarSourceMedia = (collectCar?.sourceMedia ?? {}) as Record<string, string | null>;
+  const collectCarSourceMedia = useMemo(
+    () => (collectCar?.sourceMedia ?? {}) as Record<string, string | null>,
+    [collectCar?.sourceMedia]
+  );
   const collectCarLogs = Array.isArray(collectCar?.logs) ? collectCar.logs : [];
   const collectCarNeedsReupload = collectCarDifference === "yes";
   const collectCarMissingReupload = Object.entries(collectCarSourceMedia)
@@ -1533,53 +1550,6 @@ export function InspectionDetailPageClient({
     },
     [companyId]
   );
-  const fetchLineItemDiagram = useCallback(
-    async (
-      rowKey: string,
-      args: { partName: string; partNumber: string; groupName: string }
-    ) => {
-      if (!companyId) return;
-      const vin = inspectionVin.trim().toUpperCase();
-      if (!vin || (!args.partName.trim() && !args.partNumber.trim())) return;
-      setLineItemDiagramByRow((prev) => ({
-        ...prev,
-        [rowKey]: { loading: true, url: "", message: "Loading diagram..." },
-      }));
-      try {
-        const query = new URLSearchParams({
-          vin,
-          partName: args.partName || "",
-          partNumber: args.partNumber || "",
-          groupName: args.groupName || "",
-        });
-        const res = await fetch(
-          `/api/company/${companyId}/workshop/inspections/line-item-diagram?${query.toString()}`,
-          { cache: "no-store" }
-        );
-        const body = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(String(body?.error ?? "Failed to fetch diagram"));
-        setLineItemDiagramByRow((prev) => ({
-          ...prev,
-          [rowKey]: {
-            loading: false,
-            url: String(body?.diagramUrl ?? ""),
-            message: String(body?.message ?? ""),
-            source: String(body?.source ?? ""),
-          },
-        }));
-      } catch (err: any) {
-        setLineItemDiagramByRow((prev) => ({
-          ...prev,
-          [rowKey]: {
-            loading: false,
-            url: "",
-            message: String(err?.message ?? "Failed to fetch diagram"),
-          },
-        }));
-      }
-    },
-    [companyId, inspectionVin]
-  );
   const buildSimpleRecommendationFromAnswers = useCallback(
     (
       partName: string,
@@ -1605,6 +1575,114 @@ export function InspectionDetailPageClient({
     },
     []
   );
+  const generateSmartFaultSuggestions = useCallback(
+    (partName: string, category: string, description: string): SmartFaultSuggestion[] => {
+      const context = `${partName} ${category} ${description}`.toLowerCase();
+      const suggestions: SmartFaultSuggestion[] = [];
+      const add = (id: string, label: string, reason: string) => suggestions.push({ id, label, reason });
+
+      if (
+        context.includes("brake pad") ||
+        (context.includes("brake") && (context.includes("worn") || context.includes("wear")))
+      ) {
+        add("brake-discs", "Check Brake Discs", "Brake pad wear commonly affects disc condition.");
+        add("brake-fluid", "Check Brake Fluid", "Brake heat and wear can degrade fluid performance.");
+        add("brake-sensor", "Check Brake Sensor", "Brake wear sensors may be damaged or triggered.");
+      }
+      if (
+        (context.includes("tire") || context.includes("tyre")) &&
+        (context.includes("worn") || context.includes("uneven") || context.includes("wear"))
+      ) {
+        add("wheel-alignment", "Check Wheel Alignment", "Uneven tire wear often indicates alignment issues.");
+        add("wheel-bearing", "Check Wheel Bearing", "Bearing play can lead to abnormal tire wear.");
+        add("suspension-arm", "Check Suspension Arm", "Suspension geometry issues can create uneven wear.");
+      }
+      if (context.includes("oil leak") || (context.includes("engine") && context.includes("leak"))) {
+        add("adjacent-seals", "Check Adjacent Seals", "Leaks often spread from nearby seals.");
+        add("gaskets", "Check Gaskets", "Damaged gaskets are common leak sources.");
+        add(
+          "underbody-contamination",
+          "Check Underbody Contamination",
+          "Oil spread under vehicle can hide secondary issues."
+        );
+      }
+      if ((context.includes("battery") && context.includes("issue")) || context.includes("battery weak")) {
+        add("charging-system", "Check Charging System", "Alternator/charging faults can mimic battery failure.");
+        add("battery-terminals", "Check Battery Terminals", "Poor terminal contact can cause intermittent faults.");
+      }
+
+      const deduped = Array.from(new Map(suggestions.map((s) => [s.id, s])).values());
+      return deduped.slice(0, 5);
+    },
+    []
+  );
+  const requestSmartFaultSuggestions = useCallback(
+    async (
+      rowKey: string,
+      context: {
+        partName: string;
+        partNumber: string;
+        vin: string;
+        category: string;
+        groupName: string;
+        description: string;
+        status: string;
+      }
+    ) => {
+      if (!companyId || !context.partName.trim()) return;
+      const fallback = generateSmartFaultSuggestions(context.partName, context.category, context.description);
+      setLineItemSmartSuggestionsLoadingByRow((prev) => ({ ...prev, [rowKey]: true }));
+      try {
+        const res = await fetch(`/api/company/${companyId}/workshop/inspections/ai-related-suggestions`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ context, fallback }),
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(String(body?.error ?? "Failed to fetch related suggestions"));
+        const suggestions = Array.isArray(body?.suggestions) ? (body.suggestions as SmartFaultSuggestion[]) : [];
+        setLineItemSmartSuggestionsByRow((prev) => ({
+          ...prev,
+          [rowKey]: suggestions.length > 0 ? suggestions : fallback,
+        }));
+      } catch {
+        setLineItemSmartSuggestionsByRow((prev) => ({ ...prev, [rowKey]: fallback }));
+      } finally {
+        setLineItemSmartSuggestionsLoadingByRow((prev) => ({ ...prev, [rowKey]: false }));
+        setLineItemSmartSuggestionsFetchedByRow((prev) => ({ ...prev, [rowKey]: true }));
+      }
+    },
+    [companyId, generateSmartFaultSuggestions]
+  );
+  useEffect(() => {
+    for (const row of parts) {
+      const rowKey = String(row.clientRowKey ?? row.id ?? "").trim();
+      const partName = String(row.part ?? "").trim();
+      if (!rowKey || !partName) continue;
+      if ((lineItemSmartSuggestionsByRow[rowKey] ?? []).length > 0) continue;
+      if (lineItemSmartSuggestionsLoadingByRow[rowKey]) continue;
+      if (lineItemSmartSuggestionsFetchedByRow[rowKey]) continue;
+      const groupKey = String(row.catalogGroupKey ?? "");
+      const groupLabel = vinCatalogGroups.find((group) => group.key === groupKey)?.label ?? "";
+      void requestSmartFaultSuggestions(rowKey, {
+        partName,
+        partNumber: String(row.catalogPartCode ?? ""),
+        vin: inspectionVin.trim().toUpperCase(),
+        category: groupLabel,
+        groupName: groupLabel,
+        description: String(row.description ?? ""),
+        status: String(row.reason ?? ""),
+      });
+    }
+  }, [
+    inspectionVin,
+    lineItemSmartSuggestionsByRow,
+    lineItemSmartSuggestionsLoadingByRow,
+    lineItemSmartSuggestionsFetchedByRow,
+    parts,
+    requestSmartFaultSuggestions,
+    vinCatalogGroups,
+  ]);
   const lineItemAiInsights = useMemo(() => {
     const hasRequiredMedia = (row: (typeof parts)[number]) => {
       const resolvedType = row.productType ?? products.find((product) => product.id === row.productId)?.type ?? "";
@@ -1648,17 +1726,37 @@ export function InspectionDetailPageClient({
     return { questions, suggestions };
   }, [parts, products]);
   const selectedPartsByGroup = useMemo(() => {
-    const grouped = new Map<string, { label: string; parts: string[]; reasons: string[] }>();
+    const grouped = new Map<
+      string,
+      {
+        label: string;
+        parts: string[];
+        reasons: string[];
+        severityCounts: Record<(typeof lineItemStatusOptions)[number], number>;
+      }
+    >();
     for (const row of parts) {
       const key = String(row.catalogGroupKey ?? "").trim();
       if (!key) continue;
       const label = vinCatalogGroups.find((group) => group.key === key)?.label || "Unknown Group";
-      if (!grouped.has(key)) grouped.set(key, { label, parts: [], reasons: [] });
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          label,
+          parts: [],
+          reasons: [],
+          severityCounts: { "Safety Risk": 0, Mandatory: 0, Recommended: 0, Optional: 0 },
+        });
+      }
       const entry = grouped.get(key)!;
       const partLabel = String(row.part ?? "").trim() || String(row.catalogPartCode ?? "").trim();
       if (partLabel) entry.parts.push(partLabel);
       const reason = String(row.reason ?? "").trim();
-      if (reason) entry.reasons.push(reason);
+      if (reason) {
+        entry.reasons.push(reason);
+        if (reason in entry.severityCounts) {
+          entry.severityCounts[reason as (typeof lineItemStatusOptions)[number]] += 1;
+        }
+      }
     }
     const scoreForReason = (reason: string) => {
       const normalized = reason.toLowerCase();
@@ -1673,6 +1771,7 @@ export function InspectionDetailPageClient({
         key,
         label: entry.label,
         parts: Array.from(new Set(entry.parts)),
+        severityCounts: entry.severityCounts,
         healthPercent: entry.reasons.length
           ? Math.round(entry.reasons.reduce((sum, reason) => sum + scoreForReason(reason), 0) / entry.reasons.length)
           : 100,
@@ -1697,6 +1796,208 @@ export function InspectionDetailPageClient({
         .sort((a, b) => a.groupLabel.localeCompare(b.groupLabel) || a.index - b.index),
     [parts, vinCatalogGroups]
   );
+  const reportFindings = useMemo(() => {
+    const explainWhy = (status: string, partName: string) => {
+      if (status === "Safety Risk") return `${partName} may impact safe driving/braking/vehicle control and needs urgent attention.`;
+      if (status === "Mandatory") return `${partName} is in a condition that should be repaired soon to avoid larger failures.`;
+      if (status === "Recommended") return `${partName} is currently usable but shows wear/condition that should be addressed.`;
+      return `${partName} has a minor or optional observation and can be planned with future maintenance.`;
+    };
+    return parts
+      .filter((row) => String(row.part ?? "").trim())
+      .map((row) => {
+        const groupKey = String(row.catalogGroupKey ?? "").trim();
+        const groupLabel = vinCatalogGroups.find((group) => group.key === groupKey)?.label;
+        const keyPrefix = groupKey.includes("::") ? groupKey.split("::")[0] : groupKey;
+        const normalizedText = `${String(row.part ?? "")} ${String(row.description ?? "")}`.toLowerCase();
+        const partCode = String(row.catalogPartCode ?? "").trim().toLowerCase();
+        const catalogDerivedLabel =
+          vinCatalogParts.find((part) => {
+            const code = String(part.code ?? "").trim().toLowerCase();
+            const name = String(part.name ?? "").trim().toLowerCase();
+            if (partCode && code === partCode) return true;
+            return name && normalizedText.includes(name);
+          })?.groups?.[0]?.name ?? "";
+        const heuristicCategory = (() => {
+          if (/(brake|disc|pad|rotor|caliper|abs)/.test(normalizedText)) return "Brakes";
+          if (/(engine|fuel|timing|oil|coolant|exhaust|ignition)/.test(normalizedText)) return "Engine";
+          if (/(suspension|strut|shock|control arm|stabilizer|bush)/.test(normalizedText)) return "Suspension";
+          if (/(steering|rack|tie rod|power steering)/.test(normalizedText)) return "Steering";
+          if (/(tire|tyre|wheel|rim|alignment|balanc)/.test(normalizedText)) return "Tires & Wheels";
+          if (/(transmission|gearbox|gear|clutch|drivetrain|axle|differential)/.test(normalizedText)) return "Transmission";
+          if (/(battery|electrical|sensor|ecu|obd|alternator|starter|infotainment|ac)/.test(normalizedText)) return "Electrical";
+          if (/(body|exterior|door|bumper|fender|hood|mirror|glass|paint|panel)/.test(normalizedText)) return "Body & Exterior";
+          if (/(interior|seat|dashboard|trim|cabin|upholstery)/.test(normalizedText)) return "Interior";
+          if (/(fluid|maintenance|filter|service|lubricant)/.test(normalizedText)) return "Fluids / Maintenance";
+          return "General";
+        })();
+        const partGroup =
+          String(groupLabel ?? "").trim() ||
+          String(catalogDerivedLabel ?? "").trim() ||
+          (/[a-z]/i.test(keyPrefix) ? keyPrefix.replace(/[_-]+/g, " ").trim() : "") ||
+          heuristicCategory;
+        const status = String(row.reason ?? "Recommended");
+        const recommendation =
+          lineItemAiRecommendationByRow[String(row.clientRowKey ?? row.id ?? "")] ||
+          `Inspect/repair ${row.part} and confirm condition after service.`;
+        const partLower = String(row.part ?? "").toLowerCase().trim();
+        const matchedIssueEvidence =
+          inspectionIssueEntries.find((entry) => {
+            const desc = String(entry.description ?? "").toLowerCase().trim();
+            if (!desc || !entry.imageFileId) return false;
+            if (!partLower) return false;
+            return desc.includes(partLower) || partLower.includes(desc);
+          }) ??
+          inspectionIssueEntries.find((entry) => Boolean(entry.imageFileId)) ??
+          null;
+        const evidenceFileId =
+          String(row.mediaFileId ?? "").trim() || String(matchedIssueEvidence?.imageFileId ?? "").trim();
+        return {
+          partName: row.part,
+          partNumber: String(row.catalogPartCode ?? ""),
+          partGroup,
+          severity: status,
+          observedCondition: row.description || `${row.part} requires inspection attention.`,
+          whyItMatters: explainWhy(status, row.part),
+          recommendedAction: recommendation,
+          mediaAttached: Boolean(evidenceFileId),
+          mediaFileId: evidenceFileId,
+        };
+      });
+  }, [parts, vinCatalogGroups, vinCatalogParts, lineItemAiRecommendationByRow, inspectionIssueEntries]);
+  const reportCategoryNames = useMemo(
+    () => [
+      "Engine",
+      "Transmission",
+      "Brakes",
+      "Suspension",
+      "Steering",
+      "Tires & Wheels",
+      "Electrical",
+      "Body & Exterior",
+      "Interior",
+      "Fluids / Maintenance",
+    ],
+    []
+  );
+  const mapGroupToReportCategory = useCallback((groupLabel: string) => {
+    const label = String(groupLabel ?? "").toLowerCase();
+    if (/(engine|fuel|exhaust|ignition|timing|coolant|oil)/.test(label)) return "Engine";
+    if (/(transmission|gearbox|gear|clutch|drivetrain|axle|differential)/.test(label)) return "Transmission";
+    if (/(brake|disc|pad|rotor|caliper|abs)/.test(label)) return "Brakes";
+    if (/(suspension|strut|shock|control arm|stabilizer|bush)/.test(label)) return "Suspension";
+    if (/(steering|rack|tie rod|power steering)/.test(label)) return "Steering";
+    if (/(tire|tyre|wheel|rim|alignment|balanc)/.test(label)) return "Tires & Wheels";
+    if (/(electrical|battery|alternator|starter|wiring|sensor|obd|ecu|infotainment|ac)/.test(label)) return "Electrical";
+    if (/(body|exterior|door|bumper|fender|hood|mirror|glass|paint|panel)/.test(label)) return "Body & Exterior";
+    if (/(interior|seat|dashboard|trim|cabin|upholstery)/.test(label)) return "Interior";
+    if (/(fluid|maintenance|filter|service|lubricant)/.test(label)) return "Fluids / Maintenance";
+    return "Fluids / Maintenance";
+  }, []);
+  const reportCategoryHealth = useMemo(() => {
+    const groupedScores = new Map<string, number[]>();
+    for (const group of selectedPartsByGroup) {
+      const category = mapGroupToReportCategory(group.label);
+      const arr = groupedScores.get(category) ?? [];
+      arr.push(group.healthPercent);
+      groupedScores.set(category, arr);
+    }
+    return reportCategoryNames.map((category) => {
+      const scores = groupedScores.get(category) ?? [];
+      const healthPercent = scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 100;
+      return { category, healthPercent };
+    });
+  }, [mapGroupToReportCategory, reportCategoryNames, selectedPartsByGroup]);
+  const overallHealthPercent = useMemo(() => {
+    if (!reportCategoryHealth.length) return 100;
+    let weightedTotal = 0;
+    let totalWeight = 0;
+    for (const entry of reportCategoryHealth) {
+      const weight = REPORT_CATEGORY_WEIGHTS[entry.category] ?? 0;
+      if (!weight) continue;
+      const health = Math.max(0, Math.min(100, Number(entry.healthPercent) || 0));
+      weightedTotal += health * weight;
+      totalWeight += weight;
+    }
+    if (!totalWeight) return 100;
+    return Math.round(weightedTotal / totalWeight);
+  }, [reportCategoryHealth]);
+  const reportPriorityFindings = useMemo(
+    () => ({
+      "Safety Risk": reportFindings.filter((f) => f.severity === "Safety Risk"),
+      Mandatory: reportFindings.filter((f) => f.severity === "Mandatory"),
+      Recommended: reportFindings.filter((f) => f.severity === "Recommended"),
+      Optional: reportFindings.filter((f) => f.severity === "Optional"),
+    }),
+    [reportFindings]
+  );
+  const reportMediaGallery = useMemo(() => {
+    const mediaFromReview = (key: CarMediaKey) =>
+      String(carMediaReplacement[key] || collectCarSourceMedia[key] || "").trim();
+    const items = [
+      { key: "front", label: "Front View", fileId: mediaFromReview("front") },
+      { key: "rear", label: "Rear View", fileId: mediaFromReview("rear") },
+      { key: "odometer", label: "Odometer", fileId: String(clusterImageId ?? "").trim() },
+      { key: "left", label: "Left Side", fileId: mediaFromReview("left") },
+      { key: "right", label: "Right Side", fileId: mediaFromReview("right") },
+    ].filter((item) => Boolean(item.fileId));
+    return items;
+  }, [carMediaReplacement, clusterImageId, collectCarSourceMedia]);
+  const reportWorkshopBranding = useMemo(() => {
+    const logoUrl = String(
+      inspection?.workshopLogo ??
+        inspection?.branchLogo ??
+        inspection?.companyLogo ??
+        inspection?.draftPayload?.workshopLogo ??
+        ""
+    ).trim();
+    const workshopName =
+      String(
+        inspection?.workshopName ??
+          inspection?.branchName ??
+          form.advisorName ??
+          "Premium Workshop"
+      ).trim() || "Premium Workshop";
+    const contact =
+      String(
+        inspection?.workshopContact ??
+          inspection?.branchPhone ??
+          customer?.phone ??
+          "Contact available at workshop reception"
+      ).trim() || "Contact available at workshop reception";
+    return { logoUrl, workshopName, contact };
+  }, [customer?.phone, form.advisorName, inspection]);
+  const reportFinalSummaryText = useMemo(() => {
+    const safetyCount = reportPriorityFindings["Safety Risk"].length;
+    const mandatoryCount = reportPriorityFindings.Mandatory.length;
+    const recommendedCount = reportPriorityFindings.Recommended.length;
+    const optionalCount = reportPriorityFindings.Optional.length;
+    return `Your vehicle was inspected across key systems including engine, brakes, suspension, steering, electrical, body and tires. The current overall health score is ${overallHealthPercent}%. ${safetyCount > 0 ? `${safetyCount} safety-related issue(s) require immediate attention.` : "No immediate safety risk items were identified."} ${mandatoryCount > 0 ? `${mandatoryCount} mandatory repair item(s) should be addressed soon.` : "No mandatory repairs are pending."} ${recommendedCount > 0 ? `${recommendedCount} recommended maintenance item(s) were identified to preserve reliability.` : "No additional recommended maintenance items were identified."} ${optionalCount > 0 ? `${optionalCount} optional/cosmetic item(s) can be planned based on preference.` : "No optional/cosmetic items were recorded."}`.trim();
+  }, [overallHealthPercent, reportPriorityFindings]);
+  const printInspectionReport = useCallback(() => {
+    if (typeof window !== "undefined") window.print();
+  }, []);
+  const downloadInspectionReportPdf = useCallback(async () => {
+    if (!companyId || !inspectionId) return;
+    try {
+      const res = await fetch(
+        `/api/company/${companyId}/workshop/inspections/${inspectionId}/print`,
+        { method: "GET" }
+      );
+      if (!res.ok) throw new Error("Failed to generate PDF report");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `inspection-report-${inspectionId}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      toast.error(String(err?.message ?? "Failed to download inspection report PDF."));
+    }
+  }, [companyId, inspectionId]);
   const progressStages = [
     { key: "pending", label: "Draft", done: true },
     { key: "started", label: "Started", done: Boolean(startedAt) },
@@ -1984,7 +2285,22 @@ export function InspectionDetailPageClient({
       delete next[rowKey];
       return next;
     });
-    setLineItemDiagramByRow((prev) => {
+    setLineItemSmartSuggestionsByRow((prev) => {
+      const next = { ...prev };
+      delete next[rowKey];
+      return next;
+    });
+    setLineItemSmartSuggestionsLoadingByRow((prev) => {
+      const next = { ...prev };
+      delete next[rowKey];
+      return next;
+    });
+    setLineItemSmartSuggestionsFetchedByRow((prev) => {
+      const next = { ...prev };
+      delete next[rowKey];
+      return next;
+    });
+    setDismissedSmartSuggestionsByRow((prev) => {
       const next = { ...prev };
       delete next[rowKey];
       return next;
@@ -2023,15 +2339,106 @@ export function InspectionDetailPageClient({
     }),
     [makeLineItemClientRowKey]
   );
+  const addSmartSuggestionAsLineItem = useCallback(
+    async (
+      index: number,
+      rowKey: string,
+      source: { catalogGroupKey?: string; reason?: string; description?: string },
+      suggestion: SmartFaultSuggestion
+    ) => {
+      const rawLabel = suggestion.label.trim();
+      const normalizedTarget = rawLabel.toLowerCase();
+      const normalizedNeedle = normalizedTarget
+        .replace(/^check\s+/i, "")
+        .replace(/^inspect\s+/i, "")
+        .replace(/[^a-z0-9\s]/gi, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      const parsedCodeMatch = rawLabel.match(/\(([^)]+)\)\s*$/);
+      const parsedCode = String(parsedCodeMatch?.[1] ?? "").trim();
+      const groupCandidates = vinCatalogParts.filter((part) =>
+        (part.groups ?? []).some((group) => {
+          const groupId = String(group?.id ?? "").trim();
+          const groupName = String(group?.name ?? "").trim();
+          const groupLevel = Number(group?.level ?? 0) || 0;
+          const key = `${groupId || groupName}::${groupLevel}`;
+          return key === String(source.catalogGroupKey ?? "");
+        })
+      );
+      const matchedCatalogPart =
+        (parsedCode
+          ? groupCandidates.find((part) => String(part.code ?? "").trim().toLowerCase() === parsedCode.toLowerCase())
+          : null) ??
+        groupCandidates.find((part) => {
+          const partName = String(part.name ?? "").toLowerCase().trim();
+          if (!partName) return false;
+          return partName.includes(normalizedNeedle) || normalizedNeedle.includes(partName);
+        }) ??
+        null;
+      const resolvedPartName = matchedCatalogPart?.name?.trim() || rawLabel;
+      const resolvedPartCode = matchedCatalogPart?.code?.trim() || parsedCode;
+      const exists = parts.some((p) => String(p.part ?? "").trim().toLowerCase() === normalizedTarget);
+      if (exists) {
+        toast.message("Suggestion already exists in line items.");
+        setDismissedSmartSuggestionsByRow((prev) => ({
+          ...prev,
+          [rowKey]: Array.from(new Set([...(prev[rowKey] ?? []), suggestion.id])),
+        }));
+        return;
+      }
+      const nextRow = buildLineItemDraftFromCatalog(
+        resolvedPartName,
+        resolvedPartCode,
+        source.catalogGroupKey ?? "",
+        {
+          reason: source.reason || "Recommended",
+          description: source.description || "",
+        }
+      );
+      setParts((prev) => {
+        const next = [...prev];
+        next.splice(index + 1, 0, nextRow);
+        return next;
+      });
+      if (nextRow.clientRowKey) {
+        setExpandedLineItemsByRow((prev) => ({ ...prev, [nextRow.clientRowKey as string]: true }));
+      }
+      setDismissedSmartSuggestionsByRow((prev) => ({
+        ...prev,
+        [rowKey]: Array.from(new Set([...(prev[rowKey] ?? []), suggestion.id])),
+      }));
+      if (nextRow.clientRowKey) {
+        void requestLineItemAi(
+          nextRow.clientRowKey,
+          {
+            partName: resolvedPartName,
+            partNumber: resolvedPartCode,
+            groupName: "",
+            description: source.description ?? "",
+            status: source.reason ?? "Recommended",
+          },
+          undefined,
+          undefined
+        );
+        void requestSmartFaultSuggestions(nextRow.clientRowKey, {
+          partName: resolvedPartName,
+          partNumber: resolvedPartCode,
+          vin: inspectionVin.trim().toUpperCase(),
+          category: "",
+          groupName: "",
+          description: source.description ?? "",
+          status: source.reason ?? "Recommended",
+        });
+      }
+      toast.success(`${resolvedPartName} added.`);
+    },
+    [buildLineItemDraftFromCatalog, inspectionVin, parts, requestLineItemAi, requestSmartFaultSuggestions, vinCatalogParts]
+  );
 
   const addLineItemRow = async () => {
     const ready = await ensureVinCatalogForLineItems();
     if (!ready) return;
-    const draft = buildLineItemDraftFromCatalog("", "", "");
-    setParts((prev) => [...prev, draft]);
-    if (draft.clientRowKey) {
-      setExpandedLineItemsByRow((prev) => ({ ...prev, [draft.clientRowKey as string]: true }));
-    }
+    toast.message("Use Car Group and Parts selection above to add line items.");
   };
 
   const saveAllDraftLineItems = async () => {
@@ -3585,8 +3992,19 @@ export function InspectionDetailPageClient({
                     const isNewGroup = orderIdx === 0 || groupedLineItemOrder[orderIdx - 1]?.groupKey !== groupKey;
                     const summary =
                       groupKey === "__ungrouped__"
-                        ? { label: "Ungrouped", parts: [] as string[], healthPercent: 100 }
-                        : groupSummaryByKey.get(groupKey) ?? { label: groupLabel, parts: [], healthPercent: 100 };
+                        ? {
+                            label: "Ungrouped",
+                            parts: [] as string[],
+                            healthPercent: 100,
+                            severityCounts: { "Safety Risk": 0, Mandatory: 0, Recommended: 0, Optional: 0 },
+                          }
+                        : groupSummaryByKey.get(groupKey) ??
+                          {
+                            label: groupLabel,
+                            parts: [] as string[],
+                            healthPercent: 100,
+                            severityCounts: { "Safety Risk": 0, Mandatory: 0, Recommended: 0, Optional: 0 },
+                          };
                     const isLocked =
                       isReadOnly || isCollectCarPending || row.partOrdered === 1 || row.orderStatus === "Ordered" || row.orderStatus === "Received";
                     const rowKey = row.clientRowKey || row.id || `row-${index}`;
@@ -3596,11 +4014,36 @@ export function InspectionDetailPageClient({
                       vinCatalogGroups.find((group) => group.key === selectedGroupKey)?.label ?? "";
                     const rowAiQuestions = lineItemAiQuestionsByRow[rowKey] ?? [];
                     const rowAiAnswers = lineItemAiAnswers[rowKey] ?? {};
-                    const rowRecommendation =
-                      lineItemAiRecommendationByRow[rowKey] ??
-                      buildSimpleRecommendationFromAnswers(row.part || "this part", rowAiQuestions, rowAiAnswers);
-                    const rowAiLoading = Boolean(lineItemAiLoadingByRow[rowKey]);
-                    const rowDiagram = lineItemDiagramByRow[rowKey];
+                    const smartSuggestionsBase =
+                      lineItemSmartSuggestionsByRow[rowKey] && lineItemSmartSuggestionsByRow[rowKey]!.length > 0
+                        ? lineItemSmartSuggestionsByRow[rowKey]!
+                        : generateSmartFaultSuggestions(
+                            String(row.part ?? ""),
+                            selectedGroupLabel,
+                            String(row.description ?? "")
+                          );
+                    const dismissedSuggestionIds = dismissedSmartSuggestionsByRow[rowKey] ?? [];
+                    const existingPartNames = new Set(
+                      parts
+                        .map((p) => String(p.part ?? "").trim().toLowerCase())
+                        .filter(Boolean)
+                    );
+                    const existingPartCodes = new Set(
+                      parts
+                        .map((p) => String(p.catalogPartCode ?? "").trim().toLowerCase())
+                        .filter(Boolean)
+                    );
+                    const smartSuggestions = smartSuggestionsBase.filter((s) => {
+                      if (dismissedSuggestionIds.includes(s.id)) return false;
+                      const label = String(s.label ?? "").trim();
+                      const lower = label.toLowerCase();
+                      const codeMatch = label.match(/\(([^)]+)\)\s*$/);
+                      const code = String(codeMatch?.[1] ?? "").trim().toLowerCase();
+                      if (existingPartNames.has(lower)) return false;
+                      if (code && existingPartCodes.has(code)) return false;
+                      return true;
+                    });
+                    const smartSuggestionsLoading = Boolean(lineItemSmartSuggestionsLoadingByRow[rowKey]);
                     const rowMediaRequirement = getMediaRequirement(row);
                     const answeredQuestionsCount = rowAiQuestions.filter((q) => Boolean(rowAiAnswers[q.id])).length;
                     const statusDone = Boolean(String(row.reason ?? "").trim());
@@ -3620,23 +4063,28 @@ export function InspectionDetailPageClient({
                       <React.Fragment key={`grouped-row-${rowKey}-${index}`}>
                       {isNewGroup && (
                         <div className="rounded-md border border-cyan-500/30 bg-cyan-500/10 p-2">
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="text-xs font-semibold text-cyan-100">
-                              {summary.label} - Health Indicator
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div>
+                              <div className="text-xs font-semibold text-cyan-100">{summary.label}</div>
+                              <div className="mt-1 text-[11px] text-white/80">
+                                Health Indicator:{" "}
+                                <span className="font-semibold text-white">{summary.healthPercent}%</span>
+                              </div>
                             </div>
-                            <span
-                              className={`rounded-full border px-2 py-0.5 text-[10px] ${
-                                summary.healthPercent < 50
-                                  ? "border-rose-500/40 text-rose-300"
-                                  : summary.healthPercent < 70
-                                  ? "border-amber-500/40 text-amber-300"
-                                  : summary.healthPercent < 90
-                                  ? "border-cyan-500/40 text-cyan-200"
-                                  : "border-emerald-500/40 text-emerald-300"
-                              }`}
-                            >
-                              Health {summary.healthPercent}%
-                            </span>
+                            <div className="flex flex-wrap items-center gap-1 text-[10px]">
+                              <span className="rounded-full border border-rose-500/40 px-2 py-0.5 text-rose-300">
+                                Safety {summary.severityCounts["Safety Risk"]}
+                              </span>
+                              <span className="rounded-full border border-amber-500/40 px-2 py-0.5 text-amber-300">
+                                Mandatory {summary.severityCounts.Mandatory}
+                              </span>
+                              <span className="rounded-full border border-cyan-500/40 px-2 py-0.5 text-cyan-200">
+                                Recommended {summary.severityCounts.Recommended}
+                              </span>
+                              <span className="rounded-full border border-white/20 px-2 py-0.5 text-white/80">
+                                Optional {summary.severityCounts.Optional}
+                              </span>
+                            </div>
                           </div>
                           <div className="mt-1 h-1.5 w-full rounded bg-white/10">
                             <div
@@ -3735,10 +4183,10 @@ export function InspectionDetailPageClient({
                                     ...prev,
                                     [index]: { ...prev[index], part: undefined },
                                   }));
-                                  setLineItemDiagramByRow((prev) => ({
-                                    ...prev,
-                                    [rowKey]: { loading: false, url: "", message: "" },
-                                  }));
+                                  setLineItemSmartSuggestionsByRow((prev) => ({ ...prev, [rowKey]: [] }));
+                                  setLineItemSmartSuggestionsLoadingByRow((prev) => ({ ...prev, [rowKey]: false }));
+                                  setLineItemSmartSuggestionsFetchedByRow((prev) => ({ ...prev, [rowKey]: false }));
+                                  setDismissedSmartSuggestionsByRow((prev) => ({ ...prev, [rowKey]: [] }));
                                 }}
                               >
                                 <option value="">Select Car Group</option>
@@ -3779,10 +4227,10 @@ export function InspectionDetailPageClient({
                                     }));
                                     setLineItemAiAnswers((prev) => ({ ...prev, [rowKey]: {} }));
                                     setLineItemAiRecommendationByRow((prev) => ({ ...prev, [rowKey]: "" }));
-                                    setLineItemDiagramByRow((prev) => ({
-                                      ...prev,
-                                      [rowKey]: { loading: false, url: "", message: "" },
-                                    }));
+                                    setLineItemSmartSuggestionsByRow((prev) => ({ ...prev, [rowKey]: [] }));
+                                    setLineItemSmartSuggestionsLoadingByRow((prev) => ({ ...prev, [rowKey]: false }));
+                                    setLineItemSmartSuggestionsFetchedByRow((prev) => ({ ...prev, [rowKey]: false }));
+                                    setDismissedSmartSuggestionsByRow((prev) => ({ ...prev, [rowKey]: [] }));
                                     if (nextPartName) {
                                       void requestLineItemAi(
                                         rowKey,
@@ -3796,6 +4244,15 @@ export function InspectionDetailPageClient({
                                         undefined,
                                         undefined
                                       );
+                                      void requestSmartFaultSuggestions(rowKey, {
+                                        partName: nextPartName,
+                                        partNumber: nextPartCode,
+                                        vin: inspectionVin.trim().toUpperCase(),
+                                        category: selectedGroupLabel,
+                                        groupName: selectedGroupLabel,
+                                        description: row.description ?? "",
+                                        status: row.reason ?? "",
+                                      });
                                     }
                                   }}
                                 >
@@ -3841,10 +4298,10 @@ export function InspectionDetailPageClient({
                                         setProductOpenIndex(null);
                                         setLineItemAiAnswers((prev) => ({ ...prev, [rowKey]: {} }));
                                         setLineItemAiRecommendationByRow((prev) => ({ ...prev, [rowKey]: "" }));
-                                        setLineItemDiagramByRow((prev) => ({
-                                          ...prev,
-                                          [rowKey]: { loading: false, url: "", message: "" },
-                                        }));
+                                        setLineItemSmartSuggestionsByRow((prev) => ({ ...prev, [rowKey]: [] }));
+                                        setLineItemSmartSuggestionsLoadingByRow((prev) => ({ ...prev, [rowKey]: false }));
+                                        setLineItemSmartSuggestionsFetchedByRow((prev) => ({ ...prev, [rowKey]: false }));
+                                        setDismissedSmartSuggestionsByRow((prev) => ({ ...prev, [rowKey]: [] }));
                                         void requestLineItemAi(
                                           rowKey,
                                           {
@@ -3857,6 +4314,15 @@ export function InspectionDetailPageClient({
                                           undefined,
                                           undefined
                                         );
+                                        void requestSmartFaultSuggestions(rowKey, {
+                                          partName: product.name,
+                                          partNumber: String(row.catalogPartCode ?? ""),
+                                          vin: inspectionVin.trim().toUpperCase(),
+                                          category: selectedGroupLabel,
+                                          groupName: selectedGroupLabel,
+                                          description: row.description ?? "",
+                                          status: row.reason ?? "",
+                                        });
                                       }}
                                     >
                                       <span className="font-semibold">{product.name}</span>
@@ -3976,100 +4442,126 @@ export function InspectionDetailPageClient({
                           <button
                             type="button"
                             className="rounded-md border border-cyan-500/40 px-2 py-1 text-[10px] font-semibold text-cyan-100 disabled:opacity-50"
-                            disabled={isLocked || !row.part || !inspectionVin.trim()}
-                            onClick={() =>
-                              void fetchLineItemDiagram(rowKey, {
-                                partName: row.part ?? "",
-                                partNumber: String(row.catalogPartCode ?? ""),
-                                groupName: selectedGroupLabel,
-                              })
-                            }
+                            disabled={isLocked || (!String(row.catalogPartCode ?? "").trim() && !String(row.part ?? "").trim())}
+                            onClick={() => {
+                              const searchToken =
+                                String(row.catalogPartCode ?? "").trim() || String(row.part ?? "").trim();
+                              const query = [
+                                searchToken,
+                                inspectionMake,
+                                inspectionModel,
+                                inspectionYear,
+                                inspectionVin,
+                                "car part",
+                                "diagram",
+                              ]
+                                .map((v) => String(v ?? "").trim())
+                                .filter(Boolean)
+                                .join(" ");
+                              if (!query) return;
+                              window.location.assign(
+                                `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(query)}`
+                              );
+                            }}
                           >
-                            {rowDiagram?.loading ? "Loading Diagram..." : "Show Diagram"}
+                            View Diagram
                           </button>
                         </div>
-                        {rowDiagram?.message && (
-                          <div className="mt-2 text-[11px] text-cyan-100/80">{rowDiagram.message}</div>
-                        )}
-                        {rowDiagram?.url && (
-                          <div className="mt-2 rounded border border-white/10 bg-black/20 p-2">
-                            <img
-                              className="max-h-64 w-full rounded border border-white/10 object-contain"
-                              src={rowDiagram.url}
-                              alt={`${row.part || "Part"} diagram`}
-                            />
-                            <div className="mt-1 flex items-center justify-between text-[11px]">
-                              <a
-                                href={rowDiagram.url}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-primary hover:underline"
-                              >
-                                Open full diagram
-                              </a>
-                              {rowDiagram.source ? <span className="text-white/60">Source: {rowDiagram.source}</span> : null}
+                        {hasSelectedPart && (
+                          <div className="mt-2 rounded border border-amber-500/30 bg-amber-500/10 p-2">
+                            <div className="text-[11px] font-semibold uppercase tracking-wide text-amber-200">
+                              Smart Fault Suggestions
                             </div>
-                          </div>
-                        )}
-                        <div className="mt-2 text-[11px] font-semibold uppercase tracking-wide text-cyan-200">
-                          Questions
-                        </div>
-                        {!row.part && (
-                          <div className="mt-2 text-[11px] text-cyan-100/80">
-                            Select part to generate AI inspection questions.
-                          </div>
-                        )}
-                        {rowAiLoading && (
-                          <div className="mt-2 text-[11px] text-cyan-100/80">
-                            Generating AI questions...
-                          </div>
-                        )}
-                        <div className="mt-2 grid gap-2 lg:grid-cols-3">
-                          {rowAiQuestions.map((question) => (
-                            <div key={`${rowKey}-${question.id}`} className="rounded border border-white/10 bg-black/20 p-2">
-                              <div className="text-[11px] text-white/85">{question.text}</div>
-                              <div className="mt-1 flex items-center gap-2 text-[11px]">
-                                {(["yes", "no", "na"] as const).map((answerValue) => (
-                                  <label key={answerValue} className="flex items-center gap-1 text-white/75">
-                                    <input
-                                      type="radio"
-                                      name={`${rowKey}-${question.id}`}
-                                      checked={rowAiAnswers[question.id] === answerValue}
-                                      disabled={isLocked}
-                                      onChange={() => {
-                                        const nextAnswers = {
-                                          ...(lineItemAiAnswers[rowKey] ?? {}),
-                                          [question.id]: answerValue,
-                                        };
-                                        setLineItemAiAnswers((prev) => ({
-                                          ...prev,
-                                          [rowKey]: {
-                                            ...nextAnswers,
-                                          },
-                                        }));
-                                        setLineItemAiRecommendationByRow((prev) => ({
-                                          ...prev,
-                                          [rowKey]: buildSimpleRecommendationFromAnswers(
-                                            row.part || "this part",
-                                            rowAiQuestions,
-                                            nextAnswers
-                                          ),
-                                        }));
-                                      }}
-                                      className="h-3.5 w-3.5"
-                                    />
-                                    <span className="uppercase">{answerValue}</span>
-                                  </label>
+                            {smartSuggestionsLoading ? (
+                              <div className="mt-1 text-[11px] text-amber-100/80">
+                                Loading AI related suggestions...
+                              </div>
+                            ) : smartSuggestions.length === 0 ? (
+                              <div className="mt-1 text-[11px] text-amber-100/80">
+                                No related suggestions for this issue.
+                              </div>
+                            ) : (
+                              <div className="mt-1 space-y-1">
+                                {smartSuggestions.map((suggestion) => (
+                                  (() => {
+                                    const suggestionPartNumber =
+                                      String(suggestion.label.match(/\(([^)]+)\)/)?.[1] ?? "").trim() ||
+                                      String(row.catalogPartCode ?? "").trim();
+                                    const suggestionSearchQuery = [
+                                      suggestionPartNumber,
+                                      inspectionMake,
+                                      inspectionModel,
+                                      inspectionYear,
+                                      inspectionVin,
+                                      "car part",
+                                      "diagram",
+                                    ]
+                                      .map((v) => String(v ?? "").trim())
+                                      .filter(Boolean)
+                                      .join(" ");
+                                    const suggestionSearchUrl = `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(
+                                      suggestionSearchQuery
+                                    )}`;
+                                    return (
+                                  <div
+                                    key={`${rowKey}-smart-${suggestion.id}`}
+                                    className="flex flex-wrap items-center justify-between gap-2 rounded border border-white/10 bg-black/20 px-2 py-1.5 text-[11px]"
+                                  >
+                                    <div className="text-amber-100">
+                                      ⚠ {suggestion.label}
+                                      <div className="text-[10px] text-amber-100/70">{suggestion.reason}</div>
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                      <button
+                                        type="button"
+                                        className="rounded-md border border-emerald-500/40 px-2 py-0.5 text-[10px] font-semibold text-emerald-200"
+                                        onClick={() =>
+                                          void addSmartSuggestionAsLineItem(
+                                            index,
+                                            rowKey,
+                                            {
+                                              catalogGroupKey: row.catalogGroupKey,
+                                              reason: row.reason,
+                                              description: suggestion.reason,
+                                            },
+                                            suggestion
+                                          )
+                                        }
+                                      >
+                                        Add
+                                      </button>
+                                      <a
+                                        href={suggestionSearchUrl}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="rounded-md border border-cyan-500/40 px-2 py-0.5 text-[10px] font-semibold text-cyan-200"
+                                      >
+                                        Open AI Search Result
+                                      </a>
+                                      <button
+                                        type="button"
+                                        className="rounded-md border border-white/20 px-2 py-0.5 text-[10px] font-semibold text-white/80"
+                                        onClick={() =>
+                                          setDismissedSmartSuggestionsByRow((prev) => ({
+                                            ...prev,
+                                            [rowKey]: Array.from(new Set([...(prev[rowKey] ?? []), suggestion.id])),
+                                          }))
+                                        }
+                                      >
+                                        Dismiss
+                                      </button>
+                                    </div>
+                                  </div>
+                                    );
+                                  })()
                                 ))}
                               </div>
-                            </div>
-                          ))}
-                        </div>
-                        {rowRecommendation && (
-                          <div className="mt-2 rounded border border-emerald-500/30 bg-emerald-500/10 px-2 py-1.5 text-[11px] text-emerald-200">
-                            {rowRecommendation}
+                            )}
                           </div>
                         )}
+                        <div className="mt-2 text-[11px] text-cyan-100/70">
+                          AI Questions are hidden for now. Smart Fault Suggestions remain active.
+                        </div>
                       </div>
                       )}
                       <div className="flex flex-wrap items-center gap-2 text-[11px]">
@@ -4151,8 +4643,254 @@ export function InspectionDetailPageClient({
                 placeholder="Final inspection remarks before completion."
               />
             </div>
+            <div className={`mt-4 ${inspectionStep === 6 ? "" : "hidden"}`}>
+              <div className="report-print-hide mb-3 flex flex-wrap items-center justify-end gap-2">
+                <button
+                  type="button"
+                  className="rounded-md border border-white/20 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-white/90 hover:bg-white/10"
+                  onClick={printInspectionReport}
+                >
+                  Print Report
+                </button>
+                <button
+                  type="button"
+                  className="rounded-md bg-cyan-600 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-white"
+                  onClick={() => void downloadInspectionReportPdf()}
+                >
+                  Download Inspection Report (PDF)
+                </button>
+              </div>
+              <div id="inspection-report-print" className="report-print-root rounded-md border border-cyan-500/25 bg-cyan-500/5 p-4">
+                <div className="report-section rounded-md border border-white/10 bg-black/10 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      {reportWorkshopBranding.logoUrl ? (
+                        <img
+                          src={reportWorkshopBranding.logoUrl}
+                          alt="Workshop logo"
+                          className="h-12 w-12 rounded border border-white/20 object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-12 w-12 items-center justify-center rounded border border-white/20 text-[10px] text-white/70">
+                          LOGO
+                        </div>
+                      )}
+                      <div>
+                        <div className="text-base font-semibold text-white">{reportWorkshopBranding.workshopName}</div>
+                        <div className="text-xs text-white/70">{reportWorkshopBranding.contact}</div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-lg font-semibold text-cyan-100">Vehicle Inspection Report</div>
+                      <div className="text-xs text-white/70">
+                        Inspection Date: {new Date().toLocaleDateString()}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-3 grid gap-2 text-xs lg:grid-cols-2">
+                    <div className="space-y-1 text-white/85">
+                      <div>Customer Name: {customer?.name ?? customer?.fullName ?? "N/A"}</div>
+                      <div>
+                        Vehicle: {[inspectionMake, inspectionModel, inspectionYear].filter(Boolean).join(" ") || "N/A"}
+                      </div>
+                      <div>VIN: {inspectionVin || "N/A"}</div>
+                      <div>License Plate: {plateLabel || "N/A"}</div>
+                    </div>
+                    <div className="space-y-1 text-white/85">
+                      <div>Mileage: {form.carInMileage || "N/A"}</div>
+                      <div>Inspector / Technician: {form.inspectorName || "N/A"}</div>
+                      <div>Workshop Branch: {form.advisorName || "N/A"}</div>
+                      <div>Inspection ID: {inspectionId || "N/A"}</div>
+                    </div>
+                  </div>
+                </div>
 
-            <div className="mt-6 flex items-center justify-between gap-2">
+                <div className="report-section mt-3 rounded-md border border-white/10 bg-black/10 p-3">
+                  <div className="text-sm font-semibold text-cyan-100">Vehicle Overview Photos</div>
+                  {reportMediaGallery.length === 0 ? (
+                    <div className="mt-2 text-xs text-white/60">No check-in photos available.</div>
+                  ) : (
+                    <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                      {reportMediaGallery.map((media) => (
+                        <div key={`gallery-${media.key}`} className="rounded border border-white/10 bg-white/[0.02] p-2">
+                          <div className="mb-1 text-[10px] uppercase tracking-wide text-white/60">{media.label}</div>
+                          <img
+                            src={`/api/files/${media.fileId}`}
+                            alt={media.label}
+                            className="h-32 w-full rounded border border-white/10 object-cover"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="report-section mt-3 rounded-md border border-white/10 bg-black/10 p-3">
+                  <div className="grid gap-3 lg:grid-cols-[1fr_2fr]">
+                    <div className="rounded border border-cyan-500/25 bg-cyan-500/5 p-3">
+                      <div className="text-[10px] uppercase tracking-wide text-white/60">Overall Vehicle Condition</div>
+                      <div className="mt-1 text-3xl font-bold text-cyan-100">{overallHealthPercent}%</div>
+                      <div className="text-xs text-white/80">
+                        {overallHealthPercent >= 85
+                          ? "Excellent"
+                          : overallHealthPercent >= 70
+                          ? "Good"
+                          : overallHealthPercent >= 50
+                          ? "Needs Attention"
+                          : "Critical"}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] uppercase tracking-wide text-white/60">Category Health Scores</div>
+                      <div className="mt-2 space-y-2">
+                        {reportCategoryHealth.map((entry) => (
+                          <div key={`cat-health-${entry.category}`}>
+                            <div className="flex items-center justify-between text-xs text-white/85">
+                              <span>{entry.category}</span>
+                              <span>{entry.healthPercent}%</span>
+                            </div>
+                            <div className="mt-1 h-1.5 w-full rounded bg-white/10">
+                              <div
+                                className={`h-1.5 rounded ${
+                                  entry.healthPercent < 50
+                                    ? "bg-rose-400"
+                                    : entry.healthPercent < 70
+                                    ? "bg-amber-400"
+                                    : entry.healthPercent < 90
+                                    ? "bg-cyan-400"
+                                    : "bg-emerald-400"
+                                }`}
+                                style={{ width: `${Math.max(0, Math.min(100, entry.healthPercent))}%` }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="report-section mt-3 rounded-md border border-white/10 bg-black/10 p-3">
+                  <div className="text-sm font-semibold text-cyan-100">Priority Issues Summary</div>
+                  <div className="mt-2 grid gap-2 lg:grid-cols-2">
+                    {(["Safety Risk", "Mandatory", "Recommended", "Optional"] as const).map((severity) => (
+                      <div key={`priority-${severity}`} className="rounded border border-white/10 bg-white/[0.02] p-2">
+                        <div className="text-xs font-semibold text-white">{severity}</div>
+                        <div className="mt-1 space-y-1 text-xs text-white/85">
+                          {reportPriorityFindings[severity].length === 0 ? (
+                            <div className="text-white/50">No items.</div>
+                          ) : (
+                            reportPriorityFindings[severity].map((item, idx) => (
+                              <div key={`priority-item-${severity}-${idx}`} className="rounded border border-white/10 px-2 py-1">
+                                <div className="font-semibold">
+                                  {item.partName}
+                                  {item.partNumber ? ` (${item.partNumber})` : ""}
+                                </div>
+                                <div className="text-white/70">{item.observedCondition}</div>
+                                <div className="text-white/60">Part Group: {item.partGroup}</div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="report-section mt-3 rounded-md border border-white/10 bg-black/10 p-3">
+                  <div className="text-sm font-semibold text-cyan-100">Group Summary</div>
+                  {selectedPartsByGroup.length === 0 ? (
+                    <div className="mt-2 text-xs text-white/60">No grouped inspection findings yet.</div>
+                  ) : (
+                    <div className="mt-2 space-y-2">
+                      {selectedPartsByGroup.map((group) => (
+                        <div key={`group-summary-${group.key}`} className="rounded border border-white/10 bg-white/[0.02] p-2 text-xs">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="font-semibold text-white">{group.label}</div>
+                            <div className="text-cyan-100">Health: {group.healthPercent}%</div>
+                          </div>
+                          <div className="mt-1 text-white/75">{group.parts.length} selected part(s): {group.parts.join(", ")}</div>
+                          <div className="mt-1 flex flex-wrap gap-1 text-[10px]">
+                            <span className="rounded-full border border-rose-500/40 px-2 py-0.5 text-rose-300">Safety {group.severityCounts["Safety Risk"]}</span>
+                            <span className="rounded-full border border-amber-500/40 px-2 py-0.5 text-amber-300">Mandatory {group.severityCounts.Mandatory}</span>
+                            <span className="rounded-full border border-cyan-500/40 px-2 py-0.5 text-cyan-200">Recommended {group.severityCounts.Recommended}</span>
+                            <span className="rounded-full border border-white/20 px-2 py-0.5 text-white/80">Optional {group.severityCounts.Optional}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="report-section mt-3 rounded-md border border-white/10 bg-black/10 p-3">
+                  <div className="text-sm font-semibold text-cyan-100">Detailed Inspection Findings</div>
+                  <div className="mt-2 space-y-2">
+                    {reportFindings.length === 0 ? (
+                      <div className="text-xs text-white/60">No findings selected yet.</div>
+                    ) : (
+                      reportFindings.map((finding, idx) => (
+                        <div key={`finding-${idx}`} className="rounded border border-white/10 bg-white/[0.02] p-2 text-xs text-white/85">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="font-semibold">
+                              {finding.partName}
+                              {finding.partNumber ? ` (${finding.partNumber})` : ""}
+                            </div>
+                            <span className="rounded-full border border-cyan-500/40 px-2 py-0.5 text-[10px] text-cyan-100">{finding.severity}</span>
+                          </div>
+                          <div className="mt-1 text-white/70">Part Group: {finding.partGroup}</div>
+                          <div className="mt-1"><span className="font-semibold">Observed Condition:</span> {finding.observedCondition}</div>
+                          <div className="mt-1"><span className="font-semibold">Why This Matters:</span> {finding.whyItMatters}</div>
+                          <div className="mt-1"><span className="font-semibold">Recommended Action:</span> {finding.recommendedAction}</div>
+                          <div className="mt-2">
+                            <div className="text-[10px] uppercase tracking-wide text-white/60">Evidence Photos</div>
+                            {finding.mediaFileId ? (
+                              <img
+                                src={`/api/files/${finding.mediaFileId}`}
+                                alt={`${finding.partName} evidence`}
+                                className="mt-1 h-32 w-full max-w-sm rounded border border-white/10 object-cover"
+                              />
+                            ) : (
+                              <div className="mt-1 text-white/50">No evidence attached.</div>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                <div className="report-section mt-3 rounded-md border border-white/10 bg-black/10 p-3">
+                  <div className="text-sm font-semibold text-cyan-100">Inspection Summary</div>
+                  <div className="mt-2 text-xs leading-relaxed text-white/85">{reportFinalSummaryText}</div>
+                </div>
+
+                <div className="report-section mt-3 rounded-md border border-white/10 bg-black/10 p-3">
+                  <div className="text-sm font-semibold text-cyan-100">Repair Approval Summary</div>
+                  <div className="mt-2 grid gap-2 lg:grid-cols-2">
+                    {(["Safety Risk", "Mandatory", "Recommended", "Optional"] as const).map((severity) => (
+                      <div key={`approval-${severity}`} className="rounded border border-white/10 bg-white/[0.02] p-2 text-xs">
+                        <div className="font-semibold text-white">{severity}</div>
+                        {reportPriorityFindings[severity].length === 0 ? (
+                          <div className="mt-1 text-white/50">No items.</div>
+                        ) : (
+                          <div className="mt-1 space-y-1">
+                            {reportPriorityFindings[severity].map((item, idx) => (
+                              <div key={`approval-item-${severity}-${idx}`} className="rounded border border-white/10 px-2 py-1">
+                                <div className="font-semibold">{item.partName}</div>
+                                <div className="text-white/70">{item.recommendedAction}</div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="report-page-footer">Vehicle Inspection Report</div>
+              </div>
+            </div>
+
+            <div className="report-print-hide mt-6 flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <button
                   type="button"
@@ -4174,7 +4912,7 @@ export function InspectionDetailPageClient({
             </div>
 
             <div
-              className={`mt-6 flex items-center justify-end gap-2 ${
+              className={`report-print-hide mt-6 flex items-center justify-end gap-2 ${
                 inspectionStep === 6 || (inspectionStep === 2 && !startedAt) || isReadOnly ? "" : "hidden"
               }`}
             >
@@ -4577,6 +5315,52 @@ export function InspectionDetailPageClient({
           </div>
         </div>
       </div>
+      <style>{`
+        .report-page-footer {
+          display: none;
+        }
+        @media print {
+          @page {
+            size: A4;
+            margin: 12mm;
+          }
+          .report-print-hide {
+            display: none !important;
+          }
+          .report-print-root {
+            background: #ffffff !important;
+            border: 0 !important;
+            color: #0f172a !important;
+            box-shadow: none !important;
+          }
+          .report-print-root .report-section {
+            background: #ffffff !important;
+            border: 1px solid #dbe2ea !important;
+            break-inside: avoid;
+            page-break-inside: avoid;
+          }
+          .report-print-root * {
+            color: #0f172a !important;
+          }
+          .report-print-root img {
+            max-width: 100% !important;
+            object-fit: cover !important;
+            break-inside: avoid;
+            page-break-inside: avoid;
+          }
+          .report-page-footer {
+            display: block;
+            position: fixed;
+            bottom: 4mm;
+            right: 0;
+            font-size: 10px;
+            color: #475569 !important;
+          }
+          .report-page-footer::after {
+            content: " - Page " counter(page) " of " counter(pages);
+          }
+        }
+      `}</style>
     </AppLayout>
   );
 }

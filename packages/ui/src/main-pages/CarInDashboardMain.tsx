@@ -1019,8 +1019,8 @@ export function CarInDashboardMain({ companyId, companyName }: CarInDashboardMai
                       (lead as any).metadata?.estimateId ??
                       (lead as any).metadata?.estimate_id ??
                       null;
-                    const inspectionHref = inspectionMeta?.id
-                      ? `/company/${companyId}/inspections/${inspectionMeta.id}`
+                    const inspectionPdfHref = inspectionMeta?.id
+                      ? `/api/company/${companyId}/workshop/inspections/${inspectionMeta.id}/print`
                       : null;
                     const estimateHref = estimateId
                       ? `/company/${companyId}/estimates/${estimateId}`
@@ -1231,13 +1231,16 @@ export function CarInDashboardMain({ companyId, companyName }: CarInDashboardMai
                               Cancelled: {new Date(inspectionMeta.cancelledAt).toLocaleString()}
                             </div>
                           )}
-                          {inspectionHref && (
+                          {inspectionPdfHref && (
                             <div className="mt-1">
                               <a
-                                href={inspectionHref}
+                                href={inspectionPdfHref}
+                                target="_blank"
+                                rel="noreferrer"
+                                download={`inspection-report-${inspectionMeta?.id}.pdf`}
                                 className="inline-flex items-center rounded-md border border-slate-200 bg-white px-2 py-1 text-[9px] font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition hover:bg-slate-50 hover:shadow-md"
                               >
-                                View
+                                PDF
                               </a>
                             </div>
                           )}

@@ -598,3 +598,20 @@ export async function markLineItemsOrderedByNames(
   `;
   return rows.length;
 }
+
+export async function markLineItemsOrderedByIds(
+  inspectionId: string,
+  lineItemIds: string[]
+): Promise<number> {
+  if (!lineItemIds.length) return 0;
+  const sql = getSql();
+  const rows = await sql`
+    UPDATE line_items
+    SET part_ordered = 1,
+        order_status = 'Ordered'
+    WHERE inspection_id = ${inspectionId}
+      AND id = ANY(${sql.array(lineItemIds)})
+    RETURNING id
+  `;
+  return rows.length;
+}

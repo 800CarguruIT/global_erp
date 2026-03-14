@@ -3080,12 +3080,19 @@ function CustomerInspectionsTable({
                   <td className="px-3 py-2">{formatDateTime(inspection.startAt ?? inspection.createdAt)}</td>
                   <td className="px-3 py-2">{formatDateTime(inspection.updatedAt)}</td>
                   <td className="px-3 py-2">
-                    <Link
-                      href={companyId ? `/company/${companyId}/inspections/${inspection.id}` : "#"}
-                      className="rounded-md border border-white/20 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white/70 hover:bg-white/10"
-                    >
-                      View
-                    </Link>
+                    {companyId ? (
+                      <a
+                        href={`/api/company/${companyId}/workshop/inspections/${inspection.id}/print`}
+                        target="_blank"
+                        rel="noreferrer"
+                        download={`inspection-report-${inspection.id}.pdf`}
+                        className="rounded-md border border-white/20 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white/70 hover:bg-white/10"
+                      >
+                        PDF
+                      </a>
+                    ) : (
+                      <span className="text-white/60">-</span>
+                    )}
                   </td>
                 </tr>
               ))
@@ -3124,12 +3131,19 @@ function CustomerInspectionsTable({
               <div className="text-white/60">Started: {formatDateTime(inspection.startAt ?? inspection.createdAt)}</div>
               <div className="text-white/60">Updated: {formatDateTime(inspection.updatedAt)}</div>
               <div>
-                <Link
-                  href={companyId ? `/company/${companyId}/inspections/${inspection.id}` : "#"}
-                  className="rounded-md border border-white/20 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white/70 hover:bg-white/10"
-                >
-                  View
-                </Link>
+                {companyId ? (
+                  <a
+                    href={`/api/company/${companyId}/workshop/inspections/${inspection.id}/print`}
+                    target="_blank"
+                    rel="noreferrer"
+                    download={`inspection-report-${inspection.id}.pdf`}
+                    className="rounded-md border border-white/20 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white/70 hover:bg-white/10"
+                  >
+                    PDF
+                  </a>
+                ) : (
+                  <span className="text-white/60">-</span>
+                )}
               </div>
             </div>
           ))
