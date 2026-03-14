@@ -35,6 +35,8 @@ export async function GET(req: NextRequest) {
         l.lead_status,
         l.lead_stage,
         l.assigned_user_id,
+        l.assigned_at,
+        l.branch_id,
         l.created_at,
         l.updated_at,
         c.id AS customer_id,
@@ -52,7 +54,12 @@ export async function GET(req: NextRequest) {
       LEFT JOIN users u ON u.id = l.assigned_user_id
       WHERE l.company_id = ${companyId}
         AND LOWER(COALESCE(l.lead_type, '')) = 'rsa'
-        AND l.assigned_user_id IS NOT NULL
+        AND (
+          l.assigned_user_id IS NOT NULL
+          OR l.assigned_at IS NOT NULL
+          OR l.branch_id IS NOT NULL
+          OR LOWER(COALESCE(l.lead_stage, '')) IN ('assigned', 'dispatched', 'enroute', 'processing', 'car_in')
+        )
         AND (${assignedUserFilter}::uuid IS NULL OR l.assigned_user_id = ${assignedUserFilter})
         AND (
           ${status}::text IS NULL
@@ -85,6 +92,8 @@ export async function GET(req: NextRequest) {
       leadStatus: row.lead_status ?? null,
       leadStage: row.lead_stage ?? null,
       assignedUserId: row.assigned_user_id ?? null,
+      assignedAt: row.assigned_at ?? null,
+      branchId: row.branch_id ?? null,
       assignedToName: row.assigned_to_name ?? null,
       customerId: row.customer_id ?? null,
       customerName: row.customer_name ?? null,
