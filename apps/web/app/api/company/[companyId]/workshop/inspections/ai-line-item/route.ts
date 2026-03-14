@@ -72,8 +72,8 @@ Generate inspection questions and recommendation for this line item:
 - Description: ${description || "N/A"}
 - Current Status: ${status || "N/A"}
 
-${existingQuestions.length > 0 ? `Existing questions: ${JSON.stringify(existingQuestions)}` : "Generate 3-5 practical workshop questions."}
-${answers ? `Inspector answers: ${JSON.stringify(answers)}` : "No answers yet. Do not force recommendation."}
+${existingQuestions.length > 0 ? `Existing questions: ${JSON.stringify(existingQuestions)}` : "Generate only 3 short and simple workshop questions."}
+${answers ? `Inspector answers: ${JSON.stringify(answers)}` : "No answers yet. Keep recommendation empty."}
 
 Return strict JSON only:
 {
@@ -82,6 +82,8 @@ Return strict JSON only:
 }
 Rules:
 - Questions must be answerable by yes/no/na during inspection.
+- Keep question text very simple and clear (single sentence).
+- This is one-step question generation. Do not create follow-up or conditional questions.
 - Keep recommendation concise, action-oriented, and workshop-friendly.
 - Never return markdown.
 `;

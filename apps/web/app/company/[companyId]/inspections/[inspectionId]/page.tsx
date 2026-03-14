@@ -75,6 +75,12 @@ type LineItemAiContext = {
   description: string;
   status: string;
 };
+type LineItemDiagramState = {
+  loading: boolean;
+  url: string;
+  message: string;
+  source?: string;
+};
 
 type CheckValue = "good" | "avg" | "bad" | "";
 type ProcessCheckValue = "ok" | "issue" | "na" | "";
@@ -359,6 +365,16 @@ export function InspectionDetailPageClient({
   const [lineItemAiQuestionsByRow, setLineItemAiQuestionsByRow] = useState<Record<string, LineItemAiQuestion[]>>({});
   const [lineItemAiRecommendationByRow, setLineItemAiRecommendationByRow] = useState<Record<string, string>>({});
   const [lineItemAiLoadingByRow, setLineItemAiLoadingByRow] = useState<Record<string, boolean>>({});
+  const [lineItemDiagramByRow, setLineItemDiagramByRow] = useState<Record<string, LineItemDiagramState>>({});
+  const [bulkAddGroupKey, setBulkAddGroupKey] = useState("");
+  const [bulkAddPartCodes, setBulkAddPartCodes] = useState<string[]>([]);
+  const [bulkPartSearch, setBulkPartSearch] = useState("");
+  const [expandedLineItemsByRow, setExpandedLineItemsByRow] = useState<Record<string, boolean>>({});
+  const partsRef = useRef<typeof parts>([]);
+
+  useEffect(() => {
+    partsRef.current = parts;
+  }, [parts]);
 
   useEffect(() => {
     Promise.resolve(params).then((p) => {
@@ -1244,7 +1260,7 @@ export function InspectionDetailPageClient({
     return Array.from(map.values()).sort((a, b) => a.level - b.level || a.label.localeCompare(b.label));
   };
 
-  const ensureVinCatalogForLineItems = async () => {
+  const ensureVinCatalogForLineItems = useCallback(async () => {
     const vin = inspectionVin.trim().toUpperCase();
     if (!companyId || !leadId) {
       toast.error("Lead context is missing for VIN part groups.");
@@ -1289,7 +1305,7 @@ export function InspectionDetailPageClient({
     } finally {
       setVinCatalogLoading(false);
     }
-  };
+  }, [companyId, inspectionVin, leadId, vinCatalogParts.length]);
 
 
   const updatePart = (
@@ -1517,6 +1533,78 @@ export function InspectionDetailPageClient({
     },
     [companyId]
   );
+  const fetchLineItemDiagram = useCallback(
+    async (
+      rowKey: string,
+      args: { partName: string; partNumber: string; groupName: string }
+    ) => {
+      if (!companyId) return;
+      const vin = inspectionVin.trim().toUpperCase();
+      if (!vin || (!args.partName.trim() && !args.partNumber.trim())) return;
+      setLineItemDiagramByRow((prev) => ({
+        ...prev,
+        [rowKey]: { loading: true, url: "", message: "Loading diagram..." },
+      }));
+      try {
+        const query = new URLSearchParams({
+          vin,
+          partName: args.partName || "",
+          partNumber: args.partNumber || "",
+          groupName: args.groupName || "",
+        });
+        const res = await fetch(
+          `/api/company/${companyId}/workshop/inspections/line-item-diagram?${query.toString()}`,
+          { cache: "no-store" }
+        );
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(String(body?.error ?? "Failed to fetch diagram"));
+        setLineItemDiagramByRow((prev) => ({
+          ...prev,
+          [rowKey]: {
+            loading: false,
+            url: String(body?.diagramUrl ?? ""),
+            message: String(body?.message ?? ""),
+            source: String(body?.source ?? ""),
+          },
+        }));
+      } catch (err: any) {
+        setLineItemDiagramByRow((prev) => ({
+          ...prev,
+          [rowKey]: {
+            loading: false,
+            url: "",
+            message: String(err?.message ?? "Failed to fetch diagram"),
+          },
+        }));
+      }
+    },
+    [companyId, inspectionVin]
+  );
+  const buildSimpleRecommendationFromAnswers = useCallback(
+    (
+      partName: string,
+      questions: LineItemAiQuestion[],
+      answers: Record<string, LineItemAiAnswerValue> | undefined
+    ) => {
+      if (!questions.length) return "";
+      const hasUnanswered = questions.some((q) => !answers?.[q.id]);
+      if (hasUnanswered) return `Answer all questions for ${partName || "this part"} to get recommendation.`;
+      const criticalYes = questions.some((q) => q.critical && answers?.[q.id] === "yes");
+      const anyYes = questions.some((q) => answers?.[q.id] === "yes");
+      const allNoOrNa = questions.every((q) => answers?.[q.id] === "no" || answers?.[q.id] === "na");
+      if (criticalYes) {
+        return `Recommended: Replace ${partName || "this part"} immediately and perform safety recheck.`;
+      }
+      if (anyYes) {
+        return `Recommended: Service ${partName || "this part"} soon and monitor after repair.`;
+      }
+      if (allNoOrNa) {
+        return `Recommended: No immediate replacement for ${partName || "this part"}; monitor in next inspection.`;
+      }
+      return `Recommended: Continue inspection checks for ${partName || "this part"}.`;
+    },
+    []
+  );
   const lineItemAiInsights = useMemo(() => {
     const hasRequiredMedia = (row: (typeof parts)[number]) => {
       const resolvedType = row.productType ?? products.find((product) => product.id === row.productId)?.type ?? "";
@@ -1559,6 +1647,56 @@ export function InspectionDetailPageClient({
 
     return { questions, suggestions };
   }, [parts, products]);
+  const selectedPartsByGroup = useMemo(() => {
+    const grouped = new Map<string, { label: string; parts: string[]; reasons: string[] }>();
+    for (const row of parts) {
+      const key = String(row.catalogGroupKey ?? "").trim();
+      if (!key) continue;
+      const label = vinCatalogGroups.find((group) => group.key === key)?.label || "Unknown Group";
+      if (!grouped.has(key)) grouped.set(key, { label, parts: [], reasons: [] });
+      const entry = grouped.get(key)!;
+      const partLabel = String(row.part ?? "").trim() || String(row.catalogPartCode ?? "").trim();
+      if (partLabel) entry.parts.push(partLabel);
+      const reason = String(row.reason ?? "").trim();
+      if (reason) entry.reasons.push(reason);
+    }
+    const scoreForReason = (reason: string) => {
+      const normalized = reason.toLowerCase();
+      if (normalized.includes("safety risk")) return 25;
+      if (normalized.includes("mandatory")) return 60;
+      if (normalized.includes("recommended")) return 80;
+      if (normalized.includes("optional")) return 100;
+      return 100;
+    };
+    return Array.from(grouped.entries())
+      .map(([key, entry]) => ({
+        key,
+        label: entry.label,
+        parts: Array.from(new Set(entry.parts)),
+        healthPercent: entry.reasons.length
+          ? Math.round(entry.reasons.reduce((sum, reason) => sum + scoreForReason(reason), 0) / entry.reasons.length)
+          : 100,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [parts, vinCatalogGroups]);
+  const groupSummaryByKey = useMemo(
+    () => new Map(selectedPartsByGroup.map((entry) => [entry.key, entry])),
+    [selectedPartsByGroup]
+  );
+  const groupedLineItemOrder = useMemo(
+    () =>
+      parts
+        .map((row, index) => {
+          const groupKey = String(row.catalogGroupKey ?? "").trim() || "__ungrouped__";
+          const groupLabel =
+            groupKey === "__ungrouped__"
+              ? "Ungrouped"
+              : vinCatalogGroups.find((group) => group.key === groupKey)?.label || "Unknown Group";
+          return { row, index, groupKey, groupLabel };
+        })
+        .sort((a, b) => a.groupLabel.localeCompare(b.groupLabel) || a.index - b.index),
+    [parts, vinCatalogGroups]
+  );
   const progressStages = [
     { key: "pending", label: "Draft", done: true },
     { key: "started", label: "Started", done: Boolean(startedAt) },
@@ -1717,7 +1855,8 @@ export function InspectionDetailPageClient({
       toast.error("Complete Collect Car stage first.");
       return;
     }
-    const row = parts[index];
+    const currentParts = partsRef.current;
+    const row = currentParts[index];
     if (row?.partOrdered === 1 || row?.orderStatus === "Ordered" || row?.orderStatus === "Received") {
       toast.error("Ordered/received items cannot be edited.");
       return;
@@ -1769,7 +1908,7 @@ export function InspectionDetailPageClient({
       if (!res.ok) throw new Error("Failed to save line item");
       const data = await res.json();
       const saved = data?.data ?? {};
-      const nextParts = parts.map((p, i) =>
+      const nextParts = currentParts.map((p, i) =>
         i === index
           ? {
               ...p,
@@ -1845,25 +1984,140 @@ export function InspectionDetailPageClient({
       delete next[rowKey];
       return next;
     });
+    setLineItemDiagramByRow((prev) => {
+      const next = { ...prev };
+      delete next[rowKey];
+      return next;
+    });
+    setExpandedLineItemsByRow((prev) => {
+      const next = { ...prev };
+      delete next[rowKey];
+      return next;
+    });
     toast.success("Line item deleted successfully.");
   };
+
+  const makeLineItemClientRowKey = useCallback(
+    () => `row-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    []
+  );
+
+  const buildLineItemDraftFromCatalog = useCallback(
+    (
+      partName: string,
+      partCode: string,
+      groupKey: string,
+      base?: Partial<(typeof parts)[number]>
+    ) => ({
+      part: partName,
+      description: base?.description || partCode,
+      qty: base?.qty || "1",
+      reason: base?.reason || "Mandatory",
+      catalogGroupKey: groupKey,
+      catalogPartCode: partCode,
+      clientRowKey: makeLineItemClientRowKey(),
+      productId: null,
+      productType: null,
+      mediaFileId: null,
+      isSaved: false,
+    }),
+    [makeLineItemClientRowKey]
+  );
 
   const addLineItemRow = async () => {
     const ready = await ensureVinCatalogForLineItems();
     if (!ready) return;
-    setParts((prev) => [
-      ...prev,
-      {
-        part: "",
-        description: "",
-        qty: "1",
-        reason: "Mandatory",
-        catalogGroupKey: "",
-        catalogPartCode: "",
-        clientRowKey: `row-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      },
-    ]);
+    const draft = buildLineItemDraftFromCatalog("", "", "");
+    setParts((prev) => [...prev, draft]);
+    if (draft.clientRowKey) {
+      setExpandedLineItemsByRow((prev) => ({ ...prev, [draft.clientRowKey as string]: true }));
+    }
   };
+
+  const saveAllDraftLineItems = async () => {
+    if (isReadOnly || isCollectCarPending) return;
+    const draftIndexes = partsRef.current
+      .map((row, idx) => (!row.isSaved ? idx : -1))
+      .filter((idx) => idx >= 0);
+    if (!draftIndexes.length) {
+      toast.success("No draft line items to save.");
+      return;
+    }
+    for (const idx of draftIndexes) {
+      await saveLineItem(idx);
+    }
+  };
+
+  const bulkAddPartsFromGroup = useCallback(async () => {
+    const ready = await ensureVinCatalogForLineItems();
+    if (!ready) return;
+    if (!bulkAddGroupKey) {
+      toast.error("Select car group first.");
+      return;
+    }
+    if (!bulkAddPartCodes.length) {
+      toast.error("Select at least one part.");
+      return;
+    }
+    const selectedParts = bulkAddPartCodes
+      .map((code) =>
+        vinCatalogParts.find(
+          (part) =>
+            part.code === code &&
+            (part.groups ?? []).some((group) => {
+              const groupId = String(group?.id ?? "").trim();
+              const groupName = String(group?.name ?? "").trim();
+              const groupLevel = Number(group?.level ?? 0) || 0;
+              const key = `${groupId || groupName}::${groupLevel}`;
+              return key === bulkAddGroupKey;
+            })
+        )
+      )
+      .filter(Boolean) as VinCatalogPart[];
+    if (!selectedParts.length) {
+      toast.error("No valid parts selected for this group.");
+      return;
+    }
+    const groupLabel = vinCatalogGroups.find((group) => group.key === bulkAddGroupKey)?.label ?? "";
+    const newRows = selectedParts.map((part) =>
+      buildLineItemDraftFromCatalog(part.name || part.code || "", part.code || "", bulkAddGroupKey)
+    );
+    setParts((prev) => [...prev, ...newRows]);
+    setExpandedLineItemsByRow((prev) => {
+      const next = { ...prev };
+      for (const row of newRows) {
+        const key = String(row.clientRowKey ?? "");
+        if (key) next[key] = false;
+      }
+      return next;
+    });
+    setBulkAddPartCodes([]);
+    setBulkPartSearch("");
+    for (const row of newRows) {
+      if (!row.clientRowKey || !row.part) continue;
+      void requestLineItemAi(
+        row.clientRowKey,
+        {
+          partName: row.part,
+          partNumber: row.catalogPartCode ?? "",
+          groupName: groupLabel,
+          description: row.description ?? "",
+          status: row.reason ?? "",
+        },
+        undefined,
+        undefined
+      );
+    }
+    toast.success(`${newRows.length} line item(s) added.`);
+  }, [
+    bulkAddGroupKey,
+    bulkAddPartCodes,
+    buildLineItemDraftFromCatalog,
+    ensureVinCatalogForLineItems,
+    requestLineItemAi,
+    vinCatalogGroups,
+    vinCatalogParts,
+  ]);
 
   const nextStepValidationMessage = () => {
     if (inspectionStep === 1 && !step1Complete) return "Complete Collect Car stage first.";
@@ -3130,14 +3384,24 @@ export function InspectionDetailPageClient({
                     </span>
                   </div>
                   {!isReadOnly && !isCollectCarPending && (
-                    <button
-                      type="button"
-                      className="rounded-md bg-teal-600 px-2.5 py-1 text-[11px] font-semibold text-white"
-                      onClick={addLineItemRow}
-                      disabled={vinCatalogLoading || (parts.length > 0 && parts.some((p) => !p.isSaved))}
-                    >
-                      {vinCatalogLoading ? "Loading..." : "+ Add Line Item"}
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        className="rounded-md bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white disabled:opacity-50"
+                        onClick={() => void saveAllDraftLineItems()}
+                        disabled={parts.filter((p) => !p.isSaved).length === 0}
+                      >
+                        Save All Draft
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded-md bg-teal-600 px-2.5 py-1 text-[11px] font-semibold text-white"
+                        onClick={addLineItemRow}
+                        disabled={vinCatalogLoading || (parts.length > 0 && parts.some((p) => !p.isSaved))}
+                      >
+                        {vinCatalogLoading ? "Loading..." : "+ Add Line Item"}
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
@@ -3162,6 +3426,134 @@ export function InspectionDetailPageClient({
                   </div>
                 </div>
               </div>
+              {vinCatalogGroups.length > 0 && !isReadOnly && !isCollectCarPending && (
+                <div className="mt-2 rounded-md border border-cyan-500/20 bg-cyan-500/5 p-3">
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-cyan-200">
+                    Add Multiple Line Items By Group
+                  </div>
+                  <div className="mt-2 grid gap-2 lg:grid-cols-[1.2fr_auto] lg:items-end">
+                    <div className="space-y-1">
+                      <div className="text-[10px] font-semibold uppercase tracking-wide text-cyan-100/80">Car Group</div>
+                      <select
+                        className={`${theme.input} h-10 w-full`}
+                        value={bulkAddGroupKey}
+                        onChange={(e) => {
+                          setBulkAddGroupKey(e.target.value);
+                          setBulkAddPartCodes([]);
+                          setBulkPartSearch("");
+                        }}
+                      >
+                        <option value="">Select Car Group</option>
+                        {vinCatalogGroups.map((group) => (
+                          <option key={group.key} value={group.key}>
+                            {group.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <button
+                      type="button"
+                      className="h-10 rounded-md bg-teal-600 px-3 text-xs font-semibold text-white disabled:opacity-50"
+                      disabled={!bulkAddGroupKey || bulkAddPartCodes.length === 0}
+                      onClick={() => void bulkAddPartsFromGroup()}
+                    >
+                      Add Selected Parts
+                    </button>
+                  </div>
+                  {bulkAddGroupKey && (
+                    <div className="mt-2">
+                      <div className="grid gap-2 lg:grid-cols-[1fr_auto_auto]">
+                        <input
+                          type="text"
+                          className={`${theme.input} h-10 w-full`}
+                          value={bulkPartSearch}
+                          onChange={(e) => setBulkPartSearch(e.target.value)}
+                          placeholder="Search parts in selected group"
+                        />
+                        <button
+                          type="button"
+                          className="h-10 rounded-md border border-cyan-500/40 px-3 text-xs font-semibold text-cyan-100"
+                          onClick={() => {
+                            const allVisibleCodes = vinCatalogParts
+                              .filter((part) =>
+                                (part.groups ?? []).some((group) => {
+                                  const groupId = String(group?.id ?? "").trim();
+                                  const groupName = String(group?.name ?? "").trim();
+                                  const groupLevel = Number(group?.level ?? 0) || 0;
+                                  const key = `${groupId || groupName}::${groupLevel}`;
+                                  return key === bulkAddGroupKey;
+                                })
+                              )
+                              .filter((part) => {
+                                const needle = bulkPartSearch.trim().toLowerCase();
+                                if (!needle) return true;
+                                const label = `${part.name || ""} ${part.code || ""}`.toLowerCase();
+                                return label.includes(needle);
+                              })
+                              .map((part) => part.code);
+                            setBulkAddPartCodes(allVisibleCodes);
+                          }}
+                        >
+                          Select All Visible
+                        </button>
+                        <button
+                          type="button"
+                          className="h-10 rounded-md border border-white/20 px-3 text-xs font-semibold text-white/80"
+                          onClick={() => setBulkAddPartCodes([])}
+                        >
+                          Clear
+                        </button>
+                      </div>
+                      <div className="mt-2 max-h-56 space-y-1 overflow-auto rounded-md border border-white/10 p-2">
+                        {vinCatalogParts
+                          .filter((part) =>
+                            (part.groups ?? []).some((group) => {
+                              const groupId = String(group?.id ?? "").trim();
+                              const groupName = String(group?.name ?? "").trim();
+                              const groupLevel = Number(group?.level ?? 0) || 0;
+                              const key = `${groupId || groupName}::${groupLevel}`;
+                              return key === bulkAddGroupKey;
+                            })
+                          )
+                          .filter((part) => {
+                            const needle = bulkPartSearch.trim().toLowerCase();
+                            if (!needle) return true;
+                            const label = `${part.name || ""} ${part.code || ""}`.toLowerCase();
+                            return label.includes(needle);
+                          })
+                          .map((part) => {
+                            const selected = bulkAddPartCodes.includes(part.code);
+                            return (
+                              <label
+                                key={`bulk-pick-${part.code}-${part.name}`}
+                                className="flex cursor-pointer items-center gap-2 rounded-md border border-white/10 px-2 py-1.5 text-xs hover:bg-white/5"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={selected}
+                                  onChange={(e) => {
+                                    setBulkAddPartCodes((prev) => {
+                                      if (e.target.checked) {
+                                        if (prev.includes(part.code)) return prev;
+                                        return [...prev, part.code];
+                                      }
+                                      return prev.filter((code) => code !== part.code);
+                                    });
+                                  }}
+                                />
+                                <span className="text-white/85">{part.name || "Unnamed part"}</span>
+                                <span className="text-white/55">{part.code ? `(${part.code})` : ""}</span>
+                              </label>
+                            );
+                          })}
+                      </div>
+                      <div className="mt-2 text-[11px] text-cyan-100/80">
+                        {bulkAddPartCodes.length} part(s) selected.
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
               <div className={`mt-2 rounded-md ${theme.cardBorder} ${theme.surfaceSubtle} p-3`}>
                 {parts.length === 0 ? (
                   <div className="rounded-md border border-dashed border-white/20 bg-black/20 p-4 text-center">
@@ -3189,7 +3581,12 @@ export function InspectionDetailPageClient({
                       <div>Actions</div>
                     </div>
                     <div className="mt-2 space-y-2">
-                      {parts.map((row, index) => {
+                      {groupedLineItemOrder.map(({ row, index, groupKey, groupLabel }, orderIdx) => {
+                    const isNewGroup = orderIdx === 0 || groupedLineItemOrder[orderIdx - 1]?.groupKey !== groupKey;
+                    const summary =
+                      groupKey === "__ungrouped__"
+                        ? { label: "Ungrouped", parts: [] as string[], healthPercent: 100 }
+                        : groupSummaryByKey.get(groupKey) ?? { label: groupLabel, parts: [], healthPercent: 100 };
                     const isLocked =
                       isReadOnly || isCollectCarPending || row.partOrdered === 1 || row.orderStatus === "Ordered" || row.orderStatus === "Received";
                     const rowKey = row.clientRowKey || row.id || `row-${index}`;
@@ -3201,8 +3598,15 @@ export function InspectionDetailPageClient({
                     const rowAiAnswers = lineItemAiAnswers[rowKey] ?? {};
                     const rowRecommendation =
                       lineItemAiRecommendationByRow[rowKey] ??
-                      (rowAiQuestions.length > 0 ? "Answer AI questions to generate recommendation." : "");
+                      buildSimpleRecommendationFromAnswers(row.part || "this part", rowAiQuestions, rowAiAnswers);
                     const rowAiLoading = Boolean(lineItemAiLoadingByRow[rowKey]);
+                    const rowDiagram = lineItemDiagramByRow[rowKey];
+                    const rowMediaRequirement = getMediaRequirement(row);
+                    const answeredQuestionsCount = rowAiQuestions.filter((q) => Boolean(rowAiAnswers[q.id])).length;
+                    const statusDone = Boolean(String(row.reason ?? "").trim());
+                    const mediaDone = rowMediaRequirement.required ? Boolean(row.mediaFileId) : true;
+                    const hasSelectedPart = Boolean(String(row.part ?? "").trim());
+                    const isRowExpanded = hasSelectedPart ? (expandedLineItemsByRow[rowKey] ?? !row.isSaved) : true;
                     const filteredCatalogParts = vinCatalogParts.filter((part) =>
                       (part.groups ?? []).some((group) => {
                         const groupId = String(group?.id ?? "").trim();
@@ -3213,10 +3617,95 @@ export function InspectionDetailPageClient({
                       })
                     );
                     return (
+                      <React.Fragment key={`grouped-row-${rowKey}-${index}`}>
+                      {isNewGroup && (
+                        <div className="rounded-md border border-cyan-500/30 bg-cyan-500/10 p-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="text-xs font-semibold text-cyan-100">
+                              {summary.label} - Health Indicator
+                            </div>
+                            <span
+                              className={`rounded-full border px-2 py-0.5 text-[10px] ${
+                                summary.healthPercent < 50
+                                  ? "border-rose-500/40 text-rose-300"
+                                  : summary.healthPercent < 70
+                                  ? "border-amber-500/40 text-amber-300"
+                                  : summary.healthPercent < 90
+                                  ? "border-cyan-500/40 text-cyan-200"
+                                  : "border-emerald-500/40 text-emerald-300"
+                              }`}
+                            >
+                              Health {summary.healthPercent}%
+                            </span>
+                          </div>
+                          <div className="mt-1 h-1.5 w-full rounded bg-white/10">
+                            <div
+                              className={`h-1.5 rounded ${
+                                summary.healthPercent < 50
+                                  ? "bg-rose-400"
+                                  : summary.healthPercent < 70
+                                  ? "bg-amber-400"
+                                  : summary.healthPercent < 90
+                                  ? "bg-cyan-400"
+                                  : "bg-emerald-400"
+                              }`}
+                              style={{ width: `${Math.max(0, Math.min(100, summary.healthPercent))}%` }}
+                            />
+                          </div>
+                          <div className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-white/60">
+                            Selected Parts
+                          </div>
+                          <div className="mt-1 text-[11px] text-white/80">
+                            {summary.parts.length ? summary.parts.join(", ") : "No selected parts"}
+                          </div>
+                        </div>
+                      )}
                       <div
                         key={index}
-                        className="grid w-full items-start gap-3 rounded-md border border-white/10 p-2 lg:rounded-none lg:border-0 lg:p-0 lg:grid-cols-[2fr_1.2fr_2fr_1fr_1.2fr_1fr_1.5fr]"
+                        className="rounded-md border border-white/10 bg-black/10 p-2"
                       >
+                        {hasSelectedPart && (
+                        <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-md border border-white/10 px-2 py-1.5">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <div className="text-xs font-semibold text-white/90">
+                              {row.part || "New line item"} {row.catalogPartCode ? `(${row.catalogPartCode})` : ""}
+                            </div>
+                            {selectedGroupLabel && (
+                              <span className="rounded-full border border-cyan-500/40 px-2 py-0.5 text-[10px] text-cyan-200">
+                                {selectedGroupLabel}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
+                            <span className={`rounded-full border px-2 py-0.5 ${row.isSaved ? "border-emerald-500/40 text-emerald-300" : "border-amber-500/40 text-amber-300"}`}>
+                              {row.isSaved ? "Saved" : "Draft"}
+                            </span>
+                            <span className={`rounded-full border px-2 py-0.5 ${statusDone ? "border-emerald-500/40 text-emerald-300" : "border-amber-500/40 text-amber-300"}`}>
+                              Status {statusDone ? "OK" : "Missing"}
+                            </span>
+                            <span className={`rounded-full border px-2 py-0.5 ${mediaDone ? "border-emerald-500/40 text-emerald-300" : "border-amber-500/40 text-amber-300"}`}>
+                              Media {mediaDone ? "OK" : "Missing"}
+                            </span>
+                            <span className={`rounded-full border px-2 py-0.5 ${answeredQuestionsCount === rowAiQuestions.length && rowAiQuestions.length > 0 ? "border-emerald-500/40 text-emerald-300" : "border-cyan-500/40 text-cyan-200"}`}>
+                              Questions {answeredQuestionsCount}/{rowAiQuestions.length}
+                            </span>
+                            <button
+                              type="button"
+                              className="rounded-md border border-white/20 px-2 py-0.5 text-white/80"
+                              onClick={() =>
+                                setExpandedLineItemsByRow((prev) => ({
+                                  ...prev,
+                                  [rowKey]: !(prev[rowKey] ?? !row.isSaved),
+                                }))
+                              }
+                            >
+                              {isRowExpanded ? "Collapse" : "Expand"}
+                            </button>
+                          </div>
+                        </div>
+                        )}
+                        {isRowExpanded && (
+                        <div className={`grid w-full items-start gap-3 ${hasSelectedPart ? "lg:grid-cols-[2fr_1.2fr_2fr_1fr_1.2fr_1fr_1.5fr]" : "lg:grid-cols-[2fr_1.2fr]"}`}>
                         <div className="space-y-1">
                           <div className="text-[10px] font-semibold uppercase tracking-wide text-white/60 lg:hidden">Part</div>
                           {vinCatalogGroups.length > 0 ? (
@@ -3246,6 +3735,10 @@ export function InspectionDetailPageClient({
                                     ...prev,
                                     [index]: { ...prev[index], part: undefined },
                                   }));
+                                  setLineItemDiagramByRow((prev) => ({
+                                    ...prev,
+                                    [rowKey]: { loading: false, url: "", message: "" },
+                                  }));
                                 }}
                               >
                                 <option value="">Select Car Group</option>
@@ -3255,59 +3748,65 @@ export function InspectionDetailPageClient({
                                   </option>
                                 ))}
                               </select>
-                              <select
-                                className={`${theme.input} h-10 w-full`}
-                                value={selectedPartCode}
-                                disabled={isLocked || !selectedGroupKey}
-                                onChange={(e) => {
-                                  const code = e.target.value;
-                                  const selected = filteredCatalogParts.find((part) => part.code === code) ?? null;
-                                  const nextPartName = selected?.name || selected?.code || "";
-                                  const nextPartCode = selected?.code || code;
-                                  setParts((prev) =>
-                                    prev.map((p, i) =>
-                                      i === index
-                                        ? {
-                                            ...p,
-                                            catalogPartCode: code,
-                                            part: nextPartName,
-                                            description: p.description || (selected?.code ?? ""),
-                                            productId: null,
-                                            productType: null,
-                                            isSaved: false,
-                                          }
-                                        : p
-                                    )
-                                  );
-                                  setLineItemErrors((prev) => ({
-                                    ...prev,
-                                    [index]: { ...prev[index], part: undefined },
-                                  }));
-                                  setLineItemAiAnswers((prev) => ({ ...prev, [rowKey]: {} }));
-                                  setLineItemAiRecommendationByRow((prev) => ({ ...prev, [rowKey]: "" }));
-                                  if (nextPartName) {
-                                    void requestLineItemAi(
-                                      rowKey,
-                                      {
-                                        partName: nextPartName,
-                                        partNumber: nextPartCode,
-                                        groupName: selectedGroupLabel,
-                                        description: row.description ?? "",
-                                        status: row.reason ?? "",
-                                      },
-                                      undefined,
-                                      undefined
+                              {selectedGroupKey && (
+                                <select
+                                  className={`${theme.input} h-10 w-full`}
+                                  value={selectedPartCode}
+                                  disabled={isLocked}
+                                  onChange={(e) => {
+                                    const code = e.target.value;
+                                    const selected = filteredCatalogParts.find((part) => part.code === code) ?? null;
+                                    const nextPartName = selected?.name || selected?.code || "";
+                                    const nextPartCode = selected?.code || code;
+                                    setParts((prev) =>
+                                      prev.map((p, i) =>
+                                        i === index
+                                          ? {
+                                              ...p,
+                                              catalogPartCode: code,
+                                              part: nextPartName,
+                                              description: p.description || (selected?.code ?? ""),
+                                              productId: null,
+                                              productType: null,
+                                              isSaved: false,
+                                            }
+                                          : p
+                                      )
                                     );
-                                  }
-                                }}
-                              >
-                                <option value="">{selectedGroupKey ? "Select Part" : "Select group first"}</option>
-                                {filteredCatalogParts.map((part) => (
-                                  <option key={`${part.code}-${part.name}`} value={part.code}>
-                                    {part.name || "Unnamed part"}{part.code ? ` (${part.code})` : ""}
-                                  </option>
-                                ))}
-                              </select>
+                                    setLineItemErrors((prev) => ({
+                                      ...prev,
+                                      [index]: { ...prev[index], part: undefined },
+                                    }));
+                                    setLineItemAiAnswers((prev) => ({ ...prev, [rowKey]: {} }));
+                                    setLineItemAiRecommendationByRow((prev) => ({ ...prev, [rowKey]: "" }));
+                                    setLineItemDiagramByRow((prev) => ({
+                                      ...prev,
+                                      [rowKey]: { loading: false, url: "", message: "" },
+                                    }));
+                                    if (nextPartName) {
+                                      void requestLineItemAi(
+                                        rowKey,
+                                        {
+                                          partName: nextPartName,
+                                          partNumber: nextPartCode,
+                                          groupName: selectedGroupLabel,
+                                          description: row.description ?? "",
+                                          status: row.reason ?? "",
+                                        },
+                                        undefined,
+                                        undefined
+                                      );
+                                    }
+                                  }}
+                                >
+                                  <option value="">Select Part</option>
+                                  {filteredCatalogParts.map((part) => (
+                                    <option key={`${part.code}-${part.name}`} value={part.code}>
+                                      {part.name || "Unnamed part"}{part.code ? ` (${part.code})` : ""}
+                                    </option>
+                                  ))}
+                                </select>
+                              )}
                             </div>
                           ) : (
                             <div className="relative">
@@ -3342,6 +3841,10 @@ export function InspectionDetailPageClient({
                                         setProductOpenIndex(null);
                                         setLineItemAiAnswers((prev) => ({ ...prev, [rowKey]: {} }));
                                         setLineItemAiRecommendationByRow((prev) => ({ ...prev, [rowKey]: "" }));
+                                        setLineItemDiagramByRow((prev) => ({
+                                          ...prev,
+                                          [rowKey]: { loading: false, url: "", message: "" },
+                                        }));
                                         void requestLineItemAi(
                                           rowKey,
                                           {
@@ -3371,6 +3874,7 @@ export function InspectionDetailPageClient({
                           <div className="text-xs text-destructive">{lineItemErrors[index]?.part}</div>
                         )}
                       </div>
+                      {hasSelectedPart && (
                       <div className="space-y-1">
                         <div className="text-[10px] font-semibold uppercase tracking-wide text-white/60 lg:hidden">Part Number</div>
                         <input
@@ -3388,6 +3892,8 @@ export function InspectionDetailPageClient({
                           placeholder="Part number"
                         />
                       </div>
+                      )}
+                      {hasSelectedPart && (
                       <div className="space-y-1">
                         <div className="text-[10px] font-semibold uppercase tracking-wide text-white/60 lg:hidden">Description</div>
                         <input
@@ -3399,6 +3905,8 @@ export function InspectionDetailPageClient({
                           placeholder="do it"
                         />
                       </div>
+                      )}
+                      {hasSelectedPart && (
                       <div className="space-y-1">
                         <div className="text-[10px] font-semibold uppercase tracking-wide text-white/60 lg:hidden">Quantity</div>
                         <input
@@ -3414,6 +3922,8 @@ export function InspectionDetailPageClient({
                           <div className="text-xs text-destructive">{lineItemErrors[index]?.qty}</div>
                         )}
                       </div>
+                      )}
+                      {hasSelectedPart && (
                       <div className="space-y-1">
                         <div className="text-[10px] font-semibold uppercase tracking-wide text-white/60 lg:hidden">Status</div>
                         <select
@@ -3432,6 +3942,8 @@ export function InspectionDetailPageClient({
                           ) : null}
                         </select>
                       </div>
+                      )}
+                      {hasSelectedPart && (
                       <div className="space-y-1">
                         <div className="text-[10px] font-semibold uppercase tracking-wide text-white/60 lg:hidden">Picture / Video</div>
                         {(() => {
@@ -3454,9 +3966,53 @@ export function InspectionDetailPageClient({
                           <div className="text-xs text-destructive">{lineItemErrors[index]?.media}</div>
                         )}
                       </div>
+                      )}
+                      {hasSelectedPart && (
                       <div className="lg:col-span-7 rounded-md border border-cyan-500/20 bg-cyan-500/5 p-2">
-                        <div className="text-[11px] font-semibold uppercase tracking-wide text-cyan-200">
-                          AI Part Inspection ({row.part || "Select part first"})
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="text-[11px] font-semibold uppercase tracking-wide text-cyan-200">
+                            AI Part Inspection ({row.part || "Select part first"})
+                          </div>
+                          <button
+                            type="button"
+                            className="rounded-md border border-cyan-500/40 px-2 py-1 text-[10px] font-semibold text-cyan-100 disabled:opacity-50"
+                            disabled={isLocked || !row.part || !inspectionVin.trim()}
+                            onClick={() =>
+                              void fetchLineItemDiagram(rowKey, {
+                                partName: row.part ?? "",
+                                partNumber: String(row.catalogPartCode ?? ""),
+                                groupName: selectedGroupLabel,
+                              })
+                            }
+                          >
+                            {rowDiagram?.loading ? "Loading Diagram..." : "Show Diagram"}
+                          </button>
+                        </div>
+                        {rowDiagram?.message && (
+                          <div className="mt-2 text-[11px] text-cyan-100/80">{rowDiagram.message}</div>
+                        )}
+                        {rowDiagram?.url && (
+                          <div className="mt-2 rounded border border-white/10 bg-black/20 p-2">
+                            <img
+                              className="max-h-64 w-full rounded border border-white/10 object-contain"
+                              src={rowDiagram.url}
+                              alt={`${row.part || "Part"} diagram`}
+                            />
+                            <div className="mt-1 flex items-center justify-between text-[11px]">
+                              <a
+                                href={rowDiagram.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-primary hover:underline"
+                              >
+                                Open full diagram
+                              </a>
+                              {rowDiagram.source ? <span className="text-white/60">Source: {rowDiagram.source}</span> : null}
+                            </div>
+                          </div>
+                        )}
+                        <div className="mt-2 text-[11px] font-semibold uppercase tracking-wide text-cyan-200">
+                          Questions
                         </div>
                         {!row.part && (
                           <div className="mt-2 text-[11px] text-cyan-100/80">
@@ -3491,18 +4047,14 @@ export function InspectionDetailPageClient({
                                             ...nextAnswers,
                                           },
                                         }));
-                                        void requestLineItemAi(
-                                          rowKey,
-                                          {
-                                            partName: row.part ?? "",
-                                            partNumber: String(row.catalogPartCode ?? ""),
-                                            groupName: selectedGroupLabel,
-                                            description: row.description ?? "",
-                                            status: row.reason ?? "",
-                                          },
-                                          nextAnswers,
-                                          rowAiQuestions
-                                        );
+                                        setLineItemAiRecommendationByRow((prev) => ({
+                                          ...prev,
+                                          [rowKey]: buildSimpleRecommendationFromAnswers(
+                                            row.part || "this part",
+                                            rowAiQuestions,
+                                            nextAnswers
+                                          ),
+                                        }));
                                       }}
                                       className="h-3.5 w-3.5"
                                     />
@@ -3519,6 +4071,7 @@ export function InspectionDetailPageClient({
                           </div>
                         )}
                       </div>
+                      )}
                       <div className="flex flex-wrap items-center gap-2 text-[11px]">
                         <div className="w-full text-[10px] uppercase tracking-wide text-white/60 lg:hidden">Actions</div>
                         {row.isSaved ? (
@@ -3556,11 +4109,17 @@ export function InspectionDetailPageClient({
                         {!isReadOnly && !isCollectCarPending && !row.isSaved && (
                           <span className="text-[11px] text-amber-400">Please save this item</span>
                         )}
+                        {!hasSelectedPart && (
+                          <span className="text-[11px] text-cyan-200">Select group and part first.</span>
+                        )}
                         {isLocked && (
                           <span className="text-[11px] text-amber-400">Ordered/received item</span>
                         )}
                       </div>
                     </div>
+                    )}
+                    </div>
+                    </React.Fragment>
                   );
                   })}
                     </div>
