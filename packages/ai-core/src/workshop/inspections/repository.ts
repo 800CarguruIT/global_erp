@@ -66,12 +66,18 @@ function mapLineItemRow(row: any): InspectionLineItem {
     source: row.source,
     productId: row.product_id,
     productName: row.product_name,
+    partNumber: row.part_number,
+    catalogGroupKey: row.catalog_group_key,
+    clientRowKey: row.client_row_key,
     description: row.description,
     quantity: row.quantity,
     reason: row.reason,
     status: row.status,
     approvedType: row.approved_type,
     mediaFileId: row.media_file_id,
+    aiQuestions: row.ai_questions,
+    aiAnswers: row.ai_answers,
+    aiRecommendation: row.ai_recommendation,
     partOrdered: row.part_ordered,
     orderStatus: row.order_status,
     quoteCosts:
@@ -436,12 +442,18 @@ export async function createInspectionLineItem(args: {
   isAdd?: 0 | 1;
   productId?: number | null;
   productName?: string | null;
+  partNumber?: string | null;
+  catalogGroupKey?: string | null;
+  clientRowKey?: string | null;
   description?: string | null;
   quantity?: number | null;
   reason?: string | null;
   status?: LineItemStatus;
   approvedType?: "oe" | "oem" | "aftm" | "used" | null;
   mediaFileId?: string | null;
+  aiQuestions?: any[] | null;
+  aiAnswers?: Record<string, any> | null;
+  aiRecommendation?: string | null;
 }): Promise<InspectionLineItem> {
   const sql = getSql();
   const rows = await sql`
@@ -454,12 +466,18 @@ export async function createInspectionLineItem(args: {
       is_add,
       product_id,
       product_name,
+      part_number,
+      catalog_group_key,
+      client_row_key,
       description,
       quantity,
       reason,
       status,
       approved_type,
-      media_file_id
+      media_file_id,
+      ai_questions,
+      ai_answers,
+      ai_recommendation
     ) VALUES (
       ${args.companyId},
       ${args.leadId ?? null},
@@ -469,12 +487,18 @@ export async function createInspectionLineItem(args: {
       ${args.isAdd ?? 0},
       ${args.productId ?? null},
       ${args.productName ?? null},
+      ${args.partNumber ?? null},
+      ${args.catalogGroupKey ?? null},
+      ${args.clientRowKey ?? null},
       ${args.description ?? null},
       ${args.quantity ?? 1},
       ${args.reason ?? null},
       ${args.status ?? "Pending"},
       ${args.approvedType ?? null},
-      ${args.mediaFileId ?? null}
+      ${args.mediaFileId ?? null},
+      ${args.aiQuestions ?? []},
+      ${args.aiAnswers ?? {}},
+      ${args.aiRecommendation ?? null}
     )
     RETURNING *
   `;
@@ -488,12 +512,18 @@ export async function updateInspectionLineItem(args: {
     isAdd?: 0 | 1;
     productId?: number | null;
     productName?: string | null;
+    partNumber?: string | null;
+    catalogGroupKey?: string | null;
+    clientRowKey?: string | null;
     description?: string | null;
     quantity?: number | null;
     reason?: string | null;
     status?: LineItemStatus;
     approvedType?: "oe" | "oem" | "aftm" | "used" | null;
     mediaFileId?: string | null;
+    aiQuestions?: any[] | null;
+    aiAnswers?: Record<string, any> | null;
+    aiRecommendation?: string | null;
   }>;
 }): Promise<InspectionLineItem | null> {
   const sql = getSql();
@@ -501,12 +531,18 @@ export async function updateInspectionLineItem(args: {
     is_add: args.patch.isAdd,
     product_id: args.patch.productId,
     product_name: args.patch.productName,
+    part_number: args.patch.partNumber,
+    catalog_group_key: args.patch.catalogGroupKey,
+    client_row_key: args.patch.clientRowKey,
     description: args.patch.description,
     quantity: args.patch.quantity,
     reason: args.patch.reason,
     status: args.patch.status,
     approved_type: args.patch.approvedType,
     media_file_id: args.patch.mediaFileId,
+    ai_questions: args.patch.aiQuestions,
+    ai_answers: args.patch.aiAnswers,
+    ai_recommendation: args.patch.aiRecommendation,
   };
   const cleaned = Object.fromEntries(
     Object.entries(updated).filter(([, value]) => value !== undefined)

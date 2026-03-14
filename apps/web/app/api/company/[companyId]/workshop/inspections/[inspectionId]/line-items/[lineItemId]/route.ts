@@ -33,11 +33,17 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         body.isAdd === undefined ? undefined : isAdd,
       productId: body.productId ?? undefined,
       productName: body.productName ?? undefined,
+      partNumber: body.partNumber ?? undefined,
+      catalogGroupKey: body.catalogGroupKey ?? undefined,
+      clientRowKey: body.clientRowKey ?? undefined,
       description: body.description ?? undefined,
       quantity: body.quantity ?? undefined,
       reason: body.reason ?? undefined,
       status: body.status ?? undefined,
       mediaFileId: body.mediaFileId ?? undefined,
+      aiQuestions: Array.isArray(body.aiQuestions) ? body.aiQuestions : undefined,
+      aiAnswers: body.aiAnswers && typeof body.aiAnswers === "object" ? body.aiAnswers : undefined,
+      aiRecommendation: body.aiRecommendation ?? undefined,
     },
   });
   if (!updated) {

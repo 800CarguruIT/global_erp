@@ -45,11 +45,17 @@ export async function POST(req: NextRequest, { params }: Params) {
     isAdd,
     productId: body.productId ?? null,
     productName: body.productName ?? null,
+    partNumber: body.partNumber ?? null,
+    catalogGroupKey: body.catalogGroupKey ?? null,
+    clientRowKey: body.clientRowKey ?? null,
     description: body.description ?? null,
     quantity: body.quantity ?? 1,
     reason: body.reason ?? null,
     status: body.status ?? "Pending",
     mediaFileId: body.mediaFileId ?? null,
+    aiQuestions: Array.isArray(body.aiQuestions) ? body.aiQuestions : [],
+    aiAnswers: body.aiAnswers && typeof body.aiAnswers === "object" ? body.aiAnswers : {},
+    aiRecommendation: body.aiRecommendation ?? null,
   });
   return NextResponse.json({ data: created }, { status: 201 });
 }

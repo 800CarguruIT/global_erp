@@ -65,12 +65,18 @@ export type InspectionLineItem = {
   source?: LineItemSource | null;
   productId?: number | null;
   productName?: string | null;
+  partNumber?: string | null;
+  catalogGroupKey?: string | null;
+  clientRowKey?: string | null;
   description?: string | null;
   quantity: number;
   reason?: string | null;
   status: LineItemStatus;
   approvedType?: LineItemApprovedType | null;
   mediaFileId?: string | null;
+  aiQuestions?: any[] | null;
+  aiAnswers?: Record<string, any> | null;
+  aiRecommendation?: string | null;
   partOrdered?: number | null;
   orderStatus?: OrderStatus | null;
   quoteCosts?: {

@@ -263,7 +263,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     return new NextResponse("Not found", { status: 404 });
   }
   const collectCarReview = (((current as any)?.draftPayload ?? {}) as Record<string, any>)?.collectCarReview ?? null;
-  const collectCarCompleted = Boolean(collectCarReview?.completed);
+  const incomingCollectCarReview =
+    ((body?.draftPayload ?? {}) as Record<string, any>)?.collectCarReview ?? null;
+  const collectCarCompleted = Boolean(collectCarReview?.completed || incomingCollectCarReview?.completed);
   const isCollectCarReviewAction = body?.action === "collect_car_review";
   if (!isCollectCarReviewAction && !collectCarCompleted) {
     return NextResponse.json(

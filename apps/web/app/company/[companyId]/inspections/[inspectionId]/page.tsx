@@ -42,10 +42,45 @@ type InspectionLogEntry = {
   at: string;
   message?: string;
 };
+type InspectionIssueEntry = {
+  id: string;
+  description: string;
+  imageFileId: string;
+};
+type VinCatalogPartGroup = {
+  id: string;
+  level: number;
+  name: string;
+};
+type VinCatalogPart = {
+  code: string;
+  name: string;
+  groups: VinCatalogPartGroup[];
+};
+type VinCatalogGroupOption = {
+  key: string;
+  label: string;
+  level: number;
+};
+type LineItemAiAnswerValue = "" | "yes" | "no" | "na";
+type LineItemAiQuestion = {
+  id: string;
+  text: string;
+  critical?: boolean;
+};
+type LineItemAiContext = {
+  partName: string;
+  partNumber: string;
+  groupName: string;
+  description: string;
+  status: string;
+};
 
 type CheckValue = "good" | "avg" | "bad" | "";
 type ProcessCheckValue = "ok" | "issue" | "na" | "";
 type ProcessCheckKey = "oil" | "battery" | "tyre" | "obd";
+type CarMediaKey = "front" | "rear" | "right" | "left" | "video";
+type CarMediaReviewStatus = "pending" | "verified" | "rejected";
 
 const checkItems = [
   { key: "engine", label: "Engine" },
@@ -66,6 +101,18 @@ const processCheckItems: Array<{ key: ProcessCheckKey; label: string }> = [
   { key: "tyre", label: "Tyre Check" },
   { key: "obd", label: "OBD Check" },
 ];
+const lineItemStatusOptions = ["Safety Risk", "Mandatory", "Recommended", "Optional"] as const;
+const TYRE_SIZE_OPTIONS = [
+  "195/65R15",
+  "205/55R16",
+  "215/55R17",
+  "225/45R17",
+  "225/55R18",
+  "235/55R19",
+  "245/45R19",
+];
+const carMediaKeys: CarMediaKey[] = ["front", "rear", "right", "left", "video"];
+const carMediaRejectReasons = ["Blur", "Wrong angle", "Not same car", "Blocked view", "Poor lighting"];
 
 const preInspectionQuestionLabels: Record<string, string> = {
   q1: "Any performance issue?",
@@ -162,7 +209,10 @@ export function InspectionDetailPageClient({
   const [collectCarNote, setCollectCarNote] = useState("");
   const [collectCarReuploadMedia, setCollectCarReuploadMedia] = useState<Record<string, string>>({});
   const [collectCarSaving, setCollectCarSaving] = useState(false);
-  const [inspectionIssueNotes, setInspectionIssueNotes] = useState("");
+  const [inspectionIssueEntries, setInspectionIssueEntries] = useState<InspectionIssueEntry[]>([]);
+  const [isAddingIssueNote, setIsAddingIssueNote] = useState(false);
+  const [newIssueNoteDescription, setNewIssueNoteDescription] = useState("");
+  const [newIssueNoteImageFileId, setNewIssueNoteImageFileId] = useState("");
   const [processChecks, setProcessChecks] = useState<Record<ProcessCheckKey, ProcessCheckValue>>({
     oil: "",
     battery: "",
@@ -174,6 +224,58 @@ export function InspectionDetailPageClient({
     battery: "",
     tyre: "",
     obd: "",
+  });
+  const [processCheckMediaMulti, setProcessCheckMediaMulti] = useState<Record<ProcessCheckKey, string[]>>({
+    oil: [],
+    battery: [],
+    tyre: [],
+    obd: [],
+  });
+  const [processCheckIssueNotes, setProcessCheckIssueNotes] = useState<Record<ProcessCheckKey, string>>({
+    oil: "",
+    battery: "",
+    tyre: "",
+    obd: "",
+  });
+  const [processCheckUploading, setProcessCheckUploading] = useState<Record<ProcessCheckKey, boolean>>({
+    oil: false,
+    battery: false,
+    tyre: false,
+    obd: false,
+  });
+  const [processMediaVerified, setProcessMediaVerified] = useState<Record<string, boolean>>({
+    oil: false,
+    battery: false,
+    tyre: false,
+    obd: false,
+  });
+  const [carMediaReview, setCarMediaReview] = useState<Record<CarMediaKey, CarMediaReviewStatus>>({
+    front: "pending",
+    rear: "pending",
+    right: "pending",
+    left: "pending",
+    video: "pending",
+  });
+  const [carMediaReplacement, setCarMediaReplacement] = useState<Record<CarMediaKey, string>>({
+    front: "",
+    rear: "",
+    right: "",
+    left: "",
+    video: "",
+  });
+  const [carMediaRejectReason, setCarMediaRejectReason] = useState<Record<CarMediaKey, string>>({
+    front: "",
+    rear: "",
+    right: "",
+    left: "",
+    video: "",
+  });
+  const [carMediaRejectNote, setCarMediaRejectNote] = useState<Record<CarMediaKey, string>>({
+    front: "",
+    rear: "",
+    right: "",
+    left: "",
+    video: "",
   });
   const [tyreSizeFront, setTyreSizeFront] = useState("");
   const [tyreSizeRear, setTyreSizeRear] = useState("");
@@ -193,6 +295,7 @@ export function InspectionDetailPageClient({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [nextStepSaving, setNextStepSaving] = useState(false);
   const [videoUploading, setVideoUploading] = useState<"in" | "out" | null>(null);
   const [videoUploadProgress, setVideoUploadProgress] = useState<Record<"in" | "out", number>>({
     in: 0,
@@ -210,6 +313,8 @@ export function InspectionDetailPageClient({
   const initialStatusRef = useRef("pending");
   const initialPartsSignatureRef = useRef("[]");
   const initialChecksSignatureRef = useRef("{}");
+  const autosaveInitializedRef = useRef(false);
+  const autosaveLastSignatureRef = useRef("");
   const [form, setForm] = useState({
     advisorName: "",
     inspectorName: "",
@@ -220,6 +325,10 @@ export function InspectionDetailPageClient({
   const [products, setProducts] = useState<Array<{ id: number; name: string; cost: number; type: string }>>([]);
   const [productResults, setProductResults] = useState<Array<{ id: number; name: string; cost: number; type: string }>>([]);
   const [productOpenIndex, setProductOpenIndex] = useState<number | null>(null);
+  const [vinCatalogParts, setVinCatalogParts] = useState<VinCatalogPart[]>([]);
+  const [vinCatalogGroups, setVinCatalogGroups] = useState<VinCatalogGroupOption[]>([]);
+  const [vinCatalogLoading, setVinCatalogLoading] = useState(false);
+  const vinCatalogLoadedVinRef = useRef("");
   const [checks, setChecks] = useState<Record<string, CheckValue>>({});
   const [lineItemErrors, setLineItemErrors] = useState<Record<number, { part?: string; qty?: string; media?: string }>>(
     {}
@@ -233,6 +342,9 @@ export function InspectionDetailPageClient({
       description: string;
       qty: string;
       reason: string;
+      catalogGroupKey?: string;
+      catalogPartCode?: string;
+      clientRowKey?: string;
       partOrdered?: number | null;
       orderStatus?: string | null;
 
@@ -240,7 +352,13 @@ export function InspectionDetailPageClient({
       isSaving?: boolean;
       isSaved?: boolean;
     }>
-  >([{ part: "", description: "", qty: "1", reason: "Mandatory" }]);
+  >([]);
+  const [lineItemAiAnswers, setLineItemAiAnswers] = useState<
+    Record<string, Record<string, LineItemAiAnswerValue>>
+  >({});
+  const [lineItemAiQuestionsByRow, setLineItemAiQuestionsByRow] = useState<Record<string, LineItemAiQuestion[]>>({});
+  const [lineItemAiRecommendationByRow, setLineItemAiRecommendationByRow] = useState<Record<string, string>>({});
+  const [lineItemAiLoadingByRow, setLineItemAiLoadingByRow] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     Promise.resolve(params).then((p) => {
@@ -248,6 +366,11 @@ export function InspectionDetailPageClient({
       setInspectionId(p?.inspectionId ?? null);
     });
   }, [params]);
+
+  useEffect(() => {
+    autosaveInitializedRef.current = false;
+    autosaveLastSignatureRef.current = "";
+  }, [companyId, inspectionId]);
 
   useEffect(() => {
     if (!companyId || !inspectionId) return;
@@ -286,6 +409,9 @@ export function InspectionDetailPageClient({
         setInspection(payload);
         setLeadId(payload?.leadId ?? null);
         const draft = payload?.draftPayload ?? {};
+        const savedStepRaw = Number(draft.inspectionStep ?? 1);
+        const savedStep = Number.isFinite(savedStepRaw) ? Math.min(6, Math.max(1, Math.trunc(savedStepRaw))) : 1;
+        setInspectionStep(savedStep);
         setForm((prev) => ({
           advisorName: draft.advisorName ?? prev.advisorName,
           inspectorName: draft.inspectorName ?? prev.inspectorName,
@@ -293,7 +419,31 @@ export function InspectionDetailPageClient({
           customerComplain: draft.customerComplain ?? prev.customerComplain,
           inspectorRemarks: draft.inspectorRemarks ?? prev.inspectorRemarks,
         }));
-        setInspectionIssueNotes(String(draft.inspectionIssueNotes ?? ""));
+        const savedIssueEntries = Array.isArray(draft.inspectionIssueEntries)
+          ? (draft.inspectionIssueEntries as any[])
+              .map((entry) => ({
+                id: String(entry?.id ?? `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`),
+                description: String(entry?.description ?? ""),
+                imageFileId: String(entry?.imageFileId ?? ""),
+              }))
+              .filter((entry) => entry.description || entry.imageFileId)
+          : [];
+        if (savedIssueEntries.length > 0) {
+          setInspectionIssueEntries(savedIssueEntries);
+        } else {
+          const legacyNote = String(draft.inspectionIssueNotes ?? "").trim();
+          setInspectionIssueEntries(
+            legacyNote
+              ? [
+                  {
+                    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                    description: legacyNote,
+                    imageFileId: "",
+                  },
+                ]
+              : []
+          );
+        }
         setProcessChecks({
           oil: String(draft.processChecks?.oil ?? "") as ProcessCheckValue,
           battery: String(draft.processChecks?.battery ?? "") as ProcessCheckValue,
@@ -305,6 +455,68 @@ export function InspectionDetailPageClient({
           battery: String(draft.processCheckMedia?.battery ?? ""),
           tyre: String(draft.processCheckMedia?.tyre ?? ""),
           obd: String(draft.processCheckMedia?.obd ?? ""),
+        });
+        setProcessCheckMediaMulti({
+          oil: Array.isArray(draft.processCheckMediaMulti?.oil)
+            ? (draft.processCheckMediaMulti.oil as any[]).map((id) => String(id ?? "")).filter(Boolean)
+            : draft.processCheckMedia?.oil
+            ? [String(draft.processCheckMedia.oil)]
+            : [],
+          battery: Array.isArray(draft.processCheckMediaMulti?.battery)
+            ? (draft.processCheckMediaMulti.battery as any[]).map((id) => String(id ?? "")).filter(Boolean)
+            : draft.processCheckMedia?.battery
+            ? [String(draft.processCheckMedia.battery)]
+            : [],
+          tyre: Array.isArray(draft.processCheckMediaMulti?.tyre)
+            ? (draft.processCheckMediaMulti.tyre as any[]).map((id) => String(id ?? "")).filter(Boolean)
+            : draft.processCheckMedia?.tyre
+            ? [String(draft.processCheckMedia.tyre)]
+            : [],
+          obd: Array.isArray(draft.processCheckMediaMulti?.obd)
+            ? (draft.processCheckMediaMulti.obd as any[]).map((id) => String(id ?? "")).filter(Boolean)
+            : draft.processCheckMedia?.obd
+            ? [String(draft.processCheckMedia.obd)]
+            : [],
+        });
+        setProcessCheckIssueNotes({
+          oil: String(draft.processCheckIssueNotes?.oil ?? ""),
+          battery: String(draft.processCheckIssueNotes?.battery ?? ""),
+          tyre: String(draft.processCheckIssueNotes?.tyre ?? ""),
+          obd: String(draft.processCheckIssueNotes?.obd ?? ""),
+        });
+        setProcessMediaVerified({
+          oil: Boolean(draft.processMediaVerified?.oil),
+          battery: Boolean(draft.processMediaVerified?.battery),
+          tyre: Boolean(draft.processMediaVerified?.tyre),
+          obd: Boolean(draft.processMediaVerified?.obd),
+        });
+        setCarMediaReview({
+          front: String(draft.carMediaReview?.front ?? "pending") as CarMediaReviewStatus,
+          rear: String(draft.carMediaReview?.rear ?? "pending") as CarMediaReviewStatus,
+          right: String(draft.carMediaReview?.right ?? "pending") as CarMediaReviewStatus,
+          left: String(draft.carMediaReview?.left ?? "pending") as CarMediaReviewStatus,
+          video: String(draft.carMediaReview?.video ?? "pending") as CarMediaReviewStatus,
+        });
+        setCarMediaReplacement({
+          front: String(draft.carMediaReplacement?.front ?? ""),
+          rear: String(draft.carMediaReplacement?.rear ?? ""),
+          right: String(draft.carMediaReplacement?.right ?? ""),
+          left: String(draft.carMediaReplacement?.left ?? ""),
+          video: String(draft.carMediaReplacement?.video ?? ""),
+        });
+        setCarMediaRejectReason({
+          front: String(draft.carMediaRejectReason?.front ?? ""),
+          rear: String(draft.carMediaRejectReason?.rear ?? ""),
+          right: String(draft.carMediaRejectReason?.right ?? ""),
+          left: String(draft.carMediaRejectReason?.left ?? ""),
+          video: String(draft.carMediaRejectReason?.video ?? ""),
+        });
+        setCarMediaRejectNote({
+          front: String(draft.carMediaRejectNote?.front ?? ""),
+          rear: String(draft.carMediaRejectNote?.rear ?? ""),
+          right: String(draft.carMediaRejectNote?.right ?? ""),
+          left: String(draft.carMediaRejectNote?.left ?? ""),
+          video: String(draft.carMediaRejectNote?.video ?? ""),
         });
         setTyreSizeFront(String(draft.tyreSizeFront ?? ""));
         setTyreSizeRear(String(draft.tyreSizeRear ?? ""));
@@ -324,6 +536,21 @@ export function InspectionDetailPageClient({
         setCustomerApproved(Boolean(draft.customerApproved));
         setCustomerApprovedAt(draft.customerApprovedAt ?? null);
         setCustomerApprovedBy(draft.customerApprovedBy ?? null);
+        setLineItemAiAnswers(
+          draft.lineItemAiAnswers && typeof draft.lineItemAiAnswers === "object"
+            ? (draft.lineItemAiAnswers as Record<string, Record<string, LineItemAiAnswerValue>>)
+            : {}
+        );
+        setLineItemAiQuestionsByRow(
+          draft.lineItemAiQuestionsByRow && typeof draft.lineItemAiQuestionsByRow === "object"
+            ? (draft.lineItemAiQuestionsByRow as Record<string, LineItemAiQuestion[]>)
+            : {}
+        );
+        setLineItemAiRecommendationByRow(
+          draft.lineItemAiRecommendationByRow && typeof draft.lineItemAiRecommendationByRow === "object"
+            ? (draft.lineItemAiRecommendationByRow as Record<string, string>)
+            : {}
+        );
         if (payload?.customerId) {
           const custRes = await fetch(
             `/api/customers/${payload.customerId}?companyId=${companyId}`
@@ -374,7 +601,15 @@ export function InspectionDetailPageClient({
           const itemsJson = itemsRes.ok ? await itemsRes.json().catch(() => ({})) : {};
           const items = itemsJson?.data ?? [];
           if (items.length) {
+            const aiQuestionsByRowFromItems: Record<string, LineItemAiQuestion[]> = {};
+            const aiAnswersByRowFromItems: Record<string, Record<string, LineItemAiAnswerValue>> = {};
+            const aiRecommendationByRowFromItems: Record<string, string> = {};
             const mappedParts = items.map((item: any) => ({
+              clientRowKey:
+                item.clientRowKey ??
+                item.client_row_key ??
+                item.id ??
+                `row-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
               id: item.id,
               productId: item.productId ?? item.product_id ?? null,
               productType: item.productType ?? item.product_type ?? item.type ?? null,
@@ -382,12 +617,38 @@ export function InspectionDetailPageClient({
               description: item.description ?? "",
               qty: String(item.quantity ?? 1),
               reason: item.reason ?? "Mandatory",
+              catalogGroupKey: item.catalogGroupKey ?? item.catalog_group_key ?? "",
+              catalogPartCode: item.catalogPartCode ?? item.catalog_part_code ?? item.partNumber ?? item.part_number ?? "",
+              clientRowKey:
+                item.clientRowKey ??
+                item.client_row_key ??
+                item.id ??
+                `row-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
               mediaFileId: item.mediaFileId ?? item.media_file_id ?? null,
               partOrdered: item.partOrdered ?? item.part_ordered ?? 0,
               orderStatus: item.orderStatus ?? item.order_status ?? null,
               isSaved: true,
-            }));
+            })).map((row) => {
+              const source = items.find((it: any) => String(it?.id ?? "") === String(row.id ?? ""));
+              const rowKey = String(row.clientRowKey ?? row.id ?? "");
+              if (rowKey) {
+                if (Array.isArray(source?.aiQuestions ?? source?.ai_questions)) {
+                  aiQuestionsByRowFromItems[rowKey] = (source?.aiQuestions ?? source?.ai_questions) as LineItemAiQuestion[];
+                }
+                if (source?.aiAnswers && typeof source.aiAnswers === "object") {
+                  aiAnswersByRowFromItems[rowKey] = source.aiAnswers as Record<string, LineItemAiAnswerValue>;
+                } else if (source?.ai_answers && typeof source.ai_answers === "object") {
+                  aiAnswersByRowFromItems[rowKey] = source.ai_answers as Record<string, LineItemAiAnswerValue>;
+                }
+                const rec = String(source?.aiRecommendation ?? source?.ai_recommendation ?? "").trim();
+                if (rec) aiRecommendationByRowFromItems[rowKey] = rec;
+              }
+              return row;
+            });
             setParts(mappedParts);
+            setLineItemAiQuestionsByRow((prev) => ({ ...prev, ...aiQuestionsByRowFromItems }));
+            setLineItemAiAnswers((prev) => ({ ...prev, ...aiAnswersByRowFromItems }));
+            setLineItemAiRecommendationByRow((prev) => ({ ...prev, ...aiRecommendationByRowFromItems }));
             initialPartsSignatureRef.current = JSON.stringify(
               mappedParts.map((p) => ({
                 id: p.id ?? null,
@@ -395,6 +656,9 @@ export function InspectionDetailPageClient({
                 description: p.description?.trim?.() ?? "",
                 qty: String(p.qty ?? ""),
                 reason: p.reason ?? "",
+                catalogGroupKey: p.catalogGroupKey ?? "",
+                catalogPartCode: p.catalogPartCode ?? "",
+                clientRowKey: p.clientRowKey ?? "",
                 mediaFileId: p.mediaFileId ?? null,
                 productId: p.productId ?? null,
               }))
@@ -499,6 +763,12 @@ export function InspectionDetailPageClient({
   useEffect(() => {
     if (isCollectCarPending) setInspectionStep(1);
   }, [isCollectCarPending]);
+  useEffect(() => {
+    const vin = inspectionVin.trim().toUpperCase();
+    if (!vin || vin === vinCatalogLoadedVinRef.current) return;
+    setVinCatalogParts([]);
+    setVinCatalogGroups([]);
+  }, [inspectionVin]);
   const currentStatus = String(inspection?.status ?? "pending").toLowerCase();
   const isWorkshopView = forceWorkshopView || searchParams.get("view") === "workshop" || Boolean(workshopBranchIdProp);
   const workshopBranchId = workshopBranchIdProp ?? searchParams.get("branchId");
@@ -521,6 +791,9 @@ export function InspectionDetailPageClient({
         description: p.description?.trim?.() ?? "",
         qty: String(p.qty ?? ""),
         reason: p.reason ?? "",
+        catalogGroupKey: p.catalogGroupKey ?? "",
+        catalogPartCode: p.catalogPartCode ?? "",
+        clientRowKey: p.clientRowKey ?? "",
         mediaFileId: p.mediaFileId ?? null,
         productId: p.productId ?? null,
       }))
@@ -555,52 +828,183 @@ export function InspectionDetailPageClient({
     [actorName, form.inspectorName]
   );
 
-  const buildDraftPayload = (
-    activityLogs: InspectionLogEntry[],
-    rows: typeof parts = parts,
-    approvals?: {
-      advisorApproved?: boolean;
-      advisorApprovedAt?: string | null;
-      advisorApprovedBy?: string | null;
-      customerApproved?: boolean;
-      customerApprovedAt?: string | null;
-      customerApprovedBy?: string | null;
+  const buildDraftPayload = useCallback(
+    (
+      activityLogs: InspectionLogEntry[],
+      rows: typeof parts = parts,
+      approvals?: {
+        advisorApproved?: boolean;
+        advisorApprovedAt?: string | null;
+        advisorApprovedBy?: string | null;
+        customerApproved?: boolean;
+        customerApprovedAt?: string | null;
+        customerApprovedBy?: string | null;
+      },
+      overrides?: {
+        inspectionIssueEntries?: InspectionIssueEntry[];
+      }
+    ) => ({
+      advisorName: form.advisorName,
+      inspectorName: form.inspectorName,
+      carInMileage: form.carInMileage,
+      customerComplain: form.customerComplain,
+      inspectorRemarks: form.inspectorRemarks,
+      inspectionIssueEntries: (overrides?.inspectionIssueEntries ?? inspectionIssueEntries).map((entry) => ({
+        id: entry.id,
+        description: entry.description,
+        imageFileId: entry.imageFileId,
+      })),
+      inspectionIssueNotes: (overrides?.inspectionIssueEntries ?? inspectionIssueEntries)
+        .map((entry) => entry.description.trim())
+        .filter(Boolean)
+        .join("\n"),
+      checks,
+      processChecks,
+      processCheckMedia,
+      processCheckMediaMulti,
+      processCheckIssueNotes,
+      processMediaVerified,
+      carMediaReview,
+      carMediaReplacement,
+      carMediaRejectReason,
+      carMediaRejectNote,
+      tyreSizeFront,
+      tyreSizeRear,
+      clusterImageId,
+      inspectionVin: inspectionVin.trim().toUpperCase(),
+      inspectionMake: inspectionMake.trim(),
+      inspectionModel: inspectionModel.trim(),
+      inspectionYear: inspectionYear.trim(),
+      parts: rows.map((p) => ({
+        id: p.id,
+        productId: p.productId ?? null,
+        productType: p.productType ?? null,
+        part: p.part,
+        description: p.description,
+        qty: p.qty,
+        reason: p.reason,
+        catalogGroupKey: p.catalogGroupKey ?? "",
+        catalogPartCode: p.catalogPartCode ?? "",
+        clientRowKey: p.clientRowKey ?? "",
+        mediaFileId: p.mediaFileId ?? null,
+      })),
+      lineItemAiAnswers,
+      lineItemAiQuestionsByRow,
+      lineItemAiRecommendationByRow,
+      advisorApproved: approvals?.advisorApproved ?? advisorApproved,
+      advisorApprovedAt: approvals?.advisorApprovedAt ?? advisorApprovedAt,
+      advisorApprovedBy: approvals?.advisorApprovedBy ?? advisorApprovedBy,
+      customerApproved: approvals?.customerApproved ?? customerApproved,
+      customerApprovedAt: approvals?.customerApprovedAt ?? customerApprovedAt,
+      customerApprovedBy: approvals?.customerApprovedBy ?? customerApprovedBy,
+      collectCarReview: collectCarLatestReview ?? null,
+      inspectionStep,
+      activityLogs,
+    }),
+    [
+      advisorApproved,
+      advisorApprovedAt,
+      advisorApprovedBy,
+      carMediaRejectNote,
+      carMediaRejectReason,
+      carMediaReplacement,
+      carMediaReview,
+      checks,
+      clusterImageId,
+      collectCarLatestReview,
+      customerApproved,
+      customerApprovedAt,
+      customerApprovedBy,
+      form.advisorName,
+      form.carInMileage,
+      form.customerComplain,
+      form.inspectorName,
+      form.inspectorRemarks,
+      inspectionIssueEntries,
+      inspectionMake,
+      inspectionModel,
+      inspectionVin,
+      inspectionYear,
+      inspectionStep,
+      lineItemAiAnswers,
+      lineItemAiQuestionsByRow,
+      lineItemAiRecommendationByRow,
+      parts,
+      processChecks,
+      processCheckMedia,
+      processCheckMediaMulti,
+      processCheckIssueNotes,
+      processMediaVerified,
+      tyreSizeFront,
+      tyreSizeRear,
+    ]
+  );
+
+  useEffect(() => {
+    if (!companyId || !inspectionId) return;
+    if (loading || saving || collectCarSaving) return;
+    if (isReadOnly) return;
+
+    const signature = JSON.stringify(buildDraftPayload(inspectionLogs, parts));
+    if (!autosaveInitializedRef.current) {
+      autosaveInitializedRef.current = true;
+      autosaveLastSignatureRef.current = signature;
+      return;
     }
-  ) => ({
-    advisorName: form.advisorName,
-    inspectorName: form.inspectorName,
-    carInMileage: form.carInMileage,
-    customerComplain: form.customerComplain,
-    inspectorRemarks: form.inspectorRemarks,
-    inspectionIssueNotes,
+    if (signature === autosaveLastSignatureRef.current) return;
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/company/${companyId}/workshop/inspections/${inspectionId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            draftPayload: buildDraftPayload(inspectionLogs, parts),
+          }),
+        });
+        if (!res.ok) return;
+        autosaveLastSignatureRef.current = signature;
+      } catch {
+        // silent autosave failure; manual save actions remain available
+      }
+    }, 900);
+
+    return () => clearTimeout(timer);
+  }, [
+    advisorApproved,
+    advisorApprovedAt,
+    advisorApprovedBy,
+    buildDraftPayload,
+    carMediaRejectNote,
+    carMediaRejectReason,
+    carMediaReplacement,
+    carMediaReview,
     checks,
+    clusterImageId,
+    collectCarLatestReview,
+    collectCarSaving,
+    companyId,
+    customerApproved,
+    customerApprovedAt,
+    customerApprovedBy,
+    form,
+    inspectionId,
+    inspectionIssueEntries,
+    inspectionLogs,
+    inspectionMake,
+    inspectionModel,
+    inspectionVin,
+    inspectionYear,
+    isReadOnly,
+    loading,
+    parts,
     processChecks,
     processCheckMedia,
+    processMediaVerified,
+    saving,
     tyreSizeFront,
     tyreSizeRear,
-    clusterImageId,
-    inspectionVin: inspectionVin.trim().toUpperCase(),
-    inspectionMake: inspectionMake.trim(),
-    inspectionModel: inspectionModel.trim(),
-    inspectionYear: inspectionYear.trim(),
-    parts: rows.map((p) => ({
-      id: p.id,
-      productId: p.productId ?? null,
-      productType: p.productType ?? null,
-      part: p.part,
-      description: p.description,
-      qty: p.qty,
-      reason: p.reason,
-      mediaFileId: p.mediaFileId ?? null,
-    })),
-    advisorApproved: approvals?.advisorApproved ?? advisorApproved,
-    advisorApprovedAt: approvals?.advisorApprovedAt ?? advisorApprovedAt,
-    advisorApprovedBy: approvals?.advisorApprovedBy ?? advisorApprovedBy,
-    customerApproved: approvals?.customerApproved ?? customerApproved,
-    customerApprovedAt: approvals?.customerApprovedAt ?? customerApprovedAt,
-    customerApprovedBy: approvals?.customerApprovedBy ?? customerApprovedBy,
-    activityLogs,
-  });
+  ]);
 
   const collectMediaLabel = (key: string) => {
     const normalized = key.toLowerCase();
@@ -681,6 +1085,89 @@ export function InspectionDetailPageClient({
     setProcessChecks((prev) => ({ ...prev, [key]: value }));
   };
 
+  const uploadProcessCheckFiles = async (key: ProcessCheckKey, files: FileList | null) => {
+    if (!files?.length) return;
+    if (isReadOnly || isCollectCarPending) return;
+    setProcessCheckUploading((prev) => ({ ...prev, [key]: true }));
+    try {
+      const nextIds: string[] = [];
+      for (const file of Array.from(files)) {
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("kind", "image");
+        const res = await fetch("/api/files/upload", { method: "POST", body: formData });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(String(body?.error ?? "Failed to upload image"));
+        }
+        const body = await res.json().catch(() => ({}));
+        const fileId = String(body?.fileId ?? "");
+        if (fileId) nextIds.push(fileId);
+      }
+      if (!nextIds.length) return;
+      setProcessCheckMediaMulti((prev) => {
+        const merged = [...(prev[key] ?? []), ...nextIds];
+        setProcessCheckMedia((singlePrev) => ({ ...singlePrev, [key]: merged[0] ?? "" }));
+        return { ...prev, [key]: merged };
+      });
+      setProcessMediaVerified((prev) => ({ ...prev, [key]: false }));
+      toast.success(`${nextIds.length} file(s) uploaded for ${processCheckItems.find((x) => x.key === key)?.label ?? key}.`);
+    } catch (err: any) {
+      toast.error(err?.message ?? "Failed to upload files");
+    } finally {
+      setProcessCheckUploading((prev) => ({ ...prev, [key]: false }));
+    }
+  };
+
+  const persistStep3MediaReview = async (overrides?: {
+    review?: Record<CarMediaKey, CarMediaReviewStatus>;
+    replacement?: Record<CarMediaKey, string>;
+    processVerified?: Record<string, boolean>;
+    rejectReason?: Record<CarMediaKey, string>;
+    rejectNote?: Record<CarMediaKey, string>;
+    inspectionIssueEntries?: InspectionIssueEntry[];
+  }) => {
+    if (!companyId || !inspectionId) return false;
+    const nextReview = overrides?.review ?? carMediaReview;
+    const nextReplacement = overrides?.replacement ?? carMediaReplacement;
+    const nextProcessVerified = overrides?.processVerified ?? processMediaVerified;
+    const nextRejectReason = overrides?.rejectReason ?? carMediaRejectReason;
+    const nextRejectNote = overrides?.rejectNote ?? carMediaRejectNote;
+    try {
+      const res = await fetch(`/api/company/${companyId}/workshop/inspections/${inspectionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          draftPayload: {
+            ...buildDraftPayload(inspectionLogs, parts),
+            inspectionIssueEntries: (overrides?.inspectionIssueEntries ?? inspectionIssueEntries).map((entry) => ({
+              id: entry.id,
+              description: entry.description,
+              imageFileId: entry.imageFileId,
+            })),
+            inspectionIssueNotes: (overrides?.inspectionIssueEntries ?? inspectionIssueEntries)
+              .map((entry) => entry.description.trim())
+              .filter(Boolean)
+              .join("\n"),
+            processMediaVerified: nextProcessVerified,
+            carMediaReview: nextReview,
+            carMediaReplacement: nextReplacement,
+            carMediaRejectReason: nextRejectReason,
+            carMediaRejectNote: nextRejectNote,
+          },
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(String(body?.error ?? "Failed to save media verification"));
+      }
+      return true;
+    } catch (err: any) {
+      toast.error(err?.message ?? "Failed to save media verification.");
+      return false;
+    }
+  };
+
   const autoFillVehicleFromVin = async () => {
     if (!companyId) return;
     const vin = inspectionVin.trim().toUpperCase();
@@ -737,6 +1224,70 @@ export function InspectionDetailPageClient({
       setVinLookupNote(err?.message ?? "VIN lookup failed.");
     } finally {
       setVinLookupLoading(false);
+    }
+  };
+
+  const buildVinCatalogGroupOptions = (partsList: VinCatalogPart[]): VinCatalogGroupOption[] => {
+    const map = new Map<string, VinCatalogGroupOption>();
+    for (const part of partsList) {
+      for (const group of part.groups ?? []) {
+        const id = String(group?.id ?? "").trim();
+        const name = String(group?.name ?? "").trim();
+        const level = Number(group?.level ?? 0) || 0;
+        if (!id && !name) continue;
+        const key = `${id || name}::${level}`;
+        if (!map.has(key)) {
+          map.set(key, { key, label: name || id || `Group ${level || "-"}`, level });
+        }
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => a.level - b.level || a.label.localeCompare(b.label));
+  };
+
+  const ensureVinCatalogForLineItems = async () => {
+    const vin = inspectionVin.trim().toUpperCase();
+    if (!companyId || !leadId) {
+      toast.error("Lead context is missing for VIN part groups.");
+      return false;
+    }
+    if (!vin) {
+      toast.error("Enter VIN in Step 4 first.");
+      return false;
+    }
+    if (vinCatalogLoadedVinRef.current === vin && vinCatalogParts.length > 0) return true;
+    setVinCatalogLoading(true);
+    try {
+      const res = await fetch(
+        `/api/company/${companyId}/sales/leads/${leadId}/vin-lookup?vin=${encodeURIComponent(vin)}`,
+        { cache: "no-store" }
+      );
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(String(body?.error ?? "Failed to load VIN part groups"));
+      const rawParts = Array.isArray(body?.data?.parts) ? body.data.parts : [];
+      const normalizedParts: VinCatalogPart[] = rawParts.map((part: any) => ({
+        code: String(part?.code ?? "").trim(),
+        name: String(part?.name ?? "").trim(),
+        groups: Array.isArray(part?.groups)
+          ? part.groups.map((group: any) => ({
+              id: String(group?.id ?? "").trim(),
+              level: Number(group?.level ?? 0) || 0,
+              name: String(group?.name ?? "").trim(),
+            }))
+          : [],
+      }));
+      setVinCatalogParts(normalizedParts);
+      setVinCatalogGroups(buildVinCatalogGroupOptions(normalizedParts));
+      vinCatalogLoadedVinRef.current = vin;
+      if (!normalizedParts.length) {
+        toast.error("No VIN catalog parts found for this car.");
+        return false;
+      }
+      return true;
+    } catch (err: any) {
+      toast.error(err?.message ?? "Failed to load VIN part groups.");
+      return false;
+    } finally {
+      setVinCatalogLoading(false);
     }
   };
 
@@ -815,19 +1366,37 @@ export function InspectionDetailPageClient({
 
   const serializeChecksForCompare = (value: Record<string, CheckValue>) => JSON.stringify(value ?? {});
   const processChecksCompleted = processCheckItems.every(
-    (item) => Boolean(processChecks[item.key]) && Boolean(processCheckMedia[item.key])
+    (item) => Boolean(processChecks[item.key]) && (processCheckMediaMulti[item.key]?.length ?? 0) > 0
+  );
+  const processIssueNotesComplete = processCheckItems.every(
+    (item) => processChecks[item.key] !== "issue" || Boolean((processCheckIssueNotes[item.key] ?? "").trim())
   );
   const hasAnyProcessIssue = processCheckItems.some((item) => processChecks[item.key] === "issue");
   const step1Complete = isReadOnly || collectCarCompleted;
   const step2Complete = isReadOnly || Boolean(startedAt);
-  const step3Complete =
-    isReadOnly || (processChecksCompleted && (!hasAnyProcessIssue || Boolean((inspectionIssueNotes ?? "").trim())));
+  const rejectedMediaMissingReplacement = useMemo(
+    () => carMediaKeys.some((key) => carMediaReview[key] === "rejected" && !carMediaReplacement[key]),
+    [carMediaReplacement, carMediaReview]
+  );
+  const step3Complete = isReadOnly || !rejectedMediaMissingReplacement;
+  const carMediaCounts = useMemo(() => {
+    const entries = carMediaKeys.map((key) => carMediaReview[key]);
+    return {
+      total: entries.length,
+      verified: entries.filter((v) => v === "verified").length,
+      rejected: entries.filter((v) => v === "rejected").length,
+      pending: entries.filter((v) => v === "pending").length,
+    };
+  }, [carMediaReview]);
+  const sortedCarMediaKeys = useMemo(() => {
+    const rank: Record<CarMediaReviewStatus, number> = { rejected: 0, pending: 1, verified: 2 };
+    return [...carMediaKeys].sort((a, b) => rank[carMediaReview[a]] - rank[carMediaReview[b]]);
+  }, [carMediaReview]);
   const step4Complete =
     isReadOnly ||
     (Boolean((tyreSizeFront ?? "").trim()) &&
       Boolean((tyreSizeRear ?? "").trim()) &&
       Boolean((form.carInMileage ?? "").trim()) &&
-      Boolean(clusterImageId) &&
       Boolean((inspectionVin ?? "").trim()));
   const hasUnsavedLineItems = parts.some((p) => !p.isSaved);
   const hasUnsavedChanges =
@@ -836,7 +1405,13 @@ export function InspectionDetailPageClient({
       serializePartsForCompare(parts) !== initialPartsSignatureRef.current ||
       serializeChecksForCompare(checks) !== initialChecksSignatureRef.current);
   const requiredMediaMissing = parts.some((row) => getMediaRequirement(row).required && !row.mediaFileId);
-  const step5Complete = isReadOnly || (!hasUnsavedLineItems && !requiredMediaMissing && parts.length > 0);
+  const step5Complete =
+    isReadOnly ||
+    (!hasUnsavedLineItems &&
+      !requiredMediaMissing &&
+      parts.length > 0 &&
+      processChecksCompleted &&
+      (!hasAnyProcessIssue || processIssueNotesComplete));
   const canCompleteInspection =
     !saving &&
     !isReadOnly &&
@@ -853,7 +1428,7 @@ export function InspectionDetailPageClient({
     { id: 2, label: "Start Inspection", done: step2Complete },
     { id: 3, label: "Checks & Notes", done: step3Complete },
     { id: 4, label: "Vehicle Data", done: step4Complete },
-    { id: 5, label: "Line Items", done: step5Complete },
+    { id: 5, label: "Inspection", done: step5Complete },
     { id: 6, label: "Review & Complete", done: Boolean(completedAt) || canCompleteInspection },
   ];
   const canOpenStep = (stepId: number) => {
@@ -876,20 +1451,20 @@ export function InspectionDetailPageClient({
     }
     if (inspectionStep === 3) {
       return [
-        "Did you record issues/damages in notes?",
-        "Are Oil, Battery, Tyre and OBD checks completed with images?",
+        "Did you verify or reject each car media item (front/rear/right/left/360)?",
+        "If any media is rejected, did you upload replacement media?",
       ];
     }
     if (inspectionStep === 4) {
       return [
-        "Did you enter tyre size front/rear and mileage with cluster image?",
+        "Did you enter tyre size front/rear and mileage?",
         "Did VIN lookup return make/model/year or an existing car match?",
       ];
     }
     if (inspectionStep === 5) {
       return [
-        "Did you add all required parts/line items?",
-        "Are all line items saved with mandatory media attached?",
+        "Are Oil/Battery/Tyre/OBD checks completed with images?",
+        "Did you add and save all required parts/line items with mandatory media?",
       ];
     }
     return [
@@ -897,6 +1472,93 @@ export function InspectionDetailPageClient({
       "Do you want to update draft one last time before completing inspection?",
     ];
   }, [inspectionStep]);
+  const requestLineItemAi = useCallback(
+    async (
+      rowKey: string,
+      context: LineItemAiContext,
+      answers?: Record<string, LineItemAiAnswerValue>,
+      existingQuestions?: LineItemAiQuestion[]
+    ) => {
+      if (!companyId || !context.partName.trim()) return;
+      setLineItemAiLoadingByRow((prev) => ({ ...prev, [rowKey]: true }));
+      try {
+        const res = await fetch(`/api/company/${companyId}/workshop/inspections/ai-line-item`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            context,
+            answers: answers ?? null,
+            questions: existingQuestions ?? null,
+          }),
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(String(body?.error ?? "Failed to generate AI questions"));
+        const questions = Array.isArray(body?.questions) ? (body.questions as LineItemAiQuestion[]) : [];
+        const recommendation = String(body?.recommendation ?? "");
+        if (questions.length > 0) {
+          setLineItemAiQuestionsByRow((prev) => ({ ...prev, [rowKey]: questions }));
+        }
+        if (recommendation) {
+          setLineItemAiRecommendationByRow((prev) => ({ ...prev, [rowKey]: recommendation }));
+        } else if (answers && questions.length > 0) {
+          setLineItemAiRecommendationByRow((prev) => ({
+            ...prev,
+            [rowKey]: "Answer AI questions to generate recommendation.",
+          }));
+        }
+      } catch (err: any) {
+        setLineItemAiRecommendationByRow((prev) => ({
+          ...prev,
+          [rowKey]: err?.message ?? "AI generation failed.",
+        }));
+      } finally {
+        setLineItemAiLoadingByRow((prev) => ({ ...prev, [rowKey]: false }));
+      }
+    },
+    [companyId]
+  );
+  const lineItemAiInsights = useMemo(() => {
+    const hasRequiredMedia = (row: (typeof parts)[number]) => {
+      const resolvedType = row.productType ?? products.find((product) => product.id === row.productId)?.type ?? "";
+      const type = normalizeProductType(resolvedType);
+      const isSparePart = type.includes("spare") && type.includes("part");
+      const isTyre = type.includes("tyre") || type.includes("tire");
+      return isSparePart || isTyre;
+    };
+    const total = parts.length;
+    const unsaved = parts.filter((p) => !p.isSaved).length;
+    const missingGroup = parts.filter((p) => !(p.catalogGroupKey ?? "").trim()).length;
+    const missingPart = parts.filter((p) => !(p.part ?? "").trim()).length;
+    const missingStatus = parts.filter((p) => !(p.reason ?? "").trim()).length;
+    const requiredMediaMissingCount = parts.filter((row) => hasRequiredMedia(row) && !row.mediaFileId).length;
+
+    const questions: string[] = [];
+    const suggestions: string[] = [];
+
+    questions.push(
+      total === 0
+        ? "No line items added yet. Do you want to add the first line item?"
+        : `${total} line item(s) added. Are all parts selected from the correct VIN group?`
+    );
+    if (missingGroup > 0) questions.push(`${missingGroup} row(s) are missing car group selection. Select group first.`);
+    if (missingPart > 0) questions.push(`${missingPart} row(s) are missing part selection.`);
+    if (missingStatus > 0) questions.push(`${missingStatus} row(s) are missing status (Safety Risk/Mandatory/Recommended/Optional).`);
+    if (requiredMediaMissingCount > 0) {
+      questions.push(`${requiredMediaMissingCount} row(s) are missing required media (image/video).`);
+    }
+    if (unsaved > 0) questions.push(`${unsaved} row(s) are not saved yet. Save them before moving ahead.`);
+
+    if (total === 0) {
+      suggestions.push("Click Add Line Item, then choose Car Group and Part Number from VIN catalog.");
+    } else {
+      suggestions.push("Use Safety Risk only for urgent safety-related parts that must be addressed first.");
+      suggestions.push("Use Mandatory for required repairs; Recommended for advised repairs; Optional for cosmetic/non-critical.");
+      if (requiredMediaMissingCount > 0) suggestions.push("Upload media for each required row right after selecting part.");
+      if (unsaved > 0) suggestions.push("Save each row once complete to avoid losing unsaved line items.");
+    }
+
+    return { questions, suggestions };
+  }, [parts, products]);
   const progressStages = [
     { key: "pending", label: "Draft", done: true },
     { key: "started", label: "Started", done: Boolean(startedAt) },
@@ -1084,11 +1746,16 @@ export function InspectionDetailPageClient({
         leadId: leadId ?? null,
         productId: row.productId ?? null,
         productName: row.part,
+        partNumber: row.catalogPartCode?.trim?.() || null,
+        catalogGroupKey: row.catalogGroupKey?.trim?.() || null,
+        clientRowKey: row.clientRowKey ?? null,
         description: row.description,
         quantity: qtyNumber,
         reason: row.reason,
-
         mediaFileId: row.mediaFileId ?? null,
+        aiQuestions: lineItemAiQuestionsByRow[row.clientRowKey || row.id || `row-${index}`] ?? [],
+        aiAnswers: lineItemAiAnswers[row.clientRowKey || row.id || `row-${index}`] ?? {},
+        aiRecommendation: lineItemAiRecommendationByRow[row.clientRowKey || row.id || `row-${index}`] ?? null,
       };
       const res = await fetch(
         `/api/company/${companyId}/workshop/inspections/${inspectionId}/line-items` +
@@ -1107,6 +1774,9 @@ export function InspectionDetailPageClient({
           ? {
               ...p,
               id: saved.id ?? p.id,
+              clientRowKey: saved.clientRowKey ?? saved.client_row_key ?? p.clientRowKey,
+              catalogGroupKey: saved.catalogGroupKey ?? saved.catalog_group_key ?? p.catalogGroupKey,
+              catalogPartCode: saved.partNumber ?? saved.part_number ?? p.catalogPartCode,
               isSaved: true,
               isSaving: false,
             }
@@ -1153,30 +1823,125 @@ export function InspectionDetailPageClient({
         { method: "DELETE" }
       ).catch(() => null);
     }
+    const rowKey = row?.clientRowKey || row?.id || `row-${index}`;
     setParts((prev) => prev.filter((_, i) => i !== index));
+    setLineItemAiAnswers((prev) => {
+      const next = { ...prev };
+      delete next[rowKey];
+      return next;
+    });
+    setLineItemAiQuestionsByRow((prev) => {
+      const next = { ...prev };
+      delete next[rowKey];
+      return next;
+    });
+    setLineItemAiRecommendationByRow((prev) => {
+      const next = { ...prev };
+      delete next[rowKey];
+      return next;
+    });
+    setLineItemAiLoadingByRow((prev) => {
+      const next = { ...prev };
+      delete next[rowKey];
+      return next;
+    });
     toast.success("Line item deleted successfully.");
+  };
+
+  const addLineItemRow = async () => {
+    const ready = await ensureVinCatalogForLineItems();
+    if (!ready) return;
+    setParts((prev) => [
+      ...prev,
+      {
+        part: "",
+        description: "",
+        qty: "1",
+        reason: "Mandatory",
+        catalogGroupKey: "",
+        catalogPartCode: "",
+        clientRowKey: `row-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      },
+    ]);
   };
 
   const nextStepValidationMessage = () => {
     if (inspectionStep === 1 && !step1Complete) return "Complete Collect Car stage first.";
     if (inspectionStep === 2 && !step2Complete) return "Start inspection before moving to next step.";
-    if (inspectionStep === 3 && !step3Complete) return "Complete notes and Oil/Battery/Tyre/OBD checks with images.";
-    if (inspectionStep === 4 && !step4Complete) return "Complete tyre sizes, mileage, cluster image and VIN.";
-    if (inspectionStep === 5 && !step5Complete) return "Save all line items and required media before review.";
+    if (inspectionStep === 3 && !step3Complete) {
+      if (rejectedMediaMissingReplacement) return "Upload replacement media for every rejected car image/video.";
+      return "Complete car media review before moving to next step.";
+    }
+    if (inspectionStep === 4 && !step4Complete) return "Complete tyre sizes, mileage and VIN.";
+    if (inspectionStep === 5 && !step5Complete) {
+      if (hasAnyProcessIssue && !processIssueNotesComplete) {
+        return "Add description for each check marked as ISSUE.";
+      }
+      return "Complete inspection checks and save all line items with required media before review.";
+    }
     return "Please complete the current step.";
   };
 
-  const goNextStep = () => {
+  const persistDraftBeforeStepChange = async () => {
+    if (!companyId || !inspectionId || isReadOnly) return true;
+    try {
+      const res = await fetch(`/api/company/${companyId}/workshop/inspections/${inspectionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          draftPayload: buildDraftPayload(inspectionLogs, parts),
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(String(body?.error ?? "Failed to save inspection draft"));
+      }
+      return true;
+    } catch (err: any) {
+      toast.error(err?.message ?? "Failed to save inspection draft");
+      return false;
+    }
+  };
+
+  const goNextStep = async () => {
     const next = Math.min(6, inspectionStep + 1);
     if (next === inspectionStep) return;
     if (!canOpenStep(next)) {
       toast.error(nextStepValidationMessage());
       return;
     }
+    setNextStepSaving(true);
+    const saved = await persistDraftBeforeStepChange();
+    setNextStepSaving(false);
+    if (!saved) return;
     setInspectionStep(next);
   };
 
   const goPrevStep = () => setInspectionStep((prev) => Math.max(1, prev - 1));
+  const addIssueNoteEntry = () => setIsAddingIssueNote(true);
+  const resetIssueNoteComposer = () => {
+    setIsAddingIssueNote(false);
+    setNewIssueNoteDescription("");
+    setNewIssueNoteImageFileId("");
+  };
+  const saveIssueNoteEntry = () => {
+    const description = newIssueNoteDescription.trim();
+    if (!description || !newIssueNoteImageFileId) {
+      toast.error("Add description and image before adding note.");
+      return;
+    }
+    const nextEntries = [
+      ...inspectionIssueEntries,
+      {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        description,
+        imageFileId: newIssueNoteImageFileId,
+      },
+    ];
+    setInspectionIssueEntries(nextEntries);
+    void persistStep3MediaReview({ inspectionIssueEntries: nextEntries });
+    resetIssueNoteComposer();
+  };
 
   return (
     <AppLayout hideSidebar={isWorkshopView}>
@@ -1546,7 +2311,7 @@ export function InspectionDetailPageClient({
                 </div>
               </div>
             )}
-            <div className={`grid gap-4 pt-4 lg:grid-cols-2 ${inspectionStep === 3 ? "" : "hidden"}`}>
+            <div className="hidden">
               <div className="lg:col-span-2 flex items-center justify-between">
                 <div className="text-xs font-semibold uppercase tracking-wide text-white/70">Checklist</div>
                 {!isReadOnly && (
@@ -1603,7 +2368,7 @@ export function InspectionDetailPageClient({
               ))}
             </div>
 
-            <div className={`mt-6 grid gap-3 lg:grid-cols-3 ${inspectionStep === 3 ? "" : "hidden"}`}>
+            <div className="hidden">
               <div>
                 <label className="text-xs font-semibold text-white/70">Lead Branch</label>
                 <input
@@ -1637,7 +2402,7 @@ export function InspectionDetailPageClient({
               </div>
             </div>
 
-            <div className={`mt-4 grid gap-3 lg:grid-cols-2 ${inspectionStep === 3 ? "" : "hidden"}`}>
+            <div className="hidden">
               <div>
                 <label className="text-xs font-semibold text-white/70">Customer Complain</label>
                 <textarea
@@ -1659,7 +2424,7 @@ export function InspectionDetailPageClient({
               </div>
             </div>
 
-            <div className={`mt-6 ${inspectionStep === 3 ? "" : "hidden"}`}>
+            <div className="hidden">
               <div className="text-sm font-semibold">Inspection Videos</div>
               <div className={`mt-2 rounded-md ${theme.cardBorder} ${theme.surfaceSubtle} p-3`}>
                 <div className="grid gap-3 lg:grid-cols-2">
@@ -1756,50 +2521,361 @@ export function InspectionDetailPageClient({
             <div className={`mt-6 ${inspectionStep === 3 ? "" : "hidden"}`}>
               <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
                 <div className="text-sm font-semibold">Issues and Mandatory Checks</div>
-                <div className="mt-3">
-                  <label className="text-xs font-semibold text-white/70">Issues / Damages Notes</label>
-                  <textarea
-                    className={theme.input}
-                    rows={3}
-                    value={inspectionIssueNotes}
-                    readOnly={isReadOnly || isCollectCarPending}
-                    onChange={(e) => setInspectionIssueNotes(e.target.value)}
-                    placeholder="Add notes for any issue/damage found during inspection."
-                  />
+                <div className="mt-4 rounded-md border border-white/10 bg-black/20 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="text-xs font-semibold text-white/80">Car Media Verification (Front/Rear/Right/Left + 360 Video)</div>
+                    <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                      <span className="rounded-full border border-white/15 px-2 py-0.5 text-white/70">
+                        {carMediaCounts.verified}/{carMediaCounts.total} verified
+                      </span>
+                      <span className="rounded-full border border-amber-500/40 px-2 py-0.5 text-amber-300">
+                        Pending: {carMediaCounts.pending}
+                      </span>
+                      <span className="rounded-full border border-rose-500/40 px-2 py-0.5 text-rose-300">
+                        Rejected: {carMediaCounts.rejected}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="mt-2 grid gap-3 lg:grid-cols-2">
+                    {sortedCarMediaKeys.map((key) => {
+                      const fileId = collectCarSourceMedia[key];
+                      const label = key === "video" ? "360 Video" : `${key[0]?.toUpperCase()}${key.slice(1)} Image`;
+                      const reviewStatus = carMediaReview[key];
+                      const replacementId = carMediaReplacement[key];
+                      const rejectNote = carMediaRejectNote[key];
+                      return (
+                        <div
+                          key={key}
+                          className={`rounded border p-2 ${
+                            reviewStatus === "verified"
+                              ? "border-emerald-500/30 bg-emerald-500/5"
+                              : reviewStatus === "rejected"
+                              ? "border-rose-500/30 bg-rose-500/5"
+                              : "border-white/10"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="text-[11px] text-white/70">{label}</div>
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${
+                                reviewStatus === "verified"
+                                  ? "bg-emerald-500/15 text-emerald-300"
+                                  : reviewStatus === "rejected"
+                                  ? "bg-rose-500/15 text-rose-300"
+                                  : "bg-amber-500/15 text-amber-300"
+                              }`}
+                            >
+                              {reviewStatus}
+                            </span>
+                          </div>
+                          {fileId ? (
+                            <>
+                              {key === "video" ? (
+                                <video
+                                  className="mt-2 h-32 w-full rounded border border-white/10 object-cover"
+                                  controls
+                                  preload="metadata"
+                                  src={`/api/files/${fileId}`}
+                                />
+                              ) : (
+                                <img
+                                  className="mt-2 h-32 w-full rounded border border-white/10 object-cover"
+                                  src={`/api/files/${fileId}`}
+                                  alt={label}
+                                />
+                              )}
+                              <div className="mt-2 flex items-center justify-between gap-2">
+                                <a
+                                  href={`/api/files/${fileId}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-[11px] text-primary hover:underline"
+                                >
+                                  Open {key === "video" ? "video" : "image"}
+                                </a>
+                                <div className="flex items-center gap-2">
+                                  {reviewStatus === "pending" ? (
+                                    <>
+                                      <button
+                                        type="button"
+                                        className="rounded-md bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white"
+                                        disabled={isReadOnly || isCollectCarPending}
+                                        onClick={async () => {
+                                          const nextReview = {
+                                            ...carMediaReview,
+                                            [key]: "verified" as CarMediaReviewStatus,
+                                          };
+                                          const nextReason = { ...carMediaRejectReason, [key]: "" };
+                                          const nextNote = { ...carMediaRejectNote, [key]: "" };
+                                          setCarMediaReview(nextReview);
+                                          setCarMediaRejectReason(nextReason);
+                                          setCarMediaRejectNote(nextNote);
+                                          await persistStep3MediaReview({
+                                            review: nextReview,
+                                            rejectReason: nextReason,
+                                            rejectNote: nextNote,
+                                          });
+                                        }}
+                                      >
+                                        Verify
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="rounded-md bg-rose-600 px-2.5 py-1 text-[11px] font-semibold text-white"
+                                        disabled={isReadOnly || isCollectCarPending}
+                                        onClick={async () => {
+                                          const nextReview = {
+                                            ...carMediaReview,
+                                            [key]: "rejected" as CarMediaReviewStatus,
+                                          };
+                                          const nextReason = {
+                                            ...carMediaRejectReason,
+                                            [key]: carMediaRejectReason[key] || carMediaRejectReasons[0]!,
+                                          };
+                                        setCarMediaReview(nextReview);
+                                        setCarMediaRejectReason(nextReason);
+                                        toast.info("Rejected media requires replacement upload.");
+                                        await persistStep3MediaReview({
+                                          review: nextReview,
+                                          rejectReason: nextReason,
+                                          });
+                                        }}
+                                      >
+                                        Reject
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      className="rounded-md border border-white/20 px-2.5 py-1 text-[11px] font-semibold text-white/80 hover:bg-white/10"
+                                      disabled={isReadOnly || isCollectCarPending}
+                                      onClick={async () => {
+                                        const nextReview = { ...carMediaReview, [key]: "pending" as CarMediaReviewStatus };
+                                        setCarMediaReview(nextReview);
+                                        await persistStep3MediaReview({ review: nextReview });
+                                      }}
+                                    >
+                                      Reopen
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                              {reviewStatus === "rejected" && (
+                                <div className="mt-2 rounded border border-rose-500/30 bg-rose-500/5 p-2">
+                                  <div className="text-[11px] text-rose-200">Upload new media (old media is kept)</div>
+                                  {!replacementId && (
+                                    <div className="mt-1 text-[10px] text-rose-300">Replacement file is required.</div>
+                                  )}
+                                  <textarea
+                                    className={`${theme.input} mt-2`}
+                                    rows={2}
+                                    placeholder="Add short reject note..."
+                                    value={rejectNote}
+                                    readOnly={isReadOnly || isCollectCarPending}
+                                    onChange={(e) =>
+                                      setCarMediaRejectNote((prev) => ({ ...prev, [key]: e.target.value }))
+                                    }
+                                    onBlur={() => {
+                                      const nextNote = { ...carMediaRejectNote, [key]: rejectNote };
+                                      void persistStep3MediaReview({ rejectNote: nextNote });
+                                    }}
+                                  />
+                                  <div className="mt-2">
+                                    <FileUploader
+                                      label=""
+                                      kind={key === "video" ? "video" : "image"}
+                                      value={replacementId}
+                                      onChange={(id) => {
+                                        const nextReplacement = {
+                                          ...carMediaReplacement,
+                                          [key]: String(id ?? ""),
+                                        };
+                                        setCarMediaReplacement(nextReplacement);
+                                        void persistStep3MediaReview({ replacement: nextReplacement });
+                                      }}
+                                      disabled={isReadOnly || isCollectCarPending}
+                                      buttonOnly
+                                      showPreview
+                                      buttonClassName="h-9"
+                                    />
+                                  </div>
+                                  {replacementId && (
+                                    <div className="mt-2 grid gap-2 lg:grid-cols-2">
+                                      <div className="rounded border border-white/10 bg-black/20 p-2">
+                                        <div className="text-[10px] text-white/60">Original</div>
+                                        {key === "video" ? (
+                                          <video
+                                            className="mt-1 h-24 w-full rounded border border-white/10 object-cover"
+                                            controls
+                                            preload="metadata"
+                                            src={`/api/files/${fileId}`}
+                                          />
+                                        ) : (
+                                          <img
+                                            className="mt-1 h-24 w-full rounded border border-white/10 object-cover"
+                                            src={`/api/files/${fileId}`}
+                                            alt={`Original ${label}`}
+                                          />
+                                        )}
+                                      </div>
+                                      <div className="rounded border border-emerald-500/30 bg-emerald-500/5 p-2">
+                                        <div className="text-[10px] text-emerald-300">Replacement</div>
+                                        {key === "video" ? (
+                                          <video
+                                            className="mt-1 h-24 w-full rounded border border-emerald-500/30 object-cover"
+                                            controls
+                                            preload="metadata"
+                                            src={`/api/files/${replacementId}`}
+                                          />
+                                        ) : (
+                                          <img
+                                            className="mt-1 h-24 w-full rounded border border-emerald-500/30 object-cover"
+                                            src={`/api/files/${replacementId}`}
+                                            alt={`Replacement ${label}`}
+                                          />
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            <div className="mt-2 text-[11px] text-white/50">No media uploaded.</div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {rejectedMediaMissingReplacement && (
+                    <div className="mt-2 rounded-md border border-rose-500/40 bg-rose-500/10 px-2.5 py-1.5 text-[11px] text-rose-200">
+                      Replacement upload is required for rejected media before moving to next step.
+                    </div>
+                  )}
                 </div>
-                <div className="mt-3 grid gap-3 lg:grid-cols-2">
-                  {processCheckItems.map((item) => (
-                    <div key={item.key} className="rounded-md border border-white/10 bg-black/20 p-3">
-                      <div className="text-xs font-semibold text-white/80">{item.label}</div>
-                      <div className="mt-2 flex items-center gap-3 text-xs">
-                        {(["ok", "issue", "na"] as ProcessCheckValue[]).map((value) => (
-                          <label key={value} className="flex items-center gap-1 text-white/80">
-                            <input
-                              type="radio"
-                              name={`process-${item.key}`}
-                              checked={processChecks[item.key] === value}
-                              disabled={isReadOnly || isCollectCarPending}
-                              onChange={() => updateProcessCheck(item.key, value)}
-                              className="h-3.5 w-3.5"
-                            />
-                            <span className="uppercase">{value}</span>
-                          </label>
-                        ))}
+                <div className="mt-3 rounded-md border border-white/10 bg-black/20 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <label className="text-xs font-semibold text-white/70">Issues / Damages Notes</label>
+                    {!isReadOnly && !isCollectCarPending && (
+                      <button
+                        type="button"
+                        className="rounded-md bg-cyan-600 px-2.5 py-1 text-[11px] font-semibold text-white"
+                        onClick={addIssueNoteEntry}
+                        disabled={isAddingIssueNote}
+                      >
+                        + Add Note
+                      </button>
+                    )}
+                  </div>
+                  {isAddingIssueNote && (
+                    <div className="mt-2 rounded-md border border-cyan-500/30 bg-cyan-500/5 p-2">
+                      <div>
+                        <label className="text-[11px] text-white/70">Description</label>
+                        <textarea
+                          className={theme.input}
+                          rows={2}
+                          value={newIssueNoteDescription}
+                          onChange={(e) => setNewIssueNoteDescription(e.target.value)}
+                          placeholder="Describe the issue/damage..."
+                        />
                       </div>
                       <div className="mt-2">
                         <FileUploader
-                          label={`${item.label} image`}
+                          label="Issue Image"
                           kind="image"
-                          value={processCheckMedia[item.key] ?? ""}
-                          onChange={(id) => setProcessCheckMedia((prev) => ({ ...prev, [item.key]: String(id ?? "") }))}
-                          disabled={isReadOnly || isCollectCarPending}
+                          value={newIssueNoteImageFileId}
+                          onChange={(id) => setNewIssueNoteImageFileId(String(id ?? ""))}
                           buttonOnly
                           showPreview
                           buttonClassName="h-9"
                         />
                       </div>
+                      <div className="mt-2 flex items-center gap-2">
+                        <button
+                          type="button"
+                          className="rounded-md bg-cyan-600 px-2.5 py-1 text-[11px] font-semibold text-white"
+                          onClick={saveIssueNoteEntry}
+                        >
+                          Add Note
+                        </button>
+                        <button
+                          type="button"
+                          className="rounded-md border border-white/20 px-2.5 py-1 text-[11px] font-semibold text-white/80"
+                          onClick={resetIssueNoteComposer}
+                        >
+                          Cancel
+                        </button>
+                      </div>
                     </div>
-                  ))}
+                  )}
+                  {inspectionIssueEntries.length === 0 ? (
+                    <div className="mt-2 text-[11px] text-white/60">
+                      No issue notes added. Click <span className="font-semibold text-white/80">Add Note</span> to attach image and description.
+                    </div>
+                  ) : (
+                    <div className="mt-2 space-y-2">
+                      {inspectionIssueEntries.map((entry, index) => (
+                        <div key={entry.id} className="rounded-md border border-white/10 bg-black/30 p-2">
+                          <div className="mb-2 flex items-center justify-between gap-2 text-[11px] text-white/70">
+                            <span>Note #{index + 1}</span>
+                            {!isReadOnly && !isCollectCarPending && (
+                              <button
+                                type="button"
+                                className="rounded bg-rose-600 px-2 py-1 text-[10px] font-semibold text-white"
+                                onClick={() => {
+                                  const nextEntries = inspectionIssueEntries.filter((item) => item.id !== entry.id);
+                                  setInspectionIssueEntries(nextEntries);
+                                  void persistStep3MediaReview({ inspectionIssueEntries: nextEntries });
+                                }}
+                              >
+                                Remove
+                              </button>
+                            )}
+                          </div>
+                          <div>
+                            <label className="text-[11px] text-white/70">Description</label>
+                            <textarea
+                              className={theme.input}
+                              rows={2}
+                              value={entry.description}
+                              readOnly={isReadOnly || isCollectCarPending}
+                              onChange={(e) =>
+                                setInspectionIssueEntries((prev) =>
+                                  prev.map((item) =>
+                                    item.id === entry.id ? { ...item, description: e.target.value } : item
+                                  )
+                                )
+                              }
+                              onBlur={() => {
+                                void persistStep3MediaReview({ inspectionIssueEntries });
+                              }}
+                              placeholder="Describe the issue/damage..."
+                            />
+                          </div>
+                          <div className="mt-2">
+                            <FileUploader
+                              label="Issue Image"
+                              kind="image"
+                              value={entry.imageFileId}
+                              onChange={(id) =>
+                                {
+                                  const nextEntries = inspectionIssueEntries.map((item) =>
+                                    item.id === entry.id ? { ...item, imageFileId: String(id ?? "") } : item
+                                  );
+                                  setInspectionIssueEntries(nextEntries);
+                                  void persistStep3MediaReview({ inspectionIssueEntries: nextEntries });
+                                }
+                              }
+                              disabled={isReadOnly || isCollectCarPending}
+                              buttonOnly
+                              showPreview
+                              buttonClassName="h-9"
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1808,51 +2884,6 @@ export function InspectionDetailPageClient({
               <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
                 <div className="text-sm font-semibold">Vehicle Data and VIN</div>
                 <div className="mt-3 grid gap-3 lg:grid-cols-2">
-                  <div>
-                    <label className="text-xs font-semibold text-white/70">Tyre Size (Front)</label>
-                    <input
-                      type="text"
-                      className={theme.input}
-                      value={tyreSizeFront}
-                      readOnly={isReadOnly || isCollectCarPending}
-                      onChange={(e) => setTyreSizeFront(e.target.value)}
-                      placeholder="e.g. 235/55R18"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-white/70">Tyre Size (Rear)</label>
-                    <input
-                      type="text"
-                      className={theme.input}
-                      value={tyreSizeRear}
-                      readOnly={isReadOnly || isCollectCarPending}
-                      onChange={(e) => setTyreSizeRear(e.target.value)}
-                      placeholder="e.g. 255/50R18"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-white/70">Car Mileage</label>
-                    <input
-                      type="text"
-                      className={theme.input}
-                      value={form.carInMileage}
-                      readOnly={isReadOnly || isCollectCarPending}
-                      onChange={(e) => setForm((prev) => ({ ...prev, carInMileage: e.target.value }))}
-                      placeholder="Current odometer reading"
-                    />
-                  </div>
-                  <div>
-                    <FileUploader
-                      label="Cluster Image"
-                      kind="image"
-                      value={clusterImageId}
-                      onChange={(id) => setClusterImageId(String(id ?? ""))}
-                      disabled={isReadOnly || isCollectCarPending}
-                      buttonOnly
-                      showPreview
-                      buttonClassName="h-10"
-                    />
-                  </div>
                   <div>
                     <label className="text-xs font-semibold text-white/70">VIN</label>
                     <input
@@ -1874,9 +2905,6 @@ export function InspectionDetailPageClient({
                       {vinLookupLoading ? "Checking VIN..." : "Check VIN and Fetch Data"}
                     </button>
                   </div>
-                </div>
-                {vinLookupNote && <div className="mt-2 text-xs text-cyan-200">{vinLookupNote}</div>}
-                <div className="mt-3 grid gap-3 lg:grid-cols-3">
                   <div>
                     <label className="text-xs font-semibold text-white/70">Car Make</label>
                     <input
@@ -1907,90 +2935,458 @@ export function InspectionDetailPageClient({
                       onChange={(e) => setInspectionYear(e.target.value)}
                     />
                   </div>
+                  <div>
+                    <label className="text-xs font-semibold text-white/70">Tyre Size (Front)</label>
+                    <select
+                      className={theme.input}
+                      value={tyreSizeFront}
+                      disabled={isReadOnly || isCollectCarPending}
+                      onChange={(e) => setTyreSizeFront(e.target.value)}
+                    >
+                      <option value="">Select front tyre size</option>
+                      {tyreSizeFront && !TYRE_SIZE_OPTIONS.includes(tyreSizeFront) ? (
+                        <option value={tyreSizeFront}>{tyreSizeFront} (saved)</option>
+                      ) : null}
+                      {TYRE_SIZE_OPTIONS.map((size) => (
+                        <option key={size} value={size}>
+                          {size}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-white/70">Tyre Size (Rear)</label>
+                    <select
+                      className={theme.input}
+                      value={tyreSizeRear}
+                      disabled={isReadOnly || isCollectCarPending}
+                      onChange={(e) => setTyreSizeRear(e.target.value)}
+                    >
+                      <option value="">Select rear tyre size</option>
+                      {tyreSizeRear && !TYRE_SIZE_OPTIONS.includes(tyreSizeRear) ? (
+                        <option value={tyreSizeRear}>{tyreSizeRear} (saved)</option>
+                      ) : null}
+                      {TYRE_SIZE_OPTIONS.map((size) => (
+                        <option key={size} value={size}>
+                          {size}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-white/70">Car Mileage</label>
+                    <input
+                      type="text"
+                      className={theme.input}
+                      value={form.carInMileage}
+                      readOnly={isReadOnly || isCollectCarPending}
+                      onChange={(e) => setForm((prev) => ({ ...prev, carInMileage: e.target.value }))}
+                      placeholder="Current odometer reading"
+                    />
+                  </div>
                 </div>
+                {vinLookupNote && <div className="mt-2 text-xs text-cyan-200">{vinLookupNote}</div>}
               </div>
             </div>
 
             <div className={`mt-6 ${inspectionStep === 5 ? "" : "hidden"}`}>
+              <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
+                <div className="text-sm font-semibold">Inspection Checks</div>
+                <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                  {processCheckItems.map((item) => (
+                    <div key={item.key} className="rounded-md border border-white/10 bg-black/20 p-3">
+                      <div className="text-xs font-semibold text-white/80">{item.label}</div>
+                      <div className="mt-2 flex items-center gap-3 text-xs">
+                        {(["ok", "issue", "na"] as ProcessCheckValue[]).map((value) => (
+                          <label key={value} className="flex items-center gap-1 text-white/80">
+                            <input
+                              type="radio"
+                              name={`process-${item.key}`}
+                              checked={processChecks[item.key] === value}
+                              disabled={isReadOnly || isCollectCarPending}
+                              onChange={() => updateProcessCheck(item.key, value)}
+                              className="h-3.5 w-3.5"
+                            />
+                            <span className="uppercase">{value}</span>
+                          </label>
+                        ))}
+                      </div>
+                      <div className="mt-2">
+                        <label className="text-xs font-semibold text-white/70">{item.label} images</label>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          disabled={isReadOnly || isCollectCarPending || processCheckUploading[item.key]}
+                          className={`${theme.input} mt-1`}
+                          onChange={(e) => {
+                            void uploadProcessCheckFiles(item.key, e.target.files);
+                            e.currentTarget.value = "";
+                          }}
+                        />
+                        {processCheckUploading[item.key] && (
+                          <div className="mt-1 text-[11px] text-cyan-300">Uploading images...</div>
+                        )}
+                      </div>
+                      {processChecks[item.key] === "issue" && (
+                        <div className="mt-2">
+                          <label className="text-[11px] text-white/70">Issue Description</label>
+                          <textarea
+                            className={theme.input}
+                            rows={2}
+                            value={processCheckIssueNotes[item.key] ?? ""}
+                            readOnly={isReadOnly || isCollectCarPending}
+                            onChange={(e) =>
+                              setProcessCheckIssueNotes((prev) => ({
+                                ...prev,
+                                [item.key]: e.target.value,
+                              }))
+                            }
+                            placeholder={`Describe ${item.label.toLowerCase()} issue...`}
+                          />
+                        </div>
+                      )}
+                      {(processCheckMediaMulti[item.key]?.length ?? 0) > 0 && (
+                        <div className="mt-2 rounded border border-white/10 bg-black/30 p-2">
+                          <div className="grid gap-2 sm:grid-cols-2">
+                            {(processCheckMediaMulti[item.key] ?? []).map((fileId, mediaIndex) => (
+                              <div key={`${fileId}-${mediaIndex}`} className="rounded border border-white/10 bg-black/20 p-2">
+                                <img
+                                  className="h-24 w-full rounded border border-white/10 object-cover"
+                                  src={`/api/files/${fileId}`}
+                                  alt={`${item.label} upload ${mediaIndex + 1}`}
+                                />
+                                <div className="mt-1 flex items-center justify-between gap-2 text-[11px]">
+                                  <a
+                                    href={`/api/files/${fileId}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="text-primary hover:underline"
+                                  >
+                                    Open
+                                  </a>
+                                  {!isReadOnly && !isCollectCarPending && (
+                                    <button
+                                      type="button"
+                                      className="rounded bg-rose-600 px-2 py-0.5 font-semibold text-white"
+                                      onClick={() => {
+                                        setProcessCheckMediaMulti((prev) => {
+                                          const next = (prev[item.key] ?? []).filter((_, i) => i !== mediaIndex);
+                                          setProcessCheckMedia((singlePrev) => ({
+                                            ...singlePrev,
+                                            [item.key]: next[0] ?? "",
+                                          }));
+                                          return { ...prev, [item.key]: next };
+                                        });
+                                        setProcessMediaVerified((prev) => ({ ...prev, [item.key]: false }));
+                                      }}
+                                    >
+                                      Remove
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="mt-2 flex items-center justify-end gap-2">
+                            <button
+                              type="button"
+                              className={`rounded-md px-2.5 py-1 text-[11px] font-semibold ${
+                                processMediaVerified[item.key]
+                                  ? "bg-emerald-600 text-white"
+                                  : "bg-amber-600 text-white"
+                              }`}
+                              disabled={isReadOnly || isCollectCarPending}
+                              onClick={() =>
+                                setProcessMediaVerified((prev) => ({
+                                  ...prev,
+                                  [item.key]: !prev[item.key],
+                                }))
+                              }
+                            >
+                              {processMediaVerified[item.key] ? "Verified" : "Verify"}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               <div className="flex items-center justify-between gap-2">
                 <div className="text-sm font-semibold">Findings / Parts Needed</div>
-                <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
-                  <span className="rounded-full border border-white/15 px-2 py-0.5 text-white/70">Total: {parts.length}</span>
-                  <span className="rounded-full border border-emerald-500/40 px-2 py-0.5 text-emerald-300">
-                    Received: {parts.filter((p) => (p.orderStatus ?? "").toLowerCase() === "received").length}
-                  </span>
-                  <span className="rounded-full border border-amber-500/40 px-2 py-0.5 text-amber-300">
-                    Ordered: {parts.filter((p) => (p.orderStatus ?? "").toLowerCase() === "ordered").length}
-                  </span>
-                  <span className="rounded-full border border-cyan-500/40 px-2 py-0.5 text-cyan-300">
-                    Draft: {parts.filter((p) => !p.isSaved).length}
-                  </span>
+                <div className="flex flex-wrap items-center gap-2 text-[10px]">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="rounded-full border border-white/15 px-2 py-0.5 text-white/70">Total: {parts.length}</span>
+                    <span className="rounded-full border border-emerald-500/40 px-2 py-0.5 text-emerald-300">
+                      Received: {parts.filter((p) => (p.orderStatus ?? "").toLowerCase() === "received").length}
+                    </span>
+                    <span className="rounded-full border border-amber-500/40 px-2 py-0.5 text-amber-300">
+                      Ordered: {parts.filter((p) => (p.orderStatus ?? "").toLowerCase() === "ordered").length}
+                    </span>
+                    <span className="rounded-full border border-cyan-500/40 px-2 py-0.5 text-cyan-300">
+                      Draft: {parts.filter((p) => !p.isSaved).length}
+                    </span>
+                  </div>
+                  {!isReadOnly && !isCollectCarPending && (
+                    <button
+                      type="button"
+                      className="rounded-md bg-teal-600 px-2.5 py-1 text-[11px] font-semibold text-white"
+                      onClick={addLineItemRow}
+                      disabled={vinCatalogLoading || (parts.length > 0 && parts.some((p) => !p.isSaved))}
+                    >
+                      {vinCatalogLoading ? "Loading..." : "+ Add Line Item"}
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="mt-2 rounded-md border border-cyan-500/20 bg-cyan-500/5 p-3">
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-cyan-200">AI Line Item Assistant</div>
+                <div className="mt-2 grid gap-3 lg:grid-cols-2">
+                  <div>
+                    <div className="text-[11px] font-semibold text-cyan-100/90">Questions</div>
+                    <div className="mt-1 space-y-1 text-xs text-cyan-100/85">
+                      {lineItemAiInsights.questions.map((q, idx) => (
+                        <div key={`li-q-${idx}`}>- {q}</div>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[11px] font-semibold text-cyan-100/90">Suggestions</div>
+                    <div className="mt-1 space-y-1 text-xs text-cyan-100/85">
+                      {lineItemAiInsights.suggestions.map((s, idx) => (
+                        <div key={`li-s-${idx}`}>- {s}</div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
               <div className={`mt-2 rounded-md ${theme.cardBorder} ${theme.surfaceSubtle} p-3`}>
-                <div className="hidden w-full gap-3 text-xs font-semibold text-white/70 lg:grid lg:grid-cols-[2fr_2fr_1fr_1fr_1.5fr]">
-                  <div>Parts Needed</div>
-                  <div>Description</div>
-                  <div>Quantity</div>
-                  <div>Picture / Video</div>
-                  <div>Actions</div>
-                </div>
-                <div className="mt-2 space-y-2">
-                  {parts.map((row, index) => {
+                {parts.length === 0 ? (
+                  <div className="rounded-md border border-dashed border-white/20 bg-black/20 p-4 text-center">
+                    <div className="text-xs text-white/70">No line items added yet.</div>
+                    {!isReadOnly && !isCollectCarPending && (
+                      <button
+                        type="button"
+                        className="mt-3 rounded-md bg-teal-600 px-3 py-2 text-xs font-semibold text-white"
+                        onClick={addLineItemRow}
+                        disabled={vinCatalogLoading}
+                      >
+                        {vinCatalogLoading ? "Loading..." : "Add Line Item"}
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <>
+                    <div className="hidden w-full gap-3 text-xs font-semibold text-white/70 lg:grid lg:grid-cols-[2fr_1.2fr_2fr_1fr_1.2fr_1fr_1.5fr]">
+                      <div>Parts Needed</div>
+                      <div>Part Number</div>
+                      <div>Description</div>
+                      <div>Quantity</div>
+                      <div>Status</div>
+                      <div>Picture / Video</div>
+                      <div>Actions</div>
+                    </div>
+                    <div className="mt-2 space-y-2">
+                      {parts.map((row, index) => {
                     const isLocked =
                       isReadOnly || isCollectCarPending || row.partOrdered === 1 || row.orderStatus === "Ordered" || row.orderStatus === "Received";
+                    const rowKey = row.clientRowKey || row.id || `row-${index}`;
+                    const selectedGroupKey = String(row.catalogGroupKey ?? "");
+                    const selectedPartCode = String(row.catalogPartCode ?? "");
+                    const selectedGroupLabel =
+                      vinCatalogGroups.find((group) => group.key === selectedGroupKey)?.label ?? "";
+                    const rowAiQuestions = lineItemAiQuestionsByRow[rowKey] ?? [];
+                    const rowAiAnswers = lineItemAiAnswers[rowKey] ?? {};
+                    const rowRecommendation =
+                      lineItemAiRecommendationByRow[rowKey] ??
+                      (rowAiQuestions.length > 0 ? "Answer AI questions to generate recommendation." : "");
+                    const rowAiLoading = Boolean(lineItemAiLoadingByRow[rowKey]);
+                    const filteredCatalogParts = vinCatalogParts.filter((part) =>
+                      (part.groups ?? []).some((group) => {
+                        const groupId = String(group?.id ?? "").trim();
+                        const groupName = String(group?.name ?? "").trim();
+                        const groupLevel = Number(group?.level ?? 0) || 0;
+                        const key = `${groupId || groupName}::${groupLevel}`;
+                        return key === selectedGroupKey;
+                      })
+                    );
                     return (
                       <div
                         key={index}
-                        className="grid w-full items-start gap-3 rounded-md border border-white/10 p-2 lg:rounded-none lg:border-0 lg:p-0 lg:grid-cols-[2fr_2fr_1fr_1fr_1.5fr]"
+                        className="grid w-full items-start gap-3 rounded-md border border-white/10 p-2 lg:rounded-none lg:border-0 lg:p-0 lg:grid-cols-[2fr_1.2fr_2fr_1fr_1.2fr_1fr_1.5fr]"
                       >
                         <div className="space-y-1">
                           <div className="text-[10px] font-semibold uppercase tracking-wide text-white/60 lg:hidden">Part</div>
-                          <div className="relative">
-                            <input
-                              type="text"
-                              className={`${theme.input} h-10 w-full`}
-                              value={row.part}
-                              disabled={isLocked}
-                              onChange={(e) => updatePart(index, "part", e.target.value)}
-                              placeholder="Search products"
-                              onFocus={() => setProductOpenIndex(index)}
-                              onBlur={() => {
-                                setTimeout(
-                                  () => setProductOpenIndex((current) => (current === index ? null : current)),
-                                  150
-                                );
-                              }}
-                            />
-                          {productOpenIndex === index && (
-                            <div className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded-md border border-white/10 bg-slate-950 text-xs shadow-lg">
-                              {(productResults.length ? productResults : products).map((product) => (
-                                <button
-                                  key={product.id}
-                                  type="button"
-                                  className="flex w-full items-start gap-2 px-3 py-2 text-left text-white/80 hover:bg-white/10"
-                                  onMouseDown={(e) => e.preventDefault()}
-                                  onClick={() => {
-                                    updatePart(index, "part", product.name, {
-                                      productId: product.id,
-                                      productType: product.type ?? null,
-                                    });
-                                    setProductOpenIndex(null);
-                                  }}
-                                >
-                                  <span className="font-semibold">{product.name}</span>
-                                  <span className="text-[10px] text-white/50">{product.type}</span>
-                                </button>
-                              ))}
-                              {productResults.length === 0 && products.length === 0 && (
-                                <div className="px-3 py-2 text-white/50">No products found.</div>
+                          {vinCatalogGroups.length > 0 ? (
+                            <div className="space-y-2">
+                              <select
+                                className={`${theme.input} h-10 w-full`}
+                                value={selectedGroupKey}
+                                disabled={isLocked}
+                                onChange={(e) => {
+                                  const groupKey = e.target.value;
+                                  setParts((prev) =>
+                                    prev.map((p, i) =>
+                                      i === index
+                                        ? {
+                                            ...p,
+                                            catalogGroupKey: groupKey,
+                                            catalogPartCode: "",
+                                            part: "",
+                                            productId: null,
+                                            productType: null,
+                                            isSaved: false,
+                                          }
+                                        : p
+                                    )
+                                  );
+                                  setLineItemErrors((prev) => ({
+                                    ...prev,
+                                    [index]: { ...prev[index], part: undefined },
+                                  }));
+                                }}
+                              >
+                                <option value="">Select Car Group</option>
+                                {vinCatalogGroups.map((group) => (
+                                  <option key={group.key} value={group.key}>
+                                    {group.label}
+                                  </option>
+                                ))}
+                              </select>
+                              <select
+                                className={`${theme.input} h-10 w-full`}
+                                value={selectedPartCode}
+                                disabled={isLocked || !selectedGroupKey}
+                                onChange={(e) => {
+                                  const code = e.target.value;
+                                  const selected = filteredCatalogParts.find((part) => part.code === code) ?? null;
+                                  const nextPartName = selected?.name || selected?.code || "";
+                                  const nextPartCode = selected?.code || code;
+                                  setParts((prev) =>
+                                    prev.map((p, i) =>
+                                      i === index
+                                        ? {
+                                            ...p,
+                                            catalogPartCode: code,
+                                            part: nextPartName,
+                                            description: p.description || (selected?.code ?? ""),
+                                            productId: null,
+                                            productType: null,
+                                            isSaved: false,
+                                          }
+                                        : p
+                                    )
+                                  );
+                                  setLineItemErrors((prev) => ({
+                                    ...prev,
+                                    [index]: { ...prev[index], part: undefined },
+                                  }));
+                                  setLineItemAiAnswers((prev) => ({ ...prev, [rowKey]: {} }));
+                                  setLineItemAiRecommendationByRow((prev) => ({ ...prev, [rowKey]: "" }));
+                                  if (nextPartName) {
+                                    void requestLineItemAi(
+                                      rowKey,
+                                      {
+                                        partName: nextPartName,
+                                        partNumber: nextPartCode,
+                                        groupName: selectedGroupLabel,
+                                        description: row.description ?? "",
+                                        status: row.reason ?? "",
+                                      },
+                                      undefined,
+                                      undefined
+                                    );
+                                  }
+                                }}
+                              >
+                                <option value="">{selectedGroupKey ? "Select Part" : "Select group first"}</option>
+                                {filteredCatalogParts.map((part) => (
+                                  <option key={`${part.code}-${part.name}`} value={part.code}>
+                                    {part.name || "Unnamed part"}{part.code ? ` (${part.code})` : ""}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          ) : (
+                            <div className="relative">
+                              <input
+                                type="text"
+                                className={`${theme.input} h-10 w-full`}
+                                value={row.part}
+                                disabled={isLocked}
+                                onChange={(e) => updatePart(index, "part", e.target.value)}
+                                placeholder="Search products"
+                                onFocus={() => setProductOpenIndex(index)}
+                                onBlur={() => {
+                                  setTimeout(
+                                    () => setProductOpenIndex((current) => (current === index ? null : current)),
+                                    150
+                                  );
+                                }}
+                              />
+                              {productOpenIndex === index && (
+                                <div className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded-md border border-white/10 bg-slate-950 text-xs shadow-lg">
+                                  {(productResults.length ? productResults : products).map((product) => (
+                                    <button
+                                      key={product.id}
+                                      type="button"
+                                      className="flex w-full items-start gap-2 px-3 py-2 text-left text-white/80 hover:bg-white/10"
+                                      onMouseDown={(e) => e.preventDefault()}
+                                      onClick={() => {
+                                        updatePart(index, "part", product.name, {
+                                          productId: product.id,
+                                          productType: product.type ?? null,
+                                        });
+                                        setProductOpenIndex(null);
+                                        setLineItemAiAnswers((prev) => ({ ...prev, [rowKey]: {} }));
+                                        setLineItemAiRecommendationByRow((prev) => ({ ...prev, [rowKey]: "" }));
+                                        void requestLineItemAi(
+                                          rowKey,
+                                          {
+                                            partName: product.name,
+                                            partNumber: String(row.catalogPartCode ?? ""),
+                                            groupName: selectedGroupLabel,
+                                            description: row.description ?? "",
+                                            status: row.reason ?? "",
+                                          },
+                                          undefined,
+                                          undefined
+                                        );
+                                      }}
+                                    >
+                                      <span className="font-semibold">{product.name}</span>
+                                      <span className="text-[10px] text-white/50">{product.type}</span>
+                                    </button>
+                                  ))}
+                                  {productResults.length === 0 && products.length === 0 && (
+                                    <div className="px-3 py-2 text-white/50">No products found.</div>
+                                  )}
+                                </div>
                               )}
                             </div>
                           )}
-                        </div>
                         {lineItemErrors[index]?.part && (
                           <div className="text-xs text-destructive">{lineItemErrors[index]?.part}</div>
                         )}
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-[10px] font-semibold uppercase tracking-wide text-white/60 lg:hidden">Part Number</div>
+                        <input
+                          type="text"
+                          className={`${theme.input} h-10 w-full`}
+                          value={row.catalogPartCode ?? ""}
+                          disabled={isLocked}
+                          onChange={(e) =>
+                            setParts((prev) =>
+                              prev.map((p, i) =>
+                                i === index ? { ...p, catalogPartCode: e.target.value, isSaved: false } : p
+                              )
+                            )
+                          }
+                          placeholder="Part number"
+                        />
                       </div>
                       <div className="space-y-1">
                         <div className="text-[10px] font-semibold uppercase tracking-wide text-white/60 lg:hidden">Description</div>
@@ -2019,6 +3415,24 @@ export function InspectionDetailPageClient({
                         )}
                       </div>
                       <div className="space-y-1">
+                        <div className="text-[10px] font-semibold uppercase tracking-wide text-white/60 lg:hidden">Status</div>
+                        <select
+                          className={`${theme.input} h-10 w-full`}
+                          value={row.reason || "Mandatory"}
+                          disabled={isLocked}
+                          onChange={(e) => updatePart(index, "reason", e.target.value)}
+                        >
+                          {lineItemStatusOptions.map((status) => (
+                            <option key={status} value={status}>
+                              {status}
+                            </option>
+                          ))}
+                          {row.reason && !lineItemStatusOptions.includes(row.reason as (typeof lineItemStatusOptions)[number]) ? (
+                            <option value={row.reason}>{row.reason}</option>
+                          ) : null}
+                        </select>
+                      </div>
+                      <div className="space-y-1">
                         <div className="text-[10px] font-semibold uppercase tracking-wide text-white/60 lg:hidden">Picture / Video</div>
                         {(() => {
                           const mediaRequirement = getMediaRequirement(row);
@@ -2038,6 +3452,71 @@ export function InspectionDetailPageClient({
                         })()}
                         {lineItemErrors[index]?.media && (
                           <div className="text-xs text-destructive">{lineItemErrors[index]?.media}</div>
+                        )}
+                      </div>
+                      <div className="lg:col-span-7 rounded-md border border-cyan-500/20 bg-cyan-500/5 p-2">
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-cyan-200">
+                          AI Part Inspection ({row.part || "Select part first"})
+                        </div>
+                        {!row.part && (
+                          <div className="mt-2 text-[11px] text-cyan-100/80">
+                            Select part to generate AI inspection questions.
+                          </div>
+                        )}
+                        {rowAiLoading && (
+                          <div className="mt-2 text-[11px] text-cyan-100/80">
+                            Generating AI questions...
+                          </div>
+                        )}
+                        <div className="mt-2 grid gap-2 lg:grid-cols-3">
+                          {rowAiQuestions.map((question) => (
+                            <div key={`${rowKey}-${question.id}`} className="rounded border border-white/10 bg-black/20 p-2">
+                              <div className="text-[11px] text-white/85">{question.text}</div>
+                              <div className="mt-1 flex items-center gap-2 text-[11px]">
+                                {(["yes", "no", "na"] as const).map((answerValue) => (
+                                  <label key={answerValue} className="flex items-center gap-1 text-white/75">
+                                    <input
+                                      type="radio"
+                                      name={`${rowKey}-${question.id}`}
+                                      checked={rowAiAnswers[question.id] === answerValue}
+                                      disabled={isLocked}
+                                      onChange={() => {
+                                        const nextAnswers = {
+                                          ...(lineItemAiAnswers[rowKey] ?? {}),
+                                          [question.id]: answerValue,
+                                        };
+                                        setLineItemAiAnswers((prev) => ({
+                                          ...prev,
+                                          [rowKey]: {
+                                            ...nextAnswers,
+                                          },
+                                        }));
+                                        void requestLineItemAi(
+                                          rowKey,
+                                          {
+                                            partName: row.part ?? "",
+                                            partNumber: String(row.catalogPartCode ?? ""),
+                                            groupName: selectedGroupLabel,
+                                            description: row.description ?? "",
+                                            status: row.reason ?? "",
+                                          },
+                                          nextAnswers,
+                                          rowAiQuestions
+                                        );
+                                      }}
+                                      className="h-3.5 w-3.5"
+                                    />
+                                    <span className="uppercase">{answerValue}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        {rowRecommendation && (
+                          <div className="mt-2 rounded border border-emerald-500/30 bg-emerald-500/10 px-2 py-1.5 text-[11px] text-emerald-200">
+                            {rowRecommendation}
+                          </div>
                         )}
                       </div>
                       <div className="flex flex-wrap items-center gap-2 text-[11px]">
@@ -2084,25 +3563,34 @@ export function InspectionDetailPageClient({
                     </div>
                   );
                   })}
-                </div>
-                {!isReadOnly && !isCollectCarPending && (
-                  <div className="mt-3 flex items-center gap-2">
-                    <button
-                      type="button"
-                      className="rounded-md bg-teal-600 px-3 py-2 text-xs font-semibold text-white"
-                      onClick={() =>
-                        setParts((prev) => [
-                          ...prev,
-                          { part: "", description: "", qty: "1", reason: "Mandatory" },
-                        ])
-                      }
-                      disabled={parts.some((p) => !p.isSaved)}
-                    >
-                      + Add
-                    </button>
-                  </div>
+                    </div>
+                    {!isReadOnly && !isCollectCarPending && (
+                      <div className="mt-3 flex items-center gap-2">
+                        <button
+                          type="button"
+                          className="rounded-md bg-teal-600 px-3 py-2 text-xs font-semibold text-white"
+                          onClick={addLineItemRow}
+                          disabled={vinCatalogLoading || parts.some((p) => !p.isSaved)}
+                        >
+                          {vinCatalogLoading ? "Loading..." : "+ Add Another Line Item"}
+                        </button>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
+            </div>
+
+            <div className={`mt-6 ${inspectionStep === 6 ? "" : "hidden"}`}>
+              <label className="text-xs font-semibold text-white/70">Inspector Remarks</label>
+              <textarea
+                className={theme.input}
+                rows={4}
+                value={form.inspectorRemarks}
+                readOnly={isReadOnly || isCollectCarPending}
+                onChange={(e) => setForm((prev) => ({ ...prev, inspectorRemarks: e.target.value }))}
+                placeholder="Final inspection remarks before completion."
+              />
             </div>
 
             <div className="mt-6 flex items-center justify-between gap-2">
@@ -2119,9 +3607,9 @@ export function InspectionDetailPageClient({
                   type="button"
                   className="rounded-md bg-cyan-600 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-white"
                   onClick={goNextStep}
-                  disabled={inspectionStep >= 6}
+                  disabled={inspectionStep >= 6 || nextStepSaving}
                 >
-                  Next Step
+                  {nextStepSaving ? "Saving..." : "Next Step"}
                 </button>
               </div>
             </div>
