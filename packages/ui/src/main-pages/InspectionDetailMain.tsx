@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { MainPageShell } from "./MainPageShell";
 import type { Inspection, InspectionItem, InspectionStatus } from "@repo/ai-core/workshop/inspections/types";
+import { FileUploader } from "../components/FileUploader";
 
 type InspectionDetailMainProps = {
   companyId: string;
@@ -55,6 +56,19 @@ type LoadedData = {
   inspection: Inspection;
   items: InspectionItem[];
   carFromLead?: CarDetails;
+  collectCar?: {
+    sourceType: "recovery" | "walkin" | "unknown";
+    sourceMedia: Record<string, string>;
+    latestReview?: any;
+    logs?: Array<{
+      id: string;
+      source_type: string;
+      has_difference: boolean;
+      note?: string | null;
+      reupload_media?: Record<string, string> | null;
+      reviewed_at?: string | null;
+    }>;
+  };
 };
 
 export function InspectionDetailMain({ companyId, inspectionId }: InspectionDetailMainProps) {
@@ -69,6 +83,18 @@ export function InspectionDetailMain({ companyId, inspectionId }: InspectionDeta
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const [collectDifferenceDecision, setCollectDifferenceDecision] = useState<"unset" | "no" | "yes">("unset");
+  const [collectNote, setCollectNote] = useState("");
+  const [collectReuploadMedia, setCollectReuploadMedia] = useState<Record<string, string | null>>({
+    video: null,
+    front: null,
+    rear: null,
+    right: null,
+    left: null,
+    cluster: null,
+  });
+  const [isSavingCollectStage, setIsSavingCollectStage] = useState(false);
+  const [collectStageError, setCollectStageError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -107,9 +133,11 @@ export function InspectionDetailMain({ companyId, inspectionId }: InspectionDeta
 
         if (cancelled) return;
 
+        const collectCar = inspJson.data?.collectCar ?? null;
+
         setLoadState({
           status: "loaded",
-          data: { inspection, items, carFromLead },
+          data: { inspection, items, carFromLead, collectCar },
           error: null,
         });
 
@@ -141,6 +169,31 @@ export function InspectionDetailMain({ companyId, inspectionId }: InspectionDeta
           inspectorRemarkLayman: inspection.inspectorRemarkLayman ?? "",
           items: itemDrafts,
         });
+        const latestReview = collectCar?.latestReview ?? null;
+        if (latestReview?.completed) {
+          setCollectDifferenceDecision(latestReview?.hasDifference ? "yes" : "no");
+          setCollectNote(String(latestReview?.note ?? ""));
+          const uploaded = (latestReview?.reuploadMedia ?? {}) as Record<string, string>;
+          setCollectReuploadMedia({
+            video: uploaded.video ?? null,
+            front: uploaded.front ?? null,
+            rear: uploaded.rear ?? null,
+            right: uploaded.right ?? null,
+            left: uploaded.left ?? null,
+            cluster: uploaded.cluster ?? null,
+          });
+        } else {
+          setCollectDifferenceDecision("unset");
+          setCollectNote("");
+          setCollectReuploadMedia({
+            video: null,
+            front: null,
+            rear: null,
+            right: null,
+            left: null,
+            cluster: null,
+          });
+        }
         setHasLoaded(true);
       } catch (err: any) {
         if (!cancelled) {
@@ -160,7 +213,8 @@ export function InspectionDetailMain({ companyId, inspectionId }: InspectionDeta
   }, [companyId, inspectionId]);
 
   useEffect(() => {
-    if (!hasLoaded || !draft) return;
+    const collectComplete = collectDifferenceDecision === "no" || collectDifferenceDecision === "yes";
+    if (!hasLoaded || !draft || !collectComplete) return;
 
     setSaveError(null);
     setIsSaving(true);
@@ -211,7 +265,7 @@ export function InspectionDetailMain({ companyId, inspectionId }: InspectionDeta
     }, 1000);
 
     return () => clearTimeout(timeout);
-  }, [draft, hasLoaded, companyId, inspectionId]);
+  }, [draft, hasLoaded, companyId, inspectionId, collectDifferenceDecision]);
 
   if (loadState.status === "loading" || !draft) {
     return (
@@ -230,6 +284,15 @@ export function InspectionDetailMain({ companyId, inspectionId }: InspectionDeta
   }
 
   const { inspection } = loadState.data!;
+  const collectCarSourceType = loadState.data?.collectCar?.sourceType ?? "unknown";
+  const collectCarSourceMedia = loadState.data?.collectCar?.sourceMedia ?? {};
+  const collectCarLogs = loadState.data?.collectCar?.logs ?? [];
+  const collectStageCompleted = collectDifferenceDecision === "no" || collectDifferenceDecision === "yes";
+  const hasAnyReupload =
+    Object.values(collectReuploadMedia).some((id) => Boolean(String(id ?? "").trim()));
+  const requiresReupload = collectDifferenceDecision === "yes";
+  const canSaveCollectStage =
+    collectDifferenceDecision !== "unset" && (!requiresReupload || hasAnyReupload);
 
   function updateCar<K extends keyof CarDetails>(key: K, value: string) {
     setDraft((prev) =>
@@ -307,6 +370,10 @@ export function InspectionDetailMain({ companyId, inspectionId }: InspectionDeta
   }
 
   async function markCompleted() {
+    if (!collectStageCompleted) {
+      setCollectStageError("Complete Collect Car stage first.");
+      return;
+    }
     setDraft((prev) =>
       prev
         ? {
@@ -317,6 +384,41 @@ export function InspectionDetailMain({ companyId, inspectionId }: InspectionDeta
     );
   }
 
+  async function saveCollectCarStage() {
+    if (!canSaveCollectStage) {
+      setCollectStageError("Select difference status and upload recheck media when difference is found.");
+      return;
+    }
+    setCollectStageError(null);
+    setIsSavingCollectStage(true);
+    try {
+      const reuploadMedia =
+        collectDifferenceDecision === "yes"
+          ? Object.fromEntries(
+              Object.entries(collectReuploadMedia).filter(([, value]) => String(value ?? "").trim())
+            )
+          : {};
+      const res = await fetch(`/api/company/${companyId}/workshop/inspections/${inspectionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "collect_car_review",
+          hasDifference: collectDifferenceDecision === "yes",
+          note: collectNote.trim() || null,
+          reuploadMedia,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(String(json?.error ?? "Failed to save Collect Car stage."));
+      setLastSavedAt(new Date());
+      setCollectStageError(null);
+    } catch (err: any) {
+      setCollectStageError(err?.message ?? "Failed to save Collect Car stage.");
+    } finally {
+      setIsSavingCollectStage(false);
+    }
+  }
+
   const saveStatusText = saveError ? saveError : isSaving ? "Saving..." : lastSavedAt ? `Saved ${lastSavedAt.toLocaleTimeString()}` : "All changes saved";
 
   return (
@@ -325,7 +427,12 @@ export function InspectionDetailMain({ companyId, inspectionId }: InspectionDeta
       subtitle="Verify car details and record inspection findings."
       scopeLabel={`Inspection ID: ${inspection.id.slice(0, 8)}…`}
       primaryAction={
-        <button type="button" onClick={markCompleted} className="rounded-md border px-3 py-1 text-sm font-medium">
+        <button
+          type="button"
+          onClick={markCompleted}
+          disabled={!collectStageCompleted}
+          className="rounded-md border px-3 py-1 text-sm font-medium disabled:opacity-60"
+        >
           Mark Inspection Complete
         </button>
       }
@@ -333,6 +440,7 @@ export function InspectionDetailMain({ companyId, inspectionId }: InspectionDeta
         <div className="flex items-center gap-2">
           <button
             type="button"
+            disabled={!collectStageCompleted}
             onClick={async () => {
               try {
                 const res = await fetch(`/api/company/${companyId}/workshop/estimates`, {
@@ -350,7 +458,7 @@ export function InspectionDetailMain({ companyId, inspectionId }: InspectionDeta
                 console.error("Failed to create estimate", err);
               }
             }}
-            className="rounded-md border px-3 py-1 text-sm font-medium"
+            className="rounded-md border px-3 py-1 text-sm font-medium disabled:opacity-60"
           >
             Create Estimate
           </button>
@@ -359,6 +467,89 @@ export function InspectionDetailMain({ companyId, inspectionId }: InspectionDeta
       }
     >
       <div className="space-y-6">
+        <section className="space-y-3 rounded-xl border p-4">
+          <h2 className="text-sm font-semibold">Collect Car (Stage 1)</h2>
+          <p className="text-xs text-muted-foreground">
+            Compare intake media with the actual car before inspection starts.
+          </p>
+          <div className="rounded-md border bg-muted/20 p-3 text-xs">
+            <div>
+              Source:{" "}
+              <span className="font-semibold uppercase">
+                {collectCarSourceType === "recovery" ? "Recovery Pickup" : collectCarSourceType === "walkin" ? "Walk-in Check-in" : "Unknown"}
+              </span>
+            </div>
+            <div className="mt-2 grid gap-1">
+              {Object.entries(collectCarSourceMedia).length === 0 ? (
+                <div className="text-muted-foreground">No source media found.</div>
+              ) : (
+                Object.entries(collectCarSourceMedia).map(([key, fileId]) => (
+                  <a key={key} href={`/api/files/${fileId}`} target="_blank" rel="noreferrer" className="text-primary hover:underline">
+                    View source {key}
+                  </a>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="radio"
+                name="collect-diff"
+                checked={collectDifferenceDecision === "no"}
+                onChange={() => setCollectDifferenceDecision("no")}
+              />
+              No difference (car matches media)
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="radio"
+                name="collect-diff"
+                checked={collectDifferenceDecision === "yes"}
+                onChange={() => setCollectDifferenceDecision("yes")}
+              />
+              Difference found
+            </label>
+          </div>
+
+          {collectDifferenceDecision === "yes" ? (
+            <div className="grid gap-3 md:grid-cols-2">
+              <FileUploader label="Recheck Video" kind="video" value={collectReuploadMedia.video} onChange={(id) => setCollectReuploadMedia((prev) => ({ ...prev, video: id }))} />
+              <FileUploader label="Recheck Front Image" kind="image" value={collectReuploadMedia.front} onChange={(id) => setCollectReuploadMedia((prev) => ({ ...prev, front: id }))} />
+              <FileUploader label="Recheck Rear Image" kind="image" value={collectReuploadMedia.rear} onChange={(id) => setCollectReuploadMedia((prev) => ({ ...prev, rear: id }))} />
+              <FileUploader label="Recheck Right Image" kind="image" value={collectReuploadMedia.right} onChange={(id) => setCollectReuploadMedia((prev) => ({ ...prev, right: id }))} />
+              <FileUploader label="Recheck Left Image" kind="image" value={collectReuploadMedia.left} onChange={(id) => setCollectReuploadMedia((prev) => ({ ...prev, left: id }))} />
+              <FileUploader label="Recheck Cluster Image" kind="image" value={collectReuploadMedia.cluster} onChange={(id) => setCollectReuploadMedia((prev) => ({ ...prev, cluster: id }))} />
+            </div>
+          ) : null}
+
+          <textarea
+            value={collectNote}
+            onChange={(e) => setCollectNote(e.target.value)}
+            placeholder="Optional note for collect-car verification"
+            className="min-h-24 w-full rounded-md border px-3 py-2 text-sm"
+          />
+          {collectStageError ? <div className="text-xs text-destructive">{collectStageError}</div> : null}
+          {collectCarLogs.length > 0 ? (
+            <div className="rounded-md border bg-muted/20 p-3 text-xs">
+              <div className="font-semibold">Recent Collect Car Logs</div>
+              <div className="mt-2 space-y-1">
+                {collectCarLogs.slice(0, 3).map((log) => (
+                  <div key={log.id}>
+                    {log.reviewed_at ? new Date(log.reviewed_at).toLocaleString() : "-"} - {log.has_difference ? "Difference" : "No difference"}
+                    {log.note ? ` - ${log.note}` : ""}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          <button type="button" onClick={saveCollectCarStage} disabled={isSavingCollectStage || !canSaveCollectStage} className="rounded-md border px-3 py-1 text-sm font-medium disabled:opacity-60">
+            {isSavingCollectStage ? "Saving..." : collectStageCompleted ? "Update Collect Car" : "Save Collect Car"}
+          </button>
+        </section>
+
+        <div className={collectStageCompleted ? "space-y-6" : "space-y-6 pointer-events-none opacity-60"}>
         <section className="space-y-3 rounded-xl border p-4">
           <h2 className="text-sm font-semibold">Car details (check-in)</h2>
           <p className="text-xs text-muted-foreground">
@@ -496,6 +687,7 @@ export function InspectionDetailMain({ companyId, inspectionId }: InspectionDeta
             Customer report (AI layman translation) will appear here in a later iteration.
           </p>
         </section>
+        </div>
       </div>
     </MainPageShell>
   );

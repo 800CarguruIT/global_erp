@@ -28,8 +28,18 @@ const payloadSchema = z.object({
   agentCarPlate: z.string().optional(),
   pickupFromCustomer: z.boolean().optional(),
   pickupVideo: z.string().optional(),
+  pickupFrontImage: z.string().optional(),
+  pickupRearImage: z.string().optional(),
+  pickupRightImage: z.string().optional(),
+  pickupLeftImage: z.string().optional(),
+  pickupClusterImage: z.string().optional(),
   pickupRemarks: z.string().optional(),
   dropoffVideo: z.string().optional(),
+  dropoffFrontImage: z.string().optional(),
+  dropoffRearImage: z.string().optional(),
+  dropoffRightImage: z.string().optional(),
+  dropoffLeftImage: z.string().optional(),
+  dropoffClusterImage: z.string().optional(),
   dropoffRemarks: z.string().optional(),
 });
 
@@ -74,6 +84,32 @@ export async function PUT(req: NextRequest, { params }: Params) {
   if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const now = new Date().toISOString();
+  const blockedUntilFormSubmitted = new Set([
+    "reach_pickup",
+    "set_pickup_from_customer",
+    "share_terms",
+    "confirm_terms",
+    "upload_pickup",
+    "pickup_done",
+    "reach_dropoff",
+    "upload_dropoff",
+    "dropoff_done",
+  ] as const);
+  if (blockedUntilFormSubmitted.has(action)) {
+    const pending = await getPendingMandatoryFormForRecoveryRequest({
+      companyId,
+      requestId,
+    });
+    if (pending) {
+      return NextResponse.json(
+        {
+          error: "Pre-inspection form must be submitted before continuing this recovery process.",
+          formUrl: `/pre-inspection/${pending.token}`,
+        },
+        { status: 409 }
+      );
+    }
+  }
 
   switch (action) {
     case "save_agent":
@@ -100,21 +136,6 @@ export async function PUT(req: NextRequest, { params }: Params) {
       `;
       break;
     case "reach_pickup":
-      {
-        const pending = await getPendingMandatoryFormForRecoveryRequest({
-          companyId,
-          requestId,
-        });
-        if (pending) {
-          return NextResponse.json(
-            {
-              error: "Pre-inspection form must be submitted before pickup stage.",
-              formUrl: `/pre-inspection/${pending.token}`,
-            },
-            { status: 409 }
-          );
-        }
-      }
       await sql/* sql */ `
         UPDATE recovery_requests
         SET
@@ -157,27 +178,17 @@ export async function PUT(req: NextRequest, { params }: Params) {
         UPDATE recovery_requests
         SET
           pickup_video = ${parsed.data.pickupVideo ?? row.pickup_video ?? null},
+          pickup_front_image = ${parsed.data.pickupFrontImage ?? row.pickup_front_image ?? null},
+          pickup_rear_image = ${parsed.data.pickupRearImage ?? row.pickup_rear_image ?? null},
+          pickup_right_image = ${parsed.data.pickupRightImage ?? row.pickup_right_image ?? null},
+          pickup_left_image = ${parsed.data.pickupLeftImage ?? row.pickup_left_image ?? null},
+          pickup_cluster_image = ${parsed.data.pickupClusterImage ?? row.pickup_cluster_image ?? null},
           pickup_remarks = ${parsed.data.pickupRemarks ?? row.pickup_remarks ?? null},
           updated_at = now()
         WHERE id = ${requestId}
       `;
       break;
     case "pickup_done":
-      {
-        const pending = await getPendingMandatoryFormForRecoveryRequest({
-          companyId,
-          requestId,
-        });
-        if (pending) {
-          return NextResponse.json(
-            {
-              error: "Pre-inspection form must be submitted before pickup completion.",
-              formUrl: `/pre-inspection/${pending.token}`,
-            },
-            { status: 409 }
-          );
-        }
-      }
       await sql/* sql */ `
         UPDATE recovery_requests
         SET
@@ -185,6 +196,15 @@ export async function PUT(req: NextRequest, { params }: Params) {
           pickup_completed_at = COALESCE(pickup_completed_at, ${now}),
           updated_at = now()
         WHERE id = ${requestId}
+      `;
+      await sql/* sql */ `
+        UPDATE leads
+        SET
+          lead_status = 'car_in',
+          checkin_at = COALESCE(checkin_at, ${now}),
+          updated_at = now()
+        WHERE company_id = ${companyId}
+          AND id = ${row.lead_id}
       `;
       break;
     case "reach_dropoff":
@@ -201,6 +221,11 @@ export async function PUT(req: NextRequest, { params }: Params) {
         UPDATE recovery_requests
         SET
           dropoff_video = ${parsed.data.dropoffVideo ?? row.dropoff_video ?? null},
+          dropoff_front_image = ${parsed.data.dropoffFrontImage ?? row.dropoff_front_image ?? null},
+          dropoff_rear_image = ${parsed.data.dropoffRearImage ?? row.dropoff_rear_image ?? null},
+          dropoff_right_image = ${parsed.data.dropoffRightImage ?? row.dropoff_right_image ?? null},
+          dropoff_left_image = ${parsed.data.dropoffLeftImage ?? row.dropoff_left_image ?? null},
+          dropoff_cluster_image = ${parsed.data.dropoffClusterImage ?? row.dropoff_cluster_image ?? null},
           dropoff_remarks = ${parsed.data.dropoffRemarks ?? row.dropoff_remarks ?? null},
           updated_at = now()
         WHERE id = ${requestId}

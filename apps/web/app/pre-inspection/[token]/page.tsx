@@ -21,10 +21,14 @@ type FormDataResponse = {
     id: string;
     status: "pending" | "submitted";
     appointment_type: "walkin" | "recovery";
+    submitted_at?: string | null;
     company_id?: string;
     lead_id?: string;
   };
   customerName: string | null;
+  customerPhone: string | null;
+  customerWhatsapp: string | null;
+  customerEmail: string | null;
   carLabel: string | null;
   carPlate: string | null;
 };
@@ -520,6 +524,13 @@ export default function PreInspectionPublicPage({ params }: Params) {
   }, [token]);
 
   const isSubmitted = formData?.form?.status === "submitted";
+  const submittedAtText = useMemo(() => {
+    const value = formData?.form?.submitted_at;
+    if (!value) return null;
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return null;
+    return date.toLocaleString();
+  }, [formData?.form?.submitted_at]);
   const title = useMemo(
     () =>
       formData?.form?.appointment_type === "recovery"
@@ -682,6 +693,11 @@ export default function PreInspectionPublicPage({ params }: Params) {
           <p className="mt-1 text-sm text-slate-300">
             Please complete this mandatory form before the next stage.
           </p>
+          {isSubmitted ? (
+            <div className="mt-3 rounded-xl border border-emerald-400/40 bg-emerald-500/10 p-3 text-sm text-emerald-200">
+              This form is already submitted{submittedAtText ? ` on ${submittedAtText}` : ""}. Responses are shown below in read-only mode.
+            </div>
+          ) : null}
         </div>
 
         {loading ? <div className="mt-4 text-sm text-slate-300">Loading...</div> : null}
@@ -690,8 +706,11 @@ export default function PreInspectionPublicPage({ params }: Params) {
 
         {!loading && formData ? (
           <form onSubmit={onSubmit} className="mt-4 space-y-4 rounded-2xl border border-white/10 bg-slate-900/70 p-5">
-            <div className="grid gap-2 text-sm text-slate-300 sm:grid-cols-3">
+            <div className="grid gap-2 text-sm text-slate-300 sm:grid-cols-2">
               <div><span className="text-slate-400">Customer:</span> {formData.customerName ?? "-"}</div>
+              <div><span className="text-slate-400">Phone:</span> {formData.customerPhone ?? "-"}</div>
+              <div><span className="text-slate-400">WhatsApp:</span> {formData.customerWhatsapp ?? "-"}</div>
+              <div><span className="text-slate-400">Email:</span> {formData.customerEmail ?? "-"}</div>
               <div><span className="text-slate-400">Car:</span> {formData.carLabel ?? "-"}</div>
               <div><span className="text-slate-400">Plate:</span> {formData.carPlate ?? "-"}</div>
             </div>

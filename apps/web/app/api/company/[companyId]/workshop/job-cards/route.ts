@@ -43,26 +43,34 @@ export async function GET(req: NextRequest, { params }: Params) {
         LEFT JOIN estimates e ON e.id = jc.estimate_id
         LEFT JOIN leads l ON l.id = jc.lead_id
         LEFT JOIN LATERAL (
-          SELECT id, status, total_amount, currency, verified_at, verified_by, approved_at, updated_at
-          FROM workshop_quotes
-          WHERE company_id = ${companyId}
+          SELECT
+            wq.id,
+            wq.status,
+            wq.total_amount,
+            wq.currency,
+            wq.verified_at,
+            wq.verified_by,
+            wq.approved_at,
+            wq.updated_at
+          FROM workshop_quotes wq
+          WHERE wq.company_id = ${companyId}
             AND (
-              job_card_id = jc.id
+              wq.job_card_id = jc.id
               OR (
-                job_card_id IS NULL
-                AND estimate_id = jc.estimate_id
-                AND branch_id IS NOT DISTINCT FROM l.branch_id
+                wq.job_card_id IS NULL
+                AND wq.estimate_id = jc.estimate_id
+                AND wq.branch_id IS NOT DISTINCT FROM l.branch_id
               )
             )
           ORDER BY
             CASE
-              WHEN status = 'verified' THEN 3
-              WHEN status = 'accepted' THEN 2
-              WHEN status = 'pending' THEN 1
+              WHEN wq.status = 'verified' THEN 3
+              WHEN wq.status = 'accepted' THEN 2
+              WHEN wq.status = 'pending' THEN 1
               ELSE 0
             END DESC,
-            approved_at DESC NULLS LAST,
-            updated_at DESC NULLS LAST
+            wq.approved_at DESC NULLS LAST,
+            wq.updated_at DESC NULLS LAST
           LIMIT 1
         ) wq ON TRUE
         LEFT JOIN branches b ON b.id = l.branch_id

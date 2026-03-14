@@ -8,6 +8,7 @@ export type LeadsTableProps = {
   companyId: string;
   leads: Lead[];
   onAssign?: (id: string, lead: Lead) => void;
+  onBook?: (id: string, lead: Lead) => void;
   onCarIn?: (id: string, lead: Lead) => void;
   onRequestRecovery?: (id: string, lead: Lead) => void;
   renderActions?: (lead: Lead) => React.ReactNode;
@@ -25,6 +26,7 @@ export function LeadsTable({
   companyId,
   leads,
   onAssign,
+  onBook,
   onCarIn,
   onRequestRecovery,
   renderActions,
@@ -181,6 +183,7 @@ export function LeadsTable({
             const leadType = `${lead.leadType ?? ""}`.toLowerCase();
             const canAssign =
               Boolean(onAssign) && (leadType === "rsa" || leadType === "recovery" || leadType === "workshop");
+            const canBook = Boolean(onBook) && (leadType === "rsa" || leadType === "recovery" || leadType === "workshop");
             const canCarIn =
               Boolean(onCarIn) &&
               leadType === "workshop" &&
@@ -360,10 +363,19 @@ export function LeadsTable({
                       {canAssign ? (
                         <button
                           className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-primary hover:shadow-md"
-                          onClick={() => onAssign(lead.id, lead)}
+                          onClick={() => onAssign?.(lead.id, lead)}
                           type="button"
                         >
                           Assign
+                        </button>
+                      ) : null}
+                      {canBook ? (
+                        <button
+                          className="rounded-md border border-indigo-300/60 bg-indigo-500/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-indigo-700 shadow-sm transition hover:bg-indigo-500/20 hover:shadow-md"
+                          onClick={() => onBook?.(lead.id, lead)}
+                          type="button"
+                        >
+                          Book
                         </button>
                       ) : null}
                       {canCarIn ? (

@@ -32,6 +32,7 @@ This documentation is designed to be useful, simple, and quick to access.
 - `vendor-portal-onboarding.md`
 - `vendor-portal-operations.md`
 - `mobile-apis.md`
+- `rsa-inquiry-to-close-lead-flow.md`
 
 ## Documentation Principles
 

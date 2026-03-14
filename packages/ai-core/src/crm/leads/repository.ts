@@ -8,6 +8,7 @@ export type CreateLeadInput = {
   branchId?: string | null;
   assignedUserId?: string | null;
   serviceType?: string | null;
+  workshopVisitMode?: "walkin" | "recovery" | null;
   assignedAt?: string | null;
   recoveryDirection?: string | null;
   recoveryFlow?: string | null;
@@ -37,6 +38,7 @@ async function ensureLeadAssignmentColumns(): Promise<boolean> {
           'branch_id',
           'assigned_user_id',
           'service_type',
+          'workshop_visit_mode',
           'assigned_at',
           'customer_details_requested',
           'customer_details_approved',
@@ -55,6 +57,7 @@ async function ensureLeadAssignmentColumns(): Promise<boolean> {
       "branch_id",
       "assigned_user_id",
       "service_type",
+      "workshop_visit_mode",
       "assigned_at",
       "customer_details_requested",
       "customer_details_approved",
@@ -74,6 +77,7 @@ async function ensureLeadAssignmentColumns(): Promise<boolean> {
         ADD COLUMN IF NOT EXISTS branch_id uuid NULL,
         ADD COLUMN IF NOT EXISTS assigned_user_id uuid NULL,
         ADD COLUMN IF NOT EXISTS service_type text NULL,
+        ADD COLUMN IF NOT EXISTS workshop_visit_mode text NULL,
         ADD COLUMN IF NOT EXISTS assigned_at timestamptz NULL,
         ADD COLUMN IF NOT EXISTS customer_details_requested boolean NULL DEFAULT FALSE,
         ADD COLUMN IF NOT EXISTS customer_details_approved boolean NULL DEFAULT FALSE,
@@ -208,6 +212,7 @@ export async function createLead(input: CreateLeadInput): Promise<Lead> {
           branch_id,
           assigned_user_id,
           service_type,
+          workshop_visit_mode,
           assigned_at,
           recovery_direction,
           recovery_flow,
@@ -232,6 +237,7 @@ export async function createLead(input: CreateLeadInput): Promise<Lead> {
           ${input.branchId ?? null},
           ${input.assignedUserId ?? null},
           ${input.serviceType ?? null},
+          ${input.workshopVisitMode ?? null},
           ${input.assignedAt ?? null},
           ${input.recoveryDirection ?? null},
           ${input.recoveryFlow ?? null},
@@ -305,6 +311,7 @@ function mapLeadRow(row: any): Lead {
     branchId: row.branch_id ?? null,
     assignedUserId: row.assigned_user_id ?? null,
     serviceType: row.service_type ?? null,
+    workshopVisitMode: row.workshop_visit_mode ?? null,
     assignedAt: row.assigned_at
       ? new Date(row.assigned_at).toISOString()
       : null,
@@ -486,10 +493,12 @@ export async function updateLeadPartial(
     branchId?: string | null;
     assignedUserId?: string | null;
     serviceType?: string | null;
+    workshopVisitMode?: "walkin" | "recovery" | null;
     assignedAt?: string | null;
     recoveryDirection?: string | null;
     recoveryFlow?: string | null;
     pickupFrom?: string | null;
+    pickupGoogleLocation?: string | null;
     dropoffTo?: string | null;
     dropoffGoogleLocation?: string | null;
     customerDetailsRequested?: boolean;
@@ -553,6 +562,12 @@ export async function updateLeadPartial(
       ? patch.serviceType
       : supportsAssignments
         ? (current.serviceType ?? null)
+        : null;
+  const newWorkshopVisitMode =
+    supportsAssignments && patch.workshopVisitMode !== undefined
+      ? patch.workshopVisitMode
+      : supportsAssignments
+        ? ((current as any).workshopVisitMode ?? null)
         : null;
   const newRecoveryDirection =
     supportsAssignments && patch.recoveryDirection !== undefined
@@ -648,6 +663,7 @@ export async function updateLeadPartial(
         branch_id = ${newBranchId},
         assigned_user_id = ${newAssignedUserId},
         service_type = ${newServiceType},
+        workshop_visit_mode = ${newWorkshopVisitMode},
         recovery_direction = ${newRecoveryDirection},
         recovery_flow = ${newRecoveryFlow},
         pickup_from = ${newPickupFrom},

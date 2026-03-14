@@ -205,6 +205,21 @@ export const DOCUMENTATION_STRUCTURE: DocChapter[] = [
     ],
   },
   {
+    key: "workflow",
+    title: "Workflow.",
+    description: "End-to-end operational playbooks and lifecycle flows.",
+    tagline: "Process flows",
+    sessions: [
+      {
+        slug: "rsa-inquiry-to-close-lead-flow",
+        title: "RSA Inquiry to Close",
+        description:
+          "Operational workflow from AI inquiry intake through RSA assignment, service, billing, and closure.",
+        badge: "RSA",
+      },
+    ],
+  },
+  {
     key: "app-api",
     title: "App API.",
     description: "Web application backend endpoints for admin and operations.",

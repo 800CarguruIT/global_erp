@@ -27,6 +27,7 @@ export { LeadsTable } from "./components/leads/LeadsTable";
 export { LeadTypeBadge, LeadStatusBadge, LeadHealthBadge } from "./components/leads/LeadBadges";
 export { LeadTimeline } from "./components/leads/LeadTimeline";
 export { LeadsMain } from "./main-pages/LeadsMain";
+export { QueueSystemMain } from "./main-pages/QueueSystemMain";
 export { LeadDetailMain } from "./main-pages/LeadDetailMain";
 export { RecoveryRequestsMain } from "./main-pages/RecoveryRequestsMain";
 export { RecoverySummaryMain } from "./main-pages/RecoverySummaryMain";

@@ -50,6 +50,7 @@ export interface Lead {
   leadStatus: LeadStatus;
   leadStage: string;
   serviceType?: string | null;
+  workshopVisitMode?: "walkin" | "recovery" | null;
   assignedUserId?: string | null;
   assignedAt?: string | null;
   workflowRequired?: LeadWorkflowRequired | null;

@@ -188,6 +188,19 @@ export function LeadsMain({
   const [requestDropoffSuggestionsOpen, setRequestDropoffSuggestionsOpen] = useState(false);
   const [requestRecoveryScheduledAt, setRequestRecoveryScheduledAt] = useState("");
   const [requestRecoveryRemarks, setRequestRecoveryRemarks] = useState("");
+  const [bookingLead, setBookingLead] = useState<any | null>(null);
+  const [bookingSaving, setBookingSaving] = useState(false);
+  const [bookingError, setBookingError] = useState<string | null>(null);
+  const [bookingLeadType, setBookingLeadType] = useState<"rsa" | "recovery" | "workshop">("rsa");
+  const [bookingLeadTypeConfirmed, setBookingLeadTypeConfirmed] = useState(false);
+  const [bookingScheduledAt, setBookingScheduledAt] = useState("");
+  const [bookingWorkshopType, setBookingWorkshopType] = useState<"walkin" | "recovery">("walkin");
+  const [bookingPriority, setBookingPriority] = useState<"low" | "medium" | "high">("medium");
+  const [bookingPickupLocation, setBookingPickupLocation] = useState("");
+  const [bookingPickupGoogleLocation, setBookingPickupGoogleLocation] = useState("");
+  const [bookingDropoffLocation, setBookingDropoffLocation] = useState("");
+  const [bookingDropoffGoogleLocation, setBookingDropoffGoogleLocation] = useState("");
+  const [bookingNotes, setBookingNotes] = useState("");
   const requestPickupSearchRef = useRef<HTMLInputElement | null>(null);
   const requestDropoffSearchRef = useRef<HTMLInputElement | null>(null);
   const requestPickupDropdownRef = useRef<HTMLDivElement | null>(null);
@@ -204,6 +217,15 @@ export function LeadsMain({
         .filter(Boolean);
     }
     return [];
+  }
+
+  function resolveWorkshopVisitMode(lead: any): "walkin" | "recovery" {
+    const explicit = String(lead?.workshopVisitMode ?? "").trim().toLowerCase();
+    if (explicit === "walkin" || explicit === "recovery") return explicit;
+    const serviceType = String(lead?.serviceType ?? "").trim().toLowerCase();
+    if (serviceType === "pickup" || serviceType === "recovery") return "recovery";
+    if (String(lead?.pickupFrom ?? "").trim() || String(lead?.dropoffTo ?? "").trim()) return "recovery";
+    return "walkin";
   }
 
   const refreshLeads = useCallback(async () => {
@@ -779,6 +801,106 @@ export function LeadsMain({
     }
   }
 
+  async function openBooking(leadId: string, lead?: any) {
+    const nextLead = lead ?? leads.find((l) => l.id === leadId) ?? null;
+    if (!nextLead) return;
+    const initialLeadType =
+      String(nextLead?.leadType ?? "").trim().toLowerCase() === "recovery"
+        ? "recovery"
+        : String(nextLead?.leadType ?? "").trim().toLowerCase() === "workshop"
+        ? "workshop"
+        : "rsa";
+    setBookingLead(nextLead);
+    setBookingError(null);
+    setBookingSaving(false);
+    setBookingLeadType(initialLeadType);
+    setBookingLeadTypeConfirmed(false);
+    setBookingScheduledAt("");
+    setBookingWorkshopType(resolveWorkshopVisitMode(nextLead));
+    setBookingPriority("medium");
+    setBookingPickupLocation(String(nextLead?.pickupFrom ?? "").trim());
+    setBookingPickupGoogleLocation(extractEmbedSrc(String(nextLead?.pickupGoogleLocation ?? "")) ?? "");
+    setBookingDropoffLocation(String(nextLead?.dropoffTo ?? "").trim());
+    setBookingDropoffGoogleLocation(extractEmbedSrc(String(nextLead?.dropoffGoogleLocation ?? "")) ?? "");
+    setBookingNotes("");
+    try {
+      const res = await fetch(`/api/company/${companyId}/sales/leads/${nextLead.id}/booking`, { cache: "no-store" });
+      if (!res.ok) return;
+      const data = await res.json().catch(() => ({}));
+      const defaults = data?.data ?? {};
+      const previousLeadType =
+        String(defaults?.leadType ?? "").trim().toLowerCase() === "recovery"
+          ? "recovery"
+          : String(defaults?.leadType ?? "").trim().toLowerCase() === "workshop"
+          ? "workshop"
+          : "rsa";
+      setBookingLeadType(previousLeadType);
+      setBookingWorkshopType(String(defaults?.workshopType ?? "").trim().toLowerCase() === "recovery" ? "recovery" : "walkin");
+      setBookingPriority(
+        String(defaults?.priority ?? "").trim().toLowerCase() === "low" || String(defaults?.priority ?? "").trim().toLowerCase() === "high"
+          ? (String(defaults?.priority ?? "").trim().toLowerCase() as "low" | "high")
+          : "medium"
+      );
+    } catch {
+      // keep local defaults
+    }
+  }
+
+  async function submitBooking() {
+    if (!bookingLead?.id) return;
+    if (!bookingLeadTypeConfirmed) {
+      setBookingError("Please confirm lead type before saving.");
+      return;
+    }
+    const workshopMode = bookingLeadType === "workshop" ? bookingWorkshopType : null;
+    const requiresPickup = bookingLeadType === "rsa" || bookingLeadType === "recovery" || workshopMode === "recovery";
+    const requiresDropoff = bookingLeadType === "recovery" || workshopMode === "recovery";
+    const scheduledAt = bookingScheduledAt.trim();
+    const pickupLocation = bookingPickupLocation.trim();
+    const dropoffLocation = bookingDropoffLocation.trim();
+    if (!scheduledAt) {
+      setBookingError("Date/time is required.");
+      return;
+    }
+    if (requiresPickup && !pickupLocation) {
+      setBookingError("Pickup location is required.");
+      return;
+    }
+    if (requiresDropoff && !dropoffLocation) {
+      setBookingError("Dropoff location is required.");
+      return;
+    }
+
+    setBookingSaving(true);
+    setBookingError(null);
+    try {
+      const res = await fetch(`/api/company/${companyId}/sales/leads/${bookingLead.id}/booking`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scheduledAt,
+          leadType: bookingLeadType,
+          bookingType: bookingLeadType === "workshop" ? bookingWorkshopType : undefined,
+          priority: bookingPriority,
+          pickupLocation: requiresPickup ? pickupLocation : null,
+          pickupGoogleLocation: requiresPickup ? bookingPickupGoogleLocation.trim() || null : null,
+          dropoffLocation: requiresDropoff ? dropoffLocation : null,
+          dropoffGoogleLocation: requiresDropoff ? bookingDropoffGoogleLocation.trim() || null : null,
+          notes: bookingNotes.trim() || null,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(String(data?.error ?? "Failed to save booking"));
+      setBulkMessage("Booking saved.");
+      setBookingLead(null);
+      await refreshLeads();
+    } catch (err: any) {
+      setBookingError(err?.message ?? "Failed to save booking.");
+    } finally {
+      setBookingSaving(false);
+    }
+  }
+
   async function requestRecoveryForLead(leadId: string, lead?: any) {
     const nextLead = lead ?? leads.find((l) => l.id === leadId) ?? null;
     const pickupDefault =
@@ -915,6 +1037,22 @@ export function LeadsMain({
     setRequestDropoffSuggestionsOpen(false);
     setRequestRecoveryScheduledAt("");
     setRequestRecoveryRemarks("");
+  }
+
+  function resetBooking() {
+    setBookingLead(null);
+    setBookingSaving(false);
+    setBookingError(null);
+    setBookingLeadType("rsa");
+    setBookingLeadTypeConfirmed(false);
+    setBookingScheduledAt("");
+    setBookingWorkshopType("walkin");
+    setBookingPriority("medium");
+    setBookingPickupLocation("");
+    setBookingPickupGoogleLocation("");
+    setBookingDropoffLocation("");
+    setBookingDropoffGoogleLocation("");
+    setBookingNotes("");
   }
 
   function resetAssign() {
@@ -1058,6 +1196,7 @@ export function LeadsMain({
                   selectedIds={selected}
                   onSelectChange={toggleSelect}
                   onAssign={(id, lead) => openAssign(id, lead)}
+                  onBook={(id, lead) => void openBooking(id, lead)}
                   onCarIn={(id, lead) => void moveLeadToCarIn(id, lead)}
                   onRequestRecovery={(id, lead) => void requestRecoveryForLead(id, lead)}
                   onRefresh={refreshLeads}
@@ -1110,6 +1249,189 @@ export function LeadsMain({
                   </button>
                 </div>
               </div>
+              {bookingLead && (() => {
+                const leadType = bookingLeadType;
+                const workshopMode = leadType === "workshop" ? bookingWorkshopType : null;
+                const scenarioLabel =
+                  leadType === "rsa"
+                    ? "RSA booking"
+                    : leadType === "recovery"
+                    ? "Recovery booking"
+                    : workshopMode === "recovery"
+                    ? "Workshop recovery booking"
+                    : "Workshop walk-in booking";
+                const requiresPickup = leadType === "rsa" || leadType === "recovery" || workshopMode === "recovery";
+                const requiresDropoff = leadType === "recovery" || workshopMode === "recovery";
+                return (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+                    <Card className="w-full max-w-2xl space-y-4 rounded-2xl border border-white/10 bg-slate-950 text-white shadow-xl">
+                      <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                        <div>
+                          <div className="text-sm font-semibold text-white">Book Lead</div>
+                          <div className="text-xs text-white/70">{scenarioLabel}</div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => resetBooking()}
+                          disabled={bookingSaving}
+                          className="inline-flex items-center rounded-md border border-white/20 bg-white/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-white shadow-sm transition hover:bg-white/20 hover:shadow-md disabled:opacity-60"
+                        >
+                          Close
+                        </button>
+                      </div>
+                      {bookingError ? <p className="text-sm text-red-400">{bookingError}</p> : null}
+                      <div className="grid gap-3">
+                        <div className="rounded border border-white/20 bg-white/5 p-3">
+                          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-white/70">Lead Type Verification</div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <select
+                              value={bookingLeadType}
+                              onChange={(e) => {
+                                const nextType =
+                                  e.target.value === "recovery"
+                                    ? "recovery"
+                                    : e.target.value === "workshop"
+                                    ? "workshop"
+                                    : "rsa";
+                                setBookingLeadType(nextType);
+                                setBookingLeadTypeConfirmed(false);
+                              }}
+                              className="rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white"
+                            >
+                              <option value="rsa" style={{ color: "#0f172a", backgroundColor: "#ffffff" }}>RSA</option>
+                              <option value="recovery" style={{ color: "#0f172a", backgroundColor: "#ffffff" }}>Recovery</option>
+                              <option value="workshop" style={{ color: "#0f172a", backgroundColor: "#ffffff" }}>Workshop</option>
+                            </select>
+                            <button
+                              type="button"
+                              onClick={() => setBookingLeadTypeConfirmed(true)}
+                              className={`rounded px-3 py-2 text-xs font-semibold uppercase tracking-wide ${
+                                bookingLeadTypeConfirmed
+                                  ? "bg-emerald-500/20 text-emerald-300"
+                                  : "bg-white/10 text-white hover:bg-white/20"
+                              }`}
+                            >
+                              {bookingLeadTypeConfirmed ? "Confirmed" : "Confirm Type"}
+                            </button>
+                            <span className="text-xs text-white/60">Default uses previous selected type (if found).</span>
+                          </div>
+                        </div>
+                        {!bookingLeadTypeConfirmed ? (
+                          <div className="rounded border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+                            Confirm lead type to continue booking form.
+                          </div>
+                        ) : null}
+                        {leadType === "workshop" ? (
+                          <select
+                            value={bookingWorkshopType}
+                            onChange={(e) => {
+                              setBookingWorkshopType(e.target.value === "recovery" ? "recovery" : "walkin");
+                              setBookingLeadTypeConfirmed(false);
+                            }}
+                            className="w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white"
+                            disabled={!bookingLeadTypeConfirmed}
+                          >
+                            <option value="walkin" style={{ color: "#0f172a", backgroundColor: "#ffffff" }}>
+                              Walk-in
+                            </option>
+                            <option value="recovery" style={{ color: "#0f172a", backgroundColor: "#ffffff" }}>
+                              Recovery
+                            </option>
+                          </select>
+                        ) : null}
+                        <select
+                          value={bookingPriority}
+                          onChange={(e) =>
+                            setBookingPriority(
+                              e.target.value === "low" || e.target.value === "high" ? e.target.value : "medium"
+                            )
+                          }
+                          className="w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white"
+                          disabled={!bookingLeadTypeConfirmed}
+                        >
+                          <option value="low" style={{ color: "#0f172a", backgroundColor: "#ffffff" }}>
+                            Low Priority
+                          </option>
+                          <option value="medium" style={{ color: "#0f172a", backgroundColor: "#ffffff" }}>
+                            Medium Priority
+                          </option>
+                          <option value="high" style={{ color: "#0f172a", backgroundColor: "#ffffff" }}>
+                            High Priority
+                          </option>
+                        </select>
+                        <input
+                          type="datetime-local"
+                          value={bookingScheduledAt}
+                          onChange={(e) => setBookingScheduledAt(e.target.value)}
+                          className="w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white"
+                          disabled={!bookingLeadTypeConfirmed}
+                        />
+                        {requiresPickup ? (
+                          <>
+                            <input
+                              value={bookingPickupLocation}
+                              onChange={(e) => setBookingPickupLocation(e.target.value)}
+                              placeholder="Pickup location"
+                              className="w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60"
+                              disabled={!bookingLeadTypeConfirmed}
+                            />
+                            <input
+                              value={bookingPickupGoogleLocation}
+                              onChange={(e) => setBookingPickupGoogleLocation(e.target.value)}
+                              placeholder="Pickup Google Maps URL (optional)"
+                              className="w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60"
+                              disabled={!bookingLeadTypeConfirmed}
+                            />
+                          </>
+                        ) : null}
+                        {requiresDropoff ? (
+                          <>
+                            <input
+                              value={bookingDropoffLocation}
+                              onChange={(e) => setBookingDropoffLocation(e.target.value)}
+                              placeholder="Dropoff location"
+                              className="w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60"
+                              disabled={!bookingLeadTypeConfirmed}
+                            />
+                            <input
+                              value={bookingDropoffGoogleLocation}
+                              onChange={(e) => setBookingDropoffGoogleLocation(e.target.value)}
+                              placeholder="Dropoff Google Maps URL (optional)"
+                              className="w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60"
+                              disabled={!bookingLeadTypeConfirmed}
+                            />
+                          </>
+                        ) : null}
+                        <textarea
+                          value={bookingNotes}
+                          onChange={(e) => setBookingNotes(e.target.value)}
+                          placeholder="Notes"
+                          className="h-20 w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60"
+                          disabled={!bookingLeadTypeConfirmed}
+                        />
+                      </div>
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => resetBooking()}
+                          disabled={bookingSaving}
+                          className="rounded border border-white/20 bg-white/10 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-white hover:bg-white/20 disabled:opacity-60"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void submitBooking()}
+                          disabled={bookingSaving || !bookingLeadTypeConfirmed}
+                          className="rounded bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-60"
+                        >
+                          {bookingSaving ? "Saving..." : "Save Booking"}
+                        </button>
+                      </div>
+                    </Card>
+                  </div>
+                );
+              })()}
               {requestRecoveryLead && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
                   <Card className="w-full max-w-4xl space-y-4 rounded-2xl border border-white/10 bg-slate-950 text-white shadow-xl">

@@ -96,6 +96,16 @@ export function CarInDashboardMain({ companyId, companyName }: CarInDashboardMai
       }
     >
   >({});
+  const [bookingFormByLead, setBookingFormByLead] = useState<
+    Record<
+      string,
+      {
+        status?: string | null;
+        submittedAt?: string | null;
+        token?: string | null;
+      }
+    >
+  >({});
   const [googleMapsApiKey, setGoogleMapsApiKey] = useState<string | null>(null);
   const [mapsReady, setMapsReady] = useState(false);
   const [dropoffOpen, setDropoffOpen] = useState(false);
@@ -233,6 +243,26 @@ export function CarInDashboardMain({ companyId, companyName }: CarInDashboardMai
         setInvoiceByLead(map);
       } catch (err) {
         setInvoiceByLead({});
+      }
+      try {
+        const bookingsRes = await fetch(`/api/company/${companyId}/sales/leads/bookings`);
+        if (!bookingsRes.ok) throw new Error("Failed to load lead bookings");
+        const bookingsJson = await bookingsRes.json();
+        const bookings = bookingsJson.data ?? [];
+        const map: Record<string, { status?: string | null; submittedAt?: string | null; token?: string | null }> = {};
+        bookings.forEach((booking: any) => {
+          const leadId = booking?.leadId ?? booking?.lead_id ?? null;
+          if (!leadId) return;
+          if (map[leadId]) return;
+          map[leadId] = {
+            status: booking?.preServiceFormStatus ?? booking?.pre_service_form_status ?? null,
+            submittedAt: booking?.preServiceFormSubmittedAt ?? booking?.pre_service_form_submitted_at ?? null,
+            token: booking?.preServiceFormToken ?? booking?.pre_service_form_token ?? null,
+          };
+        });
+        setBookingFormByLead(map);
+      } catch (err) {
+        setBookingFormByLead({});
       }
       try {
         const recoveryRes = await fetch(`/api/company/${companyId}/recovery-requests`);
@@ -963,11 +993,18 @@ export function CarInDashboardMain({ companyId, companyName }: CarInDashboardMai
                       : null;
                     const carHref = lead.carId ? `/company/${companyId}/cars/${lead.carId}` : null;
                     const inspectionMeta = inspectionByLead[lead.id];
-                    const preInspectionStatus = String((lead as any).preInspectionStatus ?? "").toLowerCase();
-                    const preInspectionSubmitted = Boolean((lead as any).preInspectionSubmitted);
-                    const preInspectionSubmittedAt = (lead as any).preInspectionSubmittedAt ?? null;
+                    const bookingFormMeta = bookingFormByLead[lead.id];
+                    const preInspectionStatus = String(
+                      (lead as any).preInspectionStatus ?? bookingFormMeta?.status ?? ""
+                    ).toLowerCase();
+                    const preInspectionSubmitted =
+                      Boolean((lead as any).preInspectionSubmitted) ||
+                      String(bookingFormMeta?.status ?? "").toLowerCase() === "submitted";
+                    const preInspectionSubmittedAt =
+                      (lead as any).preInspectionSubmittedAt ?? bookingFormMeta?.submittedAt ?? null;
                     const preInspectionAnswers = (lead as any).preInspectionAnswers ?? null;
                     const preInspectionSummary = summarizePreInspectionAnswers(preInspectionAnswers);
+                    const preInspectionToken = bookingFormMeta?.token ?? null;
                     const inspectionCompleted = Boolean(inspectionMeta?.completedAt);
                     const inspectionCancelled =
                       String(inspectionMeta?.status ?? "").toLowerCase() === "cancelled" ||
@@ -1151,6 +1188,18 @@ export function CarInDashboardMain({ companyId, companyName }: CarInDashboardMai
                               {preInspectionSubmitted && preInspectionSummary && (
                                 <div className="mt-1 text-[10px] text-muted-foreground">
                                   {preInspectionSummary}
+                                </div>
+                              )}
+                              {preInspectionSubmitted && preInspectionToken && (
+                                <div className="mt-1">
+                                  <a
+                                    href={`/pre-inspection/${encodeURIComponent(String(preInspectionToken))}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center rounded-md border border-slate-200 bg-white px-2 py-1 text-[9px] font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition hover:bg-slate-50 hover:shadow-md"
+                                  >
+                                    View Form
+                                  </a>
                                 </div>
                               )}
                             </>

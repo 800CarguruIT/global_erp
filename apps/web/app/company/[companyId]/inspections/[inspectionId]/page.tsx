@@ -15,6 +15,25 @@ type InspectionData = {
   inspection: any;
   items: any[];
   preInspection?: any | null;
+  collectCar?: {
+    sourceType?: "recovery" | "walkin" | "unknown";
+    sourceMedia?: Record<string, string | null>;
+    latestReview?: {
+      completed?: boolean;
+      hasDifference?: boolean;
+      note?: string | null;
+      reuploadMedia?: Record<string, string | null>;
+      reviewedAt?: string | null;
+      reviewedBy?: string | null;
+    } | null;
+    logs?: Array<{
+      id?: string;
+      hasDifference?: boolean;
+      note?: string | null;
+      reviewedAt?: string | null;
+      reviewedBy?: string | null;
+    }>;
+  } | null;
 };
 type InspectionLogEntry = {
   id: string;
@@ -25,6 +44,8 @@ type InspectionLogEntry = {
 };
 
 type CheckValue = "good" | "avg" | "bad" | "";
+type ProcessCheckValue = "ok" | "issue" | "na" | "";
+type ProcessCheckKey = "oil" | "battery" | "tyre" | "obd";
 
 const checkItems = [
   { key: "engine", label: "Engine" },
@@ -39,6 +60,13 @@ const checkItems = [
   { key: "infotainment", label: "Infotainment" },
 ];
 
+const processCheckItems: Array<{ key: ProcessCheckKey; label: string }> = [
+  { key: "oil", label: "Oil Check" },
+  { key: "battery", label: "Battery Check" },
+  { key: "tyre", label: "Tyre Check" },
+  { key: "obd", label: "OBD Check" },
+];
+
 const preInspectionQuestionLabels: Record<string, string> = {
   q1: "Any performance issue?",
   q2: "Any unusual sound or vibration?",
@@ -46,6 +74,76 @@ const preInspectionQuestionLabels: Record<string, string> = {
   q4: "Any fluid leak noticed?",
   q5: "Any urgent priority for inspection?",
 };
+const formatQuestionKeyLabel = (key: string) =>
+  key
+    .replace(/^q(\d+)$/i, "Question $1")
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const isSystemPreInspectionKey = (key: string) => {
+  const normalized = key.trim().toLowerCase();
+  return (
+    normalized === "meta" ||
+    normalized === "__meta" ||
+    normalized.startsWith("meta_") ||
+    normalized.startsWith("__meta") ||
+    normalized.includes("signature")
+  );
+};
+
+const toDisplayText = (value: unknown): string => {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (Array.isArray(value)) {
+    const items = value.map((item) => toDisplayText(item)).filter(Boolean);
+    return items.join(", ");
+  }
+  if (typeof value === "object") return JSON.stringify(value);
+  return String(value);
+};
+
+const collectPreInspectionDetails = (value: unknown, path = ""): Array<{ key: string; value: string }> => {
+  if (value === null || value === undefined) return [];
+  if (typeof value !== "object") {
+    const text = toDisplayText(value);
+    if (!text) return [];
+    return [{ key: path || "Answer", value: text }];
+  }
+  if (Array.isArray(value)) {
+    const text = toDisplayText(value);
+    if (!text) return [];
+    return [{ key: path || "Answer", value: text }];
+  }
+  const obj = value as Record<string, unknown>;
+  return Object.entries(obj).flatMap(([k, v]) => {
+    if (k === "choice") return [];
+    if (isSystemPreInspectionKey(k)) return [];
+    const nextPath = path ? `${path}.${k}` : k;
+    if (v && typeof v === "object" && !Array.isArray(v)) {
+      return collectPreInspectionDetails(v, nextPath);
+    }
+    const text = toDisplayText(v);
+    if (text.startsWith("data:image/") || text.startsWith("data:video/")) return [];
+    if (text.length > 500) return [];
+    if (!text) return [];
+    return [{ key: nextPath, value: text }];
+  });
+};
+
+const formatDetailKey = (key: string) =>
+  key
+    .split(".")
+    .map((segment) =>
+      segment
+        .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+        .replace(/[_-]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+    )
+    .join(" / ");
 
 export function InspectionDetailPageClient({
   params,
@@ -58,6 +156,34 @@ export function InspectionDetailPageClient({
   const [inspectionId, setInspectionId] = useState<string | null>(null);
   const [inspection, setInspection] = useState<any | null>(null);
   const [preInspection, setPreInspection] = useState<any | null>(null);
+  const [collectCar, setCollectCar] = useState<InspectionData["collectCar"]>(null);
+  const [inspectionStep, setInspectionStep] = useState(1);
+  const [collectCarDifference, setCollectCarDifference] = useState<"" | "yes" | "no">("");
+  const [collectCarNote, setCollectCarNote] = useState("");
+  const [collectCarReuploadMedia, setCollectCarReuploadMedia] = useState<Record<string, string>>({});
+  const [collectCarSaving, setCollectCarSaving] = useState(false);
+  const [inspectionIssueNotes, setInspectionIssueNotes] = useState("");
+  const [processChecks, setProcessChecks] = useState<Record<ProcessCheckKey, ProcessCheckValue>>({
+    oil: "",
+    battery: "",
+    tyre: "",
+    obd: "",
+  });
+  const [processCheckMedia, setProcessCheckMedia] = useState<Record<ProcessCheckKey, string>>({
+    oil: "",
+    battery: "",
+    tyre: "",
+    obd: "",
+  });
+  const [tyreSizeFront, setTyreSizeFront] = useState("");
+  const [tyreSizeRear, setTyreSizeRear] = useState("");
+  const [clusterImageId, setClusterImageId] = useState("");
+  const [inspectionVin, setInspectionVin] = useState("");
+  const [inspectionMake, setInspectionMake] = useState("");
+  const [inspectionModel, setInspectionModel] = useState("");
+  const [inspectionYear, setInspectionYear] = useState("");
+  const [vinLookupLoading, setVinLookupLoading] = useState(false);
+  const [vinLookupNote, setVinLookupNote] = useState<string | null>(null);
   const [customer, setCustomer] = useState<any | null>(null);
   const [car, setCar] = useState<any | null>(null);
   const [leadPlate, setLeadPlate] = useState("");
@@ -137,6 +263,26 @@ export function InspectionDetailPageClient({
         const data: { data: InspectionData } = await res.json();
         const payload = data?.data?.inspection ?? null;
         setPreInspection(data?.data?.preInspection ?? null);
+        const collectCarPayload = data?.data?.collectCar ?? null;
+        setCollectCar(collectCarPayload);
+        const latestCollectCarReview = collectCarPayload?.latestReview ?? null;
+        if (latestCollectCarReview?.completed) {
+          setCollectCarDifference(latestCollectCarReview?.hasDifference ? "yes" : "no");
+          setCollectCarNote(String(latestCollectCarReview?.note ?? ""));
+          setCollectCarReuploadMedia(
+            Object.entries((latestCollectCarReview?.reuploadMedia ?? {}) as Record<string, string | null>).reduce(
+              (acc, [key, fileId]) => {
+                if (fileId) acc[key] = String(fileId);
+                return acc;
+              },
+              {} as Record<string, string>
+            )
+          );
+        } else {
+          setCollectCarDifference("");
+          setCollectCarNote("");
+          setCollectCarReuploadMedia({});
+        }
         setInspection(payload);
         setLeadId(payload?.leadId ?? null);
         const draft = payload?.draftPayload ?? {};
@@ -147,6 +293,26 @@ export function InspectionDetailPageClient({
           customerComplain: draft.customerComplain ?? prev.customerComplain,
           inspectorRemarks: draft.inspectorRemarks ?? prev.inspectorRemarks,
         }));
+        setInspectionIssueNotes(String(draft.inspectionIssueNotes ?? ""));
+        setProcessChecks({
+          oil: String(draft.processChecks?.oil ?? "") as ProcessCheckValue,
+          battery: String(draft.processChecks?.battery ?? "") as ProcessCheckValue,
+          tyre: String(draft.processChecks?.tyre ?? "") as ProcessCheckValue,
+          obd: String(draft.processChecks?.obd ?? "") as ProcessCheckValue,
+        });
+        setProcessCheckMedia({
+          oil: String(draft.processCheckMedia?.oil ?? ""),
+          battery: String(draft.processCheckMedia?.battery ?? ""),
+          tyre: String(draft.processCheckMedia?.tyre ?? ""),
+          obd: String(draft.processCheckMedia?.obd ?? ""),
+        });
+        setTyreSizeFront(String(draft.tyreSizeFront ?? ""));
+        setTyreSizeRear(String(draft.tyreSizeRear ?? ""));
+        setClusterImageId(String(draft.clusterImageId ?? ""));
+        setInspectionVin(String(draft.inspectionVin ?? ""));
+        setInspectionMake(String(draft.inspectionMake ?? ""));
+        setInspectionModel(String(draft.inspectionModel ?? ""));
+        setInspectionYear(String(draft.inspectionYear ?? ""));
         initialRemarksRef.current = draft.inspectorRemarks ?? "";
         initialStatusRef.current = String(payload?.status ?? "pending").toLowerCase();
         setChecks(draft.checks ?? {});
@@ -320,6 +486,19 @@ export function InspectionDetailPageClient({
     String(inspection?.status ?? "").toLowerCase() === "completed" &&
     Boolean(inspection?.draftPayload?.legacySnapshot);
   const isReadOnly = isCancelled || isVerified || isLegacyCompletedReadonly;
+  const collectCarLatestReview = collectCar?.latestReview ?? null;
+  const collectCarCompleted = Boolean(collectCarLatestReview?.completed);
+  const collectCarSourceType = collectCar?.sourceType ?? "unknown";
+  const collectCarSourceMedia = (collectCar?.sourceMedia ?? {}) as Record<string, string | null>;
+  const collectCarLogs = Array.isArray(collectCar?.logs) ? collectCar.logs : [];
+  const collectCarNeedsReupload = collectCarDifference === "yes";
+  const collectCarMissingReupload = Object.entries(collectCarSourceMedia)
+    .filter(([, fileId]) => Boolean(fileId))
+    .some(([key]) => !collectCarReuploadMedia[key]);
+  const isCollectCarPending = !isReadOnly && !collectCarCompleted;
+  useEffect(() => {
+    if (isCollectCarPending) setInspectionStep(1);
+  }, [isCollectCarPending]);
   const currentStatus = String(inspection?.status ?? "pending").toLowerCase();
   const isWorkshopView = forceWorkshopView || searchParams.get("view") === "workshop" || Boolean(workshopBranchIdProp);
   const workshopBranchId = workshopBranchIdProp ?? searchParams.get("branchId");
@@ -393,7 +572,17 @@ export function InspectionDetailPageClient({
     carInMileage: form.carInMileage,
     customerComplain: form.customerComplain,
     inspectorRemarks: form.inspectorRemarks,
+    inspectionIssueNotes,
     checks,
+    processChecks,
+    processCheckMedia,
+    tyreSizeFront,
+    tyreSizeRear,
+    clusterImageId,
+    inspectionVin: inspectionVin.trim().toUpperCase(),
+    inspectionMake: inspectionMake.trim(),
+    inspectionModel: inspectionModel.trim(),
+    inspectionYear: inspectionYear.trim(),
     parts: rows.map((p) => ({
       id: p.id,
       productId: p.productId ?? null,
@@ -412,6 +601,144 @@ export function InspectionDetailPageClient({
     customerApprovedBy: approvals?.customerApprovedBy ?? customerApprovedBy,
     activityLogs,
   });
+
+  const collectMediaLabel = (key: string) => {
+    const normalized = key.toLowerCase();
+    if (normalized.includes("front")) return "Front Image";
+    if (normalized.includes("rear")) return "Rear Image";
+    if (normalized.includes("left")) return "Left Image";
+    if (normalized.includes("right")) return "Right Image";
+    if (normalized.includes("cluster")) return "Cluster Image";
+    if (normalized.includes("video")) return "Video";
+    return key.replace(/[_-]+/g, " ");
+  };
+  const isVideoMediaKey = (key: string) => key.toLowerCase().includes("video");
+
+  const saveCollectCarReview = async () => {
+    if (!companyId || !inspectionId) return;
+    if (!collectCarDifference) {
+      toast.error("Choose whether there is any difference before collecting car.");
+      return;
+    }
+    if (collectCarNeedsReupload && collectCarMissingReupload) {
+      toast.error("Upload replacement media for all available source files.");
+      return;
+    }
+    setCollectCarSaving(true);
+    setError(null);
+    const actionAt = new Date().toISOString();
+    const hasDifference = collectCarDifference === "yes";
+    const reuploadMedia = collectCarNeedsReupload
+      ? Object.entries(collectCarReuploadMedia).reduce((acc, [key, fileId]) => {
+          if (fileId) acc[key] = fileId;
+          return acc;
+        }, {} as Record<string, string>)
+      : {};
+    try {
+      const res = await fetch(`/api/company/${companyId}/workshop/inspections/${inspectionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "collect_car_review",
+          hasDifference,
+          note: collectCarNote.trim() || null,
+          reuploadMedia,
+          reviewedBy: actorName || form.inspectorName || "System",
+        }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.error ?? "Failed to save collect-car stage.");
+      setCollectCar((prev) => ({
+        ...(prev ?? {}),
+        latestReview: {
+          completed: true,
+          hasDifference,
+          note: collectCarNote.trim() || null,
+          reviewedAt: actionAt,
+          reviewedBy: actorName || form.inspectorName || "System",
+          reuploadMedia,
+        },
+        logs: [
+          {
+            id: `${actionAt}-${Math.random().toString(36).slice(2, 8)}`,
+            hasDifference,
+            note: collectCarNote.trim() || null,
+            reviewedAt: actionAt,
+            reviewedBy: actorName || form.inspectorName || "System",
+          },
+          ...(Array.isArray(prev?.logs) ? prev!.logs : []),
+        ],
+      }));
+      toast.success("Collect car stage completed.");
+    } catch (err: any) {
+      setError(err?.message ?? "Failed to save collect car stage");
+    } finally {
+      setCollectCarSaving(false);
+    }
+  };
+
+  const updateProcessCheck = (key: ProcessCheckKey, value: ProcessCheckValue) => {
+    setProcessChecks((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const autoFillVehicleFromVin = async () => {
+    if (!companyId) return;
+    const vin = inspectionVin.trim().toUpperCase();
+    if (!vin) {
+      setVinLookupNote("Enter VIN first.");
+      return;
+    }
+    setVinLookupLoading(true);
+    setVinLookupNote(null);
+    try {
+      const localRes = await fetch(`/api/cars?companyId=${companyId}&search=${encodeURIComponent(vin)}&pageSize=50`, {
+        cache: "no-store",
+      });
+      const localJson = localRes.ok ? await localRes.json().catch(() => ({})) : {};
+      const localCars = Array.isArray(localJson?.data) ? localJson.data : [];
+      const exact = localCars.find((row: any) => String(row?.vin ?? "").trim().toUpperCase() === vin);
+      if (exact) {
+        setInspectionMake((prev) => prev || String(exact?.make ?? ""));
+        setInspectionModel((prev) => prev || String(exact?.model ?? ""));
+        setInspectionYear((prev) => prev || String(exact?.modelYear ?? exact?.model_year ?? ""));
+        setTyreSizeFront((prev) => prev || String(exact?.tyreSizeFront ?? exact?.tyre_size_front ?? ""));
+        setTyreSizeRear((prev) => prev || String(exact?.tyreSizeBack ?? exact?.tyre_size_back ?? ""));
+        if (!form.carInMileage && (exact?.mileage ?? null) !== null) {
+          setForm((prev) => ({ ...prev, carInMileage: String(exact?.mileage ?? "") }));
+        }
+        setVinLookupNote(`VIN found in database${exact?.code ? ` (${exact.code})` : ""}. Car data loaded.`);
+        return;
+      }
+
+      if (!leadId) {
+        setVinLookupNote("VIN not found in database.");
+        return;
+      }
+
+      const vinRes = await fetch(
+        `/api/company/${companyId}/sales/leads/${leadId}/vin-lookup?vin=${encodeURIComponent(vin)}`,
+        { cache: "no-store" }
+      );
+      if (!vinRes.ok) {
+        const err = await vinRes.json().catch(() => ({}));
+        throw new Error(String(err?.error ?? "VIN lookup failed"));
+      }
+      const vinJson = await vinRes.json().catch(() => ({}));
+      const vinCar = vinJson?.data?.car ?? null;
+      if (vinCar) {
+        setInspectionMake((prev) => prev || String(vinCar?.make ?? ""));
+        setInspectionModel((prev) => prev || String(vinCar?.model ?? ""));
+        setInspectionYear((prev) => prev || String(vinCar?.year ?? ""));
+        setVinLookupNote("VIN decoded from catalog and vehicle fields auto-filled.");
+      } else {
+        setVinLookupNote("VIN lookup finished with no matched vehicle details.");
+      }
+    } catch (err: any) {
+      setVinLookupNote(err?.message ?? "VIN lookup failed.");
+    } finally {
+      setVinLookupLoading(false);
+    }
+  };
 
 
   const updatePart = (
@@ -487,6 +814,21 @@ export function InspectionDetailPageClient({
   };
 
   const serializeChecksForCompare = (value: Record<string, CheckValue>) => JSON.stringify(value ?? {});
+  const processChecksCompleted = processCheckItems.every(
+    (item) => Boolean(processChecks[item.key]) && Boolean(processCheckMedia[item.key])
+  );
+  const hasAnyProcessIssue = processCheckItems.some((item) => processChecks[item.key] === "issue");
+  const step1Complete = isReadOnly || collectCarCompleted;
+  const step2Complete = isReadOnly || Boolean(startedAt);
+  const step3Complete =
+    isReadOnly || (processChecksCompleted && (!hasAnyProcessIssue || Boolean((inspectionIssueNotes ?? "").trim())));
+  const step4Complete =
+    isReadOnly ||
+    (Boolean((tyreSizeFront ?? "").trim()) &&
+      Boolean((tyreSizeRear ?? "").trim()) &&
+      Boolean((form.carInMileage ?? "").trim()) &&
+      Boolean(clusterImageId) &&
+      Boolean((inspectionVin ?? "").trim()));
   const hasUnsavedLineItems = parts.some((p) => !p.isSaved);
   const hasUnsavedChanges =
     !isReadOnly &&
@@ -494,13 +836,67 @@ export function InspectionDetailPageClient({
       serializePartsForCompare(parts) !== initialPartsSignatureRef.current ||
       serializeChecksForCompare(checks) !== initialChecksSignatureRef.current);
   const requiredMediaMissing = parts.some((row) => getMediaRequirement(row).required && !row.mediaFileId);
+  const step5Complete = isReadOnly || (!hasUnsavedLineItems && !requiredMediaMissing && parts.length > 0);
   const canCompleteInspection =
     !saving &&
     !isReadOnly &&
+    !isCollectCarPending &&
+    step3Complete &&
+    step4Complete &&
+    step5Complete &&
     Boolean(companyId && inspectionId) &&
     !hasUnsavedLineItems &&
     !requiredMediaMissing &&
     Boolean((form.inspectorRemarks ?? "").trim());
+  const inspectionSteps = [
+    { id: 1, label: "Collect Car", done: step1Complete },
+    { id: 2, label: "Start Inspection", done: step2Complete },
+    { id: 3, label: "Checks & Notes", done: step3Complete },
+    { id: 4, label: "Vehicle Data", done: step4Complete },
+    { id: 5, label: "Line Items", done: step5Complete },
+    { id: 6, label: "Review & Complete", done: Boolean(completedAt) || canCompleteInspection },
+  ];
+  const canOpenStep = (stepId: number) => {
+    if (stepId <= 1 || isReadOnly) return true;
+    if (stepId === 2) return step1Complete;
+    if (stepId === 3) return step1Complete && step2Complete;
+    if (stepId === 4) return step1Complete && step2Complete && step3Complete;
+    if (stepId === 5) return step1Complete && step2Complete && step3Complete && step4Complete;
+    return step1Complete && step2Complete && step3Complete && step4Complete && step5Complete;
+  };
+  const aiQuestions = useMemo(() => {
+    if (inspectionStep === 1) {
+      return [
+        "Do source photos/videos match the current car condition?",
+        "If there is a mismatch, did you upload replacement media for each required angle?",
+      ];
+    }
+    if (inspectionStep === 2) {
+      return ["Is collect car stage completed?", "Ready to mark inspection as started now?"];
+    }
+    if (inspectionStep === 3) {
+      return [
+        "Did you record issues/damages in notes?",
+        "Are Oil, Battery, Tyre and OBD checks completed with images?",
+      ];
+    }
+    if (inspectionStep === 4) {
+      return [
+        "Did you enter tyre size front/rear and mileage with cluster image?",
+        "Did VIN lookup return make/model/year or an existing car match?",
+      ];
+    }
+    if (inspectionStep === 5) {
+      return [
+        "Did you add all required parts/line items?",
+        "Are all line items saved with mandatory media attached?",
+      ];
+    }
+    return [
+      "Before completion: are all mandatory steps done and inspector remarks added?",
+      "Do you want to update draft one last time before completing inspection?",
+    ];
+  }, [inspectionStep]);
   const progressStages = [
     { key: "pending", label: "Draft", done: true },
     { key: "started", label: "Started", done: Boolean(startedAt) },
@@ -566,6 +962,10 @@ export function InspectionDetailPageClient({
       toast.error("Verified/cancelled inspection is read-only.");
       return;
     }
+    if (isCollectCarPending) {
+      toast.error("Complete Collect Car stage first.");
+      return;
+    }
     if (!companyId || !inspectionId || !leadId) {
       toast.error("Missing inspection context to save video.");
       return;
@@ -626,7 +1026,7 @@ export function InspectionDetailPageClient({
   const carInDropzone = useDropzone({
     accept: { "video/*": [] },
     multiple: false,
-    disabled: isReadOnly || videoUploading !== null,
+    disabled: isReadOnly || isCollectCarPending || videoUploading !== null,
     onDrop: (acceptedFiles) => {
       const file = acceptedFiles?.[0];
       if (!file) return;
@@ -637,7 +1037,7 @@ export function InspectionDetailPageClient({
   const carOutDropzone = useDropzone({
     accept: { "video/*": [] },
     multiple: false,
-    disabled: isReadOnly || videoUploading !== null,
+    disabled: isReadOnly || isCollectCarPending || videoUploading !== null,
     onDrop: (acceptedFiles) => {
       const file = acceptedFiles?.[0];
       if (!file) return;
@@ -649,6 +1049,10 @@ export function InspectionDetailPageClient({
     if (!companyId || !inspectionId) return;
     if (isReadOnly) {
       toast.error("Verified/cancelled inspection is read-only.");
+      return;
+    }
+    if (isCollectCarPending) {
+      toast.error("Complete Collect Car stage first.");
       return;
     }
     const row = parts[index];
@@ -734,6 +1138,10 @@ export function InspectionDetailPageClient({
       toast.error("Verified/cancelled inspection is read-only.");
       return;
     }
+    if (isCollectCarPending) {
+      toast.error("Complete Collect Car stage first.");
+      return;
+    }
     const row = parts[index];
     if (row?.partOrdered === 1 || row?.orderStatus === "Ordered" || row?.orderStatus === "Received") {
       toast.error("Ordered/received items cannot be deleted.");
@@ -748,6 +1156,27 @@ export function InspectionDetailPageClient({
     setParts((prev) => prev.filter((_, i) => i !== index));
     toast.success("Line item deleted successfully.");
   };
+
+  const nextStepValidationMessage = () => {
+    if (inspectionStep === 1 && !step1Complete) return "Complete Collect Car stage first.";
+    if (inspectionStep === 2 && !step2Complete) return "Start inspection before moving to next step.";
+    if (inspectionStep === 3 && !step3Complete) return "Complete notes and Oil/Battery/Tyre/OBD checks with images.";
+    if (inspectionStep === 4 && !step4Complete) return "Complete tyre sizes, mileage, cluster image and VIN.";
+    if (inspectionStep === 5 && !step5Complete) return "Save all line items and required media before review.";
+    return "Please complete the current step.";
+  };
+
+  const goNextStep = () => {
+    const next = Math.min(6, inspectionStep + 1);
+    if (next === inspectionStep) return;
+    if (!canOpenStep(next)) {
+      toast.error(nextStepValidationMessage());
+      return;
+    }
+    setInspectionStep(next);
+  };
+
+  const goPrevStep = () => setInspectionStep((prev) => Math.max(1, prev - 1));
 
   return (
     <AppLayout hideSidebar={isWorkshopView}>
@@ -810,12 +1239,32 @@ export function InspectionDetailPageClient({
               ))}
             </div>
           </div>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            {inspectionSteps.map((step) => (
+              <button
+                key={step.id}
+                type="button"
+                disabled={!canOpenStep(step.id)}
+                onClick={() => setInspectionStep(step.id)}
+                className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide transition ${
+                  inspectionStep === step.id
+                    ? "border-cyan-400 bg-cyan-500/20 text-cyan-200"
+                    : step.done
+                    ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-300"
+                    : "border-white/15 text-white/70"
+                } disabled:cursor-not-allowed disabled:opacity-40`}
+              >
+                Step {step.id}: {step.label}
+              </button>
+            ))}
+          </div>
           <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-white/70">
             <span className={hasUnsavedChanges ? "text-amber-300" : "text-emerald-300"}>
               {hasUnsavedChanges ? "Unsaved changes" : "All changes saved"}
             </span>
             {!isReadOnly && (
               <>
+              {isCollectCarPending && <span className="text-amber-300">Collect Car stage is required before inspection workflow.</span>}
               {hasUnsavedLineItems && <span className="text-amber-300">Save all line items before completion.</span>}
               {requiredMediaMissing && <span className="text-amber-300">Required part media is missing.</span>}
               {!form.inspectorRemarks?.trim() && <span className="text-amber-300">Inspector remarks are required.</span>}
@@ -824,6 +1273,14 @@ export function InspectionDetailPageClient({
               )}
               </>
             )}
+          </div>
+          <div className="mt-2 rounded-md border border-cyan-500/20 bg-cyan-500/5 p-2">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-cyan-200">AI Inspection Guide</div>
+            <div className="mt-1 space-y-1 text-xs text-cyan-100/90">
+              {aiQuestions.map((q, idx) => (
+                <div key={`${inspectionStep}-q-${idx}`}>- {q}</div>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -852,6 +1309,169 @@ export function InspectionDetailPageClient({
               {loading && <div className="text-xs text-white/60">Loading...</div>}
             </div>
             <div className="pt-4">
+              {inspectionStep === 1 && (
+              <div className="mt-3 rounded-md border border-white/10 bg-white/[0.02] p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-white/70">Collect Car</div>
+                  <span
+                    className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${
+                      collectCarCompleted ? "bg-emerald-500/15 text-emerald-300" : "bg-amber-500/15 text-amber-300"
+                    }`}
+                  >
+                    {collectCarCompleted ? "Completed" : "Pending"}
+                  </span>
+                </div>
+                <div className="mt-1 text-[11px] text-white/60">
+                  Source:{" "}
+                  <span className="font-semibold text-white/80">
+                    {collectCarSourceType === "recovery"
+                      ? "Recovery Pickup"
+                      : collectCarSourceType === "walkin"
+                      ? "Walk-in Check-in"
+                      : "Unknown"}
+                  </span>
+                </div>
+                {collectCarLatestReview?.reviewedAt && (
+                  <div className="mt-1 text-[11px] text-white/60">
+                    Reviewed at: {new Date(String(collectCarLatestReview.reviewedAt)).toLocaleString()}
+                    {collectCarLatestReview?.reviewedBy ? ` by ${collectCarLatestReview.reviewedBy}` : ""}
+                  </div>
+                )}
+                <div className="mt-3 grid gap-2 lg:grid-cols-2">
+                  {Object.entries(collectCarSourceMedia).filter(([, fileId]) => Boolean(fileId)).length === 0 ? (
+                    <div className="rounded border border-dashed border-white/20 p-2 text-xs text-white/60 lg:col-span-2">
+                      No source media found.
+                    </div>
+                  ) : (
+                    Object.entries(collectCarSourceMedia)
+                      .filter(([, fileId]) => Boolean(fileId))
+                      .map(([key, fileId]) => (
+                        <div key={key} className="rounded border border-white/10 bg-black/20 p-2">
+                          <div className="text-[11px] text-white/70">{collectMediaLabel(key)}</div>
+                          <div className="mt-2">
+                            {isVideoMediaKey(key) ? (
+                              <video
+                                className="h-28 w-full rounded border border-white/10 object-cover"
+                                controls
+                                preload="metadata"
+                                src={`/api/files/${fileId}`}
+                              />
+                            ) : (
+                              <img
+                                className="h-28 w-full rounded border border-white/10 object-cover"
+                                src={`/api/files/${fileId}`}
+                                alt={collectMediaLabel(key)}
+                              />
+                            )}
+                          </div>
+                          <a
+                            href={`/api/files/${fileId}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mt-1 inline-block text-xs text-primary hover:underline"
+                          >
+                            Open file
+                          </a>
+                          {collectCarNeedsReupload && !isReadOnly && (
+                            <div className="mt-2">
+                              <FileUploader
+                                label=""
+                                kind={isVideoMediaKey(key) ? "video" : "image"}
+                                value={collectCarReuploadMedia[key] ?? ""}
+                                onChange={(id) =>
+                                  setCollectCarReuploadMedia((prev) => ({ ...prev, [key]: String(id ?? "") }))
+                                }
+                                buttonOnly
+                                showPreview
+                                buttonClassName="h-9"
+                              />
+                              {collectCarReuploadMedia[key] && (
+                                <div className="mt-2">
+                                  {isVideoMediaKey(key) ? (
+                                    <video
+                                      className="h-28 w-full rounded border border-emerald-500/30 object-cover"
+                                      controls
+                                      preload="metadata"
+                                      src={`/api/files/${collectCarReuploadMedia[key]}`}
+                                    />
+                                  ) : (
+                                    <img
+                                      className="h-28 w-full rounded border border-emerald-500/30 object-cover"
+                                      src={`/api/files/${collectCarReuploadMedia[key]}`}
+                                      alt={`Reupload ${collectMediaLabel(key)}`}
+                                    />
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ))
+                  )}
+                </div>
+                {!isReadOnly && (
+                  <>
+                    <div className="mt-3">
+                      <div className="text-[11px] text-white/70">Any difference between source media and received car?</div>
+                      <div className="mt-1 flex items-center gap-3 text-xs">
+                        <label className="flex items-center gap-1 text-white/80">
+                          <input
+                            type="radio"
+                            name="collect-car-difference"
+                            checked={collectCarDifference === "no"}
+                            onChange={() => setCollectCarDifference("no")}
+                            className="h-3.5 w-3.5"
+                          />
+                          No difference
+                        </label>
+                        <label className="flex items-center gap-1 text-white/80">
+                          <input
+                            type="radio"
+                            name="collect-car-difference"
+                            checked={collectCarDifference === "yes"}
+                            onChange={() => setCollectCarDifference("yes")}
+                            className="h-3.5 w-3.5"
+                          />
+                          Yes, there is a difference
+                        </label>
+                      </div>
+                    </div>
+                    <div className="mt-3">
+                      <label className="text-[11px] font-semibold text-white/70">Notes</label>
+                      <textarea
+                        className={theme.input}
+                        rows={2}
+                        value={collectCarNote}
+                        onChange={(e) => setCollectCarNote(e.target.value)}
+                        placeholder="Optional notes about mismatch/review."
+                      />
+                    </div>
+                    <div className="mt-3 flex items-center justify-end">
+                      <button
+                        type="button"
+                        className="rounded-md bg-cyan-600 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white"
+                        disabled={collectCarSaving || collectCarCompleted}
+                        onClick={saveCollectCarReview}
+                      >
+                        {collectCarSaving ? "Saving..." : collectCarCompleted ? "Collect Car Completed" : "Save Collect Car Stage"}
+                      </button>
+                    </div>
+                  </>
+                )}
+                {collectCarLogs.length > 0 && (
+                  <div className="mt-3 space-y-1">
+                    {collectCarLogs.slice(0, 3).map((log, idx) => (
+                      <div key={String(log?.id ?? idx)} className="rounded bg-white/5 px-2 py-1 text-[10px] text-white/75">
+                        Review: {log?.hasDifference ? "Difference found" : "No difference"} at{" "}
+                        {log?.reviewedAt ? new Date(String(log.reviewedAt)).toLocaleString() : "-"}
+                        {log?.reviewedBy ? ` by ${log.reviewedBy}` : ""}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              )}
+              {inspectionStep >= 3 && (
               <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
                 <div className="flex items-center justify-between gap-2">
                   <div className="text-xs font-semibold uppercase tracking-wide text-white/70">Pre-Inspection Form</div>
@@ -874,18 +1494,39 @@ export function InspectionDetailPageClient({
                 )}
                 {preInspection?.status === "submitted" && preInspection?.answers && (
                   <div className="mt-3 grid gap-2 lg:grid-cols-2">
-                    {Object.entries(preInspectionQuestionLabels).map(([key, label]) => {
-                      const answer = preInspection?.answers?.[key];
-                      if (!answer) return null;
-                      const choice = String(answer?.choice ?? "").toLowerCase();
+                    {Object.entries(preInspection.answers as Record<string, unknown>)
+                      .filter(([key]) => !isSystemPreInspectionKey(key))
+                      .map(([key, answer]) => {
+                      if (answer === null || answer === undefined) return null;
+                      const rawChoice =
+                        answer && typeof answer === "object" && !Array.isArray(answer)
+                          ? (answer as Record<string, unknown>)?.choice
+                          : null;
+                      const choice = String(rawChoice ?? "").toLowerCase();
+                      const summary = choice
+                        ? choice === "yes"
+                          ? "Yes"
+                          : choice === "no"
+                          ? "No"
+                          : String(rawChoice)
+                        : toDisplayText(answer) || "-";
+                      const details = collectPreInspectionDetails(answer);
                       return (
                         <div key={key} className="rounded border border-white/10 bg-black/20 p-2">
-                          <div className="text-[11px] text-white/70">{label}</div>
-                          <div className="mt-1 text-xs font-semibold text-white">
-                            {choice === "yes" ? "Yes" : choice === "no" ? "No" : "-"}
+                          <div className="text-[11px] text-white/70">
+                            {preInspectionQuestionLabels[key] ?? formatQuestionKeyLabel(key)}
                           </div>
-                          {String(answer?.details ?? "").trim() && (
-                            <div className="mt-1 text-[11px] text-white/70">{String(answer.details)}</div>
+                          <div className="mt-1 text-xs font-semibold text-white">
+                            {summary}
+                          </div>
+                          {details.length > 0 && (
+                            <div className="mt-1 space-y-1">
+                              {details.map((item, idx) => (
+                                <div key={`${key}-${item.key}-${idx}`} className="text-[11px] text-white/70">
+                                  <span className="text-white/50">{formatDetailKey(item.key)}:</span> {item.value}
+                                </div>
+                              ))}
+                            </div>
                           )}
                         </div>
                       );
@@ -893,8 +1534,19 @@ export function InspectionDetailPageClient({
                   </div>
                 )}
               </div>
+              )}
             </div>
-            <div className="grid gap-4 pt-4 lg:grid-cols-2">
+            {inspectionStep >= 2 && (
+            <>
+            {inspectionStep === 2 && (
+              <div className="rounded-md border border-cyan-500/30 bg-cyan-500/10 p-3 text-xs text-cyan-100">
+                <div className="font-semibold uppercase tracking-wide">Step 2: Start Inspection</div>
+                <div className="mt-1">
+                  Confirm collect car review is done, then use the Start button below to begin inspection.
+                </div>
+              </div>
+            )}
+            <div className={`grid gap-4 pt-4 lg:grid-cols-2 ${inspectionStep === 3 ? "" : "hidden"}`}>
               <div className="lg:col-span-2 flex items-center justify-between">
                 <div className="text-xs font-semibold uppercase tracking-wide text-white/70">Checklist</div>
                 {!isReadOnly && (
@@ -931,12 +1583,12 @@ export function InspectionDetailPageClient({
                             type="radio"
                             name={`check-${item.key}`}
                             checked={isChecked}
-                            aria-disabled={isReadOnly}
+                            aria-disabled={isReadOnly || isCollectCarPending}
                             onChange={() => {
-                              if (isReadOnly) return;
+                              if (isReadOnly || isCollectCarPending) return;
                               updateCheck(item.key, val);
                             }}
-                            className={`h-3.5 w-3.5 ${isReadOnly ? "cursor-default" : "cursor-pointer"}`}
+                            className={`h-3.5 w-3.5 ${isReadOnly || isCollectCarPending ? "cursor-default" : "cursor-pointer"}`}
                             style={{
                               accentColor:
                                 val === "good" ? "#34d399" : val === "avg" ? "#fbbf24" : "#fb7185",
@@ -951,7 +1603,7 @@ export function InspectionDetailPageClient({
               ))}
             </div>
 
-            <div className="mt-6 grid gap-3 lg:grid-cols-3">
+            <div className={`mt-6 grid gap-3 lg:grid-cols-3 ${inspectionStep === 3 ? "" : "hidden"}`}>
               <div>
                 <label className="text-xs font-semibold text-white/70">Lead Branch</label>
                 <input
@@ -978,14 +1630,14 @@ export function InspectionDetailPageClient({
                   type="text"
                   className={theme.input}
                   value={form.carInMileage}
-                  readOnly={isReadOnly}
+                  readOnly={isReadOnly || isCollectCarPending}
                   onChange={(e) => setForm((prev) => ({ ...prev, carInMileage: e.target.value }))}
                   placeholder="543367685"
                 />
               </div>
             </div>
 
-            <div className="mt-4 grid gap-3 lg:grid-cols-2">
+            <div className={`mt-4 grid gap-3 lg:grid-cols-2 ${inspectionStep === 3 ? "" : "hidden"}`}>
               <div>
                 <label className="text-xs font-semibold text-white/70">Customer Complain</label>
                 <textarea
@@ -1001,13 +1653,13 @@ export function InspectionDetailPageClient({
                   className={theme.input}
                   rows={4}
                   value={form.inspectorRemarks}
-                  readOnly={isReadOnly}
+                  readOnly={isReadOnly || isCollectCarPending}
                   onChange={(e) => setForm((prev) => ({ ...prev, inspectorRemarks: e.target.value }))}
                 />
               </div>
             </div>
 
-            <div className="mt-6">
+            <div className={`mt-6 ${inspectionStep === 3 ? "" : "hidden"}`}>
               <div className="text-sm font-semibold">Inspection Videos</div>
               <div className={`mt-2 rounded-md ${theme.cardBorder} ${theme.surfaceSubtle} p-3`}>
                 <div className="grid gap-3 lg:grid-cols-2">
@@ -1101,7 +1753,165 @@ export function InspectionDetailPageClient({
               </div>
             </div>
 
-            <div className="mt-6">
+            <div className={`mt-6 ${inspectionStep === 3 ? "" : "hidden"}`}>
+              <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
+                <div className="text-sm font-semibold">Issues and Mandatory Checks</div>
+                <div className="mt-3">
+                  <label className="text-xs font-semibold text-white/70">Issues / Damages Notes</label>
+                  <textarea
+                    className={theme.input}
+                    rows={3}
+                    value={inspectionIssueNotes}
+                    readOnly={isReadOnly || isCollectCarPending}
+                    onChange={(e) => setInspectionIssueNotes(e.target.value)}
+                    placeholder="Add notes for any issue/damage found during inspection."
+                  />
+                </div>
+                <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                  {processCheckItems.map((item) => (
+                    <div key={item.key} className="rounded-md border border-white/10 bg-black/20 p-3">
+                      <div className="text-xs font-semibold text-white/80">{item.label}</div>
+                      <div className="mt-2 flex items-center gap-3 text-xs">
+                        {(["ok", "issue", "na"] as ProcessCheckValue[]).map((value) => (
+                          <label key={value} className="flex items-center gap-1 text-white/80">
+                            <input
+                              type="radio"
+                              name={`process-${item.key}`}
+                              checked={processChecks[item.key] === value}
+                              disabled={isReadOnly || isCollectCarPending}
+                              onChange={() => updateProcessCheck(item.key, value)}
+                              className="h-3.5 w-3.5"
+                            />
+                            <span className="uppercase">{value}</span>
+                          </label>
+                        ))}
+                      </div>
+                      <div className="mt-2">
+                        <FileUploader
+                          label={`${item.label} image`}
+                          kind="image"
+                          value={processCheckMedia[item.key] ?? ""}
+                          onChange={(id) => setProcessCheckMedia((prev) => ({ ...prev, [item.key]: String(id ?? "") }))}
+                          disabled={isReadOnly || isCollectCarPending}
+                          buttonOnly
+                          showPreview
+                          buttonClassName="h-9"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className={`mt-6 ${inspectionStep === 4 ? "" : "hidden"}`}>
+              <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
+                <div className="text-sm font-semibold">Vehicle Data and VIN</div>
+                <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                  <div>
+                    <label className="text-xs font-semibold text-white/70">Tyre Size (Front)</label>
+                    <input
+                      type="text"
+                      className={theme.input}
+                      value={tyreSizeFront}
+                      readOnly={isReadOnly || isCollectCarPending}
+                      onChange={(e) => setTyreSizeFront(e.target.value)}
+                      placeholder="e.g. 235/55R18"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-white/70">Tyre Size (Rear)</label>
+                    <input
+                      type="text"
+                      className={theme.input}
+                      value={tyreSizeRear}
+                      readOnly={isReadOnly || isCollectCarPending}
+                      onChange={(e) => setTyreSizeRear(e.target.value)}
+                      placeholder="e.g. 255/50R18"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-white/70">Car Mileage</label>
+                    <input
+                      type="text"
+                      className={theme.input}
+                      value={form.carInMileage}
+                      readOnly={isReadOnly || isCollectCarPending}
+                      onChange={(e) => setForm((prev) => ({ ...prev, carInMileage: e.target.value }))}
+                      placeholder="Current odometer reading"
+                    />
+                  </div>
+                  <div>
+                    <FileUploader
+                      label="Cluster Image"
+                      kind="image"
+                      value={clusterImageId}
+                      onChange={(id) => setClusterImageId(String(id ?? ""))}
+                      disabled={isReadOnly || isCollectCarPending}
+                      buttonOnly
+                      showPreview
+                      buttonClassName="h-10"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-white/70">VIN</label>
+                    <input
+                      type="text"
+                      className={theme.input}
+                      value={inspectionVin}
+                      readOnly={isReadOnly || isCollectCarPending}
+                      onChange={(e) => setInspectionVin(e.target.value.toUpperCase())}
+                      placeholder="Enter VIN"
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    <button
+                      type="button"
+                      className="rounded-md bg-cyan-600 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white"
+                      disabled={isReadOnly || isCollectCarPending || vinLookupLoading}
+                      onClick={autoFillVehicleFromVin}
+                    >
+                      {vinLookupLoading ? "Checking VIN..." : "Check VIN and Fetch Data"}
+                    </button>
+                  </div>
+                </div>
+                {vinLookupNote && <div className="mt-2 text-xs text-cyan-200">{vinLookupNote}</div>}
+                <div className="mt-3 grid gap-3 lg:grid-cols-3">
+                  <div>
+                    <label className="text-xs font-semibold text-white/70">Car Make</label>
+                    <input
+                      type="text"
+                      className={theme.input}
+                      value={inspectionMake}
+                      readOnly={isReadOnly || isCollectCarPending}
+                      onChange={(e) => setInspectionMake(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-white/70">Car Model</label>
+                    <input
+                      type="text"
+                      className={theme.input}
+                      value={inspectionModel}
+                      readOnly={isReadOnly || isCollectCarPending}
+                      onChange={(e) => setInspectionModel(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-white/70">Car Year</label>
+                    <input
+                      type="text"
+                      className={theme.input}
+                      value={inspectionYear}
+                      readOnly={isReadOnly || isCollectCarPending}
+                      onChange={(e) => setInspectionYear(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className={`mt-6 ${inspectionStep === 5 ? "" : "hidden"}`}>
               <div className="flex items-center justify-between gap-2">
                 <div className="text-sm font-semibold">Findings / Parts Needed</div>
                 <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
@@ -1128,7 +1938,7 @@ export function InspectionDetailPageClient({
                 <div className="mt-2 space-y-2">
                   {parts.map((row, index) => {
                     const isLocked =
-                      isReadOnly || row.partOrdered === 1 || row.orderStatus === "Ordered" || row.orderStatus === "Received";
+                      isReadOnly || isCollectCarPending || row.partOrdered === 1 || row.orderStatus === "Ordered" || row.orderStatus === "Received";
                     return (
                       <div
                         key={index}
@@ -1264,7 +2074,7 @@ export function InspectionDetailPageClient({
                         >
                           Delete
                         </button>
-                        {!isReadOnly && !row.isSaved && (
+                        {!isReadOnly && !isCollectCarPending && !row.isSaved && (
                           <span className="text-[11px] text-amber-400">Please save this item</span>
                         )}
                         {isLocked && (
@@ -1275,7 +2085,7 @@ export function InspectionDetailPageClient({
                   );
                   })}
                 </div>
-                {!isReadOnly && (
+                {!isReadOnly && !isCollectCarPending && (
                   <div className="mt-3 flex items-center gap-2">
                     <button
                       type="button"
@@ -1295,7 +2105,32 @@ export function InspectionDetailPageClient({
               </div>
             </div>
 
-            <div className="mt-6 flex items-center justify-end gap-2">
+            <div className="mt-6 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className="rounded-md border border-white/20 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-white/80 hover:bg-white/10"
+                  onClick={goPrevStep}
+                  disabled={inspectionStep <= 1}
+                >
+                  Previous
+                </button>
+                <button
+                  type="button"
+                  className="rounded-md bg-cyan-600 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-white"
+                  onClick={goNextStep}
+                  disabled={inspectionStep >= 6}
+                >
+                  Next Step
+                </button>
+              </div>
+            </div>
+
+            <div
+              className={`mt-6 flex items-center justify-end gap-2 ${
+                inspectionStep === 6 || (inspectionStep === 2 && !startedAt) || isReadOnly ? "" : "hidden"
+              }`}
+            >
               {isReadOnly ? (
                 <button
                   type="button"
@@ -1308,7 +2143,7 @@ export function InspectionDetailPageClient({
                 <button
                   type="button"
                   className={`rounded-md px-6 py-2 text-xs font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
-                  disabled={saving || !companyId || !inspectionId}
+                  disabled={saving || isCollectCarPending || !companyId || !inspectionId}
                   onClick={async () => {
                     if (!companyId || !inspectionId) return;
                     setSaving(true);
@@ -1365,7 +2200,7 @@ export function InspectionDetailPageClient({
                   <button
                     type="button"
                     className={`rounded-md px-6 py-2 text-xs font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
-                    disabled={saving || !companyId || !inspectionId}
+                    disabled={saving || isCollectCarPending || !companyId || !inspectionId}
                     onClick={async () => {
                       if (!companyId || !inspectionId) return;
                       setSaving(true);
@@ -1429,7 +2264,7 @@ export function InspectionDetailPageClient({
                         className={`rounded-md px-4 py-2 text-xs font-semibold uppercase tracking-wide ${
                           advisorApproved ? "bg-emerald-600 text-white" : "bg-amber-600 text-white"
                         }`}
-                        disabled={saving || advisorApproved || !companyId || !inspectionId}
+                        disabled={saving || isCollectCarPending || advisorApproved || !companyId || !inspectionId}
                         onClick={async () => {
                           if (!companyId || !inspectionId || advisorApproved) return;
                           setSaving(true);
@@ -1468,7 +2303,7 @@ export function InspectionDetailPageClient({
                         className={`rounded-md px-4 py-2 text-xs font-semibold uppercase tracking-wide ${
                           customerApproved ? "bg-emerald-600 text-white" : "bg-cyan-600 text-white"
                         }`}
-                        disabled={saving || customerApproved || !companyId || !inspectionId}
+                        disabled={saving || isCollectCarPending || customerApproved || !companyId || !inspectionId}
                         onClick={async () => {
                           if (!companyId || !inspectionId || customerApproved) return;
                           setSaving(true);
@@ -1577,7 +2412,7 @@ export function InspectionDetailPageClient({
               )}
             </div>
 
-            <div className="mt-6 rounded-md bg-white/5 p-3">
+            <div className={`mt-6 rounded-md bg-white/5 p-3 ${inspectionStep === 6 || isReadOnly ? "" : "hidden"}`}>
               <div className="text-sm font-semibold">Inspection Log</div>
               <div className="mt-2 space-y-1 text-xs text-white/80">
                 {startedAt && (
@@ -1637,6 +2472,8 @@ export function InspectionDetailPageClient({
                 )}
               </div>
             </div>
+            </>
+            )}
           </Card>
 
           <div className="space-y-4">

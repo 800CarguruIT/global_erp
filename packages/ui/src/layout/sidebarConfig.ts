@@ -54,6 +54,8 @@ export const SIDEBAR_CONFIG: Record<NavScope, Partial<Record<NavCategory, Sideba
       { labelKey: "global.nav.main", href: "/company/[companyId]" },
       { labelKey: "global.nav.callCenter", href: "/company/[companyId]/call-center" },
       { labelKey: "global.nav.leads", href: "/company/[companyId]/leads" },
+      { label: "Leads Booking", href: "/company/[companyId]/leads/booking", permissionKeys: ["leads.view"] },
+      { label: "Queue System", href: "/company/[companyId]/leads/queue", permissionKeys: ["leads.view"] },
       { labelKey: "global.nav.marketing", href: "/company/[companyId]/marketing" },
       { labelKey: "global.nav.hr", href: "/company/[companyId]/hr" },
       { label: "Roles & Permissions", href: "/company/[companyId]/settings/security/roles" },
@@ -199,6 +201,8 @@ export const SIDEBAR_TREE: Partial<Record<NavScope, SidebarItem[]>> = {
       children: [
         { label: "Create", href: "/company/[companyId]/leads/new", permissionKeys: ["leads.create"] },
         { label: "List", href: "/company/[companyId]/leads", exactMatch: true, permissionKeys: ["leads.view"] },
+        { label: "Leads Booking", href: "/company/[companyId]/leads/booking", exactMatch: true, permissionKeys: ["leads.view"] },
+        { label: "Queue System", href: "/company/[companyId]/leads/queue", exactMatch: true, permissionKeys: ["leads.view"] },
         { label: "RSA Leads", href: "/company/[companyId]/leads/rsa", exactMatch: true, permissionKeys: ["leads.view", "leads.rsa.view"] },
         {
           label: "RSA Assigned",

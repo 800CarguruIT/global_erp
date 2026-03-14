@@ -14,6 +14,91 @@ import { getLatestFormForLeadOrRelated, getPendingMandatoryFormForLead } from "@
 type Params = { params: Promise<{ companyId: string; inspectionId: string }> };
 type VerifyFineInput = { fineCode?: string | null; reason?: string | null; amount?: number | string | null };
 
+type CollectCarSourceType = "recovery" | "walkin" | "unknown";
+
+function normalizeFileId(value: unknown): string | null {
+  const out = String(value ?? "").trim();
+  return out || null;
+}
+
+function normalizeMediaMap(value: unknown): Record<string, string> {
+  if (!value || typeof value !== "object") return {};
+  const row = value as Record<string, unknown>;
+  const keys = ["video", "front", "rear", "right", "left", "cluster"] as const;
+  const out: Record<string, string> = {};
+  for (const key of keys) {
+    const id = normalizeFileId(row[key]);
+    if (id) out[key] = id;
+  }
+  return out;
+}
+
+async function resolveCollectCarSource(sql: any, companyId: string, leadId: string | null | undefined): Promise<{
+  sourceType: CollectCarSourceType;
+  sourceMedia: Record<string, string>;
+}> {
+  if (!leadId) return { sourceType: "unknown", sourceMedia: {} };
+  const leadRows = await sql<any[]>`
+    SELECT
+      lead_type,
+      workshop_visit_mode,
+      pickup_from,
+      dropoff_to,
+      carin_video,
+      workflow_required
+    FROM leads
+    WHERE company_id = ${companyId}
+      AND id = ${leadId}
+    LIMIT 1
+  `;
+  const leadRow = ((leadRows as any).rows ?? leadRows)?.[0];
+  if (!leadRow) return { sourceType: "unknown", sourceMedia: {} };
+
+  const isRecovery =
+    String(leadRow.lead_type ?? "").toLowerCase() === "recovery" ||
+    String(leadRow.workshop_visit_mode ?? "").toLowerCase() === "recovery" ||
+    Boolean(String(leadRow.pickup_from ?? "").trim()) ||
+    Boolean(String(leadRow.dropoff_to ?? "").trim());
+
+  if (isRecovery) {
+    const recoveryRows = await sql<any[]>`
+      SELECT
+        pickup_video,
+        pickup_front_image,
+        pickup_rear_image,
+        pickup_right_image,
+        pickup_left_image,
+        pickup_cluster_image
+      FROM recovery_requests
+      WHERE lead_id = ${leadId}
+        AND type = 'pickup'
+      ORDER BY created_at DESC
+      LIMIT 1
+    `;
+    const recoveryRow = ((recoveryRows as any).rows ?? recoveryRows)?.[0];
+    const media = normalizeMediaMap({
+      video: recoveryRow?.pickup_video ?? null,
+      front: recoveryRow?.pickup_front_image ?? null,
+      rear: recoveryRow?.pickup_rear_image ?? null,
+      right: recoveryRow?.pickup_right_image ?? null,
+      left: recoveryRow?.pickup_left_image ?? null,
+      cluster: recoveryRow?.pickup_cluster_image ?? null,
+    });
+    return { sourceType: "recovery", sourceMedia: media };
+  }
+
+  const workflowRequired = (leadRow.workflow_required ?? {}) as Record<string, unknown>;
+  const media = normalizeMediaMap({
+    video: leadRow.carin_video ?? workflowRequired.inspectionVideo360 ?? null,
+    front: workflowRequired.inspectionPhotoFront ?? null,
+    rear: workflowRequired.inspectionPhotoRear ?? null,
+    right: workflowRequired.inspectionPhotoRight ?? null,
+    left: workflowRequired.inspectionPhotoLeft ?? null,
+    cluster: workflowRequired.inspectionClusterImage ?? null,
+  });
+  return { sourceType: "walkin", sourceMedia: media };
+}
+
 function roundMoney(value: number) {
   return Math.round(value * 100) / 100;
 }
@@ -104,6 +189,26 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
   const items = await listInspectionItems(inspectionId);
   const lineItems = await listInspectionLineItems(inspectionId, { source: "inspection" });
+  const collectCarLogs = await sql/* sql */ `
+    SELECT
+      id,
+      source_type,
+      source_media,
+      has_difference,
+      note,
+      reupload_media,
+      reviewed_by,
+      reviewed_at,
+      created_at
+    FROM inspection_collect_car_review_logs
+    WHERE company_id = ${companyId}
+      AND inspection_id = ${inspectionId}
+    ORDER BY reviewed_at DESC
+    LIMIT 20
+  `.catch(() => []);
+  const collectCarSource = await resolveCollectCarSource(sql, companyId, inspection.leadId ?? null);
+  const latestCollectCarReview =
+    ((inspection as any)?.draftPayload as Record<string, unknown> | null)?.collectCarReview ?? null;
   const latestPreInspectionForm = inspection.leadId
     ? await getLatestFormForLeadOrRelated({
         companyId,
@@ -137,6 +242,12 @@ export async function GET(_req: NextRequest, { params }: Params) {
             token: latestPreInspectionForm.token,
           }
         : null,
+      collectCar: {
+        sourceType: collectCarSource.sourceType,
+        sourceMedia: collectCarSource.sourceMedia,
+        latestReview: latestCollectCarReview,
+        logs: collectCarLogs ?? [],
+      },
       earnings: earningsRows[0] ?? null,
       fines,
     },
@@ -150,6 +261,15 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const current = await getInspectionById(companyId, inspectionId);
   if (!current) {
     return new NextResponse("Not found", { status: 404 });
+  }
+  const collectCarReview = (((current as any)?.draftPayload ?? {}) as Record<string, any>)?.collectCarReview ?? null;
+  const collectCarCompleted = Boolean(collectCarReview?.completed);
+  const isCollectCarReviewAction = body?.action === "collect_car_review";
+  if (!isCollectCarReviewAction && !collectCarCompleted) {
+    return NextResponse.json(
+      { error: "Collect Car stage must be completed before proceeding with inspection workflow." },
+      { status: 409 }
+    );
   }
 
   const requestedStatus = String(body?.status ?? "").toLowerCase();
@@ -174,6 +294,94 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         { status: 409 }
       );
     }
+  }
+
+  if (body?.action === "collect_car_review") {
+    if (current.verifiedAt || (current as any).verified_at) {
+      return NextResponse.json({ error: "Verified inspection is read-only." }, { status: 400 });
+    }
+    const hasDifference = Boolean(body?.hasDifference);
+    const note = String(body?.note ?? "").trim() || null;
+    const reuploadMedia = normalizeMediaMap(body?.reuploadMedia ?? {});
+    if (hasDifference && Object.keys(reuploadMedia).length === 0) {
+      return NextResponse.json(
+        { error: "Re-upload media is required when difference is found." },
+        { status: 400 }
+      );
+    }
+    const sql = getSql();
+    const source = await resolveCollectCarSource(sql, companyId, current.leadId ?? null);
+    const reviewedAt = new Date().toISOString();
+    const previousDraft = ((current as any)?.draftPayload ?? {}) as Record<string, unknown>;
+    const nextCollectCarReview = {
+      completed: true,
+      hasDifference,
+      note,
+      sourceType: source.sourceType,
+      sourceMedia: source.sourceMedia,
+      reuploadMedia,
+      reviewedAt,
+      reviewedBy: currentUserId ?? null,
+    };
+
+    try {
+      await sql.begin(async (trx: any) => {
+        await trx/* sql */ `
+          INSERT INTO inspection_collect_car_review_logs (
+            company_id,
+            inspection_id,
+            lead_id,
+            source_type,
+            source_media,
+            has_difference,
+            note,
+            reupload_media,
+            reviewed_by,
+            reviewed_at
+          )
+          VALUES (
+            ${companyId},
+            ${inspectionId},
+            ${current.leadId ?? null},
+            ${source.sourceType},
+            ${source.sourceMedia as any},
+            ${hasDifference},
+            ${note},
+            ${reuploadMedia as any},
+            ${currentUserId ?? null},
+            ${reviewedAt}
+          )
+        `;
+
+        await trx/* sql */ `
+          UPDATE inspections
+          SET
+            draft_payload = ${{
+              ...previousDraft,
+              collectCarReview: nextCollectCarReview,
+            } as any},
+            updated_at = now()
+          WHERE company_id = ${companyId}
+            AND id = ${inspectionId}
+        `;
+      });
+    } catch (err: any) {
+      const message = String(err?.message ?? "");
+      if (message.toLowerCase().includes("inspection_collect_car_review_logs")) {
+        return NextResponse.json(
+          { error: "Collect-car review log table is missing. Please run migration 158_inspection_collect_car_review_logs.sql." },
+          { status: 500 }
+        );
+      }
+      return NextResponse.json({ error: message || "Failed to save collect car review." }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      ok: true,
+      data: {
+        collectCarReview: nextCollectCarReview,
+      },
+    });
   }
 
   if (body?.action === "verify") {

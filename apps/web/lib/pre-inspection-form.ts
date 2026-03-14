@@ -212,6 +212,7 @@ export async function sendPreInspectionFormRequestIfPending(args: {
   formId: string;
   reason: FormSendReason;
   force?: boolean;
+  formLinkOverride?: string;
 }): Promise<{ sent: boolean; skippedReason?: string | null; form?: PreInspectionFormRequest | null }> {
   const sql: any = getSql();
   const result = await sql`
@@ -243,7 +244,7 @@ export async function sendPreInspectionFormRequestIfPending(args: {
 
   const companyId = String(row.company_id);
   const integrations = await getDefaultChannelIntegrations(companyId);
-  const link = buildFormLink(String(row.token));
+  const link = args.formLinkOverride?.trim() || buildFormLink(String(row.token));
   const messageBody = buildMessageBody({
     customerName: row.customer_name ?? null,
     formLink: link,
@@ -287,6 +288,100 @@ export async function sendPreInspectionFormRequestIfPending(args: {
     args.reason === "before_24h"
       ? "before_24h_sent_at"
       : args.reason === "recovery_started"
+      ? "recovery_started_sent_at"
+      : "direct_sent_at";
+  await sql.unsafe(
+    `UPDATE pre_inspection_form_requests SET ${sentColumn} = COALESCE(${sentColumn}, NOW()), updated_at = NOW() WHERE id = $1`,
+    [args.formId]
+  );
+
+  const refreshed = await sql`
+    SELECT *
+    FROM pre_inspection_form_requests
+    WHERE id = ${args.formId}
+    LIMIT 1
+  `;
+  return { sent: true, form: toFormRow(rowsFrom<any>(refreshed)[0]) };
+}
+
+export async function sendPreInspectionFormRequestByChannel(args: {
+  formId: string;
+  channel: "sms" | "whatsapp" | "email";
+  reason?: FormSendReason;
+  force?: boolean;
+  formLinkOverride?: string;
+}): Promise<{ sent: boolean; skippedReason?: string | null; form?: PreInspectionFormRequest | null }> {
+  const sql: any = getSql();
+  const reason = args.reason ?? "direct";
+  const result = await sql`
+    SELECT
+      f.*,
+      c.name AS customer_name,
+      c.phone AS customer_phone,
+      c.whatsapp_phone AS customer_whatsapp,
+      c.email AS customer_email
+    FROM pre_inspection_form_requests f
+    LEFT JOIN customers c ON c.id = f.customer_id
+    WHERE f.id = ${args.formId}
+    LIMIT 1
+  `;
+  const row = rowsFrom<any>(result)[0];
+  if (!row) return { sent: false, skippedReason: "form_not_found", form: null };
+  if (!args.force && String(row.status) !== "pending") {
+    return { sent: false, skippedReason: "already_submitted", form: toFormRow(row) };
+  }
+
+  const companyId = String(row.company_id);
+  const integrations = await getDefaultChannelIntegrations(companyId);
+  const link = args.formLinkOverride?.trim() || buildFormLink(String(row.token));
+  const messageBody = buildMessageBody({
+    customerName: row.customer_name ?? null,
+    formLink: link,
+    appointmentType: row.appointment_type,
+    reason,
+  });
+  const emailSubject =
+    row.appointment_type === "recovery"
+      ? "Mandatory Recovery Pre-Pickup Form"
+      : "Mandatory Pre-Inspection Form";
+  const emailBody = `${messageBody}\n\nIf already submitted, please ignore this message.`;
+
+  if (args.channel === "sms") {
+    if (!integrations.sms || !row.customer_phone) {
+      return { sent: false, skippedReason: "sms_channel_or_phone_missing", form: toFormRow(row) };
+    }
+    await sendMessageWithIntegrationId({
+      scope: "company",
+      companyId,
+      integrationId: integrations.sms,
+      input: { to: String(row.customer_phone), body: messageBody },
+    });
+  } else if (args.channel === "whatsapp") {
+    if (!integrations.whatsapp || !(row.customer_whatsapp || row.customer_phone)) {
+      return { sent: false, skippedReason: "whatsapp_channel_or_phone_missing", form: toFormRow(row) };
+    }
+    await sendMessageWithIntegrationId({
+      scope: "company",
+      companyId,
+      integrationId: integrations.whatsapp,
+      input: { to: String(row.customer_whatsapp || row.customer_phone), body: messageBody },
+    });
+  } else {
+    if (!integrations.email || !row.customer_email) {
+      return { sent: false, skippedReason: "email_channel_or_email_missing", form: toFormRow(row) };
+    }
+    await sendMessageWithIntegrationId({
+      scope: "company",
+      companyId,
+      integrationId: integrations.email,
+      input: { to: String(row.customer_email), subject: emailSubject, body: emailBody, htmlBody: emailBody },
+    });
+  }
+
+  const sentColumn =
+    reason === "before_24h"
+      ? "before_24h_sent_at"
+      : reason === "recovery_started"
       ? "recovery_started_sent_at"
       : "direct_sent_at";
   await sql.unsafe(
@@ -417,10 +512,16 @@ export async function getLatestFormForLeadOrRelated(args: {
   const sql: any = getSql();
   const rows = await sql`
     WITH target AS (
-      SELECT id, company_id, customer_id, car_id
-      FROM leads
+      SELECT
+        l.id,
+        l.company_id,
+        l.customer_id,
+        l.car_id,
+        NULLIF(regexp_replace(COALESCE(l.customer_phone, tc.phone, tc.whatsapp_phone, ''), '[^0-9]', '', 'g'), '') AS normalized_phone
+      FROM leads l
+      LEFT JOIN customers tc ON tc.id = l.customer_id
       WHERE id = ${args.leadId}
-        AND company_id = ${args.companyId}
+        AND l.company_id = ${args.companyId}
       LIMIT 1
     )
     SELECT f.*
@@ -429,6 +530,7 @@ export async function getLatestFormForLeadOrRelated(args: {
       SELECT f.*
       FROM pre_inspection_form_requests f
       JOIN leads lf ON lf.id = f.lead_id
+      LEFT JOIN customers lfc ON lfc.id = lf.customer_id
       WHERE f.company_id = t.company_id
         AND lf.company_id = t.company_id
         AND (
@@ -441,6 +543,14 @@ export async function getLatestFormForLeadOrRelated(args: {
             OR (
               t.car_id IS NOT NULL
               AND lf.car_id IS NOT DISTINCT FROM t.car_id
+            )
+            OR (
+              t.normalized_phone IS NOT NULL
+              AND (
+                NULLIF(regexp_replace(COALESCE(lf.customer_phone, lfc.phone, lfc.whatsapp_phone, ''), '[^0-9]', '', 'g'), '') IS NOT DISTINCT FROM t.normalized_phone
+                OR RIGHT(NULLIF(regexp_replace(COALESCE(lf.customer_phone, lfc.phone, lfc.whatsapp_phone, ''), '[^0-9]', '', 'g'), ''), 9) =
+                   RIGHT(t.normalized_phone, 9)
+              )
             )
           )
         )
@@ -464,10 +574,16 @@ export async function listLatestFormsForLeads(args: {
   const sql: any = getSql();
   const rows = await sql`
     WITH target AS (
-      SELECT id, company_id, customer_id, car_id
-      FROM leads
+      SELECT
+        l.id,
+        l.company_id,
+        l.customer_id,
+        l.car_id,
+        NULLIF(regexp_replace(COALESCE(l.customer_phone, tc.phone, tc.whatsapp_phone, ''), '[^0-9]', '', 'g'), '') AS normalized_phone
+      FROM leads l
+      LEFT JOIN customers tc ON tc.id = l.customer_id
       WHERE company_id = ${args.companyId}
-        AND id::text = ANY(${sql.array(leadIds, "text")})
+        AND l.id::text = ANY(${sql.array(leadIds, "text")})
     )
     SELECT
       t.id AS target_lead_id,
@@ -477,6 +593,7 @@ export async function listLatestFormsForLeads(args: {
       SELECT f.*
       FROM pre_inspection_form_requests f
       JOIN leads lf ON lf.id = f.lead_id
+      LEFT JOIN customers lfc ON lfc.id = lf.customer_id
       WHERE f.company_id = t.company_id
         AND lf.company_id = t.company_id
         AND (
@@ -489,6 +606,14 @@ export async function listLatestFormsForLeads(args: {
             OR (
               t.car_id IS NOT NULL
               AND lf.car_id IS NOT DISTINCT FROM t.car_id
+            )
+            OR (
+              t.normalized_phone IS NOT NULL
+              AND (
+                NULLIF(regexp_replace(COALESCE(lf.customer_phone, lfc.phone, lfc.whatsapp_phone, ''), '[^0-9]', '', 'g'), '') IS NOT DISTINCT FROM t.normalized_phone
+                OR RIGHT(NULLIF(regexp_replace(COALESCE(lf.customer_phone, lfc.phone, lfc.whatsapp_phone, ''), '[^0-9]', '', 'g'), ''), 9) =
+                   RIGHT(t.normalized_phone, 9)
+              )
             )
           )
         )

@@ -4,6 +4,7 @@ import { buildScopeContextFromRoute, requirePermission } from "@/lib/auth/permis
 import {
   createOrUpdatePreInspectionFormRequest,
   getLatestFormForRecoveryRequest,
+  sendPreInspectionFormRequestByChannel,
   sendPreInspectionFormRequestIfPending,
 } from "@/lib/pre-inspection-form";
 import { getSql } from "@repo/ai-core/db";
@@ -15,6 +16,7 @@ type Params = {
 };
 
 const bodySchema = z.object({
+  channel: z.enum(["sms", "whatsapp", "email", "all"]).optional().default("all"),
   reason: z.enum(["direct", "before_24h", "recovery_started"]).optional().default("direct"),
   force: z.boolean().optional().default(true),
 });
@@ -98,19 +100,29 @@ export async function POST(req: NextRequest, ctx: Params) {
     return NextResponse.json({ error: "Form not found for this recovery request" }, { status: 404 });
   }
 
-  const result = await sendPreInspectionFormRequestIfPending({
-    formId: form.id,
-    reason: parsed.data.reason,
-    force: parsed.data.force,
-  });
+  const channel = parsed.data.channel;
+  const finalResult =
+    channel === "all"
+      ? await sendPreInspectionFormRequestIfPending({
+          formId: form.id,
+          reason: parsed.data.reason,
+          force: parsed.data.force,
+        })
+      : await sendPreInspectionFormRequestByChannel({
+          formId: form.id,
+          channel,
+          reason: parsed.data.reason,
+          force: parsed.data.force,
+        });
 
   return NextResponse.json({
     data: {
-      sent: result.sent,
-      skippedReason: result.skippedReason ?? null,
+      sent: finalResult.sent,
+      skippedReason: finalResult.skippedReason ?? null,
       formId: form.id,
       formUrl: buildPublicFormUrl(form.token),
-      status: result.form?.status ?? form.status,
+      status: finalResult.form?.status ?? form.status,
+      channel,
     },
   });
 }

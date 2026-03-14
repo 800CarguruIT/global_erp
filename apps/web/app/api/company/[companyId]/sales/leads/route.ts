@@ -53,8 +53,67 @@ export async function GET(req: NextRequest, { params }: Params) {
     companyId,
     leadIds: enriched.map((lead) => String(lead.id)),
   }).catch(() => ({} as Record<string, any>));
+  const leadIds = enriched.map((lead) => String(lead.id)).filter(Boolean);
+  const fallbackFormByLead: Record<string, any> = {};
+  if (leadIds.length) {
+    try {
+      const bookingFormRows = await sql/* sql */ `
+        WITH latest_booking AS (
+          SELECT DISTINCT ON (lb.lead_id)
+            lb.lead_id,
+            lb.booking_kind,
+            lb.created_at
+          FROM lead_bookings lb
+          WHERE lb.company_id = ${companyId}
+            AND lb.lead_id::text = ANY(${sql.array(leadIds, "text")})
+          ORDER BY lb.lead_id, lb.created_at DESC
+        )
+        SELECT
+          lb.lead_id,
+          f.status,
+          f.submitted_at,
+          f.appointment_type,
+          f.answers,
+          f.created_at
+        FROM latest_booking lb
+        LEFT JOIN LATERAL (
+          SELECT
+            pif.status,
+            pif.submitted_at,
+            pif.appointment_type,
+            pif.answers,
+            pif.created_at
+          FROM pre_inspection_form_requests pif
+          WHERE pif.company_id = ${companyId}
+            AND pif.lead_id = lb.lead_id
+            AND pif.appointment_type = CASE
+              WHEN LOWER(lb.booking_kind) IN ('recovery', 'workshop_recovery') THEN 'recovery'
+              ELSE 'walkin'
+            END
+          ORDER BY
+            CASE WHEN pif.status = 'submitted' THEN 0 ELSE 1 END,
+            pif.created_at DESC
+          LIMIT 1
+        ) f ON TRUE
+      `;
+      for (const row of bookingFormRows ?? []) {
+        const leadId = String((row as any)?.lead_id ?? "");
+        if (!leadId) continue;
+        if (!(row as any)?.status) continue;
+        fallbackFormByLead[leadId] = {
+          status: (row as any).status ?? null,
+          submitted_at: (row as any).submitted_at ?? null,
+          appointment_type: (row as any).appointment_type ?? null,
+          answers: (row as any).answers ?? null,
+          created_at: (row as any).created_at ?? null,
+        };
+      }
+    } catch {
+      // ignore fallback query errors
+    }
+  }
   const withFormStatus = enriched.map((lead) => {
-    const form = formByLead[String(lead.id)];
+    const form = formByLead[String(lead.id)] ?? fallbackFormByLead[String(lead.id)];
     return {
       ...lead,
       preInspectionStatus: form?.status ?? null,
@@ -176,6 +235,11 @@ export async function POST(req: NextRequest, { params }: Params) {
       body?.workshopWorkflow ??
       null) as "direct_estimate" | "inspection" | "inspection_oil_change" | null;
   const visitType = (rawVisitType ?? body?.visitType ?? body?.workshopVisit ?? null) as "pickup" | "walkin" | null;
+  const workshopVisitMode: "walkin" | "recovery" | null = isWorkshop
+    ? visitType === "pickup"
+      ? "recovery"
+      : "walkin"
+    : null;
   const pickupNote = (pickupLocation ?? pickupFrom ?? "") as string;
   const pickupGoogle = pickupGoogleLocation ?? pickupLocationGoogle ?? pickupNote ?? null;
 
@@ -227,6 +291,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     source: source ?? null,
     leadType,
     serviceType: serviceType ?? null,
+    workshopVisitMode,
     recoveryDirection: leadType === "recovery" ? recoveryDirection ?? null : null,
     recoveryFlow: leadType === "recovery" ? recoveryFlow ?? null : null,
     pickupFrom: pickupFrom ?? null,
