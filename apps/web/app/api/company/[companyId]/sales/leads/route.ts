@@ -123,7 +123,47 @@ export async function GET(req: NextRequest, { params }: Params) {
       preInspectionAnswers: form?.answers ?? null,
     };
   });
-  return NextResponse.json({ data: withFormStatus });
+  const leadIdsForCarFallback = withFormStatus.map((lead) => String(lead.id)).filter(Boolean);
+  let inspectionFallbackByLead: Record<string, any> = {};
+  if (leadIdsForCarFallback.length) {
+    try {
+      const inspectionRows = await sql/* sql */ `
+        SELECT DISTINCT ON (i.lead_id)
+          i.lead_id,
+          i.car_id,
+          c.plate_number AS car_plate,
+          c.model AS car_model,
+          c.make AS car_make,
+          i.draft_payload
+        FROM inspections i
+        LEFT JOIN cars c ON c.id = i.car_id
+        WHERE i.company_id = ${companyId}
+          AND i.lead_id::text = ANY(${sql.array(leadIdsForCarFallback, "text")})
+        ORDER BY i.lead_id, i.updated_at DESC
+      `;
+      inspectionFallbackByLead = Object.fromEntries(
+        (inspectionRows ?? []).map((row: any) => [String(row.lead_id), row])
+      );
+    } catch {
+      inspectionFallbackByLead = {};
+    }
+  }
+  const withCarFallback = withFormStatus.map((lead) => {
+    const fallback = inspectionFallbackByLead[String(lead.id)] as any;
+    if (!fallback) return lead;
+    const draft = (fallback.draft_payload ?? {}) as Record<string, unknown>;
+    const fallbackModelRaw = String(draft.inspectionModel ?? draft.carModel ?? fallback.car_model ?? "").trim();
+    const fallbackPlateRaw = String(draft.inspectionPlate ?? draft.carPlate ?? fallback.car_plate ?? "").trim();
+    const fallbackModel = fallbackModelRaw || null;
+    const fallbackPlate = fallbackPlateRaw || null;
+    return {
+      ...lead,
+      carId: lead.carId ?? fallback.car_id ?? null,
+      carModel: lead.carModel ?? fallbackModel,
+      carPlateNumber: lead.carPlateNumber ?? fallbackPlate,
+    };
+  });
+  return NextResponse.json({ data: withCarFallback });
 }
 
 export async function POST(req: NextRequest, { params }: Params) {

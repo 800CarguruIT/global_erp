@@ -638,7 +638,45 @@ export async function GET(_req: NextRequest, { params }: Params) {
   const { companyId, id } = await params;
   const lead = await getLeadById(companyId, id);
   if (!lead) return new NextResponse("Not found", { status: 404 });
-  return NextResponse.json({ data: lead });
+  const sql = getSql();
+  let result = lead as any;
+  const needsFallback =
+    !lead.carId ||
+    !String(lead.carModel ?? "").trim() ||
+    !String(lead.carPlateNumber ?? "").trim();
+  if (needsFallback) {
+    try {
+      const rows = await sql<any[]>`
+        SELECT
+          i.car_id,
+          c.make AS car_make,
+          c.model AS car_model,
+          c.plate_number AS car_plate,
+          i.draft_payload
+        FROM inspections i
+        LEFT JOIN cars c ON c.id = i.car_id
+        WHERE i.company_id = ${companyId}
+          AND i.lead_id = ${id}
+        ORDER BY i.updated_at DESC
+        LIMIT 1
+      `;
+      const row = rows[0];
+      if (row) {
+        const draft = (row.draft_payload ?? {}) as Record<string, unknown>;
+        const fallbackModel = String(draft.inspectionModel ?? draft.carModel ?? row.car_model ?? "").trim() || null;
+        const fallbackPlate = String(draft.inspectionPlate ?? draft.carPlate ?? row.car_plate ?? "").trim() || null;
+        result = {
+          ...lead,
+          carId: lead.carId ?? row.car_id ?? null,
+          carModel: lead.carModel ?? fallbackModel,
+          carPlateNumber: lead.carPlateNumber ?? fallbackPlate,
+        };
+      }
+    } catch {
+      // ignore fallback query issues
+    }
+  }
+  return NextResponse.json({ data: result });
 }
 
 export async function PUT(req: NextRequest, { params }: Params) {

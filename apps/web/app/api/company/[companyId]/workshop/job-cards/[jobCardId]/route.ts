@@ -4,6 +4,112 @@ import { getCurrentUserIdFromRequest } from "@/lib/auth/current-user";
 import { getUserContext } from "@/lib/auth/user-context";
 
 type Params = { params: Promise<{ companyId: string; jobCardId: string }> };
+type CollectCarSourceType = "recovery" | "walkin" | "unknown";
+
+function normalizeFileId(value: unknown): string | null {
+  const out = String(value ?? "").trim();
+  return out || null;
+}
+
+function normalizeMediaMap(value: unknown): Record<string, string> {
+  if (!value || typeof value !== "object") return {};
+  const row = value as Record<string, unknown>;
+  const keys = ["video", "front", "rear", "right", "left", "cluster"] as const;
+  const out: Record<string, string> = {};
+  for (const key of keys) {
+    const id = normalizeFileId(row[key]);
+    if (id) out[key] = id;
+  }
+  return out;
+}
+
+function sanitizeCarMediaReview(value: unknown): Record<string, "pending" | "verified" | "rejected"> {
+  const keys = ["front", "rear", "right", "left", "video"] as const;
+  const out: Record<string, "pending" | "verified" | "rejected"> = {};
+  const row = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  for (const key of keys) {
+    const v = String(row[key] ?? "").trim().toLowerCase();
+    out[key] = v === "verified" || v === "rejected" ? (v as "verified" | "rejected") : "pending";
+  }
+  return out;
+}
+
+function sanitizeTextMap(value: unknown): Record<string, string> {
+  const keys = ["front", "rear", "right", "left", "video"] as const;
+  const out: Record<string, string> = {};
+  const row = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  for (const key of keys) {
+    out[key] = String(row[key] ?? "").trim();
+  }
+  return out;
+}
+
+async function resolveCollectCarSource(
+  sql: any,
+  companyId: string,
+  leadId: string | null | undefined
+): Promise<{ sourceType: CollectCarSourceType; sourceMedia: Record<string, string> }> {
+  if (!leadId) return { sourceType: "unknown", sourceMedia: {} };
+  const leadRows = await sql`
+    SELECT
+      lead_type,
+      workshop_visit_mode,
+      pickup_from,
+      dropoff_to,
+      carin_video,
+      workflow_required
+    FROM leads
+    WHERE company_id = ${companyId}
+      AND id = ${leadId}
+    LIMIT 1
+  `;
+  const leadRow = leadRows[0];
+  if (!leadRow) return { sourceType: "unknown", sourceMedia: {} };
+
+  const isRecovery =
+    String(leadRow.lead_type ?? "").toLowerCase() === "recovery" ||
+    String(leadRow.workshop_visit_mode ?? "").toLowerCase() === "recovery" ||
+    Boolean(String(leadRow.pickup_from ?? "").trim()) ||
+    Boolean(String(leadRow.dropoff_to ?? "").trim());
+
+  if (isRecovery) {
+    const recoveryRows = await sql`
+      SELECT
+        pickup_video,
+        pickup_front_image,
+        pickup_rear_image,
+        pickup_right_image,
+        pickup_left_image,
+        pickup_cluster_image
+      FROM recovery_requests
+      WHERE lead_id = ${leadId}
+        AND type = 'pickup'
+      ORDER BY created_at DESC
+      LIMIT 1
+    `;
+    const recoveryRow = recoveryRows[0];
+    const media = normalizeMediaMap({
+      video: recoveryRow?.pickup_video ?? null,
+      front: recoveryRow?.pickup_front_image ?? null,
+      rear: recoveryRow?.pickup_rear_image ?? null,
+      right: recoveryRow?.pickup_right_image ?? null,
+      left: recoveryRow?.pickup_left_image ?? null,
+      cluster: recoveryRow?.pickup_cluster_image ?? null,
+    });
+    return { sourceType: "recovery", sourceMedia: media };
+  }
+
+  const workflowRequired = (leadRow.workflow_required ?? {}) as Record<string, unknown>;
+  const media = normalizeMediaMap({
+    video: leadRow.carin_video ?? workflowRequired.inspectionVideo360 ?? null,
+    front: workflowRequired.inspectionPhotoFront ?? null,
+    rear: workflowRequired.inspectionPhotoRear ?? null,
+    right: workflowRequired.inspectionPhotoRight ?? null,
+    left: workflowRequired.inspectionPhotoLeft ?? null,
+    cluster: workflowRequired.inspectionClusterImage ?? null,
+  });
+  return { sourceType: "walkin", sourceMedia: media };
+}
 
 export async function GET(_req: NextRequest, { params }: Params) {
   const { companyId, jobCardId } = await params;
@@ -41,6 +147,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
            jc.updated_at,
            e.inspection_id,
            e.lead_id AS estimate_lead_id,
+           i.draft_payload AS inspection_draft_payload,
            i.customer_id,
            i.car_id,
            COALESCE(i.customer_remark, i.draft_payload->>'customerComplain') AS customer_remark,
@@ -50,8 +157,10 @@ export async function GET(_req: NextRequest, { params }: Params) {
            c.phone AS customer_phone,
            c.customer_type,
            car.plate_number,
+           car.vin,
            car.make,
            car.model,
+           car.model_year,
            car.body_type,
            COALESCE(b.display_name, b.name, b.code) AS branch_name,
            l.branch_id AS lead_branch_id,
@@ -116,6 +225,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
     const quoteStatusRows = await sql`
       SELECT
         source.line_item_id,
+        BOOL_OR(LOWER(COALESCE(source.status, '')) IN ('partially received', 'partially_received', 'partial')) AS has_partial,
         MAX(
           CASE
             WHEN LOWER(COALESCE(source.status, '')) IN ('received', 'completed') THEN 3
@@ -123,11 +233,15 @@ export async function GET(_req: NextRequest, { params }: Params) {
             WHEN LOWER(COALESCE(source.status, '')) = 'ordered' THEN 1
             ELSE 0
           END
-        ) AS status_rank
+        ) AS status_rank,
+        MAX(NULLIF(source.delivery_note_no, '')) AS delivery_note_no,
+        MAX(NULLIF(source.delivery_note_status, '')) AS delivery_note_status
       FROM (
         SELECT
           li.id AS line_item_id,
-          pq.status
+          pq.status,
+          pq.delivery_note_no,
+          pq.delivery_note_status
         FROM line_items li
         INNER JOIN part_quotes pq ON pq.line_item_id = li.id
         WHERE li.id = ANY(${lineItemIds})
@@ -137,23 +251,53 @@ export async function GET(_req: NextRequest, { params }: Params) {
     const derivedStatusByLineItemId = new Map(
       quoteStatusRows.map((row: any) => {
         const rank = Number(row.status_rank ?? 0);
+        const hasPartial = Boolean(row.has_partial);
         const derived =
-          rank >= 3 ? "Received" : rank === 2 ? "Returned" : rank === 1 ? "Ordered" : "";
+          hasPartial ? "Partially Received" : rank >= 3 ? "Received" : rank === 2 ? "Returned" : rank === 1 ? "Ordered" : "";
         return [String(row.line_item_id), derived] as const;
       })
     );
+    const deliveryNoteByLineItemId = new Map(
+      quoteStatusRows.map((row: any) => [
+        String(row.line_item_id),
+        {
+          delivery_note_no: row.delivery_note_no ?? null,
+          delivery_note_status: row.delivery_note_status ?? null,
+        },
+      ])
+    );
     mergedItems = items.map((row: any) => {
       const derived = derivedStatusByLineItemId.get(String(row.id));
-      if (!derived) return row;
+      const deliveryMeta = deliveryNoteByLineItemId.get(String(row.id));
+      if (!derived && !deliveryMeta) return row;
       return {
         ...row,
-        po_status: derived,
-        order_status: derived,
+        po_status: derived ?? row.po_status ?? row.order_status ?? null,
+        order_status:
+          derived === "Partially Received"
+            ? "Ordered"
+            : derived ?? row.order_status ?? null,
+        delivery_note_no: deliveryMeta?.delivery_note_no ?? row.delivery_note_no ?? null,
+        delivery_note_status: deliveryMeta?.delivery_note_status ?? row.delivery_note_status ?? null,
       };
     });
   }
 
-  return NextResponse.json({ data: { jobCard, items: mergedItems } });
+  const leadIdForCollectCar = String(jobCard?.lead_id ?? jobCard?.estimate_lead_id ?? "").trim() || null;
+  const collectCarSource = await resolveCollectCarSource(sql, companyId, leadIdForCollectCar);
+  const inspectionDraftPayload =
+    (jobCard?.inspection_draft_payload && typeof jobCard.inspection_draft_payload === "object"
+      ? jobCard.inspection_draft_payload
+      : {}) as Record<string, any>;
+  const collectCarMedia = {
+    sourceType: collectCarSource.sourceType,
+    sourceMedia: collectCarSource.sourceMedia,
+    carMediaReview: sanitizeCarMediaReview(inspectionDraftPayload.carMediaReview ?? {}),
+    carMediaReplacement: sanitizeTextMap(inspectionDraftPayload.carMediaReplacement ?? {}),
+    carMediaRejectNote: sanitizeTextMap(inspectionDraftPayload.carMediaRejectNote ?? {}),
+  };
+
+  return NextResponse.json({ data: { jobCard, items: mergedItems, collectCarMedia } });
 }
 
 export async function PATCH(req: NextRequest, { params }: Params) {
@@ -255,26 +399,16 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
   if (body?.action === "start") {
     const quoteStatus = String(jobCard?.workshop_quote_status ?? "").toLowerCase();
-    if (quoteStatus !== "accepted") {
+    if (quoteStatus !== "accepted" && quoteStatus !== "verified") {
       return NextResponse.json(
         { error: "Job card can be started only after quote is accepted." },
         { status: 400 }
       );
     }
-    const collectCarVideoId = String(jobCard?.collect_car_video_id ?? "").trim();
-    const collectCarMileage = Number(jobCard?.collect_car_mileage ?? 0);
-    const collectCarMileageImageId = String(jobCard?.collect_car_mileage_image_id ?? "").trim();
-    const collectCarDone =
-      collectCarVideoId.length > 0 &&
-      Number.isFinite(collectCarMileage) &&
-      collectCarMileage > 0 &&
-      collectCarMileageImageId.length > 0;
+    const collectCarDone = Boolean(jobCard?.collect_car_at);
     if (!collectCarDone) {
       return NextResponse.json(
-        {
-          error:
-            "Collect Car stage is required before starting (video, mileage and mileage image).",
-        },
+        { error: "Collect Car stage is required before starting." },
         { status: 400 }
       );
     }
@@ -413,46 +547,90 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   }
 
   if (body?.action === "collect_car") {
-    const collectCarVideoId = String(body?.collectCarVideoId ?? "").trim();
-    const collectCarMileage = Number(body?.collectCarMileage);
-    const collectCarMileageImageId = String(body?.collectCarMileageImageId ?? "").trim();
-    if (!collectCarVideoId) {
-      return NextResponse.json({ error: "Collect car video is required." }, { status: 400 });
-    }
-    if (!Number.isFinite(collectCarMileage) || collectCarMileage <= 0) {
-      return NextResponse.json({ error: "Valid car mileage is required." }, { status: 400 });
-    }
-    if (!collectCarMileageImageId) {
-      return NextResponse.json({ error: "Car mileage image is required." }, { status: 400 });
+    const sourceMedia = normalizeMediaMap(body?.collectCarSourceMedia ?? {});
+    const hasSourceMedia = Object.keys(sourceMedia).length > 0;
+    const carMediaReview = sanitizeCarMediaReview(body?.carMediaReview ?? {});
+    const carMediaReplacement = sanitizeTextMap(body?.carMediaReplacement ?? {});
+    if (hasSourceMedia) {
+      const mediaKeys = ["front", "rear", "right", "left", "video"] as const;
+      const pendingMedia = mediaKeys.find((key) => sourceMedia[key] && carMediaReview[key] === "pending");
+      if (pendingMedia) {
+        return NextResponse.json(
+          { error: "Verify or reject all car images/videos before saving Collect Car." },
+          { status: 400 }
+        );
+      }
+      const missingReplacement = mediaKeys.find(
+        (key) => sourceMedia[key] && carMediaReview[key] === "rejected" && !String(carMediaReplacement[key] ?? "").trim()
+      );
+      if (missingReplacement) {
+        return NextResponse.json(
+          { error: "Upload replacement media for every rejected car image/video." },
+          { status: 400 }
+        );
+      }
     }
     const updated = await sql`
       UPDATE job_cards
       SET
-        collect_car_video_id = ${collectCarVideoId},
-        collect_car_mileage = ${collectCarMileage},
-        collect_car_mileage_image_id = ${collectCarMileageImageId},
         collect_car_at = NOW()
       WHERE id = ${jobCardId}
       RETURNING *
     `;
+    if (jobCard?.inspection_id) {
+      const inspectionRows = await sql`
+        SELECT draft_payload
+        FROM inspections
+        WHERE company_id = ${companyId}
+          AND id = ${jobCard.inspection_id}
+        LIMIT 1
+      `;
+      const currentDraft =
+        (inspectionRows[0]?.draft_payload && typeof inspectionRows[0].draft_payload === "object"
+          ? inspectionRows[0].draft_payload
+          : {}) as Record<string, unknown>;
+      const nextDraft = {
+        ...currentDraft,
+        carMediaReview,
+        carMediaReplacement,
+        carMediaRejectNote: sanitizeTextMap(body?.carMediaRejectNote ?? {}),
+      };
+      await sql`
+        UPDATE inspections
+        SET draft_payload = ${nextDraft as any},
+            updated_at = NOW()
+        WHERE company_id = ${companyId}
+          AND id = ${jobCard.inspection_id}
+      `;
+    }
     return NextResponse.json({ data: updated[0] ?? jobCard });
   }
 
   if (body?.action === "pre_work_check") {
-    const collectCarVideoId = String(jobCard?.collect_car_video_id ?? "").trim();
-    const collectCarMileage = Number(jobCard?.collect_car_mileage ?? 0);
-    const collectCarMileageImageId = String(jobCard?.collect_car_mileage_image_id ?? "").trim();
-    const collectCarDone =
-      collectCarVideoId.length > 0 &&
-      Number.isFinite(collectCarMileage) &&
-      collectCarMileage > 0 &&
-      collectCarMileageImageId.length > 0;
+    const collectCarDone = Boolean(jobCard?.collect_car_at);
     if (!collectCarDone) {
       return NextResponse.json(
         { error: "Complete Collect Car stage before Pre-Work Check." },
         { status: 400 }
       );
     }
+    const collectCarMileage = Number(body?.collectCarMileage);
+    if (!Number.isFinite(collectCarMileage) || collectCarMileage <= 0) {
+      return NextResponse.json(
+        { error: "Valid car mileage is required in Pre-Work Check." },
+        { status: 400 }
+      );
+    }
+    const carVin = String(body?.carVin ?? "").trim() || null;
+    const carPlate = String(body?.carPlate ?? "").trim() || null;
+    const carMake = String(body?.carMake ?? "").trim() || null;
+    const carModel = String(body?.carModel ?? "").trim() || null;
+    const rawCarYear = String(body?.carYear ?? "").trim();
+    const parsedCarYear = Number(rawCarYear);
+    const carYear =
+      rawCarYear && Number.isFinite(parsedCarYear) && parsedCarYear >= 1900 && parsedCarYear <= 3000
+        ? Math.trunc(parsedCarYear)
+        : null;
     const unreceivedParts = await sql`
       WITH li AS (
         SELECT id, product_name, order_status
@@ -506,15 +684,63 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       );
     }
     const preWorkNote = typeof body?.preWorkNote === "string" ? body.preWorkNote.trim() : null;
-    const updated = await sql`
-      UPDATE job_cards
-      SET
-        pre_work_checked_at = NOW(),
-        pre_work_checked_by = ${currentUserId},
-        pre_work_note = ${preWorkNote}
-      WHERE id = ${jobCardId}
-      RETURNING *
-    `;
+    const updated = await sql.begin(async (trx) => {
+      const rows = await trx`
+        UPDATE job_cards
+        SET
+          pre_work_checked_at = NOW(),
+          pre_work_checked_by = ${currentUserId},
+          collect_car_mileage = ${collectCarMileage},
+          pre_work_note = ${preWorkNote}
+        WHERE id = ${jobCardId}
+        RETURNING *
+      `;
+      if (jobCard?.car_id && (carVin || carPlate || carMake || carModel || carYear)) {
+        await trx`
+          UPDATE cars
+          SET
+            vin = COALESCE(${carVin}, vin),
+            plate_number = COALESCE(${carPlate}, plate_number),
+            make = COALESCE(${carMake}, make),
+            model = COALESCE(${carModel}, model),
+            model_year = COALESCE(${carYear}, model_year),
+            updated_at = NOW()
+          WHERE company_id = ${companyId}
+            AND id = ${jobCard.car_id}
+        `;
+      }
+      if (jobCard?.inspection_id && (carVin || carPlate || carMake || carModel || carYear)) {
+        const inspectionRows = await trx`
+          SELECT draft_payload
+          FROM inspections
+          WHERE company_id = ${companyId}
+            AND id = ${jobCard.inspection_id}
+          LIMIT 1
+        `;
+        const currentDraft =
+          (inspectionRows[0]?.draft_payload && typeof inspectionRows[0].draft_payload === "object"
+            ? inspectionRows[0].draft_payload
+            : {}) as Record<string, unknown>;
+        const nextDraft = {
+          ...currentDraft,
+          inspectionVin: carVin ?? (currentDraft as any).inspectionVin ?? null,
+          inspectionPlate: carPlate ?? (currentDraft as any).inspectionPlate ?? null,
+          inspectionMake: carMake ?? (currentDraft as any).inspectionMake ?? null,
+          inspectionModel: carModel ?? (currentDraft as any).inspectionModel ?? null,
+          inspectionYear:
+            carYear != null ? String(carYear) : ((currentDraft as any).inspectionYear ?? null),
+          inspectionMileage: String(collectCarMileage),
+        };
+        await trx`
+          UPDATE inspections
+          SET draft_payload = ${nextDraft as any},
+              updated_at = NOW()
+          WHERE company_id = ${companyId}
+            AND id = ${jobCard.inspection_id}
+        `;
+      }
+      return rows;
+    });
     return NextResponse.json({ data: updated[0] ?? jobCard });
   }
 

@@ -33,6 +33,247 @@ function normalizeMediaMap(value: unknown): Record<string, string> {
   return out;
 }
 
+function normalizeTextValue(value: unknown): string | null {
+  const text = String(value ?? "").trim();
+  return text || null;
+}
+
+function normalizeIntValue(value: unknown): number | null {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return null;
+  const out = Math.trunc(n);
+  return out > 0 ? out : null;
+}
+
+async function generateCarCode(sql: any, companyId: string): Promise<string> {
+  const rows = await sql<{ code: string }[]>`
+    SELECT code
+    FROM cars
+    WHERE company_id = ${companyId} AND code LIKE 'CAR-%'
+    ORDER BY code DESC
+    LIMIT 1
+  `;
+  const last = String(rows?.[0]?.code ?? "");
+  const num = last ? Number(last.split("-").pop() ?? "0") : 0;
+  const next = Number.isFinite(num) ? num + 1 : 1;
+  return `CAR-${String(next).padStart(4, "0")}`;
+}
+
+async function generateNoPlate(sql: any, companyId: string): Promise<string> {
+  const prefix = `NOPLATE-${String(companyId).slice(0, 4).toUpperCase()}`;
+  const rows = await sql<{ plate_number: string }[]>`
+    SELECT plate_number
+    FROM cars
+    WHERE company_id = ${companyId} AND plate_number LIKE ${prefix + "%"}
+    ORDER BY plate_number DESC
+    LIMIT 1
+  `;
+  const last = String(rows?.[0]?.plate_number ?? "");
+  const num = last ? Number(last.split("-").pop() ?? "0") : 0;
+  const next = Number.isFinite(num) ? num + 1 : 1;
+  return `${prefix}-${String(next).padStart(4, "0")}`;
+}
+
+async function upsertInspectionCarAndLinks(args: {
+  sql: any;
+  companyId: string;
+  inspectionId: string;
+  leadId: string | null | undefined;
+  customerId: string | null | undefined;
+  draftPayload: Record<string, unknown> | null | undefined;
+}) {
+  const draft = (args.draftPayload ?? {}) as Record<string, unknown>;
+  const vin =
+    normalizeTextValue(draft.inspectionVin) ??
+    normalizeTextValue(draft.vin);
+  const plate =
+    normalizeTextValue(draft.inspectionPlate) ??
+    normalizeTextValue(draft.carPlate);
+  const make =
+    normalizeTextValue(draft.inspectionMake) ??
+    normalizeTextValue(draft.carMake);
+  const model =
+    normalizeTextValue(draft.inspectionModel) ??
+    normalizeTextValue(draft.carModel);
+  const modelYear =
+    normalizeIntValue(draft.inspectionYear) ??
+    normalizeIntValue(draft.carYear);
+  const mileage = normalizeIntValue(draft.inspectionMileage);
+  const tyreFront =
+    normalizeTextValue(draft.tyreSizeFront) ??
+    normalizeTextValue(draft.inspectionTyreSizeFront) ??
+    normalizeTextValue(draft.inspectionTyreSize);
+  const tyreRear =
+    normalizeTextValue(draft.tyreSizeRear) ??
+    normalizeTextValue(draft.inspectionTyreSizeRear) ??
+    normalizeTextValue(draft.inspectionTyreSize);
+
+  const hasAnyCarData = Boolean(vin || plate || make || model || modelYear || mileage || tyreFront || tyreRear);
+  if (!hasAnyCarData) return null;
+
+  const existingCarRows = vin
+    ? await args.sql<any[]>`
+        SELECT id, company_id, plate_number, vin, make, model, model_year, mileage, tyre_size_front, tyre_size_back, is_unregistered
+        FROM cars
+        WHERE company_id = ${args.companyId}
+          AND LOWER(COALESCE(vin, '')) = LOWER(${vin})
+        LIMIT 1
+      `
+    : plate
+    ? await args.sql<any[]>`
+        SELECT id, company_id, plate_number, vin, make, model, model_year, mileage, tyre_size_front, tyre_size_back, is_unregistered
+        FROM cars
+        WHERE company_id = ${args.companyId}
+          AND LOWER(COALESCE(plate_number, '')) = LOWER(${plate})
+        LIMIT 1
+      `
+    : [];
+  const existingCar = existingCarRows[0] ?? null;
+
+  let carId: string;
+  if (existingCar) {
+    carId = String(existingCar.id);
+    await args.sql`
+      UPDATE cars
+      SET
+        vin = COALESCE(${vin}, vin),
+        plate_number = COALESCE(${plate}, plate_number),
+        make = COALESCE(${make}, make),
+        model = COALESCE(${model}, model),
+        model_year = COALESCE(${modelYear}, model_year),
+        mileage = COALESCE(${mileage}, mileage),
+        tyre_size_front = COALESCE(${tyreFront}, tyre_size_front),
+        tyre_size_back = COALESCE(${tyreRear}, tyre_size_back),
+        is_unregistered = CASE
+          WHEN ${plate} IS NOT NULL THEN false
+          ELSE is_unregistered
+        END,
+        updated_at = now()
+      WHERE id = ${carId}
+    `;
+  } else {
+    const code = await generateCarCode(args.sql, args.companyId);
+    const plateNumber = plate ?? (await generateNoPlate(args.sql, args.companyId));
+    const inserted = await args.sql<any[]>`
+      INSERT INTO cars (
+        company_id,
+        code,
+        plate_number,
+        vin,
+        make,
+        model,
+        model_year,
+        mileage,
+        tyre_size_front,
+        tyre_size_back,
+        is_unregistered,
+        is_active
+      ) VALUES (
+        ${args.companyId},
+        ${code},
+        ${plateNumber},
+        ${vin},
+        ${make},
+        ${model},
+        ${modelYear},
+        ${mileage},
+        ${tyreFront},
+        ${tyreRear},
+        ${plate ? false : true},
+        ${true}
+      )
+      RETURNING id
+    `;
+    carId = String(inserted[0]?.id ?? "");
+    if (!carId) return null;
+  }
+
+  await args.sql`
+    UPDATE inspections
+    SET car_id = ${carId},
+        customer_id = COALESCE(customer_id, ${args.customerId ?? null})
+    WHERE company_id = ${args.companyId}
+      AND id = ${args.inspectionId}
+  `;
+
+  if (args.customerId) {
+    await args.sql`
+      INSERT INTO customer_car_links (
+        company_id,
+        customer_id,
+        car_id,
+        relation_type,
+        priority,
+        is_primary,
+        is_active
+      ) VALUES (
+        ${args.companyId},
+        ${args.customerId},
+        ${carId},
+        ${"owner"},
+        ${1},
+        ${true},
+        ${true}
+      )
+      ON CONFLICT (customer_id, car_id, relation_type, priority)
+      DO UPDATE SET
+        is_primary = EXCLUDED.is_primary,
+        is_active = EXCLUDED.is_active,
+        updated_at = now()
+    `.catch(async () => {
+      // Backward compatibility for schemas before customer_car_links.is_active existed.
+      await args.sql`
+        INSERT INTO customer_car_links (
+          company_id,
+          customer_id,
+          car_id,
+          relation_type,
+          priority,
+          is_primary
+        ) VALUES (
+          ${args.companyId},
+          ${args.customerId},
+          ${carId},
+          ${"owner"},
+          ${1},
+          ${true}
+        )
+        ON CONFLICT (customer_id, car_id, relation_type, priority)
+        DO UPDATE SET
+          is_primary = EXCLUDED.is_primary,
+          updated_at = now()
+      `;
+    });
+  }
+
+  if (args.leadId) {
+    await args.sql`
+      UPDATE leads
+      SET car_id = ${carId}
+      WHERE company_id = ${args.companyId}
+        AND id = ${args.leadId}
+    `;
+    await args.sql`
+      UPDATE estimates
+      SET car_id = COALESCE(car_id, ${carId})
+      WHERE company_id = ${args.companyId}
+        AND (
+          inspection_id = ${args.inspectionId}
+          OR lead_id = ${args.leadId}
+        )
+    `;
+  } else {
+    await args.sql`
+      UPDATE estimates
+      SET car_id = COALESCE(car_id, ${carId})
+      WHERE company_id = ${args.companyId}
+        AND inspection_id = ${args.inspectionId}
+    `;
+  }
+
+  return carId;
+}
+
 async function resolveCollectCarSource(sql: any, companyId: string, leadId: string | null | undefined): Promise<{
   sourceType: CollectCarSourceType;
   sourceMedia: Record<string, string>;
@@ -386,6 +627,31 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     });
   }
 
+  const sql = getSql();
+  const draftPayloadForCarSync =
+    (body?.draftPayload as Record<string, unknown> | undefined) ??
+    ((current.draftPayload ?? null) as Record<string, unknown> | null);
+  if (draftPayloadForCarSync && typeof draftPayloadForCarSync === "object") {
+    const leadRows = current.leadId
+      ? await sql<any[]>`
+          SELECT customer_id
+          FROM leads
+          WHERE company_id = ${companyId}
+            AND id = ${current.leadId}
+          LIMIT 1
+        `
+      : [];
+    const inferredCustomerId = String(leadRows?.[0]?.customer_id ?? "").trim() || null;
+    await upsertInspectionCarAndLinks({
+      sql,
+      companyId,
+      inspectionId,
+      leadId: current.leadId ?? null,
+      customerId: current.customerId ?? inferredCustomerId,
+      draftPayload: draftPayloadForCarSync,
+    });
+  }
+
   if (body?.action === "verify") {
     try {
       if (current.verifiedAt || (current as any).verified_at) {
@@ -406,7 +672,6 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         return NextResponse.json({ error: "Inspection must be completed before verify." }, { status: 400 });
       }
 
-      const sql = getSql();
       const verifyAt = new Date().toISOString();
       const branchRows = current.branchId
         ? await sql/* sql */ `

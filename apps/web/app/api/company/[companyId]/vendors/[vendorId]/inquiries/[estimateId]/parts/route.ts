@@ -16,6 +16,7 @@ export async function GET(req: NextRequest, { params }: Params) {
       SELECT
         iori.id,
         iori.part_name,
+        iori.part_number,
         iori.description,
         iori.quantity,
         iori.part_type,
@@ -33,6 +34,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     const parts = rows.map((row: any) => ({
       id: row.id,
       partName: row.part_name,
+      partNumber: row.part_number ?? null,
       description: row.description ?? null,
       quantity: Number(row.quantity ?? 0),
       partType: row.part_type ?? null,
@@ -46,6 +48,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     SELECT
       li.id,
       li.product_name AS part_name,
+      li.part_number,
       li.description,
       li.quantity,
       NULL::text AS part_type,
@@ -58,15 +61,22 @@ export async function GET(req: NextRequest, { params }: Params) {
       ) AS is_submitted,
       'line_item' AS item_source
     FROM line_items li
+    INNER JOIN inspections i ON i.id = li.inspection_id
     WHERE li.inspection_id = ${estimateId}
       AND li.company_id = ${companyId}
-      AND LOWER(COALESCE(li.status, '')) IN ('inquiry', 'pending')
+      AND (
+        LOWER(COALESCE(i.status, '')) = 'completed'
+        OR i.complete_at IS NOT NULL
+        OR i.verified_at IS NOT NULL
+      )
+      AND LOWER(COALESCE(li.status, '')) IN ('inquiry', 'pending', 'approved')
     ORDER BY part_name ASC
   `;
 
   const mapped = parts.map((row: any) => ({
     id: row.id,
     partName: row.part_name,
+    partNumber: row.part_number ?? null,
     description: row.description ?? null,
     quantity: Number(row.quantity ?? 0),
     partType: row.part_type ?? null,

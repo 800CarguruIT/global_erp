@@ -27,6 +27,11 @@ type QuoteRow = {
   requestNumber?: string | null;
   sourceType?: "inventory" | "line_item";
   lineItemId?: string | null;
+  estimateId?: string | null;
+  estimateStatus?: string | null;
+  customerApprovalStatus?: string | null;
+  customerApprovedAt?: string | null;
+  isCustomerApproved?: boolean;
   inventoryRequestItemId?: string | null;
   oem?: number | null;
   oe?: number | null;
@@ -40,6 +45,16 @@ type QuoteRow = {
   oeEtd?: string | null;
   aftmEtd?: string | null;
   usedEtd?: string | null;
+  partNumber?: string | null;
+  partBrand?: string | null;
+  oemBrand?: string | null;
+  oeBrand?: string | null;
+  aftmBrand?: string | null;
+  usedBrand?: string | null;
+  oemTime?: string | null;
+  oeTime?: string | null;
+  aftmTime?: string | null;
+  usedTime?: string | null;
   remarks?: string | null;
   estimateItemStatus?: string | null;
   approvedType?: string | null;
@@ -47,6 +62,12 @@ type QuoteRow = {
   vendorId?: string | null;
   estimateItemId?: string | null;
   grnNumber?: string | null;
+  deliveryNoteNo?: string | null;
+  deliveryNoteStatus?: string | null;
+  deliveryDestinationBranchId?: string | null;
+  aiSuggestedType?: string | null;
+  aiSuggestedUnitPrice?: number | null;
+  aiSuggestionReason?: string | null;
 };
 
 const pickQuote = (row: QuoteRow) => {
@@ -57,12 +78,54 @@ const pickQuote = (row: QuoteRow) => {
   if (row.used != null) return { type: "USED", amount: row.used, qty: row.usedQty, etd: row.usedEtd };
   return { type: "-", amount: null, qty: null, etd: null };
 };
+const parseEtdToHours = (etd?: string | null, time?: string | null) => {
+  const value = String(etd ?? "").trim().toLowerCase();
+  if (!value) return 72;
+  if (value === "same day") {
+    const hours = Number(String(time ?? "").trim());
+    if (Number.isFinite(hours) && hours > 0) return hours;
+    return 8;
+  }
+  const rangeMatch = value.match(/(\d+)\s*-\s*(\d+)\s*day/);
+  if (rangeMatch) {
+    const a = Number(rangeMatch[1]);
+    const b = Number(rangeMatch[2]);
+    if (Number.isFinite(a) && Number.isFinite(b) && a > 0 && b > 0) return ((a + b) / 2) * 24;
+  }
+  const dayMatch = value.match(/(\d+)\s*day/);
+  if (dayMatch) {
+    const d = Number(dayMatch[1]);
+    if (Number.isFinite(d) && d > 0) return d * 24;
+  }
+  const hourMatch = value.match(/(\d+)\s*hour/);
+  if (hourMatch) {
+    const h = Number(hourMatch[1]);
+    if (Number.isFinite(h) && h > 0) return h;
+  }
+  return 72;
+};
+const formatEtdLabel = (etd?: string | null, time?: string | null) => {
+  const value = String(etd ?? "").trim();
+  if (!value) return "-";
+  if (value === "Same Day") {
+    const hours = Number(String(time ?? "").trim());
+    if (Number.isFinite(hours) && hours > 0) return `Same Day (${hours}h)`;
+    return "Same Day";
+  }
+  return value;
+};
 const isApprovedType = (row: QuoteRow, type: "oem" | "oe" | "aftm" | "used") =>
   String(row.approvedType ?? "").trim().toLowerCase() === type;
 const normalizeApprovedType = (value?: string | null): "oem" | "oe" | "aftm" | "used" | null => {
   const v = String(value ?? "").trim().toLowerCase();
   if (v === "oem" || v === "oe" || v === "aftm" || v === "used") return v;
   return null;
+};
+const approvedTypeBadgeClass = (type: "oem" | "oe" | "aftm" | "used") => {
+  if (type === "oe") return "border-cyan-400/40 bg-cyan-500/15 text-cyan-200";
+  if (type === "oem") return "border-emerald-400/40 bg-emerald-500/15 text-emerald-200";
+  if (type === "aftm") return "border-amber-400/40 bg-amber-500/15 text-amber-200";
+  return "border-violet-400/40 bg-violet-500/15 text-violet-200";
 };
 
 export default function PartsQuotesPage() {
@@ -85,6 +148,93 @@ export default function PartsQuotesPage() {
   const [orderDrafts, setOrderDrafts] = useState<
     Record<string, { oemQty: string; oeQty: string; aftmQty: string; usedQty: string }>
   >({});
+  const quotesModalAiSuggestion = useMemo(() => {
+    if (!quotesModalRows.length) return null;
+    const approvedType =
+      quotesModalRows
+        .map((r) => normalizeApprovedType(r.approvedType))
+        .find((v): v is "oem" | "oe" | "aftm" | "used" => Boolean(v)) ?? null;
+
+    const explicit = quotesModalRows.find((r) => r.aiSuggestedType);
+    const explicitType = String(explicit?.aiSuggestedType ?? "").trim().toLowerCase();
+    const explicitTypeNormalized =
+      explicitType === "oem" || explicitType === "oe" || explicitType === "aftm" || explicitType === "used"
+        ? explicitType
+        : null;
+    if (explicit && (!approvedType || explicitTypeNormalized === approvedType)) {
+      return {
+        vendorName: explicit.vendorName ?? "Vendor",
+        type: String(explicit.aiSuggestedType ?? "").toUpperCase(),
+        price: explicit.aiSuggestedUnitPrice ?? null,
+        etd:
+          String(explicit.aiSuggestedType ?? "").toLowerCase() === "oem"
+            ? explicit.oemEtd
+            : String(explicit.aiSuggestedType ?? "").toLowerCase() === "oe"
+            ? explicit.oeEtd
+            : String(explicit.aiSuggestedType ?? "").toLowerCase() === "aftm"
+            ? explicit.aftmEtd
+            : explicit.usedEtd,
+        reason: explicit.aiSuggestionReason ?? "Recommended by AI based on pricing and delivery.",
+        source: "stored" as const,
+      };
+    }
+
+    const candidates: Array<{
+      vendorName: string;
+      type: "OEM" | "OE" | "AFTM" | "USED";
+      price: number;
+      etd: string | null | undefined;
+      etdHours: number;
+      score: number;
+    }> = [];
+    for (const r of quotesModalRows) {
+      const options = [
+        { type: "OEM" as const, amount: r.oem, qty: r.oemQty, etd: r.oemEtd, time: r.oemTime },
+        { type: "OE" as const, amount: r.oe, qty: r.oeQty, etd: r.oeEtd, time: r.oeTime },
+        { type: "AFTM" as const, amount: r.aftm, qty: r.aftmQty, etd: r.aftmEtd, time: r.aftmTime },
+        { type: "USED" as const, amount: r.used, qty: r.usedQty, etd: r.usedEtd, time: r.usedTime },
+      ];
+      for (const opt of options) {
+        const optionType = opt.type.toLowerCase() as "oem" | "oe" | "aftm" | "used";
+        if (approvedType && optionType !== approvedType) continue;
+        if (opt.amount == null || opt.amount <= 0) continue;
+        if (opt.qty != null && opt.qty <= 0) continue;
+        const etdHours = parseEtdToHours(opt.etd, opt.time);
+        const score = Number(opt.amount) + etdHours * 0.5;
+        candidates.push({
+          vendorName: r.vendorName ?? "Vendor",
+          type: opt.type,
+          price: Number(opt.amount),
+          etd: opt.etd,
+          etdHours,
+          score,
+        });
+      }
+    }
+    if (!candidates.length) return null;
+    const best = candidates.sort((a, b) => a.score - b.score)[0]!;
+    return {
+      vendorName: best.vendorName,
+      type: best.type,
+      price: best.price,
+      etd: best.etd,
+      reason: "AI fallback suggestion using best price + delivery time score.",
+      source: "fallback" as const,
+    };
+  }, [quotesModalRows]);
+  const isAiSuggestedOption = (
+    row: QuoteRow,
+    type: "oem" | "oe" | "aftm" | "used"
+  ) => {
+    if (!quotesModalAiSuggestion) return false;
+    const suggestedType = String(quotesModalAiSuggestion.type ?? "").trim().toLowerCase();
+    if (suggestedType !== type) return false;
+    const vendorName = String(row.vendorName ?? "Vendor").trim().toLowerCase();
+    const suggestedVendor = String(quotesModalAiSuggestion.vendorName ?? "Vendor")
+      .trim()
+      .toLowerCase();
+    return vendorName === suggestedVendor;
+  };
 
   const isOrderedTab = activeTab === "ordered";
   const filteredRows = useMemo(() => {
@@ -93,7 +243,17 @@ export default function PartsQuotesPage() {
     return rows.filter((row) => {
       const plate = row.carPlate?.toLowerCase() ?? "";
       const part = row.partName?.toLowerCase() ?? "";
-      return plate.includes(normalized) || part.includes(normalized);
+      const partNumber = row.partNumber?.toLowerCase() ?? "";
+      const brands = [row.oemBrand, row.oeBrand, row.aftmBrand, row.usedBrand]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return (
+        plate.includes(normalized) ||
+        part.includes(normalized) ||
+        partNumber.includes(normalized) ||
+        brands.includes(normalized)
+      );
     });
   }, [rows, searchTerm]);
 
@@ -212,6 +372,10 @@ export default function PartsQuotesPage() {
 
   const orderQuote = async (row: QuoteRow) => {
     if (!companyId) return;
+    if (!row.isCustomerApproved) {
+      toast.error("Customer has not approved this estimate yet.");
+      return;
+    }
     const draft = orderDrafts[row.id] ?? { oemQty: "", oeQty: "", aftmQty: "", usedQty: "" };
     const toNum = (val: string) => {
       if (!val) return 0;
@@ -279,6 +443,7 @@ export default function PartsQuotesPage() {
       );
     }
     return filteredRows.map((row, index) => {
+      const approvedType = normalizeApprovedType(row.approvedType);
       const statusLabel = row.estimateItemStatus ?? row.status ?? "pending";
       const carLabel =
         row.sourceType === "inventory"
@@ -287,8 +452,6 @@ export default function PartsQuotesPage() {
             : "Inventory request"
           : [row.carMake, row.carModel].filter(Boolean).join(" ") || "Unknown car";
       const partName = row.partName || "Unnamed part";
-      const quoteInfo = pickQuote(row);
-      const quoteAmount = quoteInfo.amount != null ? `${quoteInfo.amount.toFixed(2)} AED` : "-";
       const qtySummary = [
         row.oemQty != null ? `OEM: ${row.oemQty}` : null,
         row.oeQty != null ? `OE: ${row.oeQty}` : null,
@@ -308,19 +471,78 @@ export default function PartsQuotesPage() {
           <td className="px-3 py-3 text-xs">{row.carVin ?? "-"}</td>
           <td className="px-3 py-3 text-sm font-semibold">
             <div>{partName}</div>
+            <div className="text-[11px] text-slate-400">No: {row.partNumber ?? "-"}</div>
             <div className="text-[11px] text-slate-400">{row.remarks ?? ""}</div>
           </td>
           <td className="px-3 py-3 text-xs">
-            <div className="font-semibold">{quoteInfo.type}</div>
-            <div>{quoteAmount}</div>
-            <div className="text-[10px] uppercase text-slate-400">{quoteInfo.etd ?? ""}</div>
+            <div className="grid gap-1 sm:grid-cols-2">
+              {(
+                [
+                  { label: "OEM", amount: row.oem, qty: row.oemQty, etd: row.oemEtd, time: row.oemTime, brand: row.oemBrand },
+                  { label: "OE", amount: row.oe, qty: row.oeQty, etd: row.oeEtd, time: row.oeTime, brand: row.oeBrand },
+                  { label: "AFTM", amount: row.aftm, qty: row.aftmQty, etd: row.aftmEtd, time: row.aftmTime, brand: row.aftmBrand },
+                  { label: "USED", amount: row.used, qty: row.usedQty, etd: row.usedEtd, time: row.usedTime, brand: row.usedBrand },
+                ] as const
+              ).map((q) => (
+                <div key={`${row.id}-${q.label}`} className="rounded border border-slate-700/60 bg-slate-900/50 p-1.5">
+                  <div className="text-[10px] font-semibold text-slate-300">{q.label}</div>
+                  <div className="text-[11px] font-semibold">{q.amount != null ? `${q.amount.toFixed(2)} AED` : "-"}</div>
+                  <div className="text-[10px] text-slate-400">Brand: {q.brand ?? row.partBrand ?? "-"}</div>
+                  <div className="text-[10px] text-slate-400">Qty: {q.qty ?? "-"}</div>
+                  <div className="text-[10px] text-slate-400">{formatEtdLabel(q.etd, q.time)}</div>
+                </div>
+              ))}
+            </div>
             {qtySummary && <div className="text-[10px] text-slate-500">{qtySummary}</div>}
           </td>
           <td className="px-3 py-3 text-xs uppercase">{statusLabel}</td>
           <td className="px-3 py-3 text-xs uppercase">{row.status ?? "Requested"}</td>
           <td className="px-3 py-3 text-xs">
+            {approvedType ? (
+              <div
+                className={`mb-1 inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase ${approvedTypeBadgeClass(
+                  approvedType
+                )}`}
+              >
+                Approved Type: {approvedType.toUpperCase()}
+              </div>
+            ) : null}
+            <div
+              className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase ${
+                row.isCustomerApproved
+                  ? "border-emerald-400/40 bg-emerald-500/15 text-emerald-200"
+                  : "border-amber-400/40 bg-amber-500/10 text-amber-200"
+              }`}
+            >
+              Customer {row.isCustomerApproved ? "Approved" : "Pending"}
+            </div>
+            {row.customerApprovedAt ? (
+              <div className="text-[10px] text-slate-400">
+                Approved: {new Date(row.customerApprovedAt).toLocaleString()}
+              </div>
+            ) : null}
             <div>{orderedOn}</div>
-            {showGrn ? <div className="text-[10px] font-semibold text-emerald-300">{row.grnNumber}</div> : null}
+            {row.aiSuggestedType &&
+            (!approvedType ||
+              String(row.aiSuggestedType).trim().toLowerCase() === approvedType) ? (
+              <div className="text-[10px] text-amber-300">
+                AI: {String(row.aiSuggestedType).toUpperCase()}
+                {row.aiSuggestedUnitPrice != null ? ` @ ${row.aiSuggestedUnitPrice.toFixed(2)} AED` : ""}
+              </div>
+            ) : null}
+            {row.aiSuggestionReason ? (
+              <div className="text-[10px] text-slate-400">{row.aiSuggestionReason}</div>
+            ) : null}
+            {row.deliveryNoteNo ? (
+              <div className="text-[10px] font-semibold text-sky-300">DN: {row.deliveryNoteNo}</div>
+            ) : null}
+            {row.deliveryNoteStatus ? (
+              <div className="text-[10px] text-slate-300">DN Status: {row.deliveryNoteStatus}</div>
+            ) : null}
+            {row.deliveryDestinationBranchId ? (
+              <div className="text-[10px] text-slate-400">Dest: {row.deliveryDestinationBranchId}</div>
+            ) : null}
+            {showGrn ? <div className="text-[10px] font-semibold text-emerald-300">GRN: {row.grnNumber}</div> : null}
           </td>
           {isOrderedTab ? (
             <td className="px-3 py-3 text-center">
@@ -360,11 +582,43 @@ export default function PartsQuotesPage() {
                 <div className="text-[11px] text-slate-400">
                   Compare vendor pricing and submit the exact quantities to order.
                 </div>
+                {quotesModalAiSuggestion ? (
+                  <div className="mt-2 rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-100">
+                    <div className="font-semibold uppercase tracking-wide text-amber-200">
+                      AI Suggestion
+                    </div>
+                    <div>
+                      {quotesModalAiSuggestion.vendorName} - {quotesModalAiSuggestion.type}
+                      {quotesModalAiSuggestion.price != null
+                        ? ` @ ${quotesModalAiSuggestion.price.toFixed(2)} AED`
+                        : ""}
+                      {quotesModalAiSuggestion.etd
+                        ? ` - ETD: ${formatEtdLabel(quotesModalAiSuggestion.etd, null)}`
+                        : ""}
+                    </div>
+                    <div className="text-amber-100/80">{quotesModalAiSuggestion.reason}</div>
+                  </div>
+                ) : null}
                 {quotesModalApprovedType ? (
-                  <div className="mt-2 inline-flex rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase text-emerald-300">
+                  <div
+                    className={`mt-2 inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase ${approvedTypeBadgeClass(
+                      quotesModalApprovedType
+                    )}`}
+                  >
                     Approved Type: {quotesModalApprovedType.toUpperCase()}
                   </div>
                 ) : null}
+                <div className="mt-2">
+                  {quotesModalRows.some((r) => r.isCustomerApproved) ? (
+                    <span className="inline-flex rounded-full border border-emerald-400/40 bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase text-emerald-200">
+                      Customer Approved
+                    </span>
+                  ) : (
+                    <span className="inline-flex rounded-full border border-amber-400/40 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-amber-200">
+                      Customer Approval Pending
+                    </span>
+                  )}
+                </div>
               </div>
               <button
                 type="button"
@@ -407,13 +661,20 @@ export default function PartsQuotesPage() {
                             <div>
                               <div className="flex items-center gap-2">
                                 <div className="text-sm font-semibold">{r.oem} AED</div>
+                                {isAiSuggestedOption(r, "oem") && (
+                                  <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase text-amber-200">
+                                    AI Suggested
+                                  </span>
+                                )}
                                 {(isApprovedType(r, "oem") || quotesModalApprovedType === "oem") && (
                                   <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase text-emerald-300">
                                     Approved
                                   </span>
                                 )}
                               </div>
-                              <div className="text-[10px] text-slate-400">QTY: {r.oemQty ?? "—"}</div>
+                              <div className="text-[10px] text-slate-400">Brand: {r.oemBrand ?? r.partBrand ?? "-"}</div>
+                                                            <div className="text-[10px] text-slate-400">QTY: {r.oemQty ?? "-"}</div>
+                                                            <div className="text-[10px] text-slate-400">ETD: {formatEtdLabel(r.oemEtd, r.oemTime)}</div>
                             </div>
                           ) : (
                             "—"
@@ -424,13 +685,20 @@ export default function PartsQuotesPage() {
                             <div>
                               <div className="flex items-center gap-2">
                                 <div className="text-sm font-semibold">{r.oe} AED</div>
+                                {isAiSuggestedOption(r, "oe") && (
+                                  <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase text-amber-200">
+                                    AI Suggested
+                                  </span>
+                                )}
                                 {(isApprovedType(r, "oe") || quotesModalApprovedType === "oe") && (
                                   <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase text-emerald-300">
                                     Approved
                                   </span>
                                 )}
                               </div>
-                              <div className="text-[10px] text-slate-400">QTY: {r.oeQty ?? "—"}</div>
+                              <div className="text-[10px] text-slate-400">Brand: {r.oeBrand ?? r.partBrand ?? "-"}</div>
+                                                            <div className="text-[10px] text-slate-400">QTY: {r.oeQty ?? "-"}</div>
+                                                            <div className="text-[10px] text-slate-400">ETD: {formatEtdLabel(r.oeEtd, r.oeTime)}</div>
                             </div>
                           ) : (
                             "—"
@@ -441,13 +709,20 @@ export default function PartsQuotesPage() {
                             <div>
                               <div className="flex items-center gap-2">
                                 <div className="text-sm font-semibold">{r.aftm} AED</div>
+                                {isAiSuggestedOption(r, "aftm") && (
+                                  <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase text-amber-200">
+                                    AI Suggested
+                                  </span>
+                                )}
                                 {(isApprovedType(r, "aftm") || quotesModalApprovedType === "aftm") && (
                                   <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase text-emerald-300">
                                     Approved
                                   </span>
                                 )}
                               </div>
-                              <div className="text-[10px] text-slate-400">QTY: {r.aftmQty ?? "—"}</div>
+                              <div className="text-[10px] text-slate-400">Brand: {r.aftmBrand ?? r.partBrand ?? "-"}</div>
+                                                            <div className="text-[10px] text-slate-400">QTY: {r.aftmQty ?? "-"}</div>
+                                                            <div className="text-[10px] text-slate-400">ETD: {formatEtdLabel(r.aftmEtd, r.aftmTime)}</div>
                             </div>
                           ) : (
                             "—"
@@ -458,13 +733,20 @@ export default function PartsQuotesPage() {
                             <div>
                               <div className="flex items-center gap-2">
                                 <div className="text-sm font-semibold">{r.used} AED</div>
+                                {isAiSuggestedOption(r, "used") && (
+                                  <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase text-amber-200">
+                                    AI Suggested
+                                  </span>
+                                )}
                                 {(isApprovedType(r, "used") || quotesModalApprovedType === "used") && (
                                   <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase text-emerald-300">
                                     Approved
                                   </span>
                                 )}
                               </div>
-                              <div className="text-[10px] text-slate-400">QTY: {r.usedQty ?? "—"}</div>
+                              <div className="text-[10px] text-slate-400">Brand: {r.usedBrand ?? r.partBrand ?? "-"}</div>
+                                                            <div className="text-[10px] text-slate-400">QTY: {r.usedQty ?? "-"}</div>
+                                                            <div className="text-[10px] text-slate-400">ETD: {formatEtdLabel(r.usedEtd, r.usedTime)}</div>
                             </div>
                           ) : (
                             "—"
@@ -485,10 +767,18 @@ export default function PartsQuotesPage() {
                           <button
                             type="button"
                             onClick={() => orderQuote(r)}
-                            disabled={orderingQuoteId === r.id}
-                            className="rounded-md border border-emerald-500/60 bg-emerald-500/10 px-2 py-1 text-[11px] font-semibold text-emerald-200 hover:bg-emerald-500/20 disabled:opacity-70"
+                            disabled={orderingQuoteId === r.id || !r.isCustomerApproved}
+                            className={`rounded-md border px-2 py-1 text-[11px] font-semibold disabled:opacity-70 ${
+                              r.isCustomerApproved
+                                ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20"
+                                : "border-amber-500/60 bg-amber-500/10 text-amber-200"
+                            }`}
                           >
-                            {orderingQuoteId === r.id ? "Ordering..." : "Order"}
+                            {!r.isCustomerApproved
+                              ? "Awaiting Customer Approval"
+                              : orderingQuoteId === r.id
+                              ? "Ordering..."
+                              : "Order"}
                           </button>
                         </td>
                       </tr>
@@ -540,7 +830,7 @@ export default function PartsQuotesPage() {
               type="text"
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
-              placeholder="Search by plate or part"
+              placeholder="Search by plate, part, part no, or brand"
               className="flex-1 min-w-[220px] rounded-md border border-slate-800 bg-slate-900/70 px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/70"
             />
             {isOrderedTab && selectedOrderedIds.length > 0 && (
@@ -598,3 +888,5 @@ export default function PartsQuotesPage() {
     </AppLayout>
   );
 }
+
+

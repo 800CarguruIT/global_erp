@@ -3,13 +3,20 @@
 import { AppLayout } from "@repo/ui";
 import { DropzoneFileInput } from "@repo/ui/components/common/DropzoneFileInput";
 import { useParams } from "next/navigation";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type QuoteTypeKey = "oem" | "oe" | "aftm" | "used";
 type PartFormData = {
-  partNumber: string;
   attachmentName: string;
   remarks: string;
+  oemBrand: string;
+  oeBrand: string;
+  aftmBrand: string;
+  usedBrand: string;
+  oemCustomBrandName: string;
+  oeCustomBrandName: string;
+  aftmCustomBrandName: string;
+  usedCustomBrandName: string;
   oemAmount: string;
   oeAmount: string;
   aftmAmount: string;
@@ -54,9 +61,16 @@ const MAKES = [
 ];
 
 const createEmptyPartForm = (): PartFormData => ({
-  partNumber: "",
   attachmentName: "",
   remarks: "",
+  oemBrand: "",
+  oeBrand: "",
+  aftmBrand: "",
+  usedBrand: "",
+  oemCustomBrandName: "",
+  oeCustomBrandName: "",
+  aftmCustomBrandName: "",
+  usedCustomBrandName: "",
   oemAmount: "",
   oeAmount: "",
   aftmAmount: "",
@@ -74,6 +88,8 @@ const createEmptyPartForm = (): PartFormData => ({
   aftmTime: "",
   usedTime: "",
 });
+
+const BRAND_OTHER_VALUE = "__other__";
 
 function TableShell({
   title,
@@ -170,6 +186,7 @@ export default function VendorDashboardPage() {
     Array<{
       id: string;
       partName: string;
+      partNumber?: string | null;
       description?: string | null;
       quantity?: number | null;
       partType?: string | null;
@@ -177,6 +194,11 @@ export default function VendorDashboardPage() {
       isSubmitted?: boolean;
     }>
   >([]);
+  const [brandOptionsByRow, setBrandOptionsByRow] = useState<Record<string, string[]>>({});
+  const [brandLoadingByRow, setBrandLoadingByRow] = useState<Record<string, boolean>>({});
+  const [brandTypeaheadByField, setBrandTypeaheadByField] = useState<Record<string, string[]>>({});
+  const brandTypeaheadTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const savedTypedBrandsRef = useRef<Set<string>>(new Set());
   const [bids, setBids] = useState<
     Array<{
       id: string;
@@ -199,6 +221,15 @@ export default function VendorDashboardPage() {
       usedEtd?: string | null;
       remarks?: string | null;
       status?: string | null;
+      deliveryNoteNo?: string | null;
+      deliveryNoteStatus?: string | null;
+      deliveryDestinationBranchId?: string | null;
+      deliverySourceName?: string | null;
+      deliverySourceLocation?: string | null;
+      deliverySourceUrl?: string | null;
+      deliveryDestinationName?: string | null;
+      deliveryDestinationLocation?: string | null;
+      deliveryDestinationUrl?: string | null;
       updatedAt?: string | null;
     }>
   >([]);
@@ -213,6 +244,19 @@ export default function VendorDashboardPage() {
   const [returns, setReturns] = useState<typeof bids>([]);
   const [returnsLoading, setReturnsLoading] = useState(false);
   const [returnsError, setReturnsError] = useState<string | null>(null);
+  const [deliveryNoteModal, setDeliveryNoteModal] = useState<{
+    noteNo?: string | null;
+    status?: string | null;
+    sourceName?: string | null;
+    sourceLocation?: string | null;
+    sourceUrl?: string | null;
+    destinationName?: string | null;
+    destinationLocation?: string | null;
+    destinationBranchId?: string | null;
+    destinationUrl?: string | null;
+    items: Array<{ partName: string; qty: string; price: string }>;
+    updatedAt?: string | null;
+  } | null>(null);
 
   const currentTab = useMemo(
     () => TAB_CONFIG.find((tab) => tab.id === activeTab) ?? TAB_CONFIG[0]!,
@@ -253,6 +297,73 @@ export default function VendorDashboardPage() {
       return next;
     });
   }, [partsRows]);
+
+  useEffect(() => {
+    if (!partsOpen || !partsRows.length || !companyId || !vendorId) return;
+    let cancelled = false;
+    const controller = new AbortController();
+
+    async function loadBrandSuggestions() {
+      const pendingRows = partsRows.filter((row) => !brandOptionsByRow[row.id]?.length);
+      if (!pendingRows.length) return;
+
+      const setLoading = (rowId: string, loading: boolean) => {
+        setBrandLoadingByRow((prev) => ({ ...prev, [rowId]: loading }));
+      };
+
+      await Promise.all(
+        pendingRows.map(async (row) => {
+          setLoading(row.id, true);
+          try {
+            const res = await fetch(`/api/company/${companyId}/vendors/${vendorId}/brand-suggestions`, {
+              method: "POST",
+              signal: controller.signal,
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                partName: row.partName,
+                partNumber: row.partNumber ?? "",
+                carMake: selectedInquiry?.carMake ?? "",
+                carModel: selectedInquiry?.carModel ?? "",
+              }),
+            });
+            if (!res.ok) throw new Error(`Failed (${res.status})`);
+            const payload = await res.json();
+            const options = Array.isArray(payload?.data)
+              ? payload.data.map((item: unknown) => String(item ?? "").trim()).filter(Boolean)
+              : [];
+            if (!cancelled) {
+              setBrandOptionsByRow((prev) => ({
+                ...prev,
+                [row.id]: options.length ? options : ["Other"],
+              }));
+            }
+          } catch {
+            if (!cancelled) {
+              setBrandOptionsByRow((prev) => ({
+                ...prev,
+                [row.id]: prev[row.id]?.length ? prev[row.id] : ["Other"],
+              }));
+            }
+          } finally {
+            if (!cancelled) setLoading(row.id, false);
+          }
+        })
+      );
+    }
+
+    loadBrandSuggestions();
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [partsOpen, partsRows, companyId, vendorId, selectedInquiry?.carMake, selectedInquiry?.carModel, brandOptionsByRow]);
+
+  useEffect(() => {
+    return () => {
+      Object.values(brandTypeaheadTimersRef.current).forEach((timer) => clearTimeout(timer));
+      brandTypeaheadTimersRef.current = {};
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -505,6 +616,9 @@ export default function VendorDashboardPage() {
                 const data = await res.json();
                 const rows = Array.isArray(data?.data) ? data.data : [];
                 setPartsRows(rows);
+                setBrandOptionsByRow({});
+                setBrandLoadingByRow({});
+                setBrandTypeaheadByField({});
                 setSubmitStatus((prev) => {
                   const next = { ...prev };
                   for (const part of rows) {
@@ -620,6 +734,45 @@ export default function VendorDashboardPage() {
     return { pickQuote };
   }, []);
 
+  const openDeliveryNoteModal = useCallback(
+    (row: (typeof bids)[number]) => {
+      const allRows = [...orders, ...completed, ...returns, ...bids];
+      const noteNo = String(row.deliveryNoteNo ?? "").trim();
+      const sameNoteRows = noteNo
+        ? allRows.filter((r) => String(r.deliveryNoteNo ?? "").trim() === noteNo)
+        : [row];
+      const uniqueRows = Array.from(new Map(sameNoteRows.map((r) => [r.id, r])).values());
+      const items = uniqueRows.map((r) => {
+        const q = statusRows.pickQuote(r);
+        return {
+          partName: String(r.partName ?? "-"),
+          qty: `${q.qty ?? "-"} (${q.type})`,
+          price: q.amount != null ? `${q.amount} AED` : "-",
+        };
+      });
+      const firstWithDestination =
+        uniqueRows.find((r) => r.deliveryDestinationName || r.deliveryDestinationBranchId) ?? row;
+      const firstWithSourceUrl = uniqueRows.find((r) => r.deliverySourceUrl) ?? row;
+      const firstWithDestinationUrl = uniqueRows.find((r) => r.deliveryDestinationUrl) ?? firstWithDestination;
+      const firstWithDestinationLocation =
+        uniqueRows.find((r) => r.deliveryDestinationLocation || r.deliveryDestinationName) ?? firstWithDestination;
+      setDeliveryNoteModal({
+        noteNo: row.deliveryNoteNo ?? null,
+        status: row.deliveryNoteStatus ?? null,
+        sourceName: row.deliverySourceName ?? null,
+        sourceLocation: row.deliverySourceLocation ?? null,
+        sourceUrl: firstWithSourceUrl.deliverySourceUrl ?? null,
+        destinationName: firstWithDestination.deliveryDestinationName ?? null,
+        destinationLocation: firstWithDestinationLocation.deliveryDestinationLocation ?? null,
+        destinationBranchId: firstWithDestination.deliveryDestinationBranchId ?? null,
+        destinationUrl: firstWithDestinationUrl.deliveryDestinationUrl ?? null,
+        items,
+        updatedAt: row.updatedAt ?? null,
+      });
+    },
+    [bids, orders, completed, returns, statusRows]
+  );
+
   const allowedTypesForRow = (partType?: string | null) => {
     if (!partType) return new Set(["oem", "oe", "aftm", "used"]);
     const normalized = partType.toLowerCase();
@@ -642,6 +795,63 @@ export default function VendorDashboardPage() {
     }));
   };
 
+  const requestBrandTypeahead = (row: { id: string; partName: string; partNumber?: string | null }, type: QuoteTypeKey, query: string) => {
+    if (!companyId || !vendorId) return;
+    const fieldKey = `${row.id}:${type}`;
+    const existingTimer = brandTypeaheadTimersRef.current[fieldKey];
+    if (existingTimer) clearTimeout(existingTimer);
+    if (!query.trim()) {
+      setBrandTypeaheadByField((prev) => {
+        const next = { ...prev };
+        delete next[fieldKey];
+        return next;
+      });
+      return;
+    }
+    brandTypeaheadTimersRef.current[fieldKey] = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/company/${companyId}/vendors/${vendorId}/brand-suggestions`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            partName: row.partName,
+            partNumber: row.partNumber ?? "",
+            carMake: selectedInquiry?.carMake ?? "",
+            carModel: selectedInquiry?.carModel ?? "",
+            query,
+          }),
+        });
+        if (!res.ok) throw new Error(`Failed (${res.status})`);
+        const payload = await res.json();
+        const options = Array.isArray(payload?.data)
+          ? payload.data
+              .map((item: unknown) => String(item ?? "").trim())
+              .filter((item: string) => item && item.toLowerCase() !== "other")
+          : [];
+        setBrandTypeaheadByField((prev) => ({ ...prev, [fieldKey]: options.slice(0, 15) }));
+      } catch {
+        // Keep typed value usable even when live suggestions fail.
+      }
+    }, 320);
+  };
+
+  const persistTypedBrand = async (brandNameRaw: string) => {
+    const brandName = String(brandNameRaw ?? "").trim().replace(/\s+/g, " ");
+    if (!brandName || !companyId || !vendorId) return;
+    const key = brandName.toLowerCase();
+    if (savedTypedBrandsRef.current.has(key)) return;
+    savedTypedBrandsRef.current.add(key);
+    try {
+      await fetch(`/api/company/${companyId}/vendors/${vendorId}/brand-suggestions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "upsert", brandName }),
+      });
+    } catch {
+      savedTypedBrandsRef.current.delete(key);
+    }
+  };
+
   const markDraftSaved = (rowId: string) => {
     setDraftSavedAt((prev) => ({ ...prev, [rowId]: new Date().toLocaleTimeString() }));
   };
@@ -660,18 +870,63 @@ export default function VendorDashboardPage() {
     const hasAnyAmount = amountKeys.some((key) => toPositiveNumber(form[key] as string) > 0);
     if (!hasAnyAmount) return "Enter at least one quote amount.";
 
-    const validations: Array<{ type: QuoteTypeKey; amount: string; etd: string; time: string }> = [
-      { type: "oem", amount: form.oemAmount, etd: form.oemEtd, time: form.oemTime },
-      { type: "oe", amount: form.oeAmount, etd: form.oeEtd, time: form.oeTime },
-      { type: "aftm", amount: form.aftmAmount, etd: form.aftmEtd, time: form.aftmTime },
-      { type: "used", amount: form.usedAmount, etd: form.usedEtd, time: form.usedTime },
+    const validations: Array<{
+      type: QuoteTypeKey;
+      amount: string;
+      etd: string;
+      time: string;
+      brand: string;
+      customBrandName: string;
+    }> = [
+      {
+        type: "oem",
+        amount: form.oemAmount,
+        etd: form.oemEtd,
+        time: form.oemTime,
+        brand: form.oemBrand,
+        customBrandName: form.oemCustomBrandName,
+      },
+      {
+        type: "oe",
+        amount: form.oeAmount,
+        etd: form.oeEtd,
+        time: form.oeTime,
+        brand: form.oeBrand,
+        customBrandName: form.oeCustomBrandName,
+      },
+      {
+        type: "aftm",
+        amount: form.aftmAmount,
+        etd: form.aftmEtd,
+        time: form.aftmTime,
+        brand: form.aftmBrand,
+        customBrandName: form.aftmCustomBrandName,
+      },
+      {
+        type: "used",
+        amount: form.usedAmount,
+        etd: form.usedEtd,
+        time: form.usedTime,
+        brand: form.usedBrand,
+        customBrandName: form.usedCustomBrandName,
+      },
     ];
 
     for (const check of validations) {
       if (!isTypeEnabled(row, check.type)) continue;
       if (toPositiveNumber(check.amount) <= 0) continue;
-      if (check.etd === "Custom" && !String(check.time ?? "").trim()) {
-        return "Fill custom time for selected quote type.";
+      const selectedBrand = String(check.brand ?? "").trim();
+      if (!selectedBrand) {
+        return `Select ${check.type.toUpperCase()} brand.`;
+      }
+      if (selectedBrand === BRAND_OTHER_VALUE && !String(check.customBrandName ?? "").trim()) {
+        return `Enter custom brand for ${check.type.toUpperCase()}.`;
+      }
+      if (check.etd === "Same Day") {
+        const hours = Number(String(check.time ?? "").trim());
+        if (!Number.isFinite(hours) || hours < 1 || hours > 8) {
+          return "For Same Day, select delivery hours (1-8).";
+        }
       }
     }
     return null;
@@ -707,6 +962,8 @@ export default function VendorDashboardPage() {
     }
     return orders.map((row, index) => {
       const quote = statusRows.pickQuote(row);
+      const qtyLabel = `${quote.qty ?? "—"} (${quote.type})`;
+      const priceLabel = quote.amount != null ? `${quote.amount} AED` : "—";
       return (
         <tr key={row.id} className="border-t border-white/5">
           <td className="px-3 py-3 text-xs text-slate-300/80">{index + 1}</td>
@@ -717,17 +974,38 @@ export default function VendorDashboardPage() {
           <td className="px-3 py-3">{row.carMake ?? "—"}</td>
           <td className="px-3 py-3">{row.carModel ?? "—"}</td>
           <td className="px-3 py-3">{row.carVin ?? "—"}</td>
-          <td className="px-3 py-3">{quote.qty ?? "—"} ({quote.type})</td>
-          <td className="px-3 py-3">{quote.amount != null ? `${quote.amount} AED` : "—"}</td>
+          <td className="px-3 py-3">{qtyLabel}</td>
+          <td className="px-3 py-3">{priceLabel}</td>
           <td className="px-3 py-3">{row.status ?? "Ordered"}</td>
-          <td className="px-3 py-3">—</td>
+          <td className="px-3 py-3 text-xs">
+            <div className="font-semibold text-emerald-300">{row.deliveryNoteNo ?? "-"}</div>
+            <div className="text-slate-300/80">{row.deliveryNoteStatus ?? "issued"}</div>
+            <div className="text-[10px] text-slate-400">
+              Location: {row.deliveryDestinationLocation ?? row.deliveryDestinationName ?? "Assigned Workshop"}
+            </div>
+            {row.deliveryDestinationName ? (
+              <div className="text-[10px] text-slate-400">Destination: {row.deliveryDestinationName}</div>
+            ) : null}
+            {row.deliveryDestinationBranchId ? (
+              <div className="text-[10px] text-slate-400">Dest: {row.deliveryDestinationBranchId}</div>
+            ) : null}
+            {row.deliveryNoteNo || row.deliveryNoteStatus || row.deliverySourceName || row.deliveryDestinationName ? (
+              <button
+                type="button"
+                onClick={() => openDeliveryNoteModal(row)}
+                className="mt-1 rounded border border-cyan-500/60 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-semibold text-cyan-200 hover:bg-cyan-500/20"
+              >
+                View
+              </button>
+            ) : null}
+          </td>
           <td className="px-3 py-3 text-xs text-slate-300/80">
             {row.updatedAt ? new Date(row.updatedAt).toLocaleDateString() : "—"}
           </td>
         </tr>
       );
     });
-  }, [orders, ordersError, ordersLoading, statusRows]);
+  }, [orders, ordersError, ordersLoading, statusRows, openDeliveryNoteModal]);
 
   const completedBody = useMemo(() => {
     if (completedLoading) {
@@ -759,26 +1037,46 @@ export default function VendorDashboardPage() {
     }
     return completed.map((row, index) => {
       const quote = statusRows.pickQuote(row);
+      const qtyLabel = `${quote.qty ?? "-"} (${quote.type})`;
+      const priceLabel = quote.amount != null ? `${quote.amount} AED` : "-";
       return (
         <tr key={row.id} className="border-t border-white/5">
           <td className="px-3 py-3 text-xs text-slate-300/80">{index + 1}</td>
           <td className="px-3 py-3">
             <div className="text-sm font-semibold text-slate-100">{row.partName}</div>
           </td>
-          <td className="px-3 py-3">{row.carPlate ?? "—"}</td>
-          <td className="px-3 py-3">{row.carMake ?? "—"}</td>
-          <td className="px-3 py-3">{row.carModel ?? "—"}</td>
-          <td className="px-3 py-3">{row.carVin ?? "—"}</td>
-          <td className="px-3 py-3">{quote.qty ?? "—"} ({quote.type})</td>
-          <td className="px-3 py-3">{quote.amount != null ? `${quote.amount} AED` : "—"}</td>
+          <td className="px-3 py-3">{row.carPlate ?? "-"}</td>
+          <td className="px-3 py-3">{row.carMake ?? "-"}</td>
+          <td className="px-3 py-3">{row.carModel ?? "-"}</td>
+          <td className="px-3 py-3">{row.carVin ?? "-"}</td>
+          <td className="px-3 py-3">{qtyLabel}</td>
+          <td className="px-3 py-3">{priceLabel}</td>
           <td className="px-3 py-3">
-            {row.updatedAt ? new Date(row.updatedAt).toLocaleDateString() : "—"}
+            {row.updatedAt ? new Date(row.updatedAt).toLocaleDateString() : "-"}
           </td>
-          <td className="px-3 py-3">—</td>
+          <td className="px-3 py-3 text-xs">
+            <div className="font-semibold text-emerald-300">{row.deliveryNoteNo ?? "-"}</div>
+            <div className="text-slate-300/80">{row.deliveryNoteStatus ?? "received"}</div>
+            <div className="text-[10px] text-slate-400">
+              Location: {row.deliveryDestinationLocation ?? row.deliveryDestinationName ?? "Assigned Workshop"}
+            </div>
+            {row.deliveryDestinationName ? (
+              <div className="text-[10px] text-slate-400">Destination: {row.deliveryDestinationName}</div>
+            ) : null}
+            {row.deliveryNoteNo || row.deliveryNoteStatus || row.deliverySourceName || row.deliveryDestinationName ? (
+              <button
+                type="button"
+                onClick={() => openDeliveryNoteModal(row)}
+                className="mt-1 rounded border border-cyan-500/60 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-semibold text-cyan-200 hover:bg-cyan-500/20"
+              >
+                View
+              </button>
+            ) : null}
+          </td>
         </tr>
       );
     });
-  }, [completed, completedError, completedLoading, statusRows]);
+  }, [completed, completedError, completedLoading, statusRows, openDeliveryNoteModal]);
 
   const returnsBody = useMemo(() => {
     if (returnsLoading) {
@@ -810,26 +1108,45 @@ export default function VendorDashboardPage() {
     }
     return returns.map((row, index) => {
       const quote = statusRows.pickQuote(row);
+      const qtyLabel = `${quote.qty ?? "-"} (${quote.type})`;
       return (
         <tr key={row.id} className="border-t border-white/5">
           <td className="px-3 py-3 text-xs text-slate-300/80">{index + 1}</td>
           <td className="px-3 py-3">
             <div className="text-sm font-semibold text-slate-100">{row.partName}</div>
           </td>
-          <td className="px-3 py-3">{row.carPlate ?? "—"}</td>
-          <td className="px-3 py-3">{row.carMake ?? "—"}</td>
-          <td className="px-3 py-3">{row.carModel ?? "—"}</td>
-          <td className="px-3 py-3">{row.carVin ?? "—"}</td>
-          <td className="px-3 py-3">{quote.qty ?? "—"} ({quote.type})</td>
+          <td className="px-3 py-3">{row.carPlate ?? "-"}</td>
+          <td className="px-3 py-3">{row.carMake ?? "-"}</td>
+          <td className="px-3 py-3">{row.carModel ?? "-"}</td>
+          <td className="px-3 py-3">{row.carVin ?? "-"}</td>
+          <td className="px-3 py-3">{qtyLabel}</td>
           <td className="px-3 py-3">
-            {row.updatedAt ? new Date(row.updatedAt).toLocaleDateString() : "—"}
+            {row.updatedAt ? new Date(row.updatedAt).toLocaleDateString() : "-"}
           </td>
           <td className="px-3 py-3">{row.status ?? "Returned"}</td>
-          <td className="px-3 py-3">—</td>
+          <td className="px-3 py-3 text-xs">
+            <div className="font-semibold text-emerald-300">{row.deliveryNoteNo ?? "-"}</div>
+            <div className="text-slate-300/80">{row.deliveryNoteStatus ?? "return_pending"}</div>
+            <div className="text-[10px] text-slate-400">
+              Location: {row.deliveryDestinationLocation ?? row.deliveryDestinationName ?? "Assigned Workshop"}
+            </div>
+            {row.deliveryDestinationName ? (
+              <div className="text-[10px] text-slate-400">Destination: {row.deliveryDestinationName}</div>
+            ) : null}
+            {row.deliveryNoteNo || row.deliveryNoteStatus || row.deliverySourceName || row.deliveryDestinationName ? (
+              <button
+                type="button"
+                onClick={() => openDeliveryNoteModal(row)}
+                className="mt-1 rounded border border-cyan-500/60 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-semibold text-cyan-200 hover:bg-cyan-500/20"
+              >
+                View
+              </button>
+            ) : null}
+          </td>
         </tr>
       );
     });
-  }, [returns, returnsError, returnsLoading, statusRows]);
+  }, [returns, returnsError, returnsLoading, statusRows, openDeliveryNoteModal]);
 
   return (
     <AppLayout>
@@ -984,7 +1301,7 @@ export default function VendorDashboardPage() {
                   "Quantity",
                   "Price (inc. VAT)",
                   "Status",
-                  "Invoice",
+                  "Delivery Note",
                   "Date",
                 ]}
                 emptyText="No new orders yet."
@@ -1006,7 +1323,7 @@ export default function VendorDashboardPage() {
                   "Quantity",
                   "Price (inc. VAT)",
                   "Purchase Date",
-                  "Invoice",
+                  "Delivery Note",
                 ]}
                 emptyText="No completed orders yet."
                 body={completedBody}
@@ -1027,7 +1344,7 @@ export default function VendorDashboardPage() {
                   "Quantity",
                   "Purchase Date",
                   "Status",
-                  "Invoice",
+                  "Delivery Note",
                 ]}
                 emptyText="No return requests yet."
                 body={returnsBody}
@@ -1036,6 +1353,141 @@ export default function VendorDashboardPage() {
           </section>
         </div>
       </div>
+
+      {deliveryNoteModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-3 backdrop-blur-sm">
+          <div className="w-full max-w-3xl overflow-hidden rounded-2xl border border-cyan-400/25 bg-gradient-to-b from-slate-950 via-slate-900/95 to-slate-950 shadow-[0_35px_90px_-45px_rgba(6,182,212,0.45)]">
+            <div className="flex items-start justify-between border-b border-white/10 bg-white/[0.03] px-5 py-4">
+              <div className="space-y-1">
+                <div className="text-[10px] uppercase tracking-[0.25em] text-white/45">Delivery Note</div>
+                <div className="text-lg font-semibold text-cyan-200">
+                  {deliveryNoteModal.noteNo ?? "Not Issued Yet"}
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span
+                    className={`rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase ${
+                      String(deliveryNoteModal.status ?? "").toLowerCase().includes("issue")
+                        ? "border-amber-400/40 bg-amber-500/15 text-amber-200"
+                        : String(deliveryNoteModal.status ?? "").toLowerCase().includes("return")
+                        ? "border-rose-400/40 bg-rose-500/15 text-rose-200"
+                        : "border-emerald-400/40 bg-emerald-500/15 text-emerald-200"
+                    }`}
+                  >
+                    {deliveryNoteModal.status ?? "Pending"}
+                  </span>
+                  <span className="text-[11px] text-slate-400">
+                    Updated{" "}
+                    {deliveryNoteModal.updatedAt
+                      ? new Date(deliveryNoteModal.updatedAt).toLocaleString()
+                      : "-"}
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDeliveryNoteModal(null)}
+                className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold text-white/80 hover:bg-white/20"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="p-5">
+              <div className="overflow-hidden rounded-xl border border-white/10">
+                <table className="w-full text-xs text-slate-100">
+                  <thead className="bg-slate-900/90 text-[10px] uppercase tracking-[0.2em] text-slate-400">
+                    <tr>
+                      <th className="px-3 py-2 text-left">Part</th>
+                      <th className="px-3 py-2 text-left">Qty</th>
+                      <th className="px-3 py-2 text-left">Price</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/10 bg-slate-950/60">
+                    {(deliveryNoteModal.items.length ? deliveryNoteModal.items : [{ partName: "-", qty: "-", price: "-" }]).map(
+                      (item, idx) => (
+                        <tr key={`${item.partName}-${idx}`}>
+                          <td className="px-3 py-2 font-medium text-cyan-100">{item.partName}</td>
+                          <td className="px-3 py-2 text-emerald-100">{item.qty}</td>
+                          <td className="px-3 py-2 text-amber-100">{item.price}</td>
+                        </tr>
+                      )
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="grid gap-3 border-t border-white/10 px-5 py-4 md:grid-cols-2">
+              {(() => {
+                const sourceMapUrl =
+                  deliveryNoteModal.sourceUrl ??
+                  (deliveryNoteModal.sourceLocation
+                    ? `https://www.google.com/maps?q=${encodeURIComponent(deliveryNoteModal.sourceLocation)}`
+                    : deliveryNoteModal.sourceName
+                    ? `https://www.google.com/maps?q=${encodeURIComponent(deliveryNoteModal.sourceName)}`
+                    : null);
+                const destinationSearchText =
+                  deliveryNoteModal.destinationLocation ??
+                  deliveryNoteModal.destinationName ??
+                  (deliveryNoteModal.destinationBranchId
+                    ? `Workshop ${deliveryNoteModal.destinationBranchId}`
+                    : "Assigned Workshop");
+                const destinationMapUrl =
+                  deliveryNoteModal.destinationUrl ??
+                  `https://www.google.com/maps?q=${encodeURIComponent(destinationSearchText)}`;
+                return (
+                  <>
+              <div className="rounded-xl border border-white/10 bg-slate-900/70 p-3">
+                <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400">Pickup Location</div>
+                <div className="mt-1 text-sm font-medium text-slate-100">
+                  {deliveryNoteModal.sourceName ?? "-"}
+                  {deliveryNoteModal.sourceLocation ? ` (${deliveryNoteModal.sourceLocation})` : ""}
+                </div>
+                {sourceMapUrl ? (
+                  <div className="mt-2 space-y-1">
+                    <a
+                      href={sourceMapUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex rounded border border-cyan-500/50 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-semibold text-cyan-200 hover:bg-cyan-500/20"
+                    >
+                      Open Pickup Map
+                    </a>
+                    <div className="truncate text-[10px] text-slate-400">{sourceMapUrl}</div>
+                  </div>
+                ) : null}
+              </div>
+              <div className="rounded-xl border border-white/10 bg-slate-900/70 p-3">
+                <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400">Destination</div>
+                <div className="mt-1 text-sm font-medium text-slate-100">
+                  Assigned Workshop
+                  {deliveryNoteModal.destinationName ? ` - ${deliveryNoteModal.destinationName}` : ""}
+                  {deliveryNoteModal.destinationBranchId ? ` (${deliveryNoteModal.destinationBranchId})` : ""}
+                  {deliveryNoteModal.destinationLocation
+                    ? ` • ${deliveryNoteModal.destinationLocation}`
+                    : ""}
+                </div>
+                {destinationMapUrl ? (
+                  <div className="mt-2 space-y-1">
+                    <a
+                      href={destinationMapUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex rounded border border-cyan-500/50 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-semibold text-cyan-200 hover:bg-cyan-500/20"
+                    >
+                      Open Destination Map
+                    </a>
+                    <div className="truncate text-[10px] text-slate-400">{destinationMapUrl}</div>
+                  </div>
+                ) : null}
+              </div>
+                  </>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {partsOpen && selectedInquiry ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-2 backdrop-blur-sm">
@@ -1048,6 +1500,9 @@ export default function VendorDashboardPage() {
                   setPartsOpen(false);
                   setPartsError(null);
                   setPartsRows([]);
+                  setBrandOptionsByRow({});
+                  setBrandLoadingByRow({});
+                  setBrandTypeaheadByField({});
                 }}
                 className="text-lg font-semibold text-slate-200 hover:text-white"
               >
@@ -1115,15 +1570,17 @@ export default function VendorDashboardPage() {
                     const options: Array<{
                       key: QuoteTypeKey;
                       label: string;
+                      brandKey: keyof PartFormData;
+                      customBrandKey: keyof PartFormData;
                       amountKey: keyof PartFormData;
                       qtyKey: keyof PartFormData;
                       etdKey: keyof PartFormData;
                       timeKey: keyof PartFormData;
                     }> = [
-                      { key: "oem", label: "OEM", amountKey: "oemAmount", qtyKey: "oemQty", etdKey: "oemEtd", timeKey: "oemTime" },
-                      { key: "oe", label: "Original", amountKey: "oeAmount", qtyKey: "oeQty", etdKey: "oeEtd", timeKey: "oeTime" },
-                      { key: "aftm", label: "After Market", amountKey: "aftmAmount", qtyKey: "aftmQty", etdKey: "aftmEtd", timeKey: "aftmTime" },
-                      { key: "used", label: "Used", amountKey: "usedAmount", qtyKey: "usedQty", etdKey: "usedEtd", timeKey: "usedTime" },
+                      { key: "oem", label: "OEM", brandKey: "oemBrand", customBrandKey: "oemCustomBrandName", amountKey: "oemAmount", qtyKey: "oemQty", etdKey: "oemEtd", timeKey: "oemTime" },
+                      { key: "oe", label: "Original", brandKey: "oeBrand", customBrandKey: "oeCustomBrandName", amountKey: "oeAmount", qtyKey: "oeQty", etdKey: "oeEtd", timeKey: "oeTime" },
+                      { key: "aftm", label: "After Market", brandKey: "aftmBrand", customBrandKey: "aftmCustomBrandName", amountKey: "aftmAmount", qtyKey: "aftmQty", etdKey: "aftmEtd", timeKey: "aftmTime" },
+                      { key: "used", label: "Used", brandKey: "usedBrand", customBrandKey: "usedCustomBrandName", amountKey: "usedAmount", qtyKey: "usedQty", etdKey: "usedEtd", timeKey: "usedTime" },
                     ];
 
                     return (
@@ -1142,13 +1599,10 @@ export default function VendorDashboardPage() {
                         <div className="mt-3 grid gap-3 md:grid-cols-[1fr,1fr]">
                           <div className="space-y-2 rounded-lg border border-slate-700/60 bg-slate-950/30 p-3">
                             <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-300">Part Info</div>
-                            <input
-                              className="w-full rounded border border-slate-700 bg-slate-950/80 px-2 py-1.5 text-xs text-slate-100 placeholder:text-slate-500"
-                              placeholder="Part Number"
-                              value={form?.partNumber ?? ""}
-                              onChange={(e) => updatePartForm(row.id, "partNumber", e.target.value)}
-                              onBlur={() => markDraftSaved(row.id)}
-                            />
+                            <div className="rounded border border-slate-700 bg-slate-950/80 px-2 py-1.5 text-xs text-slate-200">
+                              <span className="text-slate-400">Part Number: </span>
+                              {row.partNumber || "-"}
+                            </div>
                             <DropzoneFileInput
                               onFileSelect={(file) => {
                                 updatePartForm(row.id, "attachmentName", file?.name ?? "");
@@ -1179,6 +1633,62 @@ export default function VendorDashboardPage() {
                                 return (
                                   <div key={opt.key} className={`rounded-lg border p-2 ${enabled ? "border-slate-700 bg-slate-900/40" : "border-slate-800 bg-slate-900/20 opacity-50"}`}>
                                     <div className="mb-1 text-[11px] font-semibold text-slate-300">{opt.label}</div>
+                                    <select
+                                      className="mb-1 w-full rounded border border-slate-700 bg-slate-950/80 px-2 py-1 text-xs text-slate-100"
+                                      value={(form?.[opt.brandKey] as string) ?? ""}
+                                      onChange={(e) => updatePartForm(row.id, opt.brandKey, e.target.value)}
+                                      onBlur={() => markDraftSaved(row.id)}
+                                      disabled={!enabled}
+                                    >
+                                      <option value="">
+                                        {brandLoadingByRow[row.id] ? `Loading ${opt.label} brands...` : `Select ${opt.label} Brand`}
+                                      </option>
+                                      {(brandOptionsByRow[row.id] ?? ["Other"]).map((brandOption) => (
+                                        <option
+                                          key={`${opt.key}-${brandOption}`}
+                                          value={brandOption.toLowerCase() === "other" ? BRAND_OTHER_VALUE : brandOption}
+                                        >
+                                          {brandOption}
+                                        </option>
+                                      ))}
+                                    </select>
+                                    {(String(form?.[opt.brandKey] ?? "") === BRAND_OTHER_VALUE) ? (
+                                      <>
+                                        <input
+                                          className="mb-1 w-full rounded border border-slate-700 bg-slate-950/80 px-2 py-1 text-xs text-slate-100 placeholder:text-slate-500"
+                                          placeholder={`Enter ${opt.label} brand`}
+                                          value={(form?.[opt.customBrandKey] as string) ?? ""}
+                                          onChange={(e) => {
+                                            updatePartForm(row.id, opt.customBrandKey, e.target.value);
+                                            requestBrandTypeahead(row, opt.key, e.target.value);
+                                          }}
+                                          onBlur={async (e) => {
+                                            const typed = e.target.value;
+                                            markDraftSaved(row.id);
+                                            await persistTypedBrand(typed);
+                                            if (typed.trim()) {
+                                              setBrandOptionsByRow((prev) => {
+                                                const rowOptions = prev[row.id] ?? [];
+                                                const exists = rowOptions.some(
+                                                  (item) => item.toLowerCase() === typed.trim().toLowerCase()
+                                                );
+                                                if (exists) return prev;
+                                                return { ...prev, [row.id]: [typed.trim(), ...rowOptions] };
+                                              });
+                                            }
+                                          }}
+                                          disabled={!enabled}
+                                          list={`brand-suggestions-${row.id}-${opt.key}`}
+                                        />
+                                        <datalist id={`brand-suggestions-${row.id}-${opt.key}`}>
+                                          {(brandTypeaheadByField[`${row.id}:${opt.key}`] ?? brandOptionsByRow[row.id] ?? [])
+                                            .filter((brandOption) => brandOption.toLowerCase() !== "other")
+                                            .map((brandOption) => (
+                                              <option key={`${row.id}-${opt.key}-suggestion-${brandOption}`} value={brandOption} />
+                                            ))}
+                                        </datalist>
+                                      </>
+                                    ) : null}
                                     <input
                                       className="w-full rounded border border-slate-700 bg-slate-950/80 px-2 py-1 text-xs text-slate-100 placeholder:text-slate-500"
                                       placeholder={`${opt.label} Unit Price`}
@@ -1199,7 +1709,13 @@ export default function VendorDashboardPage() {
                                       <select
                                         className="rounded border border-slate-700 bg-slate-950/80 px-2 py-1 text-xs text-slate-100"
                                         value={(form?.[opt.etdKey] as string) ?? "Same Day"}
-                                        onChange={(e) => updatePartForm(row.id, opt.etdKey, e.target.value)}
+                                        onChange={(e) => {
+                                          const nextEtd = e.target.value;
+                                          updatePartForm(row.id, opt.etdKey, nextEtd);
+                                          if (nextEtd !== "Same Day") {
+                                            updatePartForm(row.id, opt.timeKey, "");
+                                          }
+                                        }}
                                         onBlur={() => markDraftSaved(row.id)}
                                         disabled={!enabled}
                                       >
@@ -1208,14 +1724,25 @@ export default function VendorDashboardPage() {
                                         <option>Custom</option>
                                       </select>
                                     </div>
-                                    <input
-                                      className="mt-1 w-full rounded border border-slate-700 bg-slate-950/80 px-2 py-1 text-xs text-slate-100 placeholder:text-slate-500"
-                                      placeholder={(form?.[opt.etdKey] as string) === "Custom" ? "Enter custom time" : "--:--"}
-                                      value={(form?.[opt.timeKey] as string) ?? ""}
-                                      onChange={(e) => updatePartForm(row.id, opt.timeKey, e.target.value)}
-                                      onBlur={() => markDraftSaved(row.id)}
-                                      disabled={!enabled}
-                                    />
+                                    {(form?.[opt.etdKey] as string) === "Same Day" ? (
+                                      <select
+                                        className="mt-1 w-full rounded border border-slate-700 bg-slate-950/80 px-2 py-1 text-xs text-slate-100"
+                                        value={(form?.[opt.timeKey] as string) ?? ""}
+                                        onChange={(e) => updatePartForm(row.id, opt.timeKey, e.target.value)}
+                                        onBlur={() => markDraftSaved(row.id)}
+                                        disabled={!enabled}
+                                      >
+                                        <option value="">Select hours</option>
+                                        <option value="1">1 hour</option>
+                                        <option value="2">2 hours</option>
+                                        <option value="3">3 hours</option>
+                                        <option value="4">4 hours</option>
+                                        <option value="5">5 hours</option>
+                                        <option value="6">6 hours</option>
+                                        <option value="7">7 hours</option>
+                                        <option value="8">8 hours</option>
+                                      </select>
+                                    ) : null}
                                   </div>
                                 );
                               })}
@@ -1258,7 +1785,14 @@ export default function VendorDashboardPage() {
                                     ...(selectedInquiry.sourceType === "inventory"
                                       ? { inventoryRequestId: selectedInquiry.inquiryId, inventoryRequestItemId: row.id }
                                       : { inspectionId: selectedInquiry.inquiryId, lineItemId: row.id }),
-                                    partNumber: form.partNumber ?? "",
+                                    oemBrand: form.oemBrand ?? "",
+                                    oeBrand: form.oeBrand ?? "",
+                                    aftmBrand: form.aftmBrand ?? "",
+                                    usedBrand: form.usedBrand ?? "",
+                                    oemCustomBrandName: form.oemCustomBrandName ?? "",
+                                    oeCustomBrandName: form.oeCustomBrandName ?? "",
+                                    aftmCustomBrandName: form.aftmCustomBrandName ?? "",
+                                    usedCustomBrandName: form.usedCustomBrandName ?? "",
                                     remarks: form.remarks ?? "",
                                     oemAmount: form.oemAmount ?? "",
                                     oeAmount: form.oeAmount ?? "",
@@ -1324,3 +1858,4 @@ export default function VendorDashboardPage() {
     </AppLayout>
   );
 }
+

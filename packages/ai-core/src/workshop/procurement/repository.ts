@@ -14,6 +14,7 @@ import {
   receivePartsForEstimateItem,
   receivePartsForInventoryRequestItem,
 } from "../parts/repository";
+import { createTransferDraft } from "../inventory/repository";
 
 function mapPoRow(row: any): PurchaseOrder {
   return {
@@ -1004,6 +1005,7 @@ export async function createManualPo(args: {
   vendorContact?: string | null;
   currency?: string | null;
   createdBy?: string | null;
+  notes?: string | null;
   items?: Array<{
     name: string;
     description?: string | null;
@@ -1032,6 +1034,7 @@ export async function createManualPo(args: {
       source_type,
       status,
       currency,
+      notes,
       created_by
     ) VALUES (
       ${args.companyId},
@@ -1043,6 +1046,7 @@ export async function createManualPo(args: {
       ${"manual"},
       ${"draft" as PurchaseOrderStatus},
       ${args.currency ?? null},
+      ${args.notes ?? null},
       ${args.createdBy ?? null}
     )
     RETURNING *
@@ -1319,20 +1323,21 @@ export async function replacePurchaseOrderItems(
 export async function receivePoItems(
   companyId: string,
   poId: string,
-  items: Array<{ itemId: string; quantity: number }>,
+  items: Array<{ itemId: string; quantity: number; action?: string }>,
   userId?: string | null
 ): Promise<{ po: PurchaseOrder; items: PurchaseOrderItem[]; grns: PurchaseOrderGrnEntry[] }> {
   const sql = getSql();
   const hasMovementPoColumn = await hasInventoryMovementPurchaseOrderIdColumn();
   const hasMovementCreatedByColumn = await hasInventoryMovementCreatedByColumn();
   const poMetaRows = await sql/* sql */ `
-    SELECT vendor_id, po_number
+    SELECT vendor_id, po_number, notes
     FROM purchase_orders
     WHERE id = ${poId}
     LIMIT 1
   `;
   const poVendorId = (poMetaRows[0]?.vendor_id as string | undefined) ?? null;
   const poNumber = (poMetaRows[0]?.po_number as string | undefined) ?? "PO";
+  const poNotes = String(poMetaRows[0]?.notes ?? "").trim();
 
   function normalizePartNumber(raw?: string | null, fallback?: string | null): string {
     const base = (raw ?? fallback ?? "").trim();
@@ -1387,13 +1392,19 @@ export async function receivePoItems(
         // ignore line-link fallback errors
       }
     }
-    const newReceived = Number(current.receivedQty ?? 0) + Number(entry.quantity ?? 0);
-    const status =
-      newReceived <= 0
-        ? "pending"
-        : newReceived < (current.quantity ?? 0)
-        ? "partial"
-        : "received";
+    const action = String(entry.action ?? "received").toLowerCase();
+    const isReturn = action === "return" || action === "returned";
+    const deltaQty = Number(entry.quantity ?? 0);
+    const newReceived = isReturn
+      ? Number(current.receivedQty ?? 0)
+      : Number(current.receivedQty ?? 0) + deltaQty;
+    const status = isReturn
+      ? "return"
+      : newReceived <= 0
+      ? "pending"
+      : newReceived < (current.quantity ?? 0)
+      ? "partial"
+      : "received";
     await sql/* sql */ `
       UPDATE purchase_order_items
       SET received_qty = ${newReceived},
@@ -1402,7 +1413,7 @@ export async function receivePoItems(
     `;
 
     // push to inventory based on linked estimate item
-    if (resolvedEstimateItemId) {
+    if (!isReturn && resolvedEstimateItemId) {
       try {
         const partNumber = normalizePartNumber((current as any).partNumber ?? null, current.name);
         const brand = String((current as any).brand ?? (current as any).partBrand ?? "Generic").trim() || "Generic";
@@ -1422,7 +1433,7 @@ export async function receivePoItems(
     // Sync line/quote status using line_items linkage, independent of estimate-item linkage.
     if (resolvedLineItemId) {
       try {
-        const nextOrderStatus = status === "received" ? "Received" : "Ordered";
+        const nextOrderStatus = status === "received" ? "Received" : status === "return" ? "Returned" : "Ordered";
         await sql/* sql */ `
           UPDATE line_items
           SET part_ordered = 1,
@@ -1455,20 +1466,51 @@ export async function receivePoItems(
         )[0]?.id;
     if (quoteIdToUpdate) {
       try {
-        const nextQuoteStatus = status === "received" ? "Received" : "Ordered";
+        const nextQuoteStatus = status === "received" ? "Received" : status === "return" ? "Return" : "Ordered";
         await sql/* sql */ `
           UPDATE part_quotes
           SET status = ${nextQuoteStatus},
+              delivery_note_status = CASE
+                WHEN ${status} = 'received' THEN 'received'
+                WHEN ${status} = 'return' THEN 'return_pending'
+                WHEN ${status} = 'partial' THEN 'partially_received'
+                ELSE COALESCE(delivery_note_status, 'issued')
+              END,
               updated_at = NOW()
           WHERE company_id = ${companyId}
             AND id = ${quoteIdToUpdate}
+        `;
+        await sql/* sql */ `
+          INSERT INTO part_quote_logs (
+            company_id,
+            part_quote_id,
+            delivery_note_no,
+            event_type,
+            payload,
+            created_by
+          )
+          SELECT
+            ${companyId},
+            pq.id,
+            pq.delivery_note_no,
+            ${status === "received" ? "delivery_received" : status === "return" ? "delivery_returned" : "delivery_partially_received"},
+            ${{
+              poId,
+              poItemId: current.id,
+              quantity: Number(entry.quantity ?? 0),
+              status,
+            }},
+            ${userId ?? null}
+          FROM part_quotes pq
+          WHERE pq.company_id = ${companyId}
+            AND pq.id = ${quoteIdToUpdate}
         `;
       } catch {
         // ignore quote sync errors to avoid blocking PO receive
       }
     }
 
-    if (!resolvedEstimateItemId && current.inventoryRequestItemId) {
+    if (!isReturn && !resolvedEstimateItemId && current.inventoryRequestItemId) {
       try {
         await receivePartsForInventoryRequestItem(companyId, current.inventoryRequestItemId, {
           quantity: entry.quantity,
@@ -1479,7 +1521,7 @@ export async function receivePoItems(
       }
       // Quote status sync for inventory-request-only lines is intentionally skipped here.
       // This flow now depends only on line_items linkage for quote status updates.
-    } else if (!resolvedEstimateItemId && !current.inventoryRequestItemId) {
+    } else if (!isReturn && !resolvedEstimateItemId && !current.inventoryRequestItemId) {
       // Manual PO line (no estimate/inventory request linkage): still create GRN movement.
       try {
         await createManualPoItemGrnMovement({
@@ -1502,16 +1544,18 @@ export async function receivePoItems(
     }
 
     try {
-      await postGrnAccountingEntry({
-        companyId,
-        poId,
-        poNumber,
-        vendorId: poVendorId,
-        itemId: current.id,
-        itemName: current.name,
-        unitCost: Number(current.unitCost ?? 0),
-        quantity: Number(entry.quantity ?? 0),
-      });
+      if (!isReturn) {
+        await postGrnAccountingEntry({
+          companyId,
+          poId,
+          poNumber,
+          vendorId: poVendorId,
+          itemId: current.id,
+          itemName: current.name,
+          unitCost: Number(current.unitCost ?? 0),
+          quantity: Number(entry.quantity ?? 0),
+        });
+      }
     } catch (err) {
       console.error("Failed to post GRN accounting entry", {
         companyId,
@@ -1526,12 +1570,76 @@ export async function receivePoItems(
   const poItems = await getPoItems(poId);
   const allReceived = poItems.length > 0 && poItems.every((i) => i.status === "received");
   const anyReceived = poItems.some((i) => i.status === "partial" || i.status === "received");
-  const newStatus: PurchaseOrderStatus = allReceived ? "received" : anyReceived ? "partially_received" : "issued";
+  const anyReturned = poItems.some((i) => String(i.status ?? "").toLowerCase() === "return");
+  const newStatus: PurchaseOrderStatus = allReceived ? "received" : anyReceived || anyReturned ? "partially_received" : "issued";
   await sql/* sql */ `
     UPDATE purchase_orders
     SET status = ${newStatus}
     WHERE id = ${poId}
   `;
+
+  if (newStatus === "received") {
+    try {
+      const branchMatch = poNotes.match(/BRANCH:([0-9a-f-]{36})/i);
+      const branchId = branchMatch?.[1] ?? null;
+      if (branchId) {
+        const existingTransfer = await sql/* sql */ `
+          SELECT id
+          FROM inventory_transfer_orders
+          WHERE company_id = ${companyId}
+            AND notes = ${`AUTO-PO:${poId}`}
+          LIMIT 1
+        `;
+        if (!existingTransfer.length) {
+          const fromRows = await sql/* sql */ `
+            SELECT id
+            FROM inventory_locations
+            WHERE company_id = ${companyId}
+              AND location_type = 'warehouse'
+              AND branch_id IS NULL
+              AND is_active = TRUE
+            ORDER BY created_at ASC
+            LIMIT 1
+          `;
+          const toRows = await sql/* sql */ `
+            SELECT id
+            FROM inventory_locations
+            WHERE company_id = ${companyId}
+              AND location_type = 'branch'
+              AND branch_id = ${branchId}
+              AND is_active = TRUE
+            ORDER BY created_at ASC
+            LIMIT 1
+          `;
+          const fromLocationId = (fromRows[0]?.id as string | undefined) ?? null;
+          const toLocationId = (toRows[0]?.id as string | undefined) ?? null;
+          const transferItems = poItems
+            .filter((item) => item.partsCatalogId && Number(item.receivedQty ?? 0) > 0)
+            .map((item) => ({
+              partsCatalogId: String(item.partsCatalogId),
+              quantity: Number(item.receivedQty ?? 0),
+            }));
+          if (fromLocationId && toLocationId && transferItems.length > 0) {
+            const transfer = await createTransferDraft(
+              companyId,
+              fromLocationId,
+              toLocationId,
+              transferItems,
+              userId ?? null
+            );
+            await sql/* sql */ `
+              UPDATE inventory_transfer_orders
+              SET notes = ${`AUTO-PO:${poId}`}
+              WHERE company_id = ${companyId}
+                AND id = ${transfer.transfer.id}
+            `;
+          }
+        }
+      }
+    } catch {
+      // Do not block receiving if transfer auto-request fails.
+    }
+  }
 
   const poRow = await sql/* sql */ `SELECT * FROM purchase_orders WHERE id = ${poId} LIMIT 1`;
   const grns = await getPoGrnEntries(poId);

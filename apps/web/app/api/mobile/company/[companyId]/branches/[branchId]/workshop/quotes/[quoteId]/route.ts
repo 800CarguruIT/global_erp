@@ -3,6 +3,10 @@ import { getSql } from "@repo/ai-core/db";
 import { requireMobileUserId } from "@/lib/auth/mobile-auth";
 import { ensureCompanyAccess } from "@/lib/auth/mobile-company";
 import {
+  applyRecommendedPartQuotes,
+  recommendBestPartQuotesForWorkshopQuote,
+} from "@/lib/workshop/quote-fulfillment";
+import {
   createMobileErrorResponse,
   createMobileSuccessResponse,
   handleMobileError,
@@ -114,13 +118,33 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       }
 
       if (workflowAction === "accepted") {
+        const recommendation = await recommendBestPartQuotesForWorkshopQuote({
+          companyId,
+          workshopQuoteId: quoteId,
+        });
+
         const acceptedAmount = Number(row.negotiated_amount ?? row.quoted_amount ?? row.total_amount ?? 0);
+        const nextMeta = row.meta && typeof row.meta === "object" ? { ...row.meta } : {};
+        const fulfillment = await applyRecommendedPartQuotes({
+          companyId,
+          workshopQuoteId: quoteId,
+          branchId: row.branch_id ? String(row.branch_id) : null,
+          approvedByUserId: userId,
+          recommendations: recommendation.recommendations,
+        });
+        (nextMeta as any).aiQuoteRecommendation = {
+          summary: recommendation.summary,
+          items: recommendation.recommendations,
+          generatedAt: new Date().toISOString(),
+        };
+        (nextMeta as any).deliveryNotes = fulfillment.deliveryNotes;
         await sql`
           UPDATE workshop_quotes
           SET status = 'accepted',
               accepted_amount = ${acceptedAmount},
               total_amount = ${acceptedAmount},
               approved_by = ${userId},
+              meta = ${nextMeta},
               approved_at = NOW(),
               updated_at = NOW()
           WHERE id = ${quoteId}

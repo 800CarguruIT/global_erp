@@ -77,9 +77,15 @@ export async function GET(req: NextRequest, { params }: Params) {
             AND pq.line_item_id = li.id
         ) AS is_submitted
       FROM line_items li
+      INNER JOIN inspections i ON i.id = li.inspection_id
       WHERE li.inspection_id = ${inquiryId}
         AND li.company_id = ${companyId}
-        AND LOWER(COALESCE(li.status, '')) IN ('inquiry', 'pending')
+        AND (
+          LOWER(COALESCE(i.status, '')) = 'completed'
+          OR i.complete_at IS NOT NULL
+          OR i.verified_at IS NOT NULL
+        )
+        AND LOWER(COALESCE(li.status, '')) IN ('inquiry', 'pending', 'approved')
       ORDER BY li.product_name ASC
     `;
 
@@ -102,4 +108,3 @@ export async function GET(req: NextRequest, { params }: Params) {
     return handleMobileError(error);
   }
 }
-

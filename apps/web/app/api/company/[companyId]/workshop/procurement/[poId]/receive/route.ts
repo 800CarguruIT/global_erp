@@ -13,7 +13,11 @@ export async function POST(req: NextRequest, { params }: Params) {
   const result = await receivePoItems(
     companyId,
     poId,
-    body.items.map((i: any) => ({ itemId: i.itemId, quantity: i.quantity ?? 0 })),
+    body.items.map((i: any) => ({
+      itemId: i.itemId,
+      quantity: i.quantity ?? 0,
+      action: String(i.action ?? "received").toLowerCase(),
+    })),
     userId
   );
   return NextResponse.json({ data: result });

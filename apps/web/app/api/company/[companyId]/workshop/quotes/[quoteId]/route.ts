@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSql } from "@repo/ai-core/db";
+import {
+  applyRecommendedPartQuotes,
+  recommendBestPartQuotesForWorkshopQuote,
+} from "@/lib/workshop/quote-fulfillment";
 
 type Params = { params: Promise<{ companyId: string; quoteId: string }> };
 
@@ -91,14 +95,34 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         }
 
         if (workflowAction === "accepted") {
+          const recommendation = await recommendBestPartQuotesForWorkshopQuote({
+            companyId,
+            workshopQuoteId: quoteId,
+          });
+
           const acceptedAmount = Number(
             row.negotiated_amount ?? row.quoted_amount ?? row.total_amount ?? 0
           );
+          const nextMeta = row.meta && typeof row.meta === "object" ? { ...row.meta } : {};
+          const fulfillment = await applyRecommendedPartQuotes({
+            companyId,
+            workshopQuoteId: quoteId,
+            branchId: row.branch_id ? String(row.branch_id) : null,
+            approvedByUserId: null,
+            recommendations: recommendation.recommendations,
+          });
+          (nextMeta as any).aiQuoteRecommendation = {
+            summary: recommendation.summary,
+            items: recommendation.recommendations,
+            generatedAt: new Date().toISOString(),
+          };
+          (nextMeta as any).deliveryNotes = fulfillment.deliveryNotes;
           await sql`
             UPDATE workshop_quotes
             SET status = 'accepted',
                 accepted_amount = ${acceptedAmount},
                 total_amount = ${acceptedAmount},
+                meta = ${nextMeta},
                 approved_at = NOW(),
                 updated_at = NOW()
             WHERE id = ${quoteId} AND company_id = ${companyId}

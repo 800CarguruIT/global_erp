@@ -18,17 +18,39 @@ export async function GET(_req: NextRequest, { params }: Params) {
         MAX(li.updated_at) AS updated_at,
         i.lead_id::text AS lead_key,
         i.car_id::text AS car_key,
-        car.make AS car_make,
-        car.model AS car_model,
-        car.plate_number AS car_plate,
-        car.vin AS car_vin,
+        MAX(COALESCE(
+          NULLIF(car.make, ''),
+          NULLIF(i.draft_payload->>'inspectionMake', ''),
+          NULLIF(e.meta->>'inspectionMake', ''),
+          NULLIF(e.meta->>'carMake', '')
+        )) AS car_make,
+        MAX(COALESCE(
+          NULLIF(car.model, ''),
+          NULLIF(i.draft_payload->>'inspectionModel', ''),
+          NULLIF(e.meta->>'inspectionModel', ''),
+          NULLIF(e.meta->>'carModel', '')
+        )) AS car_model,
+        MAX(NULLIF(car.plate_number, '')) AS car_plate,
+        MAX(COALESCE(
+          NULLIF(car.vin, ''),
+          NULLIF(i.draft_payload->>'inspectionVin', ''),
+          NULLIF(e.meta->>'inspectionVin', ''),
+          NULLIF(e.meta->>'carVin', ''),
+          NULLIF(e.meta->>'vin', '')
+        )) AS car_vin,
         NULL::text AS request_number
       FROM line_items li
       INNER JOIN inspections i ON i.id = li.inspection_id
       LEFT JOIN cars car ON car.id = i.car_id
+      LEFT JOIN estimates e ON e.inspection_id = i.id AND e.company_id = ${companyId}
       WHERE li.company_id = ${companyId}
-        AND LOWER(COALESCE(li.status, '')) IN ('inquiry', 'pending')
-      GROUP BY li.inspection_id, i.lead_id, i.car_id, car.make, car.model, car.plate_number, car.vin
+        AND (
+          LOWER(COALESCE(i.status, '')) = 'completed'
+          OR i.complete_at IS NOT NULL
+          OR i.verified_at IS NOT NULL
+        )
+        AND LOWER(COALESCE(li.status, '')) IN ('inquiry', 'pending', 'approved')
+      GROUP BY li.inspection_id, i.lead_id, i.car_id
     ),
     deduped_line_inquiries AS (
       SELECT *

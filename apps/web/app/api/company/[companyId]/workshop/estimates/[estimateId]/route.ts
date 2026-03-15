@@ -15,6 +15,7 @@ import type {
   EstimateStatus,
 } from "@repo/ai-core/workshop/estimates/types";
 import type { LineItemStatus } from "@repo/ai-core/workshop/inspections/types";
+import { getSql } from "@repo/ai-core/db";
 
 type Params = { params: Promise<{ companyId: string; estimateId: string }> };
 
@@ -24,7 +25,73 @@ export async function GET(req: NextRequest, { params }: Params) {
   if (!data) {
     return new NextResponse("Not found", { status: 404 });
   }
-  return NextResponse.json({ data });
+  const sql = getSql();
+  let carSnapshot: {
+    carId: string | null;
+    make: string | null;
+    model: string | null;
+    plate: string | null;
+    vin: string | null;
+  } | null = null;
+  try {
+    const rows = await sql<any[]>`
+      SELECT
+        e.car_id,
+        COALESCE(
+          NULLIF(c.make, ''),
+          NULLIF(i.draft_payload->>'inspectionMake', ''),
+          NULLIF(e.meta->>'inspectionMake', ''),
+          NULLIF(e.meta->>'carMake', '')
+        ) AS make,
+        COALESCE(
+          NULLIF(c.model, ''),
+          NULLIF(i.draft_payload->>'inspectionModel', ''),
+          NULLIF(e.meta->>'inspectionModel', ''),
+          NULLIF(e.meta->>'carModel', '')
+        ) AS model,
+        COALESCE(
+          NULLIF(c.plate_number, ''),
+          NULLIF(i.draft_payload->>'inspectionPlate', ''),
+          NULLIF(e.meta->>'carPlate', ''),
+          NULLIF(e.meta->>'plate', '')
+        ) AS plate,
+        COALESCE(
+          NULLIF(c.vin, ''),
+          NULLIF(i.draft_payload->>'inspectionVin', ''),
+          NULLIF(e.meta->>'inspectionVin', ''),
+          NULLIF(e.meta->>'carVin', ''),
+          NULLIF(e.meta->>'vin', '')
+        ) AS vin
+      FROM estimates e
+      LEFT JOIN inspections i ON i.id = e.inspection_id
+      LEFT JOIN cars c ON c.id = e.car_id
+      WHERE e.company_id = ${companyId}
+        AND e.id = ${estimateId}
+      LIMIT 1
+    `;
+    const row = rows[0];
+    if (row) {
+      carSnapshot = {
+        carId: row.car_id ?? null,
+        make: row.make ?? null,
+        model: row.model ?? null,
+        plate: row.plate ?? null,
+        vin: row.vin ?? null,
+      };
+    }
+  } catch {
+    carSnapshot = null;
+  }
+  return NextResponse.json({
+    data: {
+      ...data,
+      estimate: {
+        ...data.estimate,
+        carId: data.estimate.carId ?? carSnapshot?.carId ?? null,
+      },
+      carSnapshot,
+    },
+  });
 }
 
 export async function PATCH(req: NextRequest, { params }: Params) {

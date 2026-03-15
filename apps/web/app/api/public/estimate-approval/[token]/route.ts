@@ -52,6 +52,7 @@ async function resolveEstimateByToken(token: string) {
       e.id,
       e.company_id,
       e.inspection_id,
+      e.lead_id,
       e.status,
       e.vat_rate,
       e.meta,
@@ -309,7 +310,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   let jobCardId: string | null = null;
   let jobCardCreated = false;
-  if (selectedInspectionLineItemIds.length > 0) {
+  if (selectedItemIds.length > 0) {
     const sql = getSql();
     const existingJobCardRows = await sql<any[]>/* sql */ `
       SELECT id
@@ -343,14 +344,26 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
 
     if (jobCardId && resolved.estimate.inspection_id) {
-      await sql<any[]>/* sql */ `
-        UPDATE line_items
-        SET job_card_id = ${jobCardId}
-        WHERE company_id = ${resolved.estimate.company_id}
-          AND inspection_id = ${resolved.estimate.inspection_id}
-          AND status = 'Approved'
-          AND id = ANY(${sql.array(selectedInspectionLineItemIds)})
-      `;
+      if (selectedInspectionLineItemIds.length > 0) {
+        await sql<any[]>/* sql */ `
+          UPDATE line_items
+          SET job_card_id = ${jobCardId}
+          WHERE company_id = ${resolved.estimate.company_id}
+            AND inspection_id = ${resolved.estimate.inspection_id}
+            AND status = 'Approved'
+            AND job_card_id IS NULL
+            AND id = ANY(${sql.array(selectedInspectionLineItemIds)})
+        `;
+      } else {
+        await sql<any[]>/* sql */ `
+          UPDATE line_items
+          SET job_card_id = ${jobCardId}
+          WHERE company_id = ${resolved.estimate.company_id}
+            AND inspection_id = ${resolved.estimate.inspection_id}
+            AND status = 'Approved'
+            AND job_card_id IS NULL
+        `;
+      }
     }
   }
 

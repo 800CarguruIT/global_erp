@@ -19,12 +19,22 @@ type LoadState<T> =
 type JobCardPayload = {
   jobCard: any;
   items: any[];
+  collectCarMedia?: {
+    sourceType?: string;
+    sourceMedia?: Record<string, string>;
+    carMediaReview?: Record<string, "pending" | "verified" | "rejected">;
+    carMediaReplacement?: Record<string, string>;
+    carMediaRejectNote?: Record<string, string>;
+  } | null;
 };
 type ProductOption = {
   id: number | string;
   name: string;
   type?: string | null;
 };
+type CarMediaKey = "front" | "rear" | "right" | "left" | "video";
+type CarMediaReviewStatus = "pending" | "verified" | "rejected";
+const carMediaKeys: CarMediaKey[] = ["front", "rear", "right", "left", "video"];
 
 export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = null }: JobCardDetailMainProps) {
   const { theme } = useTheme();
@@ -35,10 +45,41 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
   });
   const [toastMessage, setToastMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [remarks, setRemarks] = useState("");
-  const [collectCarVideoId, setCollectCarVideoId] = useState("");
   const [collectCarMileage, setCollectCarMileage] = useState("");
-  const [collectCarMileageImageId, setCollectCarMileageImageId] = useState("");
   const [isSavingCollectCar, setIsSavingCollectCar] = useState(false);
+  const [preCheckVin, setPreCheckVin] = useState("");
+  const [preCheckPlate, setPreCheckPlate] = useState("");
+  const [preCheckMake, setPreCheckMake] = useState("");
+  const [preCheckModel, setPreCheckModel] = useState("");
+  const [preCheckYear, setPreCheckYear] = useState("");
+  const [collectCarSourceMedia, setCollectCarSourceMedia] = useState<Record<CarMediaKey, string>>({
+    front: "",
+    rear: "",
+    right: "",
+    left: "",
+    video: "",
+  });
+  const [carMediaReview, setCarMediaReview] = useState<Record<CarMediaKey, CarMediaReviewStatus>>({
+    front: "pending",
+    rear: "pending",
+    right: "pending",
+    left: "pending",
+    video: "pending",
+  });
+  const [carMediaReplacement, setCarMediaReplacement] = useState<Record<CarMediaKey, string>>({
+    front: "",
+    rear: "",
+    right: "",
+    left: "",
+    video: "",
+  });
+  const [carMediaRejectNote, setCarMediaRejectNote] = useState<Record<CarMediaKey, string>>({
+    front: "",
+    rear: "",
+    right: "",
+    left: "",
+    video: "",
+  });
   const [preWorkNote, setPreWorkNote] = useState("");
   const [isSavingPreWork, setIsSavingPreWork] = useState(false);
   const [workingVideoId, setWorkingVideoId] = useState("");
@@ -53,12 +94,14 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
   });
   const [finalInspectionCarOutVideoId, setFinalInspectionCarOutVideoId] = useState("");
   const [isSavingFinalInspection, setIsSavingFinalInspection] = useState(false);
+  const [isVerifyingJobCard, setIsVerifyingJobCard] = useState(false);
   const [additionalItemName, setAdditionalItemName] = useState("");
   const [additionalItemMode, setAdditionalItemMode] = useState("recommended");
   const [additionalItemImageId, setAdditionalItemImageId] = useState("");
   const [isSavingAdditionalItem, setIsSavingAdditionalItem] = useState(false);
   const [productOptions, setProductOptions] = useState<ProductOption[]>([]);
   const [activeWizardStep, setActiveWizardStep] = useState("quote");
+  const [savingReceiveByItemId, setSavingReceiveByItemId] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -72,11 +115,49 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
           setState({ status: "loaded", data: json.data, error: null });
           setRemarks("");
           const card = json?.data?.jobCard ?? null;
-          setCollectCarVideoId(String(card?.collect_car_video_id ?? ""));
+          const collectMedia = (json?.data?.collectCarMedia ?? {}) as any;
+          const sourceMedia = (collectMedia?.sourceMedia ?? {}) as Record<string, string>;
+          const replacement = (collectMedia?.carMediaReplacement ?? {}) as Record<string, string>;
+          const rejectNote = (collectMedia?.carMediaRejectNote ?? {}) as Record<string, string>;
           setCollectCarMileage(
             card?.collect_car_mileage != null ? String(card.collect_car_mileage) : ""
           );
-          setCollectCarMileageImageId(String(card?.collect_car_mileage_image_id ?? ""));
+          const draft = (card?.inspection_draft_payload ?? {}) as Record<string, any>;
+          setPreCheckVin(String(card?.vin ?? draft?.inspectionVin ?? "").trim());
+          setPreCheckPlate(String(card?.plate_number ?? draft?.inspectionPlate ?? "").trim());
+          setPreCheckMake(String(card?.make ?? draft?.inspectionMake ?? "").trim());
+          setPreCheckModel(String(card?.model ?? draft?.inspectionModel ?? "").trim());
+          setPreCheckYear(
+            String(card?.model_year ?? draft?.inspectionYear ?? "").trim()
+          );
+          setCollectCarSourceMedia({
+            front: String(sourceMedia.front ?? ""),
+            rear: String(sourceMedia.rear ?? ""),
+            right: String(sourceMedia.right ?? ""),
+            left: String(sourceMedia.left ?? ""),
+            video: String(sourceMedia.video ?? ""),
+          });
+          setCarMediaReview({
+            front: "pending",
+            rear: "pending",
+            right: "pending",
+            left: "pending",
+            video: "pending",
+          });
+          setCarMediaReplacement({
+            front: String(replacement.front ?? ""),
+            rear: String(replacement.rear ?? ""),
+            right: String(replacement.right ?? ""),
+            left: String(replacement.left ?? ""),
+            video: String(replacement.video ?? ""),
+          });
+          setCarMediaRejectNote({
+            front: String(rejectNote.front ?? ""),
+            rear: String(rejectNote.rear ?? ""),
+            right: String(rejectNote.right ?? ""),
+            left: String(rejectNote.left ?? ""),
+            video: String(rejectNote.video ?? ""),
+          });
           setPreWorkNote(String(card?.pre_work_note ?? ""));
           setWorkingVideoId(String(card?.working_video_id ?? ""));
           setFinalInspectionChecks({
@@ -148,7 +229,8 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
   const assignedBranchId = (jobCard?.lead_branch_id as string | null) ?? null;
   const isAssignedWorkshop =
     !workshopBranchId || !assignedBranchId ? true : workshopBranchId === assignedBranchId;
-  const canProgressByQuote = workshopQuoteStatus === "accepted";
+  const canProgressByQuote = workshopQuoteStatus === "accepted" || workshopQuoteStatus === "verified";
+  const isJobVerified = workshopQuoteStatus === "verified";
   const canProgressJobCard = canProgressByQuote && isAssignedWorkshop;
   const isPreWorkDone = Boolean(jobCard?.pre_work_checked_at);
   const isJobStarted = Boolean(jobCard?.start_at);
@@ -156,15 +238,35 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
   const hasWorkingVideo = workingVideoId.trim().length > 0;
   const hasSavedWorkingVideo = String(jobCard?.working_video_id ?? "").trim().length > 0;
   const isFinalInspectionDone = Boolean(jobCard?.final_inspection_at);
-  const isCollectCarDone = useMemo(() => {
-    const mileage = Number(collectCarMileage);
-    return (
-      collectCarVideoId.trim().length > 0 &&
-      Number.isFinite(mileage) &&
-      mileage > 0 &&
-      collectCarMileageImageId.trim().length > 0
-    );
-  }, [collectCarMileage, collectCarMileageImageId, collectCarVideoId]);
+  const isCollectCarDone = Boolean(jobCard?.collect_car_at);
+  const carMediaCounts = useMemo(() => {
+    const entries = carMediaKeys
+      .filter((key) => Boolean(collectCarSourceMedia[key]))
+      .map((key) => carMediaReview[key]);
+    return {
+      total: entries.length,
+      verified: entries.filter((v) => v === "verified").length,
+      rejected: entries.filter((v) => v === "rejected").length,
+      pending: entries.filter((v) => v === "pending").length,
+    };
+  }, [carMediaReview, collectCarSourceMedia]);
+  const rejectedMediaMissingReplacement = useMemo(
+    () =>
+      carMediaKeys.some(
+        (key) =>
+          Boolean(collectCarSourceMedia[key]) &&
+          carMediaReview[key] === "rejected" &&
+          !String(carMediaReplacement[key] ?? "").trim()
+      ),
+    [carMediaReplacement, carMediaReview, collectCarSourceMedia]
+  );
+  const normalizeReceiveStatus = (item: any): "Ordered" | "Received" | "Returned" | "Partially Received" => {
+    const raw = String(item?.po_status ?? item?.order_status ?? "Ordered").trim().toLowerCase();
+    if (raw.includes("partial")) return "Partially Received";
+    if (raw === "received" || raw === "completed") return "Received";
+    if (raw === "returned" || raw === "return") return "Returned";
+    return "Ordered";
+  };
   const itemsForReceivedChecks = useMemo(
     () =>
       primaryItems.filter((item) => {
@@ -247,7 +349,8 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
   const isEvidenceStep = activeWizardStep === "evidence";
   const isCompleteStep = activeWizardStep === "complete";
   const isFinalInspectionStep = activeWizardStep === "final_inspection";
-  const showPartsTable = isStartStep || isEvidenceStep || isCompleteStep || isFinalInspectionStep;
+  const isVerificationStep = activeWizardStep === "verification";
+  const showPartsTable = isStartStep || isEvidenceStep || isCompleteStep || isFinalInspectionStep || isVerificationStep;
   const progressSteps = useMemo(
     () => [
       { key: "quote", label: "Quote Accepted", done: canProgressByQuote },
@@ -257,6 +360,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
       { key: "evidence", label: "Evidence Upload", done: isEvidenceDone },
       { key: "complete", label: "Completed", done: isJobCompleted },
       { key: "final_inspection", label: "Final Inspection", done: isFinalInspectionDone },
+      { key: "verification", label: "Verification", done: isJobVerified },
     ],
     [
       canProgressByQuote,
@@ -266,6 +370,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
       isEvidenceDone,
       isJobCompleted,
       isFinalInspectionDone,
+      isJobVerified,
     ]
   );
   const currentProgressIndex = useMemo(() => {
@@ -297,6 +402,12 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
         { label: "Working video uploaded", done: hasSavedWorkingVideo },
       ];
     }
+    if (activeWizardStep === "verification") {
+      return [
+        { label: "Job completed", done: isJobCompleted },
+        { label: "Final inspection done", done: isFinalInspectionDone },
+      ];
+    }
     return [
       { label: "Job completed", done: isJobCompleted },
       { label: "Checklist all verified", done: Object.values(finalInspectionChecks).every(Boolean) },
@@ -313,6 +424,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
     hasAllReceivedSpareScrapPictures,
     hasSavedWorkingVideo,
     isJobCompleted,
+    isFinalInspectionDone,
     finalInspectionChecks,
     finalInspectionCarOutVideoId,
   ]);
@@ -428,18 +540,62 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
     }
   }
 
+  async function updateItemReceiveStatus(
+    lineItemId: string,
+    nextStatus: "Received" | "Returned" | "Partially Received"
+  ) {
+    setSavingReceiveByItemId((prev) => ({ ...prev, [lineItemId]: true }));
+    try {
+      const res = await fetch(
+        `/api/company/${companyId}/workshop/job-cards/${jobCardId}/line-items/${lineItemId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ receiveStatus: nextStatus }),
+        }
+      );
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        throw new Error(json?.error || "Failed to update receive status.");
+      }
+      setState((prev) => {
+        if (prev.status !== "loaded") return prev;
+        return {
+          ...prev,
+          data: {
+            ...prev.data,
+            items: prev.data.items.map((item) =>
+              String(item.id) === String(lineItemId)
+                ? {
+                    ...item,
+                    po_status: nextStatus,
+                    order_status: nextStatus === "Partially Received" ? "Ordered" : nextStatus,
+                  }
+                : item
+            ),
+          },
+        };
+      });
+      setToastMessage({ type: "success", text: "Part receiving status updated." });
+    } catch (err: any) {
+      setToastMessage({ type: "error", text: err?.message ?? "Failed to update receive status." });
+    } finally {
+      setSavingReceiveByItemId((prev) => ({ ...prev, [lineItemId]: false }));
+    }
+  }
+
   async function saveCollectCarStage() {
-    const mileage = Number(collectCarMileage);
-    if (!collectCarVideoId.trim()) {
-      setToastMessage({ type: "error", text: "Collect car video is required." });
+    const mediaKeysWithSource = carMediaKeys.filter((key) => Boolean(collectCarSourceMedia[key]));
+    const hasPendingMedia = mediaKeysWithSource.some((key) => carMediaReview[key] === "pending");
+    if (hasPendingMedia) {
+      setToastMessage({ type: "error", text: "Verify or reject all car images/videos first." });
       return;
     }
-    if (!Number.isFinite(mileage) || mileage <= 0) {
-      setToastMessage({ type: "error", text: "Enter valid car mileage." });
-      return;
-    }
-    if (!collectCarMileageImageId.trim()) {
-      setToastMessage({ type: "error", text: "Mileage image is required." });
+    if (rejectedMediaMissingReplacement) {
+      setToastMessage({
+        type: "error",
+        text: "Upload replacement media for all rejected images/videos.",
+      });
       return;
     }
     setIsSavingCollectCar(true);
@@ -449,9 +605,10 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "collect_car",
-          collectCarVideoId: collectCarVideoId.trim(),
-          collectCarMileage: mileage,
-          collectCarMileageImageId: collectCarMileageImageId.trim(),
+          collectCarSourceMedia,
+          carMediaReview,
+          carMediaReplacement,
+          carMediaRejectNote,
         }),
       });
       if (!res.ok) {
@@ -467,10 +624,6 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
             ...prev.data,
             jobCard: {
               ...prev.data.jobCard,
-              collect_car_video_id: json?.data?.collect_car_video_id ?? collectCarVideoId.trim(),
-              collect_car_mileage: json?.data?.collect_car_mileage ?? mileage,
-              collect_car_mileage_image_id:
-                json?.data?.collect_car_mileage_image_id ?? collectCarMileageImageId.trim(),
               collect_car_at: json?.data?.collect_car_at ?? new Date().toISOString(),
             },
           },
@@ -485,8 +638,13 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
   }
 
   async function savePreWorkCheck() {
+    const mileage = Number(collectCarMileage);
     if (!isCollectCarDone) {
       setToastMessage({ type: "error", text: "Complete Collect Car stage first." });
+      return;
+    }
+    if (!Number.isFinite(mileage) || mileage <= 0) {
+      setToastMessage({ type: "error", text: "Enter valid car mileage in Pre-Work Check." });
       return;
     }
     if (!allPartsReceived) {
@@ -500,6 +658,12 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "pre_work_check",
+          collectCarMileage: mileage,
+          carVin: preCheckVin.trim() || null,
+          carPlate: preCheckPlate.trim() || null,
+          carMake: preCheckMake.trim() || null,
+          carModel: preCheckModel.trim() || null,
+          carYear: preCheckYear.trim() || null,
           preWorkNote: preWorkNote.trim() || null,
         }),
       });
@@ -517,6 +681,15 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
             jobCard: {
               ...prev.data.jobCard,
               pre_work_checked_at: json?.data?.pre_work_checked_at ?? new Date().toISOString(),
+              collect_car_mileage: json?.data?.collect_car_mileage ?? mileage,
+              vin: preCheckVin.trim() || prev.data.jobCard?.vin || null,
+              plate_number: preCheckPlate.trim() || prev.data.jobCard?.plate_number || null,
+              make: preCheckMake.trim() || prev.data.jobCard?.make || null,
+              model: preCheckModel.trim() || prev.data.jobCard?.model || null,
+              model_year: (() => {
+                const yearText = preCheckYear.trim() || String(prev.data.jobCard?.model_year ?? "").trim();
+                return yearText ? Number(yearText) : null;
+              })(),
               pre_work_note: json?.data?.pre_work_note ?? preWorkNote.trim(),
             },
           },
@@ -677,6 +850,39 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
     }
   }
 
+  async function verifyJobCard() {
+    setIsVerifyingJobCard(true);
+    try {
+      const res = await fetch(`/api/company/${companyId}/workshop/job-cards/${jobCardId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "verify" }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(json?.error || "Failed to verify job card.");
+      }
+      setState((prev) => {
+        if (prev.status !== "loaded") return prev;
+        return {
+          ...prev,
+          data: {
+            ...prev.data,
+            jobCard: {
+              ...prev.data.jobCard,
+              workshop_quote_status: "verified",
+            },
+          },
+        };
+      });
+      setToastMessage({ type: "success", text: "Job card verified." });
+    } catch (err: any) {
+      setToastMessage({ type: "error", text: err?.message ?? "Failed to verify job card." });
+    } finally {
+      setIsVerifyingJobCard(false);
+    }
+  }
+
   return (
     <MainPageShell
       title="Job Card"
@@ -779,55 +985,212 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
               {isCollectCarStep && (
               <div className="space-y-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-3">
                 <div className="text-xs font-semibold uppercase tracking-wide text-amber-200">Collect Car</div>
-                <div className="grid gap-3 md:grid-cols-3">
-                  <div className="space-y-1">
-                    <div className="text-[11px] font-semibold text-white/80">Collect Video</div>
-                    <FileUploader
-                      label=""
-                      kind="video"
-                      value={collectCarVideoId}
-                      onChange={(id) => setCollectCarVideoId(id ?? "")}
-                      buttonOnly
-                      showPreview
-                      buttonClassName="h-8 px-3 text-[10px]"
-                      containerClassName="w-fit"
-                      previewClassName="h-[100px] w-[140px]"
-                      chooseLabel="Upload Video"
-                      replaceLabel="Replace Video"
-                    />
+                {carMediaCounts.total > 0 && (
+                  <div className="rounded-md border border-white/10 bg-black/20 p-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="text-[11px] font-semibold text-white/80">
+                        Car Media Verification (Front/Rear/Right/Left + 360 Video)
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                        <span className="rounded-full border border-white/15 px-2 py-0.5 text-white/70">
+                          {carMediaCounts.verified}/{carMediaCounts.total} verified
+                        </span>
+                        <span className="rounded-full border border-amber-500/40 px-2 py-0.5 text-amber-300">
+                          Pending: {carMediaCounts.pending}
+                        </span>
+                        <span className="rounded-full border border-rose-500/40 px-2 py-0.5 text-rose-300">
+                          Rejected: {carMediaCounts.rejected}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="mt-2 grid gap-3 lg:grid-cols-2">
+                      {carMediaKeys
+                        .filter((key) => Boolean(collectCarSourceMedia[key]))
+                        .map((key) => {
+                          const fileId = collectCarSourceMedia[key];
+                          const label = key === "video" ? "360 Video" : `${key[0]?.toUpperCase()}${key.slice(1)} Image`;
+                          const reviewStatus = carMediaReview[key];
+                          const replacementId = carMediaReplacement[key];
+                          return (
+                            <div
+                              key={key}
+                              className={`rounded border p-2 ${
+                                reviewStatus === "verified"
+                                  ? "border-emerald-500/30 bg-emerald-500/5"
+                                  : reviewStatus === "rejected"
+                                  ? "border-rose-500/30 bg-rose-500/5"
+                                  : "border-white/10"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="text-[11px] text-white/70">{label}</div>
+                                <span
+                                  className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${
+                                    reviewStatus === "verified"
+                                      ? "bg-emerald-500/15 text-emerald-300"
+                                      : reviewStatus === "rejected"
+                                      ? "bg-rose-500/15 text-rose-300"
+                                      : "bg-amber-500/15 text-amber-300"
+                                  }`}
+                                >
+                                  {reviewStatus}
+                                </span>
+                              </div>
+                              {key === "video" ? (
+                                <video
+                                  className="mt-2 h-32 w-full rounded border border-white/10 object-cover"
+                                  controls
+                                  preload="metadata"
+                                  src={`/api/files/${fileId}`}
+                                />
+                              ) : (
+                                <img
+                                  className="mt-2 h-32 w-full rounded border border-white/10 object-cover"
+                                  src={`/api/files/${fileId}`}
+                                  alt={label}
+                                />
+                              )}
+                              <div className="mt-2 flex items-center justify-between gap-2">
+                                <a
+                                  href={`/api/files/${fileId}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-[11px] text-primary hover:underline"
+                                >
+                                  Open {key === "video" ? "video" : "image"}
+                                </a>
+                                <div className="flex items-center gap-2">
+                                  {reviewStatus === "verified" ? (
+                                    <button
+                                      type="button"
+                                      className="rounded-md border border-white/20 px-2.5 py-1 text-[11px] font-semibold text-white/80 hover:bg-white/10"
+                                      onClick={() => setCarMediaReview((prev) => ({ ...prev, [key]: "pending" }))}
+                                    >
+                                      Reopen
+                                    </button>
+                                  ) : (
+                                    <>
+                                      <button
+                                        type="button"
+                                        className="rounded-md bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white"
+                                        onClick={() =>
+                                          setCarMediaReview((prev) => ({ ...prev, [key]: "verified" }))
+                                        }
+                                      >
+                                        Verify
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="rounded-md bg-rose-600 px-2.5 py-1 text-[11px] font-semibold text-white"
+                                        onClick={() => {
+                                          setCarMediaReview((prev) => ({ ...prev, [key]: "rejected" }));
+                                          setToastMessage({
+                                            type: "error",
+                                            text: "Rejected media requires replacement upload.",
+                                          });
+                                        }}
+                                      >
+                                        Reject
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                              {reviewStatus === "rejected" && (
+                                <div className="mt-2 rounded border border-rose-500/30 bg-rose-500/5 p-2">
+                                  <div className="text-[11px] text-rose-200">Upload new media (old media is kept)</div>
+                                  <textarea
+                                    className={`${theme.input} mt-2`}
+                                    rows={2}
+                                    placeholder="Add short reject note..."
+                                    value={carMediaRejectNote[key]}
+                                    onChange={(e) =>
+                                      setCarMediaRejectNote((prev) => ({ ...prev, [key]: e.target.value }))
+                                    }
+                                  />
+                                  <div className="mt-2">
+                                    <FileUploader
+                                      label=""
+                                      kind={key === "video" ? "video" : "image"}
+                                      value={replacementId}
+                                      onChange={(id) =>
+                                        setCarMediaReplacement((prev) => ({
+                                          ...prev,
+                                          [key]: String(id ?? ""),
+                                        }))
+                                      }
+                                      buttonOnly
+                                      showPreview
+                                      buttonClassName="h-9"
+                                    />
+                                  </div>
+                                  {replacementId && (
+                                    <div className="mt-2 grid gap-2 lg:grid-cols-2">
+                                      <div className="rounded border border-white/10 bg-black/20 p-2">
+                                        <div className="text-[10px] text-white/60">Current</div>
+                                        {key === "video" ? (
+                                          <video
+                                            className="mt-1 h-24 w-full rounded border border-white/10 object-cover"
+                                            controls
+                                            preload="metadata"
+                                            src={`/api/files/${fileId}`}
+                                          />
+                                        ) : (
+                                          <img
+                                            className="mt-1 h-24 w-full rounded border border-white/10 object-cover"
+                                            src={`/api/files/${fileId}`}
+                                            alt={`Current ${label}`}
+                                          />
+                                        )}
+                                      </div>
+                                      <div className="rounded border border-emerald-500/30 bg-emerald-500/5 p-2">
+                                        <div className="text-[10px] text-emerald-300">Replacement</div>
+                                        {key === "video" ? (
+                                          <video
+                                            className="mt-1 h-24 w-full rounded border border-emerald-500/30 object-cover"
+                                            controls
+                                            preload="metadata"
+                                            src={`/api/files/${replacementId}`}
+                                          />
+                                        ) : (
+                                          <img
+                                            className="mt-1 h-24 w-full rounded border border-emerald-500/30 object-cover"
+                                            src={`/api/files/${replacementId}`}
+                                            alt={`Replacement ${label}`}
+                                          />
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+                                  {replacementId && (
+                                    <div className="mt-2 flex items-center justify-end">
+                                      <button
+                                        type="button"
+                                        className="rounded-md border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold text-emerald-300 hover:bg-emerald-500/20"
+                                        onClick={() =>
+                                          setCollectCarSourceMedia((prev) => ({
+                                            ...prev,
+                                            [key]: replacementId,
+                                          }))
+                                        }
+                                      >
+                                        Add To Current Media
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <div className="text-[11px] font-semibold text-white/80">Car Mileage</div>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      className={`${theme.input} h-9`}
-                      value={collectCarMileage}
-                      onChange={(e) => setCollectCarMileage(e.target.value)}
-                      placeholder="Enter mileage"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <div className="text-[11px] font-semibold text-white/80">Mileage Image</div>
-                    <FileUploader
-                      label=""
-                      kind="image"
-                      value={collectCarMileageImageId}
-                      onChange={(id) => setCollectCarMileageImageId(id ?? "")}
-                      buttonOnly
-                      showPreview
-                      buttonClassName="h-8 px-3 text-[10px]"
-                      containerClassName="w-fit"
-                      previewClassName="h-[100px] w-[100px]"
-                      chooseLabel="Upload Image"
-                      replaceLabel="Replace Image"
-                    />
-                  </div>
-                </div>
+                )}
                 <div className="flex items-center justify-between">
                   <div className="text-[11px] text-white/70">
-                    {isCollectCarDone ? "Collect Car completed." : "Video, mileage and mileage image are required."}
+                    {isCollectCarDone
+                      ? "Collect Car completed."
+                      : "Verify/reject all car media and upload replacements for rejected items."}
                   </div>
                   <button
                     type="button"
@@ -840,9 +1203,149 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                 </div>
               </div>
               )}
+              {isCollectCarStep && isCollectCarDone && (
+                <div className="space-y-2 rounded-md border border-cyan-500/30 bg-cyan-500/5 p-3">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-cyan-200">
+                    Required Parts Receiving
+                  </div>
+                  <div className="overflow-x-auto rounded-md border border-white/10">
+                    <table className="min-w-full text-xs">
+                      <thead className={`${theme.surfaceSubtle} ${theme.appText}`}>
+                        <tr>
+                          <th className="px-2 py-1 text-left">#</th>
+                          <th className="px-2 py-1 text-left">Part</th>
+                          <th className="px-2 py-1 text-left">Qty</th>
+                          <th className="px-2 py-1 text-left">Delivery Note</th>
+                          <th className="px-2 py-1 text-left">Delivery Status</th>
+                          <th className="px-2 py-1 text-left">Receive Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {primaryItems.length === 0 ? (
+                          <tr>
+                            <td colSpan={6} className="px-3 py-3 text-xs text-muted-foreground">
+                              No required parts found.
+                            </td>
+                          </tr>
+                        ) : (
+                          primaryItems.map((item, idx) => {
+                            const itemId = String(item.id ?? "");
+                            const currentStatus = normalizeReceiveStatus(item);
+                            const selectedStatus = currentStatus === "Ordered" ? "" : currentStatus;
+                            const isSavingStatus = Boolean(savingReceiveByItemId[itemId]);
+                            return (
+                              <tr key={item.id ?? idx} className="border-b border-border/60 last:border-0">
+                                <td className="px-2 py-1">{idx + 1}</td>
+                                <td className="px-2 py-1 font-semibold">
+                                  {item.product_name ?? item.productName ?? "-"}
+                                </td>
+                                <td className="px-2 py-1">{item.quantity ?? 0}</td>
+                                <td className="px-2 py-1">
+                                  {String(item.delivery_note_no ?? "").trim() || "-"}
+                                </td>
+                                <td className="px-2 py-1">
+                                  {String(item.delivery_note_status ?? "").trim() || "-"}
+                                </td>
+                                <td className="px-2 py-1">
+                                  <select
+                                    className={`${theme.input} h-8 min-w-[170px]`}
+                                    value={selectedStatus}
+                                    onChange={(e) =>
+                                      updateItemReceiveStatus(
+                                        itemId,
+                                        e.target.value as
+                                          | "Received"
+                                          | "Returned"
+                                          | "Partially Received"
+                                      )
+                                    }
+                                    disabled={isSavingStatus}
+                                  >
+                                    <option value="" disabled>
+                                      Select status
+                                    </option>
+                                    <option value="Received">Received</option>
+                                    <option value="Returned">Return</option>
+                                    <option value="Partially Received">Partially Received</option>
+                                  </select>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
               {isPreWorkStep && (
               <div className="space-y-2 rounded-md border border-cyan-500/30 bg-cyan-500/5 p-3">
                 <div className="text-xs font-semibold uppercase tracking-wide text-cyan-200">Pre-Work Check</div>
+                <div className="rounded-md border border-white/10 bg-black/20 p-2">
+                  <div className="mb-2 text-[11px] font-semibold text-white/80">Car VIN Section (Fetched data)</div>
+                  <div className="grid gap-2 md:grid-cols-2">
+                    <div className="space-y-1">
+                      <div className="text-[11px] text-white/70">VIN</div>
+                      <input
+                        className={`${theme.input} h-9`}
+                        value={preCheckVin}
+                        onChange={(e) => setPreCheckVin(e.target.value)}
+                        placeholder="Enter VIN"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <div className="text-[11px] text-white/70">Plate</div>
+                      <input
+                        className={`${theme.input} h-9`}
+                        value={preCheckPlate}
+                        onChange={(e) => setPreCheckPlate(e.target.value)}
+                        placeholder="Enter plate"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <div className="text-[11px] text-white/70">Year</div>
+                      <input
+                        type="number"
+                        min="1900"
+                        max="3000"
+                        className={`${theme.input} h-9`}
+                        value={preCheckYear}
+                        onChange={(e) => setPreCheckYear(e.target.value)}
+                        placeholder="Enter year"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <div className="text-[11px] text-white/70">Make</div>
+                      <input
+                        className={`${theme.input} h-9`}
+                        value={preCheckMake}
+                        onChange={(e) => setPreCheckMake(e.target.value)}
+                        placeholder="Enter make"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <div className="text-[11px] text-white/70">Model</div>
+                      <input
+                        className={`${theme.input} h-9`}
+                        value={preCheckModel}
+                        onChange={(e) => setPreCheckModel(e.target.value)}
+                        placeholder="Enter model"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-[11px] font-semibold text-white/80">Car Mileage</div>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    className={`${theme.input} h-9`}
+                    value={collectCarMileage}
+                    onChange={(e) => setCollectCarMileage(e.target.value)}
+                    placeholder="Enter mileage"
+                  />
+                </div>
                 <textarea
                   className={`${theme.input} h-20 resize-none`}
                   value={preWorkNote}
@@ -1020,6 +1523,26 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                         ? "Final Inspection Done"
                         : "Save Final Inspection"}
                     </button>
+                  </div>
+                </div>
+              )}
+              {isVerificationStep && (
+                <div className="space-y-2 rounded-md border border-violet-500/30 bg-violet-500/5 p-3">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-violet-200">
+                    Verification
+                  </div>
+                  <div className="text-[11px] text-white/70">
+                    Verify the job card only after completion and final inspection are done.
+                  </div>
+                  <div className="grid gap-2 text-[11px] md:grid-cols-2">
+                    <div className="rounded-md border border-white/10 bg-black/20 px-2.5 py-2">
+                      <div className="text-white/60">Job Status</div>
+                      <div className="font-semibold text-white">{isJobCompleted ? "Completed" : "Pending"}</div>
+                    </div>
+                    <div className="rounded-md border border-white/10 bg-black/20 px-2.5 py-2">
+                      <div className="text-white/60">Final Inspection</div>
+                      <div className="font-semibold text-white">{isFinalInspectionDone ? "Done" : "Pending"}</div>
+                    </div>
                   </div>
                 </div>
               )}
@@ -1282,6 +1805,10 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                 <div className="text-[11px] text-white/80 md:text-left">
                   {unmetRequirementCount > 0
                     ? `${unmetRequirementCount} stage requirement${unmetRequirementCount > 1 ? "s" : ""} pending`
+                    : isVerificationStep
+                    ? isJobVerified
+                      ? "Job card is verified"
+                      : "Complete verification for this job card"
                     : isFinalInspectionStep
                     ? isFinalInspectionDone
                       ? "Final inspection completed"
@@ -1392,6 +1919,20 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                     }
                   >
                     {isSavingFinalInspection ? "Saving..." : "Save Final Inspection"}
+                  </button>
+                )}
+                {isVerificationStep &&
+                  canProgressJobCard &&
+                  jobCard?.complete_at &&
+                  jobCard?.final_inspection_at &&
+                  !isJobVerified && (
+                  <button
+                    type="button"
+                    className="rounded-md bg-violet-500 px-5 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60 md:min-w-[160px]"
+                    onClick={verifyJobCard}
+                    disabled={isVerifyingJobCard}
+                  >
+                    {isVerifyingJobCard ? "Verifying..." : "Verify Job Card"}
                   </button>
                 )}
                 </div>
