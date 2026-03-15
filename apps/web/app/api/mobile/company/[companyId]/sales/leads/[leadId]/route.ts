@@ -18,7 +18,6 @@ import {
 } from "@/app/api/mobile/utils";
 import { normalizeRsaStatus } from "@/lib/leads/rsa-flow";
 
-
 type Params = { params: Promise<{ companyId: string; leadId: string }> };
 
 function respondNotFound() {
@@ -66,6 +65,11 @@ export async function PUT(req: NextRequest, { params }: Params) {
       leadStage,
       recoveryDirection,
       recoveryFlow,
+      pickupFrom,
+      pickupGoogleLocation,
+      dropoffTo,
+      dropoffGoogleLocation,
+      workflowRequired,
       ensureInspection,
     } = body ?? {};
 
@@ -84,13 +88,23 @@ export async function PUT(req: NextRequest, { params }: Params) {
       lead.leadType === "workshop" &&
       nextLeadStatus === "car_in" &&
       (branchIdFromBody || nextAssignedUserId) &&
-      (branchChanged || nextAssignedUserId !== lead.assignedUserId || ensureInspection === true);
+      (branchChanged ||
+        nextAssignedUserId !== lead.assignedUserId ||
+        ensureInspection === true);
 
     if (assignmentRequested) {
-      const latestInspection = await getLatestInspectionForLead(companyId, leadId);
-      const isVerified = Boolean(latestInspection?.verifiedAt ?? (latestInspection as any)?.verified_at);
+      const latestInspection = await getLatestInspectionForLead(
+        companyId,
+        leadId,
+      );
+      const isVerified = Boolean(
+        latestInspection?.verifiedAt ?? (latestInspection as any)?.verified_at,
+      );
       if (isVerified) {
-        return createMobileErrorResponse("Inspection already verified. Reassign/assign is not allowed.", 400);
+        return createMobileErrorResponse(
+          "Inspection already verified. Reassign/assign is not allowed.",
+          400,
+        );
       }
     }
 
@@ -102,6 +116,12 @@ export async function PUT(req: NextRequest, { params }: Params) {
       serviceType: serviceType ?? lead.serviceType ?? null,
       recoveryDirection: recoveryDirection ?? lead.recoveryDirection ?? null,
       recoveryFlow: recoveryFlow ?? lead.recoveryFlow ?? null,
+      pickupFrom: pickupFrom ?? lead.pickupFrom ?? null,
+      pickupGoogleLocation:
+        pickupGoogleLocation ?? (lead as any).pickupGoogleLocation ?? null,
+      dropoffTo: dropoffTo ?? lead.dropoffTo ?? null,
+      dropoffGoogleLocation:
+        dropoffGoogleLocation ?? (lead as any).dropoffGoogleLocation ?? null,
       assignedAt: nextAssignedUserId ? new Date().toISOString() : null,
       agentRemark: agentRemark ?? lead.agentRemark,
       customerRemark: customerRemark ?? lead.customerRemark,
@@ -109,6 +129,10 @@ export async function PUT(req: NextRequest, { params }: Params) {
       carOutVideo: carOutVideo ?? (lead as any).carOutVideo ?? null,
       customerFeedback: lead.customerFeedback,
       sentimentScore: lead.sentimentScore,
+      workflowRequired:
+        workflowRequired !== undefined
+          ? (workflowRequired ?? null)
+          : ((lead as any).workflowRequired ?? null),
     });
 
     if (ownerId && ownerId !== lead.agentEmployeeId) {
