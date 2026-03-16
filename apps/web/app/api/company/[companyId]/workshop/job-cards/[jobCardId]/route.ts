@@ -361,13 +361,34 @@ export async function GET(_req: NextRequest, { params }: Params) {
       const deliveryMeta = deliveryNoteByLineItemId.get(String(row.id));
       const procurementMeta = procurementByLineItemId.get(String(row.id));
       if (!derived && !deliveryMeta && !procurementMeta) return row;
+      const poItemStatus = String(procurementMeta?.procurement_po_item_status ?? "").trim().toLowerCase();
+      const poStatus = String(procurementMeta?.procurement_po_status ?? "").trim().toLowerCase();
+      const poQty = Number(procurementMeta?.procurement_po_qty ?? 0) || 0;
+      const poReceivedQty = Number(procurementMeta?.procurement_po_received_qty ?? 0) || 0;
+      const procurementResolvedStatus =
+        poItemStatus === "received" || poStatus === "received"
+          ? "Received"
+          : poItemStatus === "return" || poItemStatus === "returned"
+          ? "Returned"
+          : poItemStatus === "partial" ||
+            poStatus === "partially_received" ||
+            (poQty > 0 && poReceivedQty > 0 && poReceivedQty < poQty)
+          ? "Partially Received"
+          : poQty > 0 && poReceivedQty >= poQty
+          ? "Received"
+          : "";
+      const resolvedStatus =
+        derived ||
+        procurementResolvedStatus ||
+        String(row.po_status ?? row.order_status ?? "").trim() ||
+        "Ordered";
       return {
         ...row,
-        po_status: derived ?? row.po_status ?? row.order_status ?? null,
+        po_status: resolvedStatus,
         order_status:
-          derived === "Partially Received"
+          resolvedStatus === "Partially Received"
             ? "Ordered"
-            : derived ?? row.order_status ?? null,
+            : resolvedStatus,
         delivery_note_no: deliveryMeta?.delivery_note_no ?? row.delivery_note_no ?? null,
         delivery_note_status: deliveryMeta?.delivery_note_status ?? row.delivery_note_status ?? null,
         procurement_linked: procurementMeta?.procurement_linked ?? false,

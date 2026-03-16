@@ -7,6 +7,11 @@ ALTER TABLE leads
   ADD COLUMN IF NOT EXISTS workshop_visit_mode text NULL;
 
 ALTER TABLE leads
+  ADD COLUMN IF NOT EXISTS service_type text NULL,
+  ADD COLUMN IF NOT EXISTS pickup_from text NULL,
+  ADD COLUMN IF NOT EXISTS dropoff_to text NULL;
+
+ALTER TABLE leads
   DROP CONSTRAINT IF EXISTS leads_workshop_visit_mode_check;
 
 ALTER TABLE leads

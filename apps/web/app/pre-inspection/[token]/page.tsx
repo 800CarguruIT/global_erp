@@ -503,6 +503,14 @@ export default function PreInspectionPublicPage({ params }: Params) {
         return;
       }
       setFormData(json.data ?? null);
+      const loadedTermsAccepted = Boolean(json.data?.form?.terms_accepted);
+      setTermsAccepted(loadedTermsAccepted);
+      const loadedSignature = String(
+        json.data?.form?.answers?.__meta?.signatureDataUrl ??
+          json.data?.form?.answers?.signatureDataUrl ??
+          ""
+      ).trim();
+      setSignatureDataUrl(loadedSignature);
       const existingAnswers = (json.data?.form?.answers ?? null) as Answers | null;
       if (existingAnswers) {
         const normalized = normalizeAnswers(existingAnswers);
@@ -891,6 +899,7 @@ export default function PreInspectionPublicPage({ params }: Params) {
 
             <SignaturePad
               disabled={isSubmitted}
+              value={signatureDataUrl}
               onChange={(value) => setSignatureDataUrl(value)}
             />
 
@@ -911,7 +920,15 @@ export default function PreInspectionPublicPage({ params }: Params) {
   );
 }
 
-function SignaturePad({ disabled, onChange }: { disabled?: boolean; onChange: (value: string) => void }) {
+function SignaturePad({
+  disabled,
+  value,
+  onChange,
+}: {
+  disabled?: boolean;
+  value?: string;
+  onChange: (value: string) => void;
+}) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [drawing, setDrawing] = useState(false);
   const [hasStroke, setHasStroke] = useState(false);
@@ -920,8 +937,31 @@ function SignaturePad({ disabled, onChange }: { disabled?: boolean; onChange: (v
   useEffect(() => {
     if (initializedRef.current) return;
     initializedRef.current = true;
-    onChange("");
+    onChange(String(value ?? ""));
   }, [onChange]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const dataUrl = String(value ?? "").trim();
+    if (!dataUrl) {
+      setHasStroke(false);
+      return;
+    }
+    const img = new Image();
+    img.onload = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      setHasStroke(true);
+    };
+    img.onerror = () => {
+      setHasStroke(false);
+    };
+    img.src = dataUrl;
+  }, [value]);
 
   function getCtx(canvas: HTMLCanvasElement) {
     const ctx = canvas.getContext("2d");

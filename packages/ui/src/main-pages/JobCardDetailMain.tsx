@@ -335,6 +335,10 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
   );
   const normalizeReceiveStatus = (item: any): "Ordered" | "Received" | "Returned" | "Partially Received" => {
     const raw = String(item?.po_status ?? item?.order_status ?? "Ordered").trim().toLowerCase();
+    const poQty = Math.max(0, Number(item?.procurement_po_qty ?? item?.quantity ?? 0) || 0);
+    const poReceivedQty = Math.max(0, Number(item?.procurement_po_received_qty ?? 0) || 0);
+    if (poQty > 0 && poReceivedQty >= poQty) return "Received";
+    if (poQty > 0 && poReceivedQty > 0 && poReceivedQty < poQty) return "Partially Received";
     if (raw.includes("partial")) return "Partially Received";
     if (raw === "received" || raw === "completed") return "Received";
     if (raw === "returned" || raw === "return") return "Returned";
@@ -344,22 +348,18 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
     () =>
       requiredPrimaryItems.filter((item) => {
         const isAdditional = Number(item.is_add ?? 0) === 1;
-        const itemStatus = String(item.po_status ?? item.order_status ?? "").toLowerCase();
+        const itemStatus = normalizeReceiveStatus(item).toLowerCase();
         return !(isAdditional && itemStatus === "pending");
       }),
     [requiredPrimaryItems]
   );
   const atLeastOnePartReceived = useMemo(() => {
     if (itemsForReceivedChecks.length === 0) return true;
-    return itemsForReceivedChecks.some(
-      (item) => String(item.po_status ?? item.order_status ?? "").toLowerCase() === "received"
-    );
+    return itemsForReceivedChecks.some((item) => normalizeReceiveStatus(item) === "Received");
   }, [itemsForReceivedChecks]);
   const receivedItems = useMemo(
     () =>
-      itemsForReceivedChecks.filter(
-        (item) => String(item.po_status ?? item.order_status ?? "").toLowerCase() === "received"
-      ),
+      itemsForReceivedChecks.filter((item) => normalizeReceiveStatus(item) === "Received"),
     [itemsForReceivedChecks]
   );
   const notFullyReceivedItems = useMemo(
@@ -2152,7 +2152,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                           <td className="px-2 py-1">{item.quantity ?? 0}</td>
                           <td className="px-2 py-1">
                             {(() => {
-                              const partStatus = String(item.po_status ?? item.order_status ?? "Ordered");
+                              const partStatus = normalizeReceiveStatus(item);
                               const partStatusLower = partStatus.toLowerCase();
                               const isAdditionalPendingApproval =
                                 Number(item.is_add ?? 0) === 1 && partStatusLower === "pending";
@@ -2442,14 +2442,14 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                           <div className="font-semibold">{item.product_name ?? item.productName ?? "-"}</div>
                           <span
                             className={`rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase ${
-                              String(item.po_status ?? item.order_status ?? "Ordered").toLowerCase() === "received"
+                              normalizeReceiveStatus(item).toLowerCase() === "received"
                                 ? "bg-emerald-500 text-white"
-                                : String(item.po_status ?? item.order_status ?? "Ordered").toLowerCase() === "returned"
+                                : normalizeReceiveStatus(item).toLowerCase() === "returned"
                                 ? "bg-sky-500 text-white"
                                 : "bg-amber-400 text-slate-900"
                             }`}
                           >
-                            {String(item.po_status ?? item.order_status ?? "Ordered")}
+                            {normalizeReceiveStatus(item)}
                           </span>
                         </div>
                         <div className="mb-2">
