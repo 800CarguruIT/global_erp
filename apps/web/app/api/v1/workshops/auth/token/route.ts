@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { IntegrationAuth } from "@repo/ai-core";
-import { createIntegrationAccessToken } from "../../../../../lib/auth/integration-jwt";
+import { createIntegrationAccessToken } from "@/lib/auth/integration-jwt";
 
 type ParsedTokenRequest = {
   grantType: string | null;

@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getOpenAIClient, canUseAi } from "@repo/ai-core";
 
-const client = getOpenAIClient();
-
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -25,6 +23,8 @@ export async function POST(req: NextRequest) {
         { status: 403 }
       );
     }
+
+    const client = getOpenAIClient();
 
     const prompt = `
 Translate the following English text into ${targetLang}.

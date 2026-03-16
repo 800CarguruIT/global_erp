@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getIntegrationTokenPayload } from "../../../lib/auth/integration-auth";
+import { getIntegrationTokenPayload } from "@/lib/auth/integration-auth";
 
 type WorkshopScopeMode = "read" | "write";
 
