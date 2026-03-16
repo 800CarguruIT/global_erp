@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getSql } from "@repo/ai-core/db";
-import { WorkshopProcurement } from "@repo/ai-core";
+import { canUseAi, getOpenAIClientForCompany, WorkshopProcurement } from "@repo/ai-core";
 import { updateEstimateHeader } from "@repo/ai-core/workshop/estimates/repository";
 import type { EstimateItemCostType, EstimateItemStatus, EstimateStatus } from "@repo/ai-core/workshop/estimates/types";
 import { markLineItemsOrderedByIds } from "@repo/ai-core/workshop/inspections/repository";
@@ -53,6 +53,220 @@ function normalizeMatchText(value: unknown): string {
     .replace(/[^a-z0-9]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+type SelectedQuoteCandidate = {
+  lineItemId: string;
+  quoteId: string;
+  vendorId: string | null;
+  vendorName: string;
+  selectedType: EstimateItemCostType;
+  selectedPrice: number;
+  selectedQty: number;
+  selectedEtd: string;
+  reason: string;
+  score: number;
+};
+
+const QUALITY_BY_TYPE: Record<EstimateItemCostType, number> = {
+  oe: 1.0,
+  oem: 0.95,
+  aftm: 0.78,
+  used: 0.6,
+};
+
+function parseEtdHours(raw: unknown): number {
+  const value = String(raw ?? "").trim().toLowerCase();
+  if (!value) return 72;
+  if (value.includes("same day")) return 8;
+  const rangeMatch = value.match(/(\d+)\s*-\s*(\d+)\s*day/);
+  if (rangeMatch) {
+    const a = Number(rangeMatch[1]);
+    const b = Number(rangeMatch[2]);
+    if (Number.isFinite(a) && Number.isFinite(b) && a > 0 && b > 0) return ((a + b) / 2) * 24;
+  }
+  const daysMatch = value.match(/(\d+)\s*day/);
+  if (daysMatch) {
+    const d = Number(daysMatch[1]);
+    if (Number.isFinite(d) && d > 0) return d * 24;
+  }
+  const hoursMatch = value.match(/(\d+)\s*hour/);
+  if (hoursMatch) {
+    const h = Number(hoursMatch[1]);
+    if (Number.isFinite(h) && h > 0) return h;
+  }
+  return 72;
+}
+
+function normalize01(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) return 1;
+  if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return 0.5;
+  return Math.max(0, Math.min(1, (value - min) / (max - min)));
+}
+
+async function selectBestQuotesByLineItem(args: {
+  companyId: string;
+  lineItemIds: string[];
+  selectedTypeByItemId: Record<string, EstimateItemCostType>;
+}): Promise<Map<string, SelectedQuoteCandidate>> {
+  const sql = getSql();
+  if (!args.lineItemIds.length) return new Map();
+  const rows = await sql<any[]>`
+    WITH vendor_stats AS (
+      SELECT
+        pq.vendor_id,
+        COUNT(*)::int AS total_quotes,
+        SUM(CASE WHEN LOWER(COALESCE(pq.status, '')) IN ('return', 'returned') THEN 1 ELSE 0 END)::int AS return_quotes,
+        SUM(CASE WHEN LOWER(COALESCE(pq.status, '')) IN ('received', 'completed') THEN 1 ELSE 0 END)::int AS good_quotes
+      FROM part_quotes pq
+      WHERE pq.company_id = ${args.companyId}
+      GROUP BY pq.vendor_id
+    )
+    SELECT
+      pq.id AS quote_id,
+      pq.vendor_id,
+      COALESCE(v.name, 'Vendor') AS vendor_name,
+      pq.line_item_id,
+      COALESCE(li.quantity, 1)::numeric AS required_qty,
+      pq.oe, pq.oem, pq.aftm, pq.used,
+      pq.oe_qty, pq.oem_qty, pq.aftm_qty, pq.used_qty,
+      pq.oe_etd, pq.oem_etd, pq.aftm_etd, pq.used_etd,
+      COALESCE(vs.total_quotes, 0) AS vendor_total_quotes,
+      COALESCE(vs.return_quotes, 0) AS vendor_return_quotes,
+      COALESCE(vs.good_quotes, 0) AS vendor_good_quotes
+    FROM part_quotes pq
+    INNER JOIN line_items li ON li.id = pq.line_item_id
+    LEFT JOIN vendors v ON v.id = pq.vendor_id
+    LEFT JOIN vendor_stats vs ON vs.vendor_id = pq.vendor_id
+    WHERE pq.company_id = ${args.companyId}
+      AND pq.line_item_id::text = ANY(${sql.array(args.lineItemIds)})
+  `;
+
+  type Candidate = SelectedQuoteCandidate & {
+    returnRate: number;
+    creditScore: number;
+    qualityScore: number;
+    etdHours: number;
+  };
+  const candidatesByLineItem = new Map<string, Candidate[]>();
+  for (const row of rows) {
+    const lineItemId = String(row?.line_item_id ?? "").trim();
+    if (!lineItemId) continue;
+    const selectedType = args.selectedTypeByItemId[lineItemId];
+    if (!selectedType) continue;
+    const requiredQty = Math.max(1, Number(row?.required_qty ?? 1) || 1);
+    const priceRaw = Number(row?.[selectedType] ?? 0);
+    if (!Number.isFinite(priceRaw) || priceRaw <= 0) continue;
+    const qtyRaw = Number(row?.[`${selectedType}_qty`] ?? requiredQty);
+    const selectedQty = Number.isFinite(qtyRaw) && qtyRaw > 0 ? qtyRaw : requiredQty;
+    if (selectedQty < requiredQty) continue;
+    const etdRaw = String(row?.[`${selectedType}_etd`] ?? "").trim();
+    const etdHours = parseEtdHours(etdRaw);
+    const totalQuotes = Math.max(1, Number(row?.vendor_total_quotes ?? 0));
+    const returnRate = Number(row?.vendor_return_quotes ?? 0) / totalQuotes;
+    const goodRate = Number(row?.vendor_good_quotes ?? 0) / totalQuotes;
+    const creditScore = Math.max(0, Math.min(1, 0.35 + goodRate * 0.65));
+    const candidate: Candidate = {
+      lineItemId,
+      quoteId: String(row?.quote_id ?? ""),
+      vendorId: row?.vendor_id ? String(row.vendor_id) : null,
+      vendorName: String(row?.vendor_name ?? "Vendor"),
+      selectedType,
+      selectedPrice: Number(priceRaw.toFixed(2)),
+      selectedQty: Number(selectedQty.toFixed(2)),
+      selectedEtd: etdRaw || "Unknown",
+      reason: "Best balance of shortest ETA, lowest price, and highest quality.",
+      score: 0,
+      returnRate,
+      creditScore,
+      qualityScore: QUALITY_BY_TYPE[selectedType],
+      etdHours,
+    };
+    const current = candidatesByLineItem.get(lineItemId) ?? [];
+    current.push(candidate);
+    candidatesByLineItem.set(lineItemId, current);
+  }
+
+  const selectedByLineItem = new Map<string, SelectedQuoteCandidate>();
+  for (const [lineItemId, list] of candidatesByLineItem.entries()) {
+    if (!list.length) continue;
+    const prices = list.map((x) => x.selectedPrice);
+    const hours = list.map((x) => x.etdHours);
+    const minPrice = Math.min(...prices);
+    const maxPrice = Math.max(...prices);
+    const minHours = Math.min(...hours);
+    const maxHours = Math.max(...hours);
+    for (const item of list) {
+      const priceScore = normalize01(item.selectedPrice, minPrice, maxPrice);
+      const speedScore = normalize01(item.etdHours, minHours, maxHours);
+      const qualityPenalty = 1 - item.qualityScore;
+      const returnPenalty = Math.max(0, Math.min(1, item.returnRate));
+      const creditPenalty = 1 - item.creditScore;
+      item.score = priceScore * 0.45 + speedScore * 0.35 + qualityPenalty * 0.15 + returnPenalty * 0.03 + creditPenalty * 0.02;
+    }
+    const best = [...list].sort((a, b) => a.score - b.score)[0]!;
+    selectedByLineItem.set(lineItemId, best);
+  }
+
+  try {
+    const allowed = await canUseAi("ai.workshop.quote.best_vendor_recommendation" as any, { companyId: args.companyId }).catch(
+      () => true
+    );
+    if (allowed && selectedByLineItem.size > 0) {
+      const resolved = await getOpenAIClientForCompany(args.companyId);
+      if (resolved?.client) {
+        const options = Array.from(candidatesByLineItem.values()).flat().map((item) => ({
+          lineItemId: item.lineItemId,
+          quoteId: item.quoteId,
+          vendorId: item.vendorId,
+          vendorName: item.vendorName,
+          selectedType: item.selectedType,
+          selectedPrice: item.selectedPrice,
+          selectedEtd: item.selectedEtd,
+          qualityScore: item.qualityScore,
+          returnRate: item.returnRate,
+        }));
+        const completion = await resolved.client.chat.completions.create({
+          model: "gpt-4o-mini",
+          temperature: 0.1,
+          messages: [
+            {
+              role: "system",
+              content:
+                "Select one best quote per line item with priority: shortest delivery, lowest price, high quality, low return rate. Return strict JSON only.",
+            },
+            {
+              role: "user",
+              content: JSON.stringify({
+                options,
+                output: { picks: [{ lineItemId: "string", quoteId: "string", reason: "string" }] },
+              }),
+            },
+          ],
+        });
+        const raw = String(completion.choices?.[0]?.message?.content ?? "").trim();
+        const firstBrace = raw.indexOf("{");
+        const lastBrace = raw.lastIndexOf("}");
+        if (firstBrace >= 0 && lastBrace > firstBrace) {
+          const parsed = JSON.parse(raw.slice(firstBrace, lastBrace + 1));
+          const picks = Array.isArray(parsed?.picks) ? parsed.picks : [];
+          for (const pick of picks as any[]) {
+            const lineItemId = String(pick?.lineItemId ?? "").trim();
+            const quoteId = String(pick?.quoteId ?? "").trim();
+            if (!lineItemId || !quoteId) continue;
+            const match = (candidatesByLineItem.get(lineItemId) ?? []).find((c) => c.quoteId === quoteId);
+            if (!match) continue;
+            const reason = String(pick?.reason ?? "").trim();
+            selectedByLineItem.set(lineItemId, { ...match, reason: reason || match.reason });
+          }
+        }
+      }
+    }
+  } catch {
+    // keep heuristic selection if AI selection fails
+  }
+
+  return selectedByLineItem;
 }
 
 async function resolveEstimateByToken(token: string) {
@@ -531,6 +745,8 @@ export async function POST(req: NextRequest, { params }: Params) {
   let purchaseOrderId: string | null = null;
   let purchaseOrderCreated = false;
   let purchaseOrderError: string | null = null;
+  const purchaseOrdersCreated: Array<{ poId: string; vendorId: string | null; vendorName: string | null; itemsCount: number }> = [];
+  const selectedQuoteByLineItemId: Record<string, { quoteId: string; vendorId: string | null; selectedType: EstimateItemCostType; reason: string }> = {};
   if (selectedItemIds.length > 0) {
     const existingJobCardRows = await sql<any[]>/* sql */ `
       SELECT id
@@ -596,39 +812,126 @@ export async function POST(req: NextRequest, { params }: Params) {
           `
         : [];
       const branchId = leadRows[0]?.branch_id ? String(leadRows[0].branch_id) : null;
-      const autoPoItems = mappedItems
-        .filter((item: any) => selectedItemIds.includes(String(item.id)))
-        .map((item: any) => {
-          const qty = Math.max(1, Number(item.quantity ?? 1) || 1);
-          const totalCost = Number(item.approvedCost ?? item.cost ?? 0);
-          const unitCost = qty > 0 ? Number((totalCost / qty).toFixed(2)) : 0;
-          return {
-            name: String(item.partName ?? "Part"),
-            description: String(item.description ?? "").trim() || null,
-            quantity: qty,
-            unitCost: Number.isFinite(unitCost) ? unitCost : 0,
-            estimateItemId: String(item.id),
-            quoteId: null,
-            lineStatus: null,
+      const approvedMappedItems = mappedItems.filter((item: any) => selectedItemIds.includes(String(item.id)));
+      const bestQuotesByLineItemId = await selectBestQuotesByLineItem({
+        companyId: String(resolved.estimate.company_id),
+        lineItemIds: approvedMappedItems.map((item) => String(item.id)),
+        selectedTypeByItemId,
+      });
+
+      const groupedByVendor = new Map<
+        string,
+        {
+          vendorId: string | null;
+          vendorName: string | null;
+          items: Array<{
+            lineItemId: string;
+            partName: string;
+            description: string | null;
+            quantity: number;
+            unitCost: number;
+            quoteId: string | null;
+            selectedType: EstimateItemCostType | null;
+            reason: string | null;
+          }>;
+        }
+      >();
+      for (const item of approvedMappedItems) {
+        const lineItemId = String(item.id);
+        const qty = Math.max(1, Number(item.quantity ?? 1) || 1);
+        const totalCost = Number(item.approvedCost ?? item.cost ?? 0);
+        const fallbackUnitCost = qty > 0 ? Number((totalCost / qty).toFixed(2)) : 0;
+        const bestQuote = bestQuotesByLineItemId.get(lineItemId);
+        const vendorId = bestQuote?.vendorId ?? null;
+        const vendorName = bestQuote?.vendorName ?? null;
+        const groupKey = vendorId || "__no_vendor__";
+        const group = groupedByVendor.get(groupKey) ?? {
+          vendorId,
+          vendorName,
+          items: [],
+        };
+        if (bestQuote) {
+          selectedQuoteByLineItemId[lineItemId] = {
+            quoteId: bestQuote.quoteId,
+            vendorId: bestQuote.vendorId,
+            selectedType: bestQuote.selectedType,
+            reason: bestQuote.reason,
           };
-        })
-        .filter((item: any) => item.quantity > 0);
-      if (autoPoItems.length > 0) {
+        }
+        group.items.push({
+          lineItemId,
+          partName: String(item.partName ?? "Part"),
+          description: String(item.description ?? "").trim() || null,
+          quantity: bestQuote?.selectedQty && bestQuote.selectedQty > 0 ? bestQuote.selectedQty : qty,
+          unitCost: bestQuote?.selectedPrice && bestQuote.selectedPrice > 0 ? bestQuote.selectedPrice : fallbackUnitCost,
+          quoteId: bestQuote?.quoteId ?? null,
+          selectedType: bestQuote?.selectedType ?? (item.approvedType ?? null),
+          reason: bestQuote?.reason ?? null,
+        });
+        groupedByVendor.set(groupKey, group);
+      }
+
+      for (const [, group] of groupedByVendor.entries()) {
+        const autoPoItems = group.items
+          .map((entry) => ({
+            name: entry.partName,
+            description: entry.description,
+            quantity: entry.quantity,
+            unitCost: Number.isFinite(entry.unitCost) ? entry.unitCost : 0,
+            estimateItemId: entry.lineItemId,
+            quoteId: entry.quoteId,
+            lineStatus: null,
+          }))
+          .filter((entry) => entry.quantity > 0);
+        if (!autoPoItems.length) continue;
         const autoPo = await WorkshopProcurement.createManualPo({
           companyId: String(resolved.estimate.company_id),
           poType: "po",
-          vendorId: null,
-          vendorName: null,
+          vendorId: group.vendorId,
+          vendorName: group.vendorName,
           currency: "AED",
           createdBy: null,
-          notes: `AUTO-ESTIMATE:${String(resolved.estimate.id)};LEAD:${String(resolved.estimate.lead_id ?? "")};BRANCH:${branchId ?? ""};JOB_CARD:${jobCardId ?? ""}`,
+          notes: `AUTO-ESTIMATE:${String(resolved.estimate.id)};LEAD:${String(resolved.estimate.lead_id ?? "")};BRANCH:${branchId ?? ""};JOB_CARD:${jobCardId ?? ""};VENDOR:${group.vendorId ?? "UNASSIGNED"}`,
           items: autoPoItems,
         });
-        purchaseOrderId = String(autoPo.po.id);
-        purchaseOrderCreated = true;
-        await WorkshopProcurement.updatePurchaseOrderHeader(String(resolved.estimate.company_id), purchaseOrderId, {
+        const createdPoId = String(autoPo.po.id);
+        purchaseOrdersCreated.push({
+          poId: createdPoId,
+          vendorId: group.vendorId,
+          vendorName: group.vendorName,
+          itemsCount: autoPoItems.length,
+        });
+        if (!purchaseOrderId) purchaseOrderId = createdPoId;
+        await WorkshopProcurement.updatePurchaseOrderHeader(String(resolved.estimate.company_id), createdPoId, {
           status: "issued",
         });
+      }
+      purchaseOrderCreated = purchaseOrdersCreated.length > 0;
+
+      for (const item of approvedMappedItems) {
+        const lineItemId = String(item.id);
+        const picked = selectedQuoteByLineItemId[lineItemId];
+        if (!picked?.quoteId) continue;
+        const orderedQtyByType = {
+          oe: picked.selectedType === "oe" ? Number(item.quantity ?? 1) : 0,
+          oem: picked.selectedType === "oem" ? Number(item.quantity ?? 1) : 0,
+          aftm: picked.selectedType === "aftm" ? Number(item.quantity ?? 1) : 0,
+          used: picked.selectedType === "used" ? Number(item.quantity ?? 1) : 0,
+        };
+        await sql`
+          UPDATE part_quotes
+          SET
+            status = 'Ordered',
+            ordered_type = ${picked.selectedType},
+            ordered_unit_price = ${Number(item.approvedCost ?? item.cost ?? 0) / Math.max(1, Number(item.quantity ?? 1))},
+            ordered_oe_qty = ${orderedQtyByType.oe || null},
+            ordered_oem_qty = ${orderedQtyByType.oem || null},
+            ordered_aftm_qty = ${orderedQtyByType.aftm || null},
+            ordered_used_qty = ${orderedQtyByType.used || null},
+            updated_at = NOW()
+          WHERE company_id = ${resolved.estimate.company_id}
+            AND id = ${picked.quoteId}
+        `;
       }
     } catch (err: any) {
       purchaseOrderError = err?.message ? String(err.message) : "Failed to auto-create purchase order.";
@@ -680,6 +983,8 @@ export async function POST(req: NextRequest, { params }: Params) {
       purchaseOrderId: purchaseOrderId ?? null,
       selectedItemIds,
       selectedTypeByItemId,
+      selectedQuoteByLineItemId,
+      purchaseOrders: purchaseOrdersCreated,
     },
   };
   const nextEstimateStatus: EstimateStatus = selectedItemIds.length > 0 ? "approved" : "rejected";
@@ -700,6 +1005,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       jobCardCreated,
       purchaseOrderId,
       purchaseOrderCreated,
+      purchaseOrders: purchaseOrdersCreated,
     },
   });
 }

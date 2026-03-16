@@ -412,8 +412,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     body?.action !== "collect_car" &&
     body?.action !== "pre_work_check" &&
     body?.action !== "working_video" &&
+    body?.action !== "completion_evidence" &&
     body?.action !== "add_additional_item" &&
-    body?.action !== "final_inspection"
+    body?.action !== "final_inspection" &&
+    body?.action !== "car_wash"
   ) {
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
   }
@@ -470,8 +472,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       body?.action === "collect_car" ||
       body?.action === "pre_work_check" ||
       body?.action === "working_video" ||
+      body?.action === "completion_evidence" ||
       body?.action === "add_additional_item" ||
-      body?.action === "final_inspection") &&
+      body?.action === "final_inspection" ||
+      body?.action === "car_wash") &&
     isBranchScopedUser &&
     !isAssignedWorkshopUser
   ) {
@@ -525,6 +529,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         FROM line_items
         WHERE job_card_id = ${jobCardId}
           AND company_id = ${companyId}
+          AND (
+            LOWER(COALESCE(customer_approval_status, '')) = 'approved'
+            OR LOWER(COALESCE(status, '')) = 'approved'
+          )
           AND NOT (
             COALESCE(is_add, 0) = 1
             AND LOWER(COALESCE(order_status, 'pending')) = 'pending'
@@ -577,6 +585,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         FROM line_items
         WHERE job_card_id = ${jobCardId}
           AND company_id = ${companyId}
+          AND (
+            LOWER(COALESCE(customer_approval_status, '')) = 'approved'
+            OR LOWER(COALESCE(status, '')) = 'approved'
+          )
           AND NOT (
             COALESCE(is_add, 0) = 1
             AND LOWER(COALESCE(order_status, 'pending')) = 'pending'
@@ -820,6 +832,46 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       RETURNING *
     `;
     return NextResponse.json({ data: updated[0] ?? jobCard });
+  }
+
+  if (body?.action === "completion_evidence") {
+    if (!jobCard?.inspection_id) {
+      return NextResponse.json({ error: "Inspection is not linked to this job card." }, { status: 400 });
+    }
+    const engineImageId = String(body?.engineImageId ?? "").trim() || null;
+    const bottomImageId = String(body?.bottomImageId ?? "").trim() || null;
+    const inspectionRows = await sql`
+      SELECT draft_payload
+      FROM inspections
+      WHERE company_id = ${companyId}
+        AND id = ${jobCard.inspection_id}
+      LIMIT 1
+    `;
+    if (!inspectionRows.length) {
+      return NextResponse.json({ error: "Inspection not found." }, { status: 404 });
+    }
+    const currentDraft =
+      (inspectionRows[0]?.draft_payload && typeof inspectionRows[0].draft_payload === "object"
+        ? inspectionRows[0].draft_payload
+        : {}) as Record<string, unknown>;
+    const nextDraft = {
+      ...currentDraft,
+      jobCardEngineImageId: engineImageId ?? (currentDraft as any).jobCardEngineImageId ?? null,
+      jobCardBottomImageId: bottomImageId ?? (currentDraft as any).jobCardBottomImageId ?? null,
+    };
+    await sql`
+      UPDATE inspections
+      SET draft_payload = ${nextDraft as any},
+          updated_at = NOW()
+      WHERE company_id = ${companyId}
+        AND id = ${jobCard.inspection_id}
+    `;
+    return NextResponse.json({
+      data: {
+        engineImageId: nextDraft.jobCardEngineImageId ?? null,
+        bottomImageId: nextDraft.jobCardBottomImageId ?? null,
+      },
+    });
   }
 
   if (body?.action === "add_additional_item") {
@@ -1248,40 +1300,279 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const checks = {
       testDrive: Boolean(body?.checks?.testDrive),
       clusterWarning: Boolean(body?.checks?.clusterWarning),
-      carWash: Boolean(body?.checks?.carWash),
       tyreCheck: Boolean(body?.checks?.tyreCheck),
       computerReset: Boolean(body?.checks?.computerReset),
       protectiveShields: Boolean(body?.checks?.protectiveShields),
     };
     const finalInspectionRemarks =
       typeof body?.finalInspectionRemarks === "string" ? body.finalInspectionRemarks.trim() : "";
-    const finalInspectionCarOutVideoId = String(body?.carOutVideoId ?? body?.finalInspectionCarOutVideoId ?? "").trim();
-    if (!checks.testDrive || !checks.clusterWarning || !checks.carWash || !checks.tyreCheck || !checks.computerReset || !checks.protectiveShields) {
+    const finalPhotosRaw =
+      body?.finalInspectionCarPhotos && typeof body.finalInspectionCarPhotos === "object"
+        ? (body.finalInspectionCarPhotos as Record<string, unknown>)
+        : {};
+    const finalInspectionCarPhotos = {
+      front: String(finalPhotosRaw.front ?? "").trim(),
+      rear: String(finalPhotosRaw.rear ?? "").trim(),
+      right: String(finalPhotosRaw.right ?? "").trim(),
+      left: String(finalPhotosRaw.left ?? "").trim(),
+    };
+    const reworkRequired = Boolean(body?.reworkRequired);
+    const reworkNote = String(body?.reworkNote ?? "").trim();
+    const reworkLineItemIds = Array.isArray(body?.reworkLineItemIds)
+      ? body.reworkLineItemIds.map((id: unknown) => String(id ?? "").trim()).filter(Boolean)
+      : [];
+    const rawPartStatuses =
+      body?.finalInspectionPartStatuses && typeof body.finalInspectionPartStatuses === "object"
+        ? (body.finalInspectionPartStatuses as Record<string, unknown>)
+        : {};
+    const finalInspectionPartStatuses: Record<string, "verified" | "rework"> = {};
+    Object.entries(rawPartStatuses).forEach(([itemId, value]) => {
+      const normalized = String(value ?? "").toLowerCase();
+      if (normalized === "verified" || normalized === "rework") {
+        finalInspectionPartStatuses[String(itemId)] = normalized;
+      }
+    });
+
+    if (!checks.testDrive || !checks.clusterWarning || !checks.tyreCheck || !checks.computerReset || !checks.protectiveShields) {
       return NextResponse.json(
         { error: "All final inspection checklist items must be verified." },
         { status: 400 }
       );
     }
-    if (!finalInspectionCarOutVideoId) {
-      return NextResponse.json({ error: "Car out video is required." }, { status: 400 });
+
+    if (
+      !finalInspectionCarPhotos.front ||
+      !finalInspectionCarPhotos.rear ||
+      !finalInspectionCarPhotos.right ||
+      !finalInspectionCarPhotos.left
+    ) {
+      return NextResponse.json(
+        { error: "Front, rear, right, and left final car photos are required." },
+        { status: 400 }
+      );
     }
+
+    const approvedPartsPendingRows = await sql`
+      SELECT
+        li.id,
+        li.product_name,
+        LOWER(COALESCE(li.order_status, 'pending')) AS order_status,
+        COALESCE(li.part_pic, '') AS part_pic,
+        COALESCE(li.scrap_pic, '') AS scrap_pic
+      FROM line_items li
+      WHERE li.job_card_id = ${jobCardId}
+        AND li.company_id = ${companyId}
+        AND (
+          LOWER(COALESCE(li.customer_approval_status, '')) = 'approved'
+          OR LOWER(COALESCE(li.status, '')) = 'approved'
+        )
+        AND NOT (
+          COALESCE(li.is_add, 0) = 1
+          AND LOWER(COALESCE(li.order_status, 'pending')) = 'pending'
+        )
+    `;
+    const finalizedPartIssues = approvedPartsPendingRows.filter((row: any) => {
+      const status = String(row?.order_status ?? "").toLowerCase();
+      const partPic = String(row?.part_pic ?? "").trim();
+      const scrapPic = String(row?.scrap_pic ?? "").trim();
+      return status !== "received" || !partPic || !scrapPic;
+    });
+    if (finalizedPartIssues.length) {
+      const summary = finalizedPartIssues
+        .slice(0, 6)
+        .map((row: any) => String(row?.product_name ?? "Part").trim() || "Part")
+        .join(", ");
+      return NextResponse.json(
+        { error: `Finalize all approved parts before final inspection: ${summary}.` },
+        { status: 400 }
+      );
+    }
+
+    const requiredPartIds = approvedPartsPendingRows.map((row: any) => String(row?.id ?? "")).filter(Boolean);
+    const missingDecisionIds = requiredPartIds.filter((id) => {
+      const status = finalInspectionPartStatuses[id];
+      return status !== "verified" && status !== "rework";
+    });
+    if (missingDecisionIds.length) {
+      return NextResponse.json(
+        { error: "Select Verify/Re-Work status for all approved parts before saving final inspection." },
+        { status: 400 }
+      );
+    }
+    const reworkIdsFromPartStatus = requiredPartIds.filter(
+      (id) => finalInspectionPartStatuses[id] === "rework"
+    );
+    const effectiveReworkLineItemIds = reworkIdsFromPartStatus.length
+      ? reworkIdsFromPartStatus
+      : reworkLineItemIds;
+    const effectiveReworkRequired = effectiveReworkLineItemIds.length > 0 || reworkRequired;
+
+    if (effectiveReworkRequired && !effectiveReworkLineItemIds.length) {
+      return NextResponse.json(
+        { error: "Select at least one part for rework before reopening." },
+        { status: 400 }
+      );
+    }
+    if (effectiveReworkRequired && !reworkNote) {
+      return NextResponse.json(
+        { error: "Add rework note before reopening the job card." },
+        { status: 400 }
+      );
+    }
+
+    const inspectionRows = jobCard?.inspection_id
+      ? await sql`
+          SELECT draft_payload
+          FROM inspections
+          WHERE company_id = ${companyId}
+            AND id = ${jobCard.inspection_id}
+          LIMIT 1
+        `
+      : [];
+    const currentDraft =
+      (inspectionRows[0]?.draft_payload && typeof inspectionRows[0].draft_payload === "object"
+        ? inspectionRows[0].draft_payload
+        : {}) as Record<string, unknown>;
+    const nextDraft = {
+      ...currentDraft,
+      jobCardFinalInspectionCarPhotos: finalInspectionCarPhotos,
+      jobCardFinalInspectionRemarks: finalInspectionRemarks || null,
+      jobCardFinalInspectionPartStatuses: finalInspectionPartStatuses,
+      jobCardFinalInspectionRework: effectiveReworkRequired
+        ? {
+            at: new Date().toISOString(),
+            lineItemIds: effectiveReworkLineItemIds,
+            note: reworkNote,
+          }
+        : null,
+    };
+    if (jobCard?.inspection_id) {
+      await sql`
+        UPDATE inspections
+        SET draft_payload = ${nextDraft as any},
+            updated_at = NOW()
+        WHERE company_id = ${companyId}
+          AND id = ${jobCard.inspection_id}
+      `;
+    }
+
+    if (effectiveReworkRequired) {
+      const updated = await sql`
+        UPDATE job_cards
+        SET
+          status = 'Pending',
+          complete_at = NULL,
+          final_inspection_at = NULL,
+          final_inspection_by = NULL,
+          final_inspection_remarks = ${reworkNote},
+          updated_at = NOW()
+        WHERE id = ${jobCardId}
+        RETURNING *
+      `;
+      return NextResponse.json({ data: { ...(updated[0] ?? jobCard), reopened_for_rework: true } });
+    }
+
     const updated = await sql`
       UPDATE job_cards
       SET
         final_inspection_test_drive = ${checks.testDrive},
         final_inspection_cluster_warning = ${checks.clusterWarning},
-        final_inspection_car_wash = ${checks.carWash},
+        final_inspection_car_wash = FALSE,
         final_inspection_tyre_check = ${checks.tyreCheck},
         final_inspection_computer_reset = ${checks.computerReset},
         final_inspection_protective_shields = ${checks.protectiveShields},
         final_inspection_remarks = ${finalInspectionRemarks || null},
-        final_inspection_car_out_video_id = ${finalInspectionCarOutVideoId},
+        final_inspection_car_out_video_id = NULL,
         final_inspection_by = ${currentUserId},
         final_inspection_at = NOW()
       WHERE id = ${jobCardId}
       RETURNING *
     `;
-    return NextResponse.json({ data: updated[0] ?? jobCard });
+    return NextResponse.json({ data: { ...(updated[0] ?? jobCard), reopened_for_rework: false } });
+  }
+
+  if (body?.action === "car_wash") {
+    const isCompleted =
+      Boolean(jobCard?.complete_at) || String(jobCard?.status ?? "").toLowerCase() === "completed";
+    if (!isCompleted) {
+      return NextResponse.json(
+        { error: "Complete job card before car wash stage." },
+        { status: 400 }
+      );
+    }
+    if (!jobCard?.final_inspection_at) {
+      return NextResponse.json(
+        { error: "Final inspection is required before car wash stage." },
+        { status: 400 }
+      );
+    }
+    if (!jobCard?.inspection_id) {
+      return NextResponse.json(
+        { error: "Inspection is not linked to this job card." },
+        { status: 400 }
+      );
+    }
+    const mediaRaw =
+      body?.carWashMedia && typeof body.carWashMedia === "object"
+        ? (body.carWashMedia as Record<string, unknown>)
+        : {};
+    const carWashMedia = {
+      front: String(mediaRaw.front ?? "").trim(),
+      rear: String(mediaRaw.rear ?? "").trim(),
+      right: String(mediaRaw.right ?? "").trim(),
+      left: String(mediaRaw.left ?? "").trim(),
+      video: String(mediaRaw.video ?? "").trim(),
+    };
+    if (
+      !carWashMedia.front ||
+      !carWashMedia.rear ||
+      !carWashMedia.right ||
+      !carWashMedia.left ||
+      !carWashMedia.video
+    ) {
+      return NextResponse.json(
+        { error: "Car wash images (front/rear/right/left) and video are required." },
+        { status: 400 }
+      );
+    }
+    const carWashNotes = String(body?.carWashNotes ?? "").trim();
+    const inspectionRows = await sql`
+      SELECT draft_payload
+      FROM inspections
+      WHERE company_id = ${companyId}
+        AND id = ${jobCard.inspection_id}
+      LIMIT 1
+    `;
+    const currentDraft =
+      (inspectionRows[0]?.draft_payload && typeof inspectionRows[0].draft_payload === "object"
+        ? inspectionRows[0].draft_payload
+        : {}) as Record<string, unknown>;
+    const nextDraft = {
+      ...currentDraft,
+      jobCardCarWashMedia: carWashMedia,
+      jobCardCarWashNotes: carWashNotes || null,
+    };
+    await sql`
+      UPDATE inspections
+      SET draft_payload = ${nextDraft as any},
+          updated_at = NOW()
+      WHERE company_id = ${companyId}
+        AND id = ${jobCard.inspection_id}
+    `;
+    const updated = await sql`
+      UPDATE job_cards
+      SET
+        final_inspection_car_wash = TRUE,
+        updated_at = NOW()
+      WHERE id = ${jobCardId}
+      RETURNING *
+    `;
+    return NextResponse.json({
+      data: {
+        ...(updated[0] ?? jobCard),
+        car_wash_done: true,
+      },
+    });
   }
 
   const remarks = typeof body?.remarks === "string" ? body.remarks.trim() : "";
@@ -1296,10 +1587,51 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     );
   }
 
-  const workingVideoId = String(jobCard?.working_video_id ?? "").trim();
-  if (!workingVideoId) {
+  const completionEvidenceRows = jobCard?.inspection_id
+    ? await sql`
+        SELECT draft_payload
+        FROM inspections
+        WHERE company_id = ${companyId}
+          AND id = ${jobCard.inspection_id}
+        LIMIT 1
+      `
+    : [];
+  const completionDraft =
+    (completionEvidenceRows[0]?.draft_payload && typeof completionEvidenceRows[0].draft_payload === "object"
+      ? completionEvidenceRows[0].draft_payload
+      : {}) as Record<string, unknown>;
+  const engineImageId = String((completionDraft as any).jobCardEngineImageId ?? "").trim();
+  const bottomImageId = String((completionDraft as any).jobCardBottomImageId ?? "").trim();
+  if (!engineImageId || !bottomImageId) {
     return NextResponse.json(
-      { error: "Working video is required before completing the job." },
+      { error: "Engine image and bottom image are required before completing the job." },
+      { status: 400 }
+    );
+  }
+
+  const missingScrapRows = await sql`
+    SELECT id, product_name
+    FROM line_items
+    WHERE job_card_id = ${jobCardId}
+      AND company_id = ${companyId}
+      AND (
+        LOWER(COALESCE(customer_approval_status, '')) = 'approved'
+        OR LOWER(COALESCE(status, '')) = 'approved'
+      )
+      AND NOT (
+        COALESCE(is_add, 0) = 1
+        AND LOWER(COALESCE(order_status, 'pending')) = 'pending'
+      )
+      AND (scrap_pic IS NULL OR scrap_pic = '')
+    ORDER BY product_name ASC
+    LIMIT 10
+  `;
+  if (missingScrapRows.length) {
+    const summary = missingScrapRows
+      .map((row: any) => String(row?.product_name ?? "Part").trim() || "Part")
+      .join(", ");
+    return NextResponse.json(
+      { error: `Upload scrap pictures for all parts before completion: ${summary}.` },
       { status: 400 }
     );
   }
@@ -1310,31 +1642,38 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       FROM line_items li
       WHERE li.job_card_id = ${jobCardId}
         AND li.company_id = ${companyId}
+        AND (
+          LOWER(COALESCE(li.customer_approval_status, '')) = 'approved'
+          OR LOWER(COALESCE(li.status, '')) = 'approved'
+        )
         AND NOT (
           COALESCE(li.is_add, 0) = 1
           AND LOWER(COALESCE(li.order_status, 'pending')) = 'pending'
         )
     ),
-    linked_po_items AS (
-      SELECT
+    selected_po_item AS (
+      SELECT DISTINCT ON (ri.id)
         ri.id AS line_item_id,
         ri.product_name,
         poi.id AS po_item_id,
         COALESCE(poi.quantity, 0)::numeric AS ordered_qty,
-        COALESCE(poi.received_qty, 0)::numeric AS received_qty
+        COALESCE(poi.received_qty, 0)::numeric AS received_qty,
+        LOWER(COALESCE(po.status, '')) AS po_status
       FROM required_items ri
-      LEFT JOIN part_quotes pq
-        ON pq.company_id = ${companyId}
-       AND pq.line_item_id = ri.id
       LEFT JOIN purchase_order_items poi
-        ON (
-          poi.quote_id = pq.id
-          OR (
-            poi.estimate_item_id IS NOT NULL
-            AND pq.estimate_item_id IS NOT NULL
-            AND poi.estimate_item_id = pq.estimate_item_id
-          )
-        )
+        ON poi.estimate_item_id::text = ri.id::text
+      LEFT JOIN purchase_orders po
+        ON po.id = poi.purchase_order_id
+      ORDER BY
+        ri.id,
+        CASE
+          WHEN LOWER(COALESCE(po.status, '')) = 'issued' THEN 0
+          WHEN LOWER(COALESCE(po.status, '')) = 'partially_received' THEN 1
+          WHEN LOWER(COALESCE(po.status, '')) = 'received' THEN 2
+          ELSE 3
+        END,
+        po.updated_at DESC NULLS LAST,
+        poi.updated_at DESC NULLS LAST
     ),
     receipt_rollup AS (
       SELECT
@@ -1343,7 +1682,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         COUNT(po_item_id) FILTER (WHERE po_item_id IS NOT NULL) AS po_item_count,
         COALESCE(SUM(ordered_qty), 0)::numeric AS ordered_qty,
         COALESCE(SUM(received_qty), 0)::numeric AS received_qty
-      FROM linked_po_items
+      FROM selected_po_item
       GROUP BY line_item_id
     )
     SELECT

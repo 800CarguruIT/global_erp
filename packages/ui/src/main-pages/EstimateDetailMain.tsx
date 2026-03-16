@@ -294,6 +294,15 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [invoiceConvertError, setInvoiceConvertError] = useState<string | null>(null);
   const [isConvertingInvoice, setIsConvertingInvoice] = useState(false);
+  const [topupOpen, setTopupOpen] = useState(false);
+  const [topupForm, setTopupForm] = useState({
+    amount: "",
+    method: "cash",
+    paymentDate: "",
+    proofFileId: "",
+  });
+  const [topupSaving, setTopupSaving] = useState(false);
+  const [topupError, setTopupError] = useState<string | null>(null);
   const [marketPricingByKey, setMarketPricingByKey] = useState<Record<string, MarketPricingInsight>>({});
   const [marketPricingLoadingByKey, setMarketPricingLoadingByKey] = useState<Record<string, boolean>>({});
   const [isApplyingMarketPricingAll, setIsApplyingMarketPricingAll] = useState(false);
@@ -1828,7 +1837,12 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
       const res = await fetch(`/api/company/${companyId}/workshop/invoices`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ estimateId }),
+        body: JSON.stringify({
+          estimateId,
+          autoSettleOnConvert: true,
+          autoCarOutOnAutoPaid: true,
+          handoverType: "branch",
+        }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -1836,7 +1850,17 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
         return;
       }
       setShowInvoiceModal(false);
-      setJobCardMessage("Invoice created successfully.");
+      const autoPaid = Boolean(json?.data?.autoSettlement?.autoPaid);
+      const autoReason = String(json?.data?.autoSettlement?.reason ?? "");
+      const gatepassId = String(json?.data?.carOut?.gatepassId ?? "").trim();
+      if (autoPaid) {
+        const reasonLabel = autoReason === "wallet" ? "wallet" : "zero balance";
+        setJobCardMessage(
+          `Invoice created and auto-paid (${reasonLabel})${gatepassId ? `, car-out gatepass created (${gatepassId.slice(0, 8)}...)` : ""}.`
+        );
+      } else {
+        setJobCardMessage("Invoice created. Wallet is insufficient for auto-payment.");
+      }
     } catch {
       setInvoiceConvertError("Failed to convert to invoice.");
     } finally {
@@ -1877,6 +1901,73 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
       setIsSharingCustomerApproval(false);
     }
   }
+
+  function openTopupModal(requiredAmount: number) {
+    const minimum = Math.max(0, Number(requiredAmount) || 0);
+    setTopupError(null);
+    setTopupForm((prev) => ({
+      ...prev,
+      amount: minimum > 0 ? minimum.toFixed(2) : "",
+    }));
+    setTopupOpen(true);
+  }
+
+  async function submitTopupFromInvoiceModal(requiredAmount: number) {
+    const customerId = String(customer?.id ?? "").trim();
+    if (!companyId || !customerId) {
+      setTopupError("Customer is required for wallet topup.");
+      return;
+    }
+    const minAmount = Math.max(0, Number(requiredAmount) || 0);
+    const amount = Number(topupForm.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setTopupError("Enter a valid topup amount.");
+      return;
+    }
+    if (amount + 1e-9 < minAmount) {
+      setTopupError(`Topup amount must be at least AED ${minAmount.toFixed(2)}.`);
+      return;
+    }
+
+    setTopupSaving(true);
+    setTopupError(null);
+    try {
+      const res = await fetch(`/api/customers/${customerId}/wallet/transactions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          companyId,
+          amount,
+          paymentMethod: topupForm.method,
+          paymentDate: topupForm.paymentDate || null,
+          paymentProofFileId: topupForm.proofFileId || null,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(String(data?.error ?? "Failed to create topup"));
+
+      let balance: number | null = null;
+      const summaryRes = await fetch(`/api/customers/${customerId}/wallet/summary?companyId=${companyId}`);
+      if (summaryRes.ok) {
+        const summary = await summaryRes.json().catch(() => ({}));
+        balance = Number(summary?.balance ?? 0);
+      }
+      setCustomer((prev: any) => ({
+        ...(prev ?? {}),
+        id: customerId,
+        wallet_amount: balance ?? Number(prev?.wallet_amount ?? prev?.walletAmount ?? 0) + amount,
+        walletAmount: balance ?? Number(prev?.walletAmount ?? prev?.wallet_amount ?? 0) + amount,
+      }));
+      setTopupOpen(false);
+      setTopupForm({ amount: "", method: "cash", paymentDate: "", proofFileId: "" });
+      setJobCardMessage("Wallet topup submitted successfully.");
+    } catch (err: any) {
+      setTopupError(String(err?.message ?? "Failed to create topup."));
+    } finally {
+      setTopupSaving(false);
+    }
+  }
+
   function applyApprovedTypeToAll(type: EstimateItemCostType, checked: boolean) {
     setDraft((prev) => {
       if (!prev) return prev;
@@ -2170,6 +2261,29 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
   const invoiceNetSubTotalPreview = Math.max(0, invoiceSubTotalPreview - invoiceDiscountAmountPreview);
   const invoiceVatPreview = (invoiceNetSubTotalPreview * (Number(draft.vatRate) || 0)) / 100;
   const invoiceGrandTotalPreview = invoiceNetSubTotalPreview + invoiceVatPreview;
+  const customerWalletBalance = Number(customer?.wallet_amount ?? customer?.walletAmount ?? 0) || 0;
+  const customerIdForWallet = String(customer?.id ?? "").trim();
+  const isZeroBillInvoice = invoiceGrandTotalPreview <= 0.00001;
+  const walletCanAutoPayInvoice = customerWalletBalance + 1e-9 >= invoiceGrandTotalPreview;
+  const invoiceCanAutoSettle = isZeroBillInvoice || walletCanAutoPayInvoice;
+  const invoicePreviewLineItems = draft.items
+    .filter((item) => item.status === "approved" && (Number(item.quantity) || 0) > 0)
+    .map((item, idx) => {
+      const qty = Number(item.quantity) || 0;
+      const lineSale = Number(item.sale ?? item.approvedSale ?? 0) || 0;
+      const lineDiscount = Number(item.discount ?? 0) || 0;
+      const lineTotal = Math.max(0, lineSale - lineDiscount);
+      const unitRate = qty > 0 ? lineSale / qty : lineSale;
+      return {
+        key: String(item.id ?? item.inspectionItemId ?? `${item.partName}-${idx}`),
+        lineNo: item.lineNo ?? idx + 1,
+        partName: item.partName || "Part",
+        description: item.description || "-",
+        qty,
+        unitRate,
+        total: lineTotal,
+      };
+    });
 
   return (
     <MainPageShell
@@ -3337,14 +3451,42 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                 </div>
                 <div className="mt-2 rounded-md border border-slate-600/60 bg-slate-900/30 p-2">
                   <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-300">Invoice Discount</div>
-                  <div className="flex items-center gap-1">
-                    <select
-                      className={`${theme.input} h-8 w-[74px] text-xs`}
-                      value={invoiceDiscountMode}
-                      onChange={(e) => {
-                        const mode = e.target.value as "amount" | "percent";
-                        setInvoiceDiscountMode(mode);
-                        if (mode === "percent") {
+                  <div className="space-y-2">
+                    <div className="inline-flex rounded-md border border-slate-600/70 bg-slate-950/50 p-0.5">
+                      <button
+                        type="button"
+                        className={`h-7 rounded px-2.5 text-[11px] font-semibold transition ${
+                          invoiceDiscountMode === "amount"
+                            ? "bg-cyan-500/20 text-cyan-200"
+                            : "text-slate-300 hover:bg-slate-700/40"
+                        }`}
+                        onClick={() => {
+                          const mode: "amount" | "percent" = "amount";
+                          setInvoiceDiscountMode(mode);
+                          setDraft((prev) =>
+                            prev
+                              ? {
+                                  ...prev,
+                                  discountAmount: Number(
+                                    ((invoiceSubTotalPreview * Math.max(0, invoiceDiscountPercent)) / 100).toFixed(2)
+                                  ),
+                                }
+                              : prev
+                          );
+                        }}
+                      >
+                        Amount
+                      </button>
+                      <button
+                        type="button"
+                        className={`h-7 rounded px-2.5 text-[11px] font-semibold transition ${
+                          invoiceDiscountMode === "percent"
+                            ? "bg-cyan-500/20 text-cyan-200"
+                            : "text-slate-300 hover:bg-slate-700/40"
+                        }`}
+                        onClick={() => {
+                          const mode: "amount" | "percent" = "percent";
+                          setInvoiceDiscountMode(mode);
                           const pct = derivePercentFromAmount(invoiceSubTotalPreview, Number(draft.discountAmount || 0));
                           setInvoiceDiscountPercent(pct);
                           setDraft((prev) =>
@@ -3357,47 +3499,54 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                                 }
                               : prev
                           );
-                        } else {
-                          setDraft((prev) =>
-                            prev
-                              ? {
-                                  ...prev,
-                                  discountAmount: Number(
-                                    ((invoiceSubTotalPreview * Math.max(0, invoiceDiscountPercent)) / 100).toFixed(2)
-                                  ),
-                                }
-                              : prev
-                          );
+                        }}
+                      >
+                        %
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        className={`${theme.input} h-9 flex-1 text-sm font-semibold`}
+                        value={
+                          invoiceDiscountMode === "percent"
+                            ? invoiceDiscountPercent
+                            : Number(draft.discountAmount || 0)
                         }
-                      }}
-                    >
-                      <option value="amount">Amount</option>
-                      <option value="percent">%</option>
-                    </select>
-                    <input
-                      type="number"
-                      step="0.01"
-                      className={`${theme.input} h-8 flex-1 text-xs`}
-                      value={invoiceDiscountMode === "percent" ? invoiceDiscountPercent : Number(draft.discountAmount || 0)}
-                      onChange={(e) => {
-                        const value = Number(e.target.value) || 0;
-                        if (invoiceDiscountMode === "percent") {
-                          setInvoiceDiscountPercent(value);
-                          setDraft((prev) =>
-                            prev
-                              ? {
-                                  ...prev,
-                                  discountAmount: Number(
-                                    ((invoiceSubTotalPreview * Math.max(0, value)) / 100).toFixed(2)
-                                  ),
-                                }
-                              : prev
-                          );
-                          return;
-                        }
-                        setDraft((prev) => (prev ? { ...prev, discountAmount: value } : prev));
-                      }}
-                    />
+                        onChange={(e) => {
+                          const value = Number(e.target.value) || 0;
+                          if (invoiceDiscountMode === "percent") {
+                            const safePercent = Math.max(0, Math.min(100, value));
+                            setInvoiceDiscountPercent(safePercent);
+                            setDraft((prev) =>
+                              prev
+                                ? {
+                                    ...prev,
+                                    discountAmount: Number(
+                                      ((invoiceSubTotalPreview * safePercent) / 100).toFixed(2)
+                                    ),
+                                  }
+                                : prev
+                            );
+                            return;
+                          }
+                          setDraft((prev) => (prev ? { ...prev, discountAmount: Math.max(0, value) } : prev));
+                        }}
+                      />
+                      <div className="inline-flex h-9 min-w-[52px] items-center justify-center rounded border border-slate-600/70 bg-slate-950/60 px-2 text-[11px] font-semibold text-slate-200">
+                        {invoiceDiscountMode === "percent" ? "%" : "AED"}
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between text-[10px] text-slate-400">
+                      <span>
+                        {invoiceDiscountMode === "percent"
+                          ? `Applied: ${invoiceDiscountPercent.toFixed(2)}%`
+                          : "Applied as fixed amount"}
+                      </span>
+                      <span>Discount Value: AED {invoiceDiscountAmountPreview.toFixed(2)}</span>
+                    </div>
                   </div>
                 </div>
                 <div className="mt-1 flex items-center justify-between text-[11px]">
@@ -3479,6 +3628,42 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                     <div className="font-semibold">AED {row.total.toFixed(2)}</div>
                   </div>
                 ))}
+                <div className="rounded-md border border-slate-600/60 bg-slate-900/30 p-2">
+                  <div className="mb-2 flex items-center justify-between">
+                    <div className="text-[11px] font-semibold text-slate-200">Invoice Line Items</div>
+                    <div className="text-[10px] text-slate-400">{invoicePreviewLineItems.length} item(s)</div>
+                  </div>
+                  {invoicePreviewLineItems.length === 0 ? (
+                    <div className="text-[11px] text-slate-400">No approved line items available.</div>
+                  ) : (
+                    <div className="max-h-56 overflow-auto rounded-md border border-slate-700/60">
+                      <table className="min-w-full text-[11px]">
+                        <thead className={`${theme.surfaceSubtle} ${theme.appText}`}>
+                          <tr>
+                            <th className="px-2 py-1 text-left">#</th>
+                            <th className="px-2 py-1 text-left">Part</th>
+                            <th className="px-2 py-1 text-left">Description</th>
+                            <th className="px-2 py-1 text-right">Qty</th>
+                            <th className="px-2 py-1 text-right">Rate</th>
+                            <th className="px-2 py-1 text-right">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {invoicePreviewLineItems.map((item) => (
+                            <tr key={`inv-line-${item.key}`} className="border-t border-slate-700/50">
+                              <td className="px-2 py-1">{item.lineNo}</td>
+                              <td className="px-2 py-1 font-semibold">{item.partName}</td>
+                              <td className="px-2 py-1 text-slate-300">{item.description}</td>
+                              <td className="px-2 py-1 text-right">{item.qty.toFixed(2)}</td>
+                              <td className="px-2 py-1 text-right">AED {item.unitRate.toFixed(2)}</td>
+                              <td className="px-2 py-1 text-right font-semibold">AED {item.total.toFixed(2)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
                 <div className="rounded-md border border-slate-500/70 bg-slate-800/40 px-3 py-2">
                   <div className="flex items-center justify-between text-[11px]">
                     <span className="text-muted-foreground">Subtotal</span>
@@ -3500,6 +3685,40 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                     <span>Grand Total</span>
                     <span>AED {invoiceGrandTotalPreview.toFixed(2)}</span>
                   </div>
+                </div>
+                <div
+                  className={`rounded-md border px-3 py-2 ${
+                    invoiceCanAutoSettle
+                      ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-200"
+                      : "border-amber-500/50 bg-amber-500/10 text-amber-200"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px]">Customer Wallet Balance</span>
+                    <span className="font-semibold">AED {customerWalletBalance.toFixed(2)}</span>
+                  </div>
+                  <div className="mt-1 flex items-center justify-between">
+                    <span className="text-[11px]">Amount Required</span>
+                    <span className="font-semibold">AED {invoiceGrandTotalPreview.toFixed(2)}</span>
+                  </div>
+                  <div className="mt-1 text-[11px]">
+                    {isZeroBillInvoice
+                      ? "Invoice bill is zero: direct payment and car-out will run automatically."
+                      : walletCanAutoPayInvoice
+                      ? "Wallet is sufficient: direct payment and car-out will run automatically."
+                      : "Wallet is not sufficient: invoice will be created without auto-payment."}
+                  </div>
+                  {!isZeroBillInvoice && !walletCanAutoPayInvoice && customerIdForWallet && (
+                    <div className="mt-2">
+                      <button
+                        type="button"
+                        onClick={() => openTopupModal(invoiceGrandTotalPreview)}
+                        className="inline-flex rounded-md border border-amber-300/60 bg-amber-500/20 px-2 py-1 text-[11px] font-semibold text-amber-100 transition hover:bg-amber-500/30"
+                      >
+                        Top Up Wallet
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
               {(openJobCards.length > 0 || approvedLineItemsNotReceived.length > 0) && (
@@ -3534,6 +3753,97 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                   onClick={convertToInvoice}
                 >
                   {convertInvoiceLabel}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {topupOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
+          <div className={`w-full max-w-lg rounded-xl border border-slate-600/60 ${theme.cardBg}`}>
+            <div className={`flex items-center justify-between rounded-t-xl border-b border-slate-600/60 px-4 py-3 ${theme.surfaceSubtle}`}>
+              <div>
+                <div className="text-sm font-semibold">Topup Wallet</div>
+                <div className="text-[11px] text-muted-foreground">
+                  Minimum topup required: AED {invoiceGrandTotalPreview.toFixed(2)}
+                </div>
+              </div>
+              <button
+                type="button"
+                className="rounded-md border border-slate-500/60 px-2 py-1 text-xs"
+                onClick={() => setTopupOpen(false)}
+                disabled={topupSaving}
+              >
+                Close
+              </button>
+            </div>
+            <div className="space-y-3 p-4 text-xs">
+              {topupError && (
+                <div className="rounded-md border border-rose-500/50 bg-rose-500/10 px-3 py-2 text-rose-200">
+                  {topupError}
+                </div>
+              )}
+              <div className="space-y-1">
+                <label className="text-[11px] text-muted-foreground">Amount</label>
+                <input
+                  type="number"
+                  min={invoiceGrandTotalPreview > 0 ? invoiceGrandTotalPreview.toFixed(2) : "0"}
+                  step="0.01"
+                  className={theme.input}
+                  value={topupForm.amount}
+                  onChange={(e) => setTopupForm((prev) => ({ ...prev, amount: e.target.value }))}
+                  placeholder="Enter topup amount"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[11px] text-muted-foreground">Payment Method</label>
+                <select
+                  className={theme.input}
+                  value={topupForm.method}
+                  onChange={(e) => setTopupForm((prev) => ({ ...prev, method: e.target.value }))}
+                >
+                  <option value="cash">Cash</option>
+                  <option value="card">Card</option>
+                  <option value="bank_transfer">Bank Transfer</option>
+                  <option value="online">Online</option>
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[11px] text-muted-foreground">Payment Date</label>
+                <input
+                  type="date"
+                  className={theme.input}
+                  value={topupForm.paymentDate}
+                  onChange={(e) => setTopupForm((prev) => ({ ...prev, paymentDate: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[11px] text-muted-foreground">Payment Proof File ID (Optional)</label>
+                <input
+                  type="text"
+                  className={theme.input}
+                  value={topupForm.proofFileId}
+                  onChange={(e) => setTopupForm((prev) => ({ ...prev, proofFileId: e.target.value }))}
+                  placeholder="Enter file id"
+                />
+              </div>
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  className="rounded-md border border-slate-500/60 px-3 py-1.5 text-xs font-semibold"
+                  onClick={() => setTopupOpen(false)}
+                  disabled={topupSaving}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
+                  disabled={topupSaving}
+                  onClick={() => void submitTopupFromInvoiceModal(invoiceGrandTotalPreview)}
+                >
+                  {topupSaving ? "Saving..." : "Save Topup"}
                 </button>
               </div>
             </div>

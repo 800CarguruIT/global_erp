@@ -82,19 +82,37 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
   });
   const [preWorkNote, setPreWorkNote] = useState("");
   const [isSavingPreWork, setIsSavingPreWork] = useState(false);
-  const [workingVideoId, setWorkingVideoId] = useState("");
-  const [isSavingWorkingVideo, setIsSavingWorkingVideo] = useState(false);
+  const [completionEngineImageId, setCompletionEngineImageId] = useState("");
+  const [completionBottomImageId, setCompletionBottomImageId] = useState("");
+  const [isSavingCompletionEvidence, setIsSavingCompletionEvidence] = useState(false);
   const [finalInspectionChecks, setFinalInspectionChecks] = useState({
     testDrive: false,
     clusterWarning: false,
-    carWash: false,
     tyreCheck: false,
     computerReset: false,
     protectiveShields: false,
   });
-  const [finalInspectionCarOutVideoId, setFinalInspectionCarOutVideoId] = useState("");
+  const [finalInspectionCarPhotos, setFinalInspectionCarPhotos] = useState({
+    front: "",
+    rear: "",
+    right: "",
+    left: "",
+  });
+  const [finalInspectionRemarks, setFinalInspectionRemarks] = useState("");
+  const [finalInspectionPartStatusByItemId, setFinalInspectionPartStatusByItemId] = useState<
+    Record<string, "" | "verified" | "rework">
+  >({});
+  const [finalInspectionReworkNote, setFinalInspectionReworkNote] = useState("");
   const [isSavingFinalInspection, setIsSavingFinalInspection] = useState(false);
-  const [isVerifyingJobCard, setIsVerifyingJobCard] = useState(false);
+  const [carWashMedia, setCarWashMedia] = useState({
+    front: "",
+    rear: "",
+    right: "",
+    left: "",
+    video: "",
+  });
+  const [carWashNotes, setCarWashNotes] = useState("");
+  const [isSavingCarWash, setIsSavingCarWash] = useState(false);
   const [additionalItemName, setAdditionalItemName] = useState("");
   const [additionalItemMode, setAdditionalItemMode] = useState("recommended");
   const [additionalItemImageId, setAdditionalItemImageId] = useState("");
@@ -131,6 +149,8 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
           setPreCheckYear(
             String(card?.model_year ?? draft?.inspectionYear ?? "").trim()
           );
+          setCompletionEngineImageId(String(draft?.jobCardEngineImageId ?? ""));
+          setCompletionBottomImageId(String(draft?.jobCardBottomImageId ?? ""));
           setCollectCarSourceMedia({
             front: String(sourceMedia.front ?? ""),
             rear: String(sourceMedia.rear ?? ""),
@@ -160,16 +180,59 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
             video: String(rejectNote.video ?? ""),
           });
           setPreWorkNote(String(card?.pre_work_note ?? ""));
-          setWorkingVideoId(String(card?.working_video_id ?? ""));
           setFinalInspectionChecks({
             testDrive: Boolean(card?.final_inspection_test_drive),
             clusterWarning: Boolean(card?.final_inspection_cluster_warning),
-            carWash: Boolean(card?.final_inspection_car_wash),
             tyreCheck: Boolean(card?.final_inspection_tyre_check),
             computerReset: Boolean(card?.final_inspection_computer_reset),
             protectiveShields: Boolean(card?.final_inspection_protective_shields),
           });
-          setFinalInspectionCarOutVideoId(String(card?.final_inspection_car_out_video_id ?? ""));
+          const finalPhotos = (draft?.jobCardFinalInspectionCarPhotos ?? {}) as Record<string, string>;
+          setFinalInspectionCarPhotos({
+            front: String(finalPhotos.front ?? ""),
+            rear: String(finalPhotos.rear ?? ""),
+            right: String(finalPhotos.right ?? ""),
+            left: String(finalPhotos.left ?? ""),
+          });
+          setFinalInspectionRemarks(String(draft?.jobCardFinalInspectionRemarks ?? card?.final_inspection_remarks ?? ""));
+          const rework = (draft?.jobCardFinalInspectionRework ?? null) as
+            | { lineItemIds?: string[]; note?: string }
+            | null;
+          const draftPartStatuses =
+            draft?.jobCardFinalInspectionPartStatuses &&
+            typeof draft.jobCardFinalInspectionPartStatuses === "object"
+              ? (draft.jobCardFinalInspectionPartStatuses as Record<string, unknown>)
+              : null;
+          if (draftPartStatuses) {
+            const mapped: Record<string, "" | "verified" | "rework"> = {};
+            Object.entries(draftPartStatuses).forEach(([itemId, status]) => {
+              const normalized = String(status ?? "").toLowerCase();
+              mapped[String(itemId)] = normalized === "rework" ? "rework" : normalized === "verified" ? "verified" : "";
+            });
+            setFinalInspectionPartStatusByItemId(mapped);
+          } else {
+            const reworkSet = new Set(
+              Array.isArray(rework?.lineItemIds) ? rework!.lineItemIds.map((id) => String(id)) : []
+            );
+            const fallback: Record<string, "" | "verified" | "rework"> = {};
+            const loadedItems = Array.isArray(json?.data?.items) ? json.data.items : [];
+            loadedItems.forEach((row: any) => {
+              const itemId = String(row?.id ?? "");
+              if (!itemId) return;
+              fallback[itemId] = reworkSet.has(itemId) ? "rework" : "";
+            });
+            setFinalInspectionPartStatusByItemId(fallback);
+          }
+          setFinalInspectionReworkNote(String(rework?.note ?? ""));
+          const washMedia = (draft?.jobCardCarWashMedia ?? {}) as Record<string, string>;
+          setCarWashMedia({
+            front: String(washMedia.front ?? ""),
+            rear: String(washMedia.rear ?? ""),
+            right: String(washMedia.right ?? ""),
+            left: String(washMedia.left ?? ""),
+            video: String(washMedia.video ?? ""),
+          });
+          setCarWashNotes(String(draft?.jobCardCarWashNotes ?? ""));
         }
       } catch (err) {
         if (!cancelled) {
@@ -216,6 +279,15 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
     () => items.filter((item) => Number(item.is_add ?? 0) !== 1),
     [items]
   );
+  const requiredPrimaryItems = useMemo(
+    () =>
+      primaryItems.filter((item) => {
+        const approval = String(item.customer_approval_status ?? "").toLowerCase();
+        const status = String(item.status ?? "").toLowerCase();
+        return approval === "approved" || status === "approved";
+      }),
+    [primaryItems]
+  );
 
   const carLabel = useMemo(() => {
     if (!jobCard) return "";
@@ -231,14 +303,14 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
   const isAssignedWorkshop =
     !workshopBranchId || !assignedBranchId ? true : workshopBranchId === assignedBranchId;
   const canProgressByQuote = workshopQuoteStatus === "accepted" || workshopQuoteStatus === "verified";
-  const isJobVerified = workshopQuoteStatus === "verified";
   const canProgressJobCard = canProgressByQuote && isAssignedWorkshop;
   const isPreWorkDone = Boolean(jobCard?.pre_work_checked_at);
   const isJobStarted = Boolean(jobCard?.start_at);
   const isJobCompleted = Boolean(jobCard?.complete_at);
-  const hasWorkingVideo = workingVideoId.trim().length > 0;
-  const hasSavedWorkingVideo = String(jobCard?.working_video_id ?? "").trim().length > 0;
+  const hasCompletionEngineImage = completionEngineImageId.trim().length > 0;
+  const hasCompletionBottomImage = completionBottomImageId.trim().length > 0;
   const isFinalInspectionDone = Boolean(jobCard?.final_inspection_at);
+  const isCarWashDone = Boolean(jobCard?.final_inspection_car_wash);
   const isCollectCarDone = Boolean(jobCard?.collect_car_at);
   const carMediaCounts = useMemo(() => {
     const entries = carMediaKeys
@@ -270,12 +342,12 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
   };
   const itemsForReceivedChecks = useMemo(
     () =>
-      primaryItems.filter((item) => {
+      requiredPrimaryItems.filter((item) => {
         const isAdditional = Number(item.is_add ?? 0) === 1;
         const itemStatus = String(item.po_status ?? item.order_status ?? "").toLowerCase();
         return !(isAdditional && itemStatus === "pending");
       }),
-    [primaryItems]
+    [requiredPrimaryItems]
   );
   const atLeastOnePartReceived = useMemo(() => {
     if (itemsForReceivedChecks.length === 0) return true;
@@ -312,6 +384,14 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
     () => items.filter((item) => Number(item.is_add ?? 0) === 1),
     [items]
   );
+  const approvedPartsFinalizationPending = useMemo(
+    () =>
+      requiredPrimaryItems.filter((item) => {
+        const status = normalizeReceiveStatus(item);
+        return status !== "Received" || !String(item.part_pic ?? "").trim() || !String(item.scrap_pic ?? "").trim();
+      }),
+    [requiredPrimaryItems]
+  );
   const quoteSummary = useMemo(() => {
     const lines = quoteRemarks
       .split("\n")
@@ -329,12 +409,16 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
     };
   }, [quoteRemarks]);
   const partPicMissingCount = useMemo(
-    () => primaryItems.filter((item) => !(item.part_pic ?? "")).length,
-    [primaryItems]
+    () => requiredPrimaryItems.filter((item) => !(item.part_pic ?? "")).length,
+    [requiredPrimaryItems]
+  );
+  const scrapPicMissingCount = useMemo(
+    () => requiredPrimaryItems.filter((item) => !(item.scrap_pic ?? "")).length,
+    [requiredPrimaryItems]
   );
   const requiredUploadsPending = partPicMissingCount;
   const isEvidenceDone =
-    partPicMissingCount === 0 && primaryItems.length > 0;
+    partPicMissingCount === 0 && requiredPrimaryItems.length > 0;
   const receivedPartPicMissingCount = useMemo(
     () => receivedItems.filter((item) => !(item.part_pic ?? "")).length,
     [receivedItems]
@@ -350,15 +434,56 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
   const isEvidenceStep = activeWizardStep === "evidence";
   const isCompleteStep = activeWizardStep === "complete";
   const isFinalInspectionStep = activeWizardStep === "final_inspection";
-  const isVerificationStep = activeWizardStep === "verification";
+  const isCarWashStep = activeWizardStep === "car_wash";
+  const finalInspectionRequiredItemIds = useMemo(
+    () => requiredPrimaryItems.map((item) => String(item.id ?? "")).filter(Boolean),
+    [requiredPrimaryItems]
+  );
+  const finalInspectionReworkLineItemIds = useMemo(
+    () =>
+      finalInspectionRequiredItemIds.filter(
+        (itemId) => finalInspectionPartStatusByItemId[itemId] === "rework"
+      ),
+    [finalInspectionPartStatusByItemId, finalInspectionRequiredItemIds]
+  );
+  const isFinalInspectionPartDecisionDone = useMemo(
+    () =>
+      finalInspectionRequiredItemIds.every(
+        (itemId) => finalInspectionPartStatusByItemId[itemId] === "verified" || finalInspectionPartStatusByItemId[itemId] === "rework"
+      ),
+    [finalInspectionPartStatusByItemId, finalInspectionRequiredItemIds]
+  );
+  const isFinalInspectionChecklistDone = Object.values(finalInspectionChecks).every(Boolean);
+  const isFinalInspectionPhotosDone =
+    finalInspectionCarPhotos.front.trim().length > 0 &&
+    finalInspectionCarPhotos.rear.trim().length > 0 &&
+    finalInspectionCarPhotos.right.trim().length > 0 &&
+    finalInspectionCarPhotos.left.trim().length > 0;
+  const isFinalInspectionReworkValid =
+    finalInspectionReworkLineItemIds.length === 0 || finalInspectionReworkNote.trim().length > 0;
+  const canSaveFinalInspectionNow =
+    isJobCompleted &&
+    approvedPartsFinalizationPending.length === 0 &&
+    isFinalInspectionChecklistDone &&
+    isFinalInspectionPhotosDone &&
+    isFinalInspectionPartDecisionDone &&
+    isFinalInspectionReworkValid &&
+    !isFinalInspectionDone;
+  const isCarWashMediaDone =
+    carWashMedia.front.trim().length > 0 &&
+    carWashMedia.rear.trim().length > 0 &&
+    carWashMedia.right.trim().length > 0 &&
+    carWashMedia.left.trim().length > 0 &&
+    carWashMedia.video.trim().length > 0;
+  const canSaveCarWashNow =
+    isJobCompleted && isFinalInspectionDone && isCarWashMediaDone && !isCarWashDone;
   const showPartsTable =
     isPreWorkStep ||
     isPartsReceiveStep ||
     isStartStep ||
     isEvidenceStep ||
     isCompleteStep ||
-    isFinalInspectionStep ||
-    isVerificationStep;
+    isFinalInspectionStep;
   const progressSteps = useMemo(
     () => [
       { key: "quote", label: "Quote Accepted", done: canProgressByQuote },
@@ -369,7 +494,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
       { key: "evidence", label: "Evidence Upload", done: isEvidenceDone },
       { key: "complete", label: "Completed", done: isJobCompleted },
       { key: "final_inspection", label: "Final Inspection", done: isFinalInspectionDone },
-      { key: "verification", label: "Verification", done: isJobVerified },
+      { key: "car_wash", label: "Car Wash", done: isCarWashDone },
     ],
     [
       canProgressByQuote,
@@ -380,7 +505,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
       isEvidenceDone,
       isJobCompleted,
       isFinalInspectionDone,
-      isJobVerified,
+      isCarWashDone,
     ]
   );
   const currentProgressIndex = useMemo(() => {
@@ -415,20 +540,32 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
       return [
         { label: "Job started", done: isJobStarted },
         { label: "All required parts fully received", done: allRequiredPartsFullyReceived },
-        { label: "Received part photos uploaded", done: hasAllReceivedPartPictures },
-        { label: "Working video uploaded", done: hasSavedWorkingVideo },
+        { label: "Engine image uploaded", done: hasCompletionEngineImage },
+        { label: "Bottom image uploaded", done: hasCompletionBottomImage },
+        { label: "All parts scrap images uploaded", done: scrapPicMissingCount === 0 },
       ];
     }
-    if (activeWizardStep === "verification") {
+    if (activeWizardStep === "car_wash") {
       return [
         { label: "Job completed", done: isJobCompleted },
         { label: "Final inspection done", done: isFinalInspectionDone },
+        { label: "Car wash images uploaded", done: carWashMedia.front.trim().length > 0 && carWashMedia.rear.trim().length > 0 && carWashMedia.right.trim().length > 0 && carWashMedia.left.trim().length > 0 },
+        { label: "Car wash video uploaded", done: carWashMedia.video.trim().length > 0 },
       ];
     }
     return [
       { label: "Job completed", done: isJobCompleted },
+      { label: "All approved parts finalized", done: approvedPartsFinalizationPending.length === 0 },
+      { label: "Verify/Re-Work selected for each approved part", done: isFinalInspectionPartDecisionDone },
       { label: "Checklist all verified", done: Object.values(finalInspectionChecks).every(Boolean) },
-      { label: "Car out video uploaded", done: finalInspectionCarOutVideoId.trim().length > 0 },
+      {
+        label: "Final car photos uploaded",
+        done:
+          finalInspectionCarPhotos.front.trim().length > 0 &&
+          finalInspectionCarPhotos.rear.trim().length > 0 &&
+          finalInspectionCarPhotos.right.trim().length > 0 &&
+          finalInspectionCarPhotos.left.trim().length > 0,
+      },
     ];
   }, [
     activeWizardStep,
@@ -439,11 +576,23 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
     isPreWorkDone,
     allRequiredPartsFullyReceived,
     hasAllReceivedPartPictures,
-    hasSavedWorkingVideo,
+    hasCompletionEngineImage,
+    hasCompletionBottomImage,
+    scrapPicMissingCount,
     isJobCompleted,
     isFinalInspectionDone,
+    carWashMedia.front,
+    carWashMedia.rear,
+    carWashMedia.right,
+    carWashMedia.left,
+    carWashMedia.video,
+    approvedPartsFinalizationPending.length,
+    isFinalInspectionPartDecisionDone,
     finalInspectionChecks,
-    finalInspectionCarOutVideoId,
+    finalInspectionCarPhotos.front,
+    finalInspectionCarPhotos.rear,
+    finalInspectionCarPhotos.right,
+    finalInspectionCarPhotos.left,
   ]);
   const unmetRequirementCount = activeStageRequirements.filter((req) => !req.done).length;
 
@@ -458,6 +607,20 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
     const timer = setTimeout(() => setToastMessage(null), 2500);
     return () => clearTimeout(timer);
   }, [toastMessage]);
+
+  useEffect(() => {
+    setFinalInspectionPartStatusByItemId((prev) => {
+      const next: Record<string, "" | "verified" | "rework"> = { ...prev };
+      let changed = false;
+      finalInspectionRequiredItemIds.forEach((itemId) => {
+        if (!(itemId in next)) {
+          next[itemId] = "";
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [finalInspectionRequiredItemIds]);
 
   async function startJobCard() {
     try {
@@ -524,7 +687,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
     }
   }
 
-  async function updateItemPic(lineItemId: string, field: "partPic", fileId: string | null) {
+  async function updateItemPic(lineItemId: string, field: "partPic" | "scrapPic", fileId: string | null) {
     try {
       const res = await fetch(
         `/api/company/${companyId}/workshop/job-cards/${jobCardId}/line-items/${lineItemId}`,
@@ -557,6 +720,36 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
     }
   }
 
+  async function saveCompletionEvidence() {
+    if (!completionEngineImageId.trim() || !completionBottomImageId.trim()) {
+      setToastMessage({ type: "error", text: "Engine image and bottom image are required." });
+      return;
+    }
+    setIsSavingCompletionEvidence(true);
+    try {
+      const res = await fetch(`/api/company/${companyId}/workshop/job-cards/${jobCardId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "completion_evidence",
+          engineImageId: completionEngineImageId.trim(),
+          bottomImageId: completionBottomImageId.trim(),
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(json?.error || "Failed to save completion evidence.");
+      }
+      setCompletionEngineImageId(String(json?.data?.engineImageId ?? completionEngineImageId).trim());
+      setCompletionBottomImageId(String(json?.data?.bottomImageId ?? completionBottomImageId).trim());
+      setToastMessage({ type: "success", text: "Completion evidence saved." });
+    } catch (err: any) {
+      setToastMessage({ type: "error", text: err?.message ?? "Failed to save completion evidence." });
+    } finally {
+      setIsSavingCompletionEvidence(false);
+    }
+  }
+
   async function updateItemReceiveStatus(
     lineItemId: string,
     nextStatus: "Received" | "Returned" | "Partially Received",
@@ -586,6 +779,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
         const json = await res.json().catch(() => ({}));
         throw new Error(json?.error || "Failed to update receive status.");
       }
+      const json = await res.json().catch(() => ({}));
       setState((prev) => {
         if (prev.status !== "loaded") return prev;
         return {
@@ -762,47 +956,6 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
     }
   }
 
-  async function saveWorkingVideo() {
-    if (!workingVideoId.trim()) {
-      setToastMessage({ type: "error", text: "Working video is required." });
-      return;
-    }
-    setIsSavingWorkingVideo(true);
-    try {
-      const res = await fetch(`/api/company/${companyId}/workshop/job-cards/${jobCardId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "working_video",
-          workingVideoId: workingVideoId.trim(),
-        }),
-      });
-      if (!res.ok) {
-        const json = await res.json().catch(() => ({}));
-        throw new Error(json?.error || "Failed to save working video.");
-      }
-      const json = await res.json().catch(() => ({}));
-      setState((prev) => {
-        if (prev.status !== "loaded") return prev;
-        return {
-          ...prev,
-          data: {
-            ...prev.data,
-            jobCard: {
-              ...prev.data.jobCard,
-              working_video_id: json?.data?.working_video_id ?? workingVideoId.trim(),
-            },
-          },
-        };
-      });
-      setToastMessage({ type: "success", text: "Working video saved." });
-    } catch (err: any) {
-      setToastMessage({ type: "error", text: err?.message ?? "Failed to save working video." });
-    } finally {
-      setIsSavingWorkingVideo(false);
-    }
-  }
-
   async function addAdditionalLineItem() {
     const itemName = additionalItemName.trim();
     if (!itemName) {
@@ -890,12 +1043,29 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
       setToastMessage({ type: "error", text: "Complete the job before final inspection." });
       return;
     }
+    if (approvedPartsFinalizationPending.length > 0) {
+      setToastMessage({ type: "error", text: "Finalize all approved parts before final inspection." });
+      return;
+    }
     if (!Object.values(finalInspectionChecks).every(Boolean)) {
       setToastMessage({ type: "error", text: "Verify all final inspection checklist items." });
       return;
     }
-    if (!finalInspectionCarOutVideoId.trim()) {
-      setToastMessage({ type: "error", text: "Car out video is required." });
+    if (
+      !finalInspectionCarPhotos.front.trim() ||
+      !finalInspectionCarPhotos.rear.trim() ||
+      !finalInspectionCarPhotos.right.trim() ||
+      !finalInspectionCarPhotos.left.trim()
+    ) {
+      setToastMessage({ type: "error", text: "Upload front, rear, right and left car photos." });
+      return;
+    }
+    if (!isFinalInspectionPartDecisionDone) {
+      setToastMessage({ type: "error", text: "Select Verify/Re-Work status for all approved parts." });
+      return;
+    }
+    if (finalInspectionReworkLineItemIds.length > 0 && !finalInspectionReworkNote.trim()) {
+      setToastMessage({ type: "error", text: "Add rework note before reopening." });
       return;
     }
     setIsSavingFinalInspection(true);
@@ -906,7 +1076,12 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
         body: JSON.stringify({
           action: "final_inspection",
           checks: finalInspectionChecks,
-          carOutVideoId: finalInspectionCarOutVideoId.trim(),
+          finalInspectionCarPhotos,
+          finalInspectionRemarks: finalInspectionRemarks.trim() || null,
+          finalInspectionPartStatuses: finalInspectionPartStatusByItemId,
+          reworkRequired: finalInspectionReworkLineItemIds.length > 0,
+          reworkNote: finalInspectionReworkNote.trim() || null,
+          reworkLineItemIds: finalInspectionReworkLineItemIds,
         }),
       });
       const json = await res.json().catch(() => ({}));
@@ -925,22 +1100,38 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                 json?.data?.final_inspection_test_drive ?? finalInspectionChecks.testDrive,
               final_inspection_cluster_warning:
                 json?.data?.final_inspection_cluster_warning ?? finalInspectionChecks.clusterWarning,
-              final_inspection_car_wash:
-                json?.data?.final_inspection_car_wash ?? finalInspectionChecks.carWash,
+              final_inspection_car_wash: false,
               final_inspection_tyre_check:
                 json?.data?.final_inspection_tyre_check ?? finalInspectionChecks.tyreCheck,
               final_inspection_computer_reset:
                 json?.data?.final_inspection_computer_reset ?? finalInspectionChecks.computerReset,
               final_inspection_protective_shields:
                 json?.data?.final_inspection_protective_shields ?? finalInspectionChecks.protectiveShields,
-              final_inspection_car_out_video_id:
-                json?.data?.final_inspection_car_out_video_id ?? finalInspectionCarOutVideoId.trim(),
-              final_inspection_at: json?.data?.final_inspection_at ?? new Date().toISOString(),
+              final_inspection_car_out_video_id: null,
+              final_inspection_remarks:
+                json?.data?.final_inspection_remarks ?? (finalInspectionRemarks.trim() || null),
+              final_inspection_at:
+                json?.data?.reopened_for_rework
+                  ? null
+                  : json?.data?.final_inspection_at ?? new Date().toISOString(),
+              complete_at:
+                json?.data?.reopened_for_rework
+                  ? null
+                  : prev.data.jobCard?.complete_at ?? null,
+              status:
+                json?.data?.reopened_for_rework
+                  ? "Pending"
+                  : prev.data.jobCard?.status ?? "Completed",
             },
           },
         };
       });
-      setToastMessage({ type: "success", text: "Final inspection saved." });
+      setToastMessage({
+        type: "success",
+        text: json?.data?.reopened_for_rework
+          ? "Rework flagged. Job card reopened."
+          : "Final inspection saved.",
+      });
     } catch (err: any) {
       setToastMessage({ type: "error", text: err?.message ?? "Failed to save final inspection." });
     } finally {
@@ -948,17 +1139,29 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
     }
   }
 
-  async function verifyJobCard() {
-    setIsVerifyingJobCard(true);
+  async function saveCarWashStage() {
+    if (!isJobCompleted || !isFinalInspectionDone) {
+      setToastMessage({ type: "error", text: "Complete job and final inspection before car wash." });
+      return;
+    }
+    if (!isCarWashMediaDone) {
+      setToastMessage({ type: "error", text: "Upload all car wash images and video." });
+      return;
+    }
+    setIsSavingCarWash(true);
     try {
       const res = await fetch(`/api/company/${companyId}/workshop/job-cards/${jobCardId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "verify" }),
+        body: JSON.stringify({
+          action: "car_wash",
+          carWashMedia,
+          carWashNotes: carWashNotes.trim() || null,
+        }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(json?.error || "Failed to verify job card.");
+        throw new Error(json?.error || "Failed to save car wash stage.");
       }
       setState((prev) => {
         if (prev.status !== "loaded") return prev;
@@ -968,16 +1171,17 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
             ...prev.data,
             jobCard: {
               ...prev.data.jobCard,
-              workshop_quote_status: "verified",
+              final_inspection_car_wash: true,
+              updated_at: json?.data?.updated_at ?? new Date().toISOString(),
             },
           },
         };
       });
-      setToastMessage({ type: "success", text: "Job card verified." });
+      setToastMessage({ type: "success", text: "Car wash stage completed." });
     } catch (err: any) {
-      setToastMessage({ type: "error", text: err?.message ?? "Failed to verify job card." });
+      setToastMessage({ type: "error", text: err?.message ?? "Failed to save car wash stage." });
     } finally {
-      setIsVerifyingJobCard(false);
+      setIsSavingCarWash(false);
     }
   }
 
@@ -1490,35 +1694,54 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                     />
                   </div>
                   <div className="space-y-2 rounded-md border border-cyan-500/30 bg-cyan-500/5 p-3">
-                    <div className="text-xs font-semibold uppercase tracking-wide text-cyan-200">Working Video</div>
-                    <FileUploader
-                      label=""
-                      kind="video"
-                      value={workingVideoId}
-                      onChange={(id) => setWorkingVideoId(id ?? "")}
-                      buttonOnly
-                      showPreview
-                      buttonClassName="h-8 px-3 text-[10px]"
-                      containerClassName="w-fit"
-                      previewClassName="h-[120px] w-[180px]"
-                      chooseLabel="Upload Working Video"
-                      replaceLabel="Replace Working Video"
-                    />
+                    <div className="text-xs font-semibold uppercase tracking-wide text-cyan-200">
+                      Completion Evidence (Mandatory)
+                    </div>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <div>
+                        <div className="mb-1 text-[11px] text-white/70">Engine Image</div>
+                        <FileUploader
+                          label=""
+                          kind="image"
+                          value={completionEngineImageId}
+                          onChange={(id) => setCompletionEngineImageId(id ?? "")}
+                          buttonOnly
+                          showPreview
+                          buttonClassName="h-8 px-3 text-[10px]"
+                          containerClassName="w-fit"
+                          previewClassName="h-[120px] w-[120px]"
+                          chooseLabel="Upload Engine Image"
+                          replaceLabel="Replace Engine Image"
+                        />
+                      </div>
+                      <div>
+                        <div className="mb-1 text-[11px] text-white/70">Bottom Image</div>
+                        <FileUploader
+                          label=""
+                          kind="image"
+                          value={completionBottomImageId}
+                          onChange={(id) => setCompletionBottomImageId(id ?? "")}
+                          buttonOnly
+                          showPreview
+                          buttonClassName="h-8 px-3 text-[10px]"
+                          containerClassName="w-fit"
+                          previewClassName="h-[120px] w-[120px]"
+                          chooseLabel="Upload Bottom Image"
+                          replaceLabel="Replace Bottom Image"
+                        />
+                      </div>
+                    </div>
                     <div className="flex items-center justify-between">
                       <div className="text-[11px] text-white/70">
-                        {hasSavedWorkingVideo
-                          ? "Working video uploaded and saved."
-                          : hasWorkingVideo
-                          ? "Click Save Working Video to persist it."
-                          : "Working video is mandatory before completion."}
+                        Save engine and bottom images before completion.
                       </div>
                       <button
                         type="button"
                         className="rounded-md bg-cyan-500 px-3 py-1.5 text-xs font-semibold text-slate-900 disabled:opacity-60"
-                        onClick={saveWorkingVideo}
-                        disabled={isSavingWorkingVideo}
+                        onClick={saveCompletionEvidence}
+                        disabled={isSavingCompletionEvidence}
                       >
-                        {isSavingWorkingVideo ? "Saving..." : "Save Working Video"}
+                        {isSavingCompletionEvidence ? "Saving..." : "Save Evidence"}
                       </button>
                     </div>
                   </div>
@@ -1527,6 +1750,10 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
               {isFinalInspectionStep && (
                 <div className="space-y-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3">
                   <div className="text-xs font-semibold uppercase tracking-wide text-emerald-200">Final Inspection</div>
+                  <div className="rounded-md border border-white/10 bg-black/20 px-2.5 py-2 text-[11px] text-white/75">
+                    1) Verify all approved parts are finalized. 2) Upload final car photos and notes.
+                    3) Complete checklist. 4) If rework is needed, reopen job card.
+                  </div>
                   <div className="grid gap-2 text-[11px] md:grid-cols-3">
                     <label className="inline-flex items-center gap-2">
                       <input
@@ -1550,16 +1777,6 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                         }
                       />
                       <span>Cluster Warning</span>
-                    </label>
-                    <label className="inline-flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={finalInspectionChecks.carWash}
-                        onChange={(e) =>
-                          setFinalInspectionChecks((prev) => ({ ...prev, carWash: e.target.checked }))
-                        }
-                      />
-                      <span>Car Wash</span>
                     </label>
                     <label className="inline-flex items-center gap-2">
                       <input
@@ -1598,33 +1815,114 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                       <span>Protective Shields</span>
                     </label>
                   </div>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div>
+                      <div className="mb-1 text-[11px] text-white/70">Front Photo</div>
+                      <FileUploader
+                        label=""
+                        kind="image"
+                        value={finalInspectionCarPhotos.front}
+                        onChange={(id) =>
+                          setFinalInspectionCarPhotos((prev) => ({ ...prev, front: id ?? "" }))
+                        }
+                        buttonOnly
+                        showPreview
+                        buttonClassName="h-8 px-3 text-[10px]"
+                        containerClassName="w-fit"
+                        previewClassName="h-[120px] w-[120px]"
+                        chooseLabel="Upload Front"
+                        replaceLabel="Replace Front"
+                      />
+                    </div>
+                    <div>
+                      <div className="mb-1 text-[11px] text-white/70">Rear Photo</div>
+                      <FileUploader
+                        label=""
+                        kind="image"
+                        value={finalInspectionCarPhotos.rear}
+                        onChange={(id) =>
+                          setFinalInspectionCarPhotos((prev) => ({ ...prev, rear: id ?? "" }))
+                        }
+                        buttonOnly
+                        showPreview
+                        buttonClassName="h-8 px-3 text-[10px]"
+                        containerClassName="w-fit"
+                        previewClassName="h-[120px] w-[120px]"
+                        chooseLabel="Upload Rear"
+                        replaceLabel="Replace Rear"
+                      />
+                    </div>
+                    <div>
+                      <div className="mb-1 text-[11px] text-white/70">Right Photo</div>
+                      <FileUploader
+                        label=""
+                        kind="image"
+                        value={finalInspectionCarPhotos.right}
+                        onChange={(id) =>
+                          setFinalInspectionCarPhotos((prev) => ({ ...prev, right: id ?? "" }))
+                        }
+                        buttonOnly
+                        showPreview
+                        buttonClassName="h-8 px-3 text-[10px]"
+                        containerClassName="w-fit"
+                        previewClassName="h-[120px] w-[120px]"
+                        chooseLabel="Upload Right"
+                        replaceLabel="Replace Right"
+                      />
+                    </div>
+                    <div>
+                      <div className="mb-1 text-[11px] text-white/70">Left Photo</div>
+                      <FileUploader
+                        label=""
+                        kind="image"
+                        value={finalInspectionCarPhotos.left}
+                        onChange={(id) =>
+                          setFinalInspectionCarPhotos((prev) => ({ ...prev, left: id ?? "" }))
+                        }
+                        buttonOnly
+                        showPreview
+                        buttonClassName="h-8 px-3 text-[10px]"
+                        containerClassName="w-fit"
+                        previewClassName="h-[120px] w-[120px]"
+                        chooseLabel="Upload Left"
+                        replaceLabel="Replace Left"
+                      />
+                    </div>
+                  </div>
                   <div className="space-y-1">
-                    <div className="text-[11px] font-semibold text-white/80">Car Out Video</div>
-                    <FileUploader
-                      label=""
-                      kind="video"
-                      value={finalInspectionCarOutVideoId}
-                      onChange={(id) => setFinalInspectionCarOutVideoId(id ?? "")}
-                      buttonOnly
-                      showPreview
-                      buttonClassName="h-8 px-3 text-[10px]"
-                      containerClassName="w-fit"
-                      previewClassName="h-[120px] w-[180px]"
-                      chooseLabel="Upload Car Out Video"
-                      replaceLabel="Replace Car Out Video"
+                    <div className="text-[11px] font-semibold text-white/80">Final Notes (optional)</div>
+                    <textarea
+                      className={`${theme.input} h-20 resize-none`}
+                      value={finalInspectionRemarks}
+                      onChange={(e) => setFinalInspectionRemarks(e.target.value)}
+                      placeholder="Example: oil marks under vehicle, paint marks need wash/polish..."
                     />
+                  </div>
+                  <div className="space-y-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-2.5">
+                    <div className="text-[11px] text-amber-200">
+                      Rework is controlled from the parts table column <span className="font-semibold">Verify / Re-Work</span>.
+                      If any part is marked Re-Work, job card will be reopened after save.
+                    </div>
+                    {finalInspectionReworkLineItemIds.length > 0 ? (
+                      <textarea
+                        className={`${theme.input} h-20 resize-none`}
+                        value={finalInspectionReworkNote}
+                        onChange={(e) => setFinalInspectionReworkNote(e.target.value)}
+                        placeholder="Mandatory for rework: explain what needs rework and why."
+                      />
+                    ) : null}
                   </div>
                   <div className="flex items-center justify-between">
                     <div className="text-[11px] text-white/70">
                       {isFinalInspectionDone
                         ? `Completed at ${new Date(jobCard?.final_inspection_at).toLocaleString()}`
-                        : "All checks and car out video are required."}
+                        : "All checklist items and final car photos are required."}
                     </div>
                     <button
                       type="button"
                       className="rounded-md bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-slate-900 disabled:opacity-60"
                       onClick={saveFinalInspection}
-                      disabled={isSavingFinalInspection || isFinalInspectionDone}
+                      disabled={isSavingFinalInspection || isFinalInspectionDone || !canSaveFinalInspectionNow}
                     >
                       {isSavingFinalInspection
                         ? "Saving..."
@@ -1635,27 +1933,154 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                   </div>
                 </div>
               )}
-              {isVerificationStep && (
-                <div className="space-y-2 rounded-md border border-violet-500/30 bg-violet-500/5 p-3">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-violet-200">
-                    Verification
+              {isCarWashStep && (
+                <div className="space-y-3 rounded-md border border-cyan-500/30 bg-cyan-500/5 p-3">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-cyan-200">Car Wash</div>
+                  <div className="rounded-md border border-white/10 bg-black/20 px-2.5 py-2 text-[11px] text-white/75">
+                    Upload post-wash car images and video. This stage is mandatory to finish workshop flow.
                   </div>
-                  <div className="text-[11px] text-white/70">
-                    Verify the job card only after completion and final inspection are done.
+                  <div className="space-y-2 rounded-md border border-white/10 bg-black/20 p-2.5">
+                    <div className="text-[11px] font-semibold text-white/80">Reference Car Media</div>
+                    <div className="grid gap-2 md:grid-cols-5">
+                      {(["front", "rear", "right", "left"] as const).map((key) => {
+                        const fileId = finalInspectionCarPhotos[key] || collectCarSourceMedia[key];
+                        return (
+                          <div key={`reference-${key}`} className="rounded border border-white/10 p-1">
+                            <div className="mb-1 text-[10px] uppercase text-white/60">{key}</div>
+                            {fileId ? (
+                              <img
+                                className="h-20 w-full rounded object-cover"
+                                src={`/api/files/${fileId}`}
+                                alt={`Reference ${key}`}
+                              />
+                            ) : (
+                              <div className="h-20 rounded border border-dashed border-white/10 bg-white/[0.02]" />
+                            )}
+                          </div>
+                        );
+                      })}
+                      <div className="rounded border border-white/10 p-1 md:col-span-1">
+                        <div className="mb-1 text-[10px] uppercase text-white/60">video</div>
+                        {collectCarSourceMedia.video ? (
+                          <video
+                            className="h-20 w-full rounded object-cover"
+                            src={`/api/files/${collectCarSourceMedia.video}`}
+                            controls
+                            preload="metadata"
+                          />
+                        ) : (
+                          <div className="h-20 rounded border border-dashed border-white/10 bg-white/[0.02]" />
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <div className="grid gap-2 text-[11px] md:grid-cols-2">
-                    <div className="rounded-md border border-white/10 bg-black/20 px-2.5 py-2">
-                      <div className="text-white/60">Job Status</div>
-                      <div className="font-semibold text-white">{isJobCompleted ? "Completed" : "Pending"}</div>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div>
+                      <div className="mb-1 text-[11px] text-white/70">Wash Front Image</div>
+                      <FileUploader
+                        label=""
+                        kind="image"
+                        value={carWashMedia.front}
+                        onChange={(id) => setCarWashMedia((prev) => ({ ...prev, front: id ?? "" }))}
+                        buttonOnly
+                        showPreview
+                        buttonClassName="h-8 px-3 text-[10px]"
+                        containerClassName="w-fit"
+                        previewClassName="h-[120px] w-[120px]"
+                        chooseLabel="Upload Front"
+                        replaceLabel="Replace Front"
+                      />
                     </div>
-                    <div className="rounded-md border border-white/10 bg-black/20 px-2.5 py-2">
-                      <div className="text-white/60">Final Inspection</div>
-                      <div className="font-semibold text-white">{isFinalInspectionDone ? "Done" : "Pending"}</div>
+                    <div>
+                      <div className="mb-1 text-[11px] text-white/70">Wash Rear Image</div>
+                      <FileUploader
+                        label=""
+                        kind="image"
+                        value={carWashMedia.rear}
+                        onChange={(id) => setCarWashMedia((prev) => ({ ...prev, rear: id ?? "" }))}
+                        buttonOnly
+                        showPreview
+                        buttonClassName="h-8 px-3 text-[10px]"
+                        containerClassName="w-fit"
+                        previewClassName="h-[120px] w-[120px]"
+                        chooseLabel="Upload Rear"
+                        replaceLabel="Replace Rear"
+                      />
                     </div>
+                    <div>
+                      <div className="mb-1 text-[11px] text-white/70">Wash Right Image</div>
+                      <FileUploader
+                        label=""
+                        kind="image"
+                        value={carWashMedia.right}
+                        onChange={(id) => setCarWashMedia((prev) => ({ ...prev, right: id ?? "" }))}
+                        buttonOnly
+                        showPreview
+                        buttonClassName="h-8 px-3 text-[10px]"
+                        containerClassName="w-fit"
+                        previewClassName="h-[120px] w-[120px]"
+                        chooseLabel="Upload Right"
+                        replaceLabel="Replace Right"
+                      />
+                    </div>
+                    <div>
+                      <div className="mb-1 text-[11px] text-white/70">Wash Left Image</div>
+                      <FileUploader
+                        label=""
+                        kind="image"
+                        value={carWashMedia.left}
+                        onChange={(id) => setCarWashMedia((prev) => ({ ...prev, left: id ?? "" }))}
+                        buttonOnly
+                        showPreview
+                        buttonClassName="h-8 px-3 text-[10px]"
+                        containerClassName="w-fit"
+                        previewClassName="h-[120px] w-[120px]"
+                        chooseLabel="Upload Left"
+                        replaceLabel="Replace Left"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="text-[11px] font-semibold text-white/80">Car Wash Video</div>
+                    <FileUploader
+                      label=""
+                      kind="video"
+                      value={carWashMedia.video}
+                      onChange={(id) => setCarWashMedia((prev) => ({ ...prev, video: id ?? "" }))}
+                      buttonOnly
+                      showPreview
+                      buttonClassName="h-8 px-3 text-[10px]"
+                      containerClassName="w-fit"
+                      previewClassName="h-[120px] w-[180px]"
+                      chooseLabel="Upload Wash Video"
+                      replaceLabel="Replace Wash Video"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <div className="text-[11px] font-semibold text-white/80">Car Wash Notes (optional)</div>
+                    <textarea
+                      className={`${theme.input} h-20 resize-none`}
+                      value={carWashNotes}
+                      onChange={(e) => setCarWashNotes(e.target.value)}
+                      placeholder="Optional note after wash."
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="text-[11px] text-white/70">
+                      {isCarWashDone ? "Car wash stage completed." : "All images + video are mandatory."}
+                    </div>
+                    <button
+                      type="button"
+                      className="rounded-md bg-cyan-500 px-3 py-1.5 text-xs font-semibold text-slate-900 disabled:opacity-60"
+                      onClick={saveCarWashStage}
+                      disabled={isSavingCarWash || isCarWashDone || !canSaveCarWashNow}
+                    >
+                      {isSavingCarWash ? "Saving..." : isCarWashDone ? "Car Wash Done" : "Complete Car Wash"}
+                    </button>
                   </div>
                 </div>
               )}
-              {(isStartStep || isCompleteStep || isFinalInspectionStep) && (
+              {(isStartStep || isCompleteStep || isFinalInspectionStep || isCarWashStep) && (
                 <div className="grid gap-3 lg:grid-cols-4">
                   <div className="space-y-1 lg:col-span-2">
                     <div className="text-xs font-semibold">Lead Advisor</div>
@@ -1688,13 +2113,20 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                       <th className="px-2 py-1 text-left">Quantity</th>
                       <th className="px-2 py-1 text-left">Order Status</th>
                       <th className="px-2 py-1 text-left">Part Pic</th>
+                      {isCompleteStep ? <th className="px-2 py-1 text-left">Scrap Pic</th> : null}
                       <th className="px-2 py-1 text-left">Receive Status</th>
+                      {isFinalInspectionStep ? <th className="px-2 py-1 text-left">Verify / Re-Work</th> : null}
                     </tr>
                   </thead>
                   <tbody>
                     {primaryItems.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="px-3 py-3 text-xs text-muted-foreground">
+                        <td
+                          colSpan={
+                            (isCompleteStep ? 9 : 8) + (isFinalInspectionStep ? 1 : 0)
+                          }
+                          className="px-3 py-3 text-xs text-muted-foreground"
+                        >
                           No parts assigned yet.
                         </td>
                       </tr>
@@ -1706,6 +2138,11 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                         const isSavingStatus = Boolean(savingReceiveByItemId[itemId]);
                         const isProcurementLinked = Boolean(item.procurement_linked);
                         const qtyInput = String(receiveQtyByItemId[itemId] ?? "");
+                        const itemQty = Math.max(0, Number(item.quantity ?? 0));
+                        const visibleStatusActions =
+                          itemQty <= 1
+                            ? statusActionMeta.filter((status) => status.value !== "Partially Received")
+                            : statusActionMeta;
                         return (
                         <tr key={item.id ?? idx} className="border-b border-border/60 last:border-0">
                           <td className="px-2 py-1">{idx + 1}</td>
@@ -1779,11 +2216,35 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                               )}
                             </div>
                           </td>
+                          {isCompleteStep ? (
+                            <td className="px-2 py-1">
+                              <FileUploader
+                                label=""
+                                kind="image"
+                                value={item.scrap_pic ?? ""}
+                                onChange={(id) => updateItemPic(item.id, "scrapPic", id ?? null)}
+                                buttonOnly
+                                showPreview
+                                buttonClassName="h-8 px-3 text-[10px]"
+                                containerClassName="w-fit"
+                                previewClassName="h-[100px] w-[100px]"
+                                chooseLabel="Upload Scrap Photo"
+                                replaceLabel="Replace Scrap Photo"
+                              />
+                              <div className="mt-1 text-[10px]">
+                                {(item.scrap_pic ?? "") ? (
+                                  <span className="text-emerald-300">Done</span>
+                                ) : (
+                                  <span className="text-amber-300">Missing</span>
+                                )}
+                              </div>
+                            </td>
+                          ) : null}
                           <td className="px-2 py-1">
                             {isPartsReceiveStep && Number(item.is_add ?? 0) !== 1 ? (
                               <div className="min-w-[230px] space-y-1">
-                                <div className="grid grid-cols-3 gap-1">
-                                  {statusActionMeta.map((status) => {
+                                <div className={`grid gap-1 ${visibleStatusActions.length === 2 ? "grid-cols-2" : "grid-cols-3"}`}>
+                                  {visibleStatusActions.map((status) => {
                                     const isActive = selectedStatus === status.value;
                                     return (
                                       <button
@@ -1872,6 +2333,55 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                               <span className="text-[10px] text-white/70">{currentStatus}</span>
                             )}
                           </td>
+                          {isFinalInspectionStep ? (
+                            <td className="px-2 py-1">
+                              {finalInspectionRequiredItemIds.includes(itemId) ? (
+                                <div className="min-w-[210px] space-y-1">
+                                  <div className="grid grid-cols-2 gap-1">
+                                    <button
+                                      type="button"
+                                      className={`h-8 rounded-md border px-2 text-[10px] font-semibold transition ${
+                                        finalInspectionPartStatusByItemId[itemId] === "verified"
+                                          ? "border-emerald-400/60 bg-emerald-500/20 text-emerald-200"
+                                          : "border-white/15 bg-white/[0.03] text-white/70 hover:bg-white/[0.08]"
+                                      }`}
+                                      onClick={() =>
+                                        setFinalInspectionPartStatusByItemId((prev) => ({
+                                          ...prev,
+                                          [itemId]:
+                                            prev[itemId] === "verified" ? "" : "verified",
+                                        }))
+                                      }
+                                    >
+                                      Verify
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className={`h-8 rounded-md border px-2 text-[10px] font-semibold transition ${
+                                        finalInspectionPartStatusByItemId[itemId] === "rework"
+                                          ? "border-amber-400/60 bg-amber-500/20 text-amber-200"
+                                          : "border-white/15 bg-white/[0.03] text-white/70 hover:bg-white/[0.08]"
+                                      }`}
+                                      onClick={() =>
+                                        setFinalInspectionPartStatusByItemId((prev) => ({
+                                          ...prev,
+                                          [itemId]:
+                                            prev[itemId] === "rework" ? "" : "rework",
+                                        }))
+                                      }
+                                    >
+                                      Re-Work
+                                    </button>
+                                  </div>
+                                  {!finalInspectionPartStatusByItemId[itemId] ? (
+                                    <div className="text-[10px] text-amber-300">Mandatory</div>
+                                  ) : null}
+                                </div>
+                              ) : (
+                                <span className="text-[10px] text-white/45">-</span>
+                              )}
+                            </td>
+                          ) : null}
                         </tr>
                       );
                       })
@@ -1889,7 +2399,21 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                         </td>
                         <td className="px-2 py-2 text-amber-300">Pending Uploads: {requiredUploadsPending}</td>
                         <td className="px-2 py-2 text-amber-300">Part Missing: {partPicMissingCount}</td>
+                        {isCompleteStep ? (
+                          <td className="px-2 py-2 text-amber-300">Scrap Missing: {scrapPicMissingCount}</td>
+                        ) : null}
                         <td className="px-2 py-2 text-white/60">Receive status per line item</td>
+                        {isFinalInspectionStep ? (
+                          <td className="px-2 py-2 text-amber-300">
+                            Pending decision:{" "}
+                            {Math.max(
+                              0,
+                              finalInspectionRequiredItemIds.filter(
+                                (itemId) => !finalInspectionPartStatusByItemId[itemId]
+                              ).length
+                            )}
+                          </td>
+                        ) : null}
                       </tr>
                     </tfoot>
                   ) : null}
@@ -1907,6 +2431,11 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                       const isSavingStatus = Boolean(savingReceiveByItemId[itemId]);
                       const isProcurementLinked = Boolean(item.procurement_linked);
                       const qtyInput = String(receiveQtyByItemId[itemId] ?? "");
+                      const itemQty = Math.max(0, Number(item.quantity ?? 0));
+                      const visibleStatusActions =
+                        itemQty <= 1
+                          ? statusActionMeta.filter((status) => status.value !== "Partially Received")
+                          : statusActionMeta;
                       return (
                       <div key={item.id ?? idx} className="rounded-md border border-white/10 bg-white/[0.02] p-3 text-xs">
                         <div className="mb-2 flex items-center justify-between gap-2">
@@ -1954,8 +2483,8 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                               <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-white/70">
                                 Receive Status
                               </div>
-                              <div className="grid grid-cols-3 gap-1">
-                                {statusActionMeta.map((status) => {
+                              <div className={`grid gap-1 ${visibleStatusActions.length === 2 ? "grid-cols-2" : "grid-cols-3"}`}>
+                                {visibleStatusActions.map((status) => {
                                   const isActive = selectedStatus === status.value;
                                   return (
                                     <button
@@ -2041,6 +2570,50 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                               </div>
                             </div>
                           )}
+                          {isFinalInspectionStep && finalInspectionRequiredItemIds.includes(itemId) && (
+                            <div>
+                              <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-white/70">
+                                Verify / Re-Work
+                              </div>
+                              <div className="grid grid-cols-2 gap-1">
+                                <button
+                                  type="button"
+                                  className={`h-9 rounded-md border px-2 text-[10px] font-semibold transition ${
+                                    finalInspectionPartStatusByItemId[itemId] === "verified"
+                                      ? "border-emerald-400/60 bg-emerald-500/20 text-emerald-200"
+                                      : "border-white/15 bg-white/[0.03] text-white/70 hover:bg-white/[0.08]"
+                                  }`}
+                                  onClick={() =>
+                                    setFinalInspectionPartStatusByItemId((prev) => ({
+                                      ...prev,
+                                      [itemId]: prev[itemId] === "verified" ? "" : "verified",
+                                    }))
+                                  }
+                                >
+                                  Verify
+                                </button>
+                                <button
+                                  type="button"
+                                  className={`h-9 rounded-md border px-2 text-[10px] font-semibold transition ${
+                                    finalInspectionPartStatusByItemId[itemId] === "rework"
+                                      ? "border-amber-400/60 bg-amber-500/20 text-amber-200"
+                                      : "border-white/15 bg-white/[0.03] text-white/70 hover:bg-white/[0.08]"
+                                  }`}
+                                  onClick={() =>
+                                    setFinalInspectionPartStatusByItemId((prev) => ({
+                                      ...prev,
+                                      [itemId]: prev[itemId] === "rework" ? "" : "rework",
+                                    }))
+                                  }
+                                >
+                                  Re-Work
+                                </button>
+                              </div>
+                              {!finalInspectionPartStatusByItemId[itemId] ? (
+                                <div className="mt-1 text-[10px] text-amber-300">Mandatory selection</div>
+                              ) : null}
+                            </div>
+                          )}
                           <div>
                             <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-white/70">Part Pic</div>
                             <FileUploader
@@ -2064,6 +2637,31 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                               )}
                             </div>
                           </div>
+                          {isCompleteStep ? (
+                            <div>
+                              <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-white/70">Scrap Pic</div>
+                              <FileUploader
+                                label=""
+                                kind="image"
+                                value={item.scrap_pic ?? ""}
+                                onChange={(id) => updateItemPic(item.id, "scrapPic", id ?? null)}
+                                buttonOnly
+                                showPreview
+                                buttonClassName="h-9 w-full px-3 text-[10px]"
+                                containerClassName="w-full"
+                                previewClassName="h-[100px] w-[100px]"
+                                chooseLabel="Upload Scrap Photo"
+                                replaceLabel="Replace Scrap Photo"
+                              />
+                              <div className="mt-1 text-[10px]">
+                                {(item.scrap_pic ?? "") ? (
+                                  <span className="text-emerald-300">Done</span>
+                                ) : (
+                                  <span className="text-amber-300">Missing</span>
+                                )}
+                              </div>
+                            </div>
+                          ) : null}
                         </div>
                       </div>
                     );
@@ -2092,15 +2690,21 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                 <div className="text-[11px] text-white/80 md:text-left">
                   {unmetRequirementCount > 0
                     ? `${unmetRequirementCount} stage requirement${unmetRequirementCount > 1 ? "s" : ""} pending`
-                    : isVerificationStep
-                    ? isJobVerified
-                      ? "Job card is verified"
-                      : "Complete verification for this job card"
+                    : isCarWashStep
+                    ? isCarWashDone
+                      ? "Car wash stage completed"
+                      : "Upload wash images and wash video"
                     : isFinalInspectionStep
                     ? isFinalInspectionDone
                       ? "Final inspection completed"
                       : "Complete final inspection checklist and remarks"
-                    : isEvidenceStep || isCompleteStep
+                    : isCompleteStep
+                    ? !hasCompletionEngineImage || !hasCompletionBottomImage
+                      ? "Engine and bottom images are required"
+                      : scrapPicMissingCount > 0
+                      ? `${scrapPicMissingCount} scrap image${scrapPicMissingCount > 1 ? "s" : ""} pending`
+                      : "Completion evidence ready"
+                    : isEvidenceStep
                     ? requiredUploadsPending > 0
                     ? `${requiredUploadsPending} required upload${requiredUploadsPending > 1 ? "s" : ""} pending`
                     : "All required uploads completed"
@@ -2176,9 +2780,18 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                   canProgressJobCard &&
                   jobCard?.start_at &&
                   !jobCard?.complete_at &&
-                  !hasSavedWorkingVideo && (
+                  (!hasCompletionEngineImage || !hasCompletionBottomImage) && (
                   <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[11px] font-medium text-amber-200">
-                    Upload and save working video before completing.
+                    Upload and save engine and bottom images before completing.
+                  </div>
+                )}
+                {isCompleteStep &&
+                  canProgressJobCard &&
+                  jobCard?.start_at &&
+                  !jobCard?.complete_at &&
+                  scrapPicMissingCount > 0 && (
+                  <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[11px] font-medium text-amber-200">
+                    Upload scrap images for all parts before completing.
                   </div>
                 )}
                 {isCompleteStep && canProgressJobCard && jobCard?.start_at && !jobCard?.complete_at && (
@@ -2186,7 +2799,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                     type="button"
                     className="rounded-md bg-amber-400 px-5 py-2 text-xs font-semibold text-slate-900 disabled:cursor-not-allowed disabled:opacity-60 md:min-w-[130px]"
                     onClick={completeJobCard}
-                    disabled={!hasSavedWorkingVideo || !allRequiredPartsFullyReceived}
+                    disabled={!allRequiredPartsFullyReceived || !hasCompletionEngineImage || !hasCompletionBottomImage || scrapPicMissingCount > 0}
                   >
                     Complete Job
                   </button>
@@ -2200,26 +2813,24 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                     className="rounded-md bg-emerald-500 px-5 py-2 text-xs font-semibold text-slate-900 disabled:cursor-not-allowed disabled:opacity-60 md:min-w-[160px]"
                     onClick={saveFinalInspection}
                     disabled={
-                      isSavingFinalInspection ||
-                      !Object.values(finalInspectionChecks).every(Boolean) ||
-                      !finalInspectionCarOutVideoId.trim()
+                      isSavingFinalInspection || !canSaveFinalInspectionNow
                     }
                   >
                     {isSavingFinalInspection ? "Saving..." : "Save Final Inspection"}
                   </button>
                 )}
-                {isVerificationStep &&
+                {isCarWashStep &&
                   canProgressJobCard &&
                   jobCard?.complete_at &&
                   jobCard?.final_inspection_at &&
-                  !isJobVerified && (
+                  !isCarWashDone && (
                   <button
                     type="button"
-                    className="rounded-md bg-violet-500 px-5 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60 md:min-w-[160px]"
-                    onClick={verifyJobCard}
-                    disabled={isVerifyingJobCard}
+                    className="rounded-md bg-cyan-500 px-5 py-2 text-xs font-semibold text-slate-900 disabled:cursor-not-allowed disabled:opacity-60 md:min-w-[160px]"
+                    onClick={saveCarWashStage}
+                    disabled={isSavingCarWash || !canSaveCarWashNow}
                   >
-                    {isVerifyingJobCard ? "Verifying..." : "Verify Job Card"}
+                    {isSavingCarWash ? "Saving..." : "Complete Car Wash"}
                   </button>
                 )}
                 </div>

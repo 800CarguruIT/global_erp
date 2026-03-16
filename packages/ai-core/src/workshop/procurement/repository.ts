@@ -14,7 +14,7 @@ import {
   receivePartsForEstimateItem,
   receivePartsForInventoryRequestItem,
 } from "../parts/repository";
-import { createTransferDraft } from "../inventory/repository";
+import { approveTransfer, createLocation, createTransferDraft } from "../inventory/repository";
 
 function mapPoRow(row: any): PurchaseOrder {
   return {
@@ -1221,16 +1221,20 @@ export async function updatePurchaseOrderHeader(
   }>
 ): Promise<void> {
   const sql = getSql();
-  await sql/* sql */ `
-    UPDATE purchase_orders
-    SET ${sql({
+  const updatePayload = Object.fromEntries(
+    Object.entries({
       status: patch.status,
       expected_date: patch.expectedDate,
       notes: patch.notes,
       po_type: patch.poType,
       vendor_name: patch.vendorName,
       vendor_contact: patch.vendorContact,
-    })}
+    }).filter(([, value]) => value !== undefined)
+  );
+  if (!Object.keys(updatePayload).length) return;
+  await sql/* sql */ `
+    UPDATE purchase_orders
+    SET ${sql(updatePayload)}
     WHERE company_id = ${companyId} AND id = ${poId}
   `;
 }
@@ -1338,6 +1342,7 @@ export async function receivePoItems(
   const poVendorId = (poMetaRows[0]?.vendor_id as string | undefined) ?? null;
   const poNumber = (poMetaRows[0]?.po_number as string | undefined) ?? "PO";
   const poNotes = String(poMetaRows[0]?.notes ?? "").trim();
+  const transferQtyByPartId = new Map<string, number>();
 
   function normalizePartNumber(raw?: string | null, fallback?: string | null): string {
     const base = (raw ?? fallback ?? "").trim();
@@ -1543,6 +1548,12 @@ export async function receivePoItems(
       }
     }
 
+    if (!isReturn && Number(entry.quantity ?? 0) > 0 && current.partsCatalogId) {
+      const partId = String(current.partsCatalogId);
+      const prevQty = transferQtyByPartId.get(partId) ?? 0;
+      transferQtyByPartId.set(partId, prevQty + Number(entry.quantity ?? 0));
+    }
+
     try {
       if (!isReturn) {
         await postGrnAccountingEntry({
@@ -1578,61 +1589,99 @@ export async function receivePoItems(
     WHERE id = ${poId}
   `;
 
-  if (newStatus === "received") {
+  if (transferQtyByPartId.size > 0) {
     try {
       const branchMatch = poNotes.match(/BRANCH:([0-9a-f-]{36})/i);
       const branchId = branchMatch?.[1] ?? null;
       if (branchId) {
-        const existingTransfer = await sql/* sql */ `
-          SELECT id
-          FROM inventory_transfer_orders
-          WHERE company_id = ${companyId}
-            AND notes = ${`AUTO-PO:${poId}`}
-          LIMIT 1
-        `;
-        if (!existingTransfer.length) {
-          const fromRows = await sql/* sql */ `
+        const transferItems = Array.from(transferQtyByPartId.entries())
+          .filter(([, qty]) => Number.isFinite(qty) && qty > 0)
+          .map(([partsCatalogId, quantity]) => ({
+            partsCatalogId,
+            quantity: Number(quantity),
+          }));
+        if (transferItems.length > 0) {
+          const receiptTag = transferItems
+            .map((item) => `${item.partsCatalogId}:${item.quantity}`)
+            .sort()
+            .join("|");
+          const transferNote = `AUTO-PO:${poId};BRANCH:${branchId};RECEIPT:${receiptTag}`;
+          const existingTransfer = await sql/* sql */ `
             SELECT id
-            FROM inventory_locations
+            FROM inventory_transfer_orders
             WHERE company_id = ${companyId}
-              AND location_type = 'warehouse'
-              AND branch_id IS NULL
-              AND is_active = TRUE
-            ORDER BY created_at ASC
+              AND notes = ${transferNote}
             LIMIT 1
           `;
-          const toRows = await sql/* sql */ `
-            SELECT id
-            FROM inventory_locations
-            WHERE company_id = ${companyId}
-              AND location_type = 'branch'
-              AND branch_id = ${branchId}
-              AND is_active = TRUE
-            ORDER BY created_at ASC
-            LIMIT 1
-          `;
-          const fromLocationId = (fromRows[0]?.id as string | undefined) ?? null;
-          const toLocationId = (toRows[0]?.id as string | undefined) ?? null;
-          const transferItems = poItems
-            .filter((item) => item.partsCatalogId && Number(item.receivedQty ?? 0) > 0)
-            .map((item) => ({
-              partsCatalogId: String(item.partsCatalogId),
-              quantity: Number(item.receivedQty ?? 0),
-            }));
-          if (fromLocationId && toLocationId && transferItems.length > 0) {
-            const transfer = await createTransferDraft(
-              companyId,
-              fromLocationId,
-              toLocationId,
-              transferItems,
-              userId ?? null
-            );
-            await sql/* sql */ `
-              UPDATE inventory_transfer_orders
-              SET notes = ${`AUTO-PO:${poId}`}
+          if (!existingTransfer.length) {
+            const fromRows = await sql/* sql */ `
+              SELECT id
+              FROM inventory_locations
               WHERE company_id = ${companyId}
-                AND id = ${transfer.transfer.id}
+                AND location_type = 'warehouse'
+                AND branch_id IS NULL
+                AND is_active = TRUE
+              ORDER BY created_at ASC
+              LIMIT 1
             `;
+            const fromLocationId = (fromRows[0]?.id as string | undefined) ?? null;
+            if (fromLocationId) {
+              let toLocationId: string | null = null;
+              const toRows = await sql/* sql */ `
+                SELECT id
+                FROM inventory_locations
+                WHERE company_id = ${companyId}
+                  AND location_type = 'branch'
+                  AND branch_id = ${branchId}
+                  AND is_active = TRUE
+                ORDER BY created_at ASC
+                LIMIT 1
+              `;
+              toLocationId = (toRows[0]?.id as string | undefined) ?? null;
+              if (!toLocationId) {
+                let branchName = `Assigned Workshop ${branchId.slice(0, 8)}`;
+                try {
+                  const branchRows = await sql/* sql */ `
+                    SELECT COALESCE(NULLIF(name, ''), NULLIF(branch_name, ''), NULLIF(title, '')) AS branch_name
+                    FROM branches
+                    WHERE company_id = ${companyId}
+                      AND id = ${branchId}
+                    LIMIT 1
+                  `;
+                  const resolvedName = String(branchRows[0]?.branch_name ?? "").trim();
+                  if (resolvedName) branchName = resolvedName;
+                } catch {
+                  // fallback name is enough if branch table shape is different
+                }
+                try {
+                  const createdLocation = await createLocation(companyId, {
+                    name: branchName,
+                    locationType: "branch",
+                    branchId,
+                  });
+                  toLocationId = createdLocation.id;
+                } catch {
+                  toLocationId = null;
+                }
+              }
+
+              if (toLocationId) {
+                const transfer = await createTransferDraft(
+                  companyId,
+                  fromLocationId,
+                  toLocationId,
+                  transferItems,
+                  userId ?? null
+                );
+                await sql/* sql */ `
+                  UPDATE inventory_transfer_orders
+                  SET notes = ${transferNote}
+                  WHERE company_id = ${companyId}
+                    AND id = ${transfer.transfer.id}
+                `;
+                await approveTransfer(companyId, transfer.transfer.id, userId ?? null);
+              }
+            }
           }
         }
       }
