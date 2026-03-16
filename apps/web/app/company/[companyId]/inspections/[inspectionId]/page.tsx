@@ -298,6 +298,7 @@ export function InspectionDetailPageClient({
   const [tyreSizeRear, setTyreSizeRear] = useState("");
   const [clusterImageId, setClusterImageId] = useState("");
   const [inspectionVin, setInspectionVin] = useState("");
+  const [inspectionPlate, setInspectionPlate] = useState("");
   const [inspectionMake, setInspectionMake] = useState("");
   const [inspectionModel, setInspectionModel] = useState("");
   const [inspectionYear, setInspectionYear] = useState("");
@@ -552,6 +553,17 @@ export function InspectionDetailPageClient({
         setTyreSizeRear(String(draft.tyreSizeRear ?? ""));
         setClusterImageId(String(draft.clusterImageId ?? ""));
         setInspectionVin(String(draft.inspectionVin ?? ""));
+        setInspectionPlate(
+          String(
+            draft.inspectionPlate ??
+              draft.carPlate ??
+              payload?.plate_number ??
+              payload?.plateNumber ??
+              payload?.car_plate_number ??
+              payload?.carPlateNumber ??
+              ""
+          )
+        );
         setInspectionMake(String(draft.inspectionMake ?? ""));
         setInspectionModel(String(draft.inspectionModel ?? ""));
         setInspectionYear(String(draft.inspectionYear ?? ""));
@@ -802,6 +814,11 @@ export function InspectionDetailPageClient({
     setVinCatalogParts([]);
     setVinCatalogGroups([]);
   }, [inspectionVin]);
+  useEffect(() => {
+    if (!inspectionPlate.trim() && leadPlate.trim()) {
+      setInspectionPlate(leadPlate.trim());
+    }
+  }, [inspectionPlate, leadPlate]);
   const currentStatus = String(inspection?.status ?? "pending").toLowerCase();
   const isWorkshopView = forceWorkshopView || searchParams.get("view") === "workshop" || Boolean(workshopBranchIdProp);
   const workshopBranchId = workshopBranchIdProp ?? searchParams.get("branchId");
@@ -905,6 +922,7 @@ export function InspectionDetailPageClient({
       tyreSizeRear,
       clusterImageId,
       inspectionVin: inspectionVin.trim().toUpperCase(),
+      inspectionPlate: inspectionPlate.trim(),
       inspectionMake: inspectionMake.trim(),
       inspectionModel: inspectionModel.trim(),
       inspectionYear: inspectionYear.trim(),
@@ -956,6 +974,7 @@ export function InspectionDetailPageClient({
       inspectionIssueEntries,
       inspectionMake,
       inspectionModel,
+      inspectionPlate,
       inspectionVin,
       inspectionYear,
       inspectionStep,
@@ -1218,16 +1237,24 @@ export function InspectionDetailPageClient({
       const localCars = Array.isArray(localJson?.data) ? localJson.data : [];
       const exact = localCars.find((row: any) => String(row?.vin ?? "").trim().toUpperCase() === vin);
       if (exact) {
-        setInspectionMake((prev) => prev || String(exact?.make ?? ""));
-        setInspectionModel((prev) => prev || String(exact?.model ?? ""));
-        setInspectionYear((prev) => prev || String(exact?.modelYear ?? exact?.model_year ?? ""));
+        const localMake = String(exact?.make ?? "").trim();
+        const localModel = String(exact?.model ?? "").trim();
+        const localYear = String(exact?.modelYear ?? exact?.model_year ?? "").trim();
+        const localPlate = String(exact?.plateNumber ?? exact?.plate_number ?? "").trim();
+        const hasLocalVehicleBasics = Boolean(localMake && localModel && localYear);
+        setInspectionMake((prev) => prev || localMake);
+        setInspectionModel((prev) => prev || localModel);
+        setInspectionYear((prev) => prev || localYear);
+        setInspectionPlate((prev) => prev || localPlate);
         setTyreSizeFront((prev) => prev || String(exact?.tyreSizeFront ?? exact?.tyre_size_front ?? ""));
         setTyreSizeRear((prev) => prev || String(exact?.tyreSizeBack ?? exact?.tyre_size_back ?? ""));
         if (!form.carInMileage && (exact?.mileage ?? null) !== null) {
           setForm((prev) => ({ ...prev, carInMileage: String(exact?.mileage ?? "") }));
         }
-        setVinLookupNote(`VIN found in database${exact?.code ? ` (${exact.code})` : ""}. Car data loaded.`);
-        return;
+        if (hasLocalVehicleBasics) {
+          setVinLookupNote(`VIN found in database${exact?.code ? ` (${exact.code})` : ""}. Car data loaded.`);
+          return;
+        }
       }
 
       if (!leadId) {
@@ -1246,9 +1273,9 @@ export function InspectionDetailPageClient({
       const vinJson = await vinRes.json().catch(() => ({}));
       const vinCar = vinJson?.data?.car ?? null;
       if (vinCar) {
-        setInspectionMake((prev) => prev || String(vinCar?.make ?? ""));
-        setInspectionModel((prev) => prev || String(vinCar?.model ?? ""));
-        setInspectionYear((prev) => prev || String(vinCar?.year ?? ""));
+        setInspectionMake((prev) => prev || String(vinCar?.make ?? vinCar?.brand?.name ?? ""));
+        setInspectionModel((prev) => prev || String(vinCar?.model ?? vinCar?.title ?? ""));
+        setInspectionYear((prev) => prev || String(vinCar?.year ?? vinCar?.modelYear ?? ""));
         setVinLookupNote("VIN decoded from catalog and vehicle fields auto-filled.");
       } else {
         setVinLookupNote("VIN lookup finished with no matched vehicle details.");
@@ -1430,7 +1457,8 @@ export function InspectionDetailPageClient({
     (Boolean((tyreSizeFront ?? "").trim()) &&
       Boolean((tyreSizeRear ?? "").trim()) &&
       Boolean((form.carInMileage ?? "").trim()) &&
-      Boolean((inspectionVin ?? "").trim()));
+      Boolean((inspectionVin ?? "").trim()) &&
+      Boolean((inspectionPlate ?? "").trim()));
   const hasUnsavedLineItems = parts.some((p) => !p.isSaved);
   const hasUnsavedChanges =
     !isReadOnly &&
@@ -1490,7 +1518,7 @@ export function InspectionDetailPageClient({
     }
     if (inspectionStep === 4) {
       return [
-        "Did you enter tyre size front/rear and mileage?",
+        "Did you enter car plate, tyre size front/rear and mileage?",
         "Did VIN lookup return make/model/year or an existing car match?",
       ];
     }
@@ -1528,8 +1556,24 @@ export function InspectionDetailPageClient({
         if (!res.ok) throw new Error(String(body?.error ?? "Failed to generate AI questions"));
         const questions = Array.isArray(body?.questions) ? (body.questions as LineItemAiQuestion[]) : [];
         const recommendation = String(body?.recommendation ?? "");
+        const aiDescription = String(body?.description ?? "").trim();
         if (questions.length > 0) {
           setLineItemAiQuestionsByRow((prev) => ({ ...prev, [rowKey]: questions }));
+        }
+        if (aiDescription) {
+          setParts((prev) =>
+            prev.map((row) => {
+              const currentRowKey = String(row.clientRowKey ?? row.id ?? "").trim();
+              if (currentRowKey !== rowKey) return row;
+              const currentDescription = String(row.description ?? "").trim();
+              const partCode = String(row.catalogPartCode ?? "").trim();
+              const shouldReplaceDescription =
+                !currentDescription ||
+                currentDescription.toLowerCase() === partCode.toLowerCase();
+              if (!shouldReplaceDescription) return row;
+              return { ...row, description: aiDescription, isSaved: false };
+            })
+          );
         }
         if (recommendation) {
           setLineItemAiRecommendationByRow((prev) => ({ ...prev, [rowKey]: recommendation }));
@@ -2326,7 +2370,7 @@ export function InspectionDetailPageClient({
       base?: Partial<(typeof parts)[number]>
     ) => ({
       part: partName,
-      description: base?.description || partCode,
+      description: base?.description || "",
       qty: base?.qty || "1",
       reason: base?.reason || "Mandatory",
       catalogGroupKey: groupKey,
@@ -2533,7 +2577,7 @@ export function InspectionDetailPageClient({
       if (rejectedMediaMissingReplacement) return "Upload replacement media for every rejected car image/video.";
       return "Complete car media review before moving to next step.";
     }
-    if (inspectionStep === 4 && !step4Complete) return "Complete tyre sizes, mileage and VIN.";
+    if (inspectionStep === 4 && !step4Complete) return "Complete car plate, tyre sizes, mileage and VIN.";
     if (inspectionStep === 5 && !step5Complete) {
       if (hasAnyProcessIssue && !processIssueNotesComplete) {
         return "Add description for each check marked as ISSUE.";
@@ -3547,24 +3591,35 @@ export function InspectionDetailPageClient({
                 <div className="mt-3 grid gap-3 lg:grid-cols-2">
                   <div>
                     <label className="text-xs font-semibold text-white/70">VIN</label>
+                    <div className="mt-1 flex flex-col gap-2 sm:flex-row">
+                      <input
+                        type="text"
+                        className={theme.input}
+                        value={inspectionVin}
+                        readOnly={isReadOnly || isCollectCarPending}
+                        onChange={(e) => setInspectionVin(e.target.value.toUpperCase())}
+                        placeholder="Enter VIN"
+                      />
+                      <button
+                        type="button"
+                        className="h-10 rounded-md bg-cyan-600 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white sm:whitespace-nowrap"
+                        disabled={isReadOnly || isCollectCarPending || vinLookupLoading}
+                        onClick={autoFillVehicleFromVin}
+                      >
+                        {vinLookupLoading ? "Checking VIN..." : "Check VIN"}
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-white/70">Car Plate</label>
                     <input
                       type="text"
                       className={theme.input}
-                      value={inspectionVin}
+                      value={inspectionPlate}
                       readOnly={isReadOnly || isCollectCarPending}
-                      onChange={(e) => setInspectionVin(e.target.value.toUpperCase())}
-                      placeholder="Enter VIN"
+                      onChange={(e) => setInspectionPlate(e.target.value)}
+                      placeholder="Enter car plate"
                     />
-                  </div>
-                  <div className="flex items-end">
-                    <button
-                      type="button"
-                      className="rounded-md bg-cyan-600 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white"
-                      disabled={isReadOnly || isCollectCarPending || vinLookupLoading}
-                      onClick={autoFillVehicleFromVin}
-                    >
-                      {vinLookupLoading ? "Checking VIN..." : "Check VIN and Fetch Data"}
-                    </button>
                   </div>
                   <div>
                     <label className="text-xs font-semibold text-white/70">Car Make</label>
@@ -3749,24 +3804,8 @@ export function InspectionDetailPageClient({
                               </div>
                             ))}
                           </div>
-                          <div className="mt-2 flex items-center justify-end gap-2">
-                            <button
-                              type="button"
-                              className={`rounded-md px-2.5 py-1 text-[11px] font-semibold ${
-                                processMediaVerified[item.key]
-                                  ? "bg-emerald-600 text-white"
-                                  : "bg-amber-600 text-white"
-                              }`}
-                              disabled={isReadOnly || isCollectCarPending}
-                              onClick={() =>
-                                setProcessMediaVerified((prev) => ({
-                                  ...prev,
-                                  [item.key]: !prev[item.key],
-                                }))
-                              }
-                            >
-                              {processMediaVerified[item.key] ? "Verified" : "Verify"}
-                            </button>
+                          <div className="mt-2 text-[11px] text-emerald-300">
+                            Media uploaded
                           </div>
                         </div>
                       )}
@@ -4213,7 +4252,7 @@ export function InspectionDetailPageClient({
                                               ...p,
                                               catalogPartCode: code,
                                               part: nextPartName,
-                                              description: p.description || (selected?.code ?? ""),
+                                              description: p.description || "",
                                               productId: null,
                                               productType: null,
                                               isSaved: false,
@@ -4645,13 +4684,6 @@ export function InspectionDetailPageClient({
             </div>
             <div className={`mt-4 ${inspectionStep === 6 ? "" : "hidden"}`}>
               <div className="report-print-hide mb-3 flex flex-wrap items-center justify-end gap-2">
-                <button
-                  type="button"
-                  className="rounded-md border border-white/20 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-white/90 hover:bg-white/10"
-                  onClick={printInspectionReport}
-                >
-                  Print Report
-                </button>
                 <button
                   type="button"
                   className="rounded-md bg-cyan-600 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-white"

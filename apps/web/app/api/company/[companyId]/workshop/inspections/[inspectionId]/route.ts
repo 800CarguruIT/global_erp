@@ -145,7 +145,7 @@ async function upsertInspectionCarAndLinks(args: {
         tyre_size_front = COALESCE(${tyreFront}, tyre_size_front),
         tyre_size_back = COALESCE(${tyreRear}, tyre_size_back),
         is_unregistered = CASE
-          WHEN ${plate} IS NOT NULL THEN false
+          WHEN COALESCE(${plate}::text, '') <> '' THEN false
           ELSE is_unregistered
         END,
         updated_at = now()
@@ -247,15 +247,35 @@ async function upsertInspectionCarAndLinks(args: {
   }
 
   if (args.leadId) {
+    const leadWorkflowPatch = {
+      inspectionVin: vin,
+      inspectionPlate: plate,
+      inspectionMake: make,
+      inspectionModel: model,
+      inspectionYear: modelYear ? String(modelYear) : null,
+      inspectionMileage: mileage ? String(mileage) : null,
+    };
+    const estimateMetaPatch = {
+      inspectionVin: vin,
+      carPlate: plate,
+      carMake: make,
+      carModel: model,
+      carYear: modelYear,
+      carMileage: mileage,
+    };
     await args.sql`
       UPDATE leads
-      SET car_id = ${carId}
+      SET
+        car_id = ${carId},
+        workflow_required = COALESCE(workflow_required, '{}'::jsonb) || ${JSON.stringify(leadWorkflowPatch)}::jsonb
       WHERE company_id = ${args.companyId}
         AND id = ${args.leadId}
     `;
     await args.sql`
       UPDATE estimates
-      SET car_id = COALESCE(car_id, ${carId})
+      SET
+        car_id = COALESCE(car_id, ${carId}),
+        meta = COALESCE(meta, '{}'::jsonb) || ${JSON.stringify(estimateMetaPatch)}::jsonb
       WHERE company_id = ${args.companyId}
         AND (
           inspection_id = ${args.inspectionId}
@@ -263,9 +283,19 @@ async function upsertInspectionCarAndLinks(args: {
         )
     `;
   } else {
+    const estimateMetaPatch = {
+      inspectionVin: vin,
+      carPlate: plate,
+      carMake: make,
+      carModel: model,
+      carYear: modelYear,
+      carMileage: mileage,
+    };
     await args.sql`
       UPDATE estimates
-      SET car_id = COALESCE(car_id, ${carId})
+      SET
+        car_id = COALESCE(car_id, ${carId}),
+        meta = COALESCE(meta, '{}'::jsonb) || ${JSON.stringify(estimateMetaPatch)}::jsonb
       WHERE company_id = ${args.companyId}
         AND inspection_id = ${args.inspectionId}
     `;
@@ -882,6 +912,28 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     aiSummaryPlain: body.aiSummaryPlain,
     draftPayload: body.draftPayload,
   };
+
+  const draftForValidation =
+    ((body?.draftPayload as Record<string, unknown> | undefined) ??
+      ((current?.draftPayload as Record<string, unknown> | undefined) ?? {})) as Record<string, unknown>;
+  const stepRaw = Number(draftForValidation?.inspectionStep ?? 1);
+  const effectiveStep = Number.isFinite(stepRaw) ? Math.trunc(stepRaw) : 1;
+  const effectiveStatus = String(body?.status ?? current?.status ?? "").toLowerCase();
+  const requiresPlateValidation =
+    effectiveStep >= 5 ||
+    effectiveStatus === "completed" ||
+    Boolean(body?.completeAt ?? body?.complete_at);
+  if (requiresPlateValidation) {
+    const requiredPlate =
+      normalizeTextValue(draftForValidation?.inspectionPlate) ??
+      normalizeTextValue(draftForValidation?.carPlate);
+    if (!requiredPlate) {
+      return NextResponse.json(
+        { error: "Car plate is required in Vehicle Data before proceeding." },
+        { status: 400 }
+      );
+    }
+  }
 
   await updateInspectionPartial(companyId, inspectionId, patch);
 

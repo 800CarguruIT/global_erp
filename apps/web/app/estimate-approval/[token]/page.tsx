@@ -35,6 +35,9 @@ type ApprovalPayload = {
     isExpired?: boolean;
     customerName: string | null;
     termsAccepted: boolean;
+    signatureDataUrl?: string | null;
+    jobCardId?: string | null;
+    purchaseOrderId?: string | null;
     selectedItemIds: string[];
     selectedTypeByItemId?: Record<string, "oe" | "oem" | "aftm" | "used">;
   };
@@ -158,6 +161,7 @@ export default function EstimateApprovalPage({ params }: Params) {
         setSelectedTypeByItemId(nextSelectedTypes);
         setCustomerName(String(data?.approval?.customerName ?? data?.estimate?.customerName ?? ""));
         setTermsAccepted(Boolean(data?.approval?.termsAccepted));
+        setSignatureDataUrl(String(data?.approval?.signatureDataUrl ?? ""));
         setSuccess(
           String(data?.approval?.status ?? "").toLowerCase() === "approved"
             ? `Already approved on ${formatDate(data?.approval?.approvedAt)}`
@@ -417,7 +421,7 @@ export default function EstimateApprovalPage({ params }: Params) {
               </label>
             </div>
 
-            <SignaturePad disabled={isAlreadyApproved || isExpired} onChange={setSignatureDataUrl} />
+            <SignaturePad disabled={isAlreadyApproved || isExpired} value={signatureDataUrl} onChange={setSignatureDataUrl} />
 
             <button
               type="submit"
@@ -433,7 +437,15 @@ export default function EstimateApprovalPage({ params }: Params) {
   );
 }
 
-function SignaturePad({ disabled, onChange }: { disabled?: boolean; onChange: (value: string) => void }) {
+function SignaturePad({
+  disabled,
+  value,
+  onChange,
+}: {
+  disabled?: boolean;
+  value?: string;
+  onChange: (value: string) => void;
+}) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [drawing, setDrawing] = useState(false);
   const [hasStroke, setHasStroke] = useState(false);
@@ -494,7 +506,15 @@ function SignaturePad({ disabled, onChange }: { disabled?: boolean; onChange: (v
   return (
     <div className="rounded-xl border border-white/10 p-3">
       <div className="mb-2 text-sm font-semibold">Signature</div>
+      {disabled && value ? (
+        <div className="mb-3 rounded-lg border border-emerald-400/30 bg-emerald-500/10 p-2 text-xs text-emerald-200">
+          Customer signature saved.
+        </div>
+      ) : null}
       <div className="overflow-hidden rounded-lg border border-white/15 bg-slate-950/60">
+        {disabled && value ? (
+          <img src={value} alt="Customer signature" className="h-44 w-full object-contain" />
+        ) : (
         <canvas
           ref={canvasRef}
           width={700}
@@ -508,6 +528,7 @@ function SignaturePad({ disabled, onChange }: { disabled?: boolean; onChange: (v
           onTouchMove={(e) => moveDraw(e.currentTarget, e)}
           onTouchEnd={(e) => endDraw(e.currentTarget)}
         />
+        )}
       </div>
       <div className="mt-2 flex items-center gap-2">
         <button

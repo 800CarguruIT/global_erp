@@ -78,13 +78,15 @@ ${answers ? `Inspector answers: ${JSON.stringify(answers)}` : "No answers yet. K
 Return strict JSON only:
 {
   "questions": [{ "id": "q1", "text": "...", "critical": true|false }],
-  "recommendation": "short practical recommendation based on answers or empty string if answers missing"
+  "recommendation": "short practical recommendation based on answers or empty string if answers missing",
+  "description": "one-line, plain, workshop-friendly issue description (no markdown)"
 }
 Rules:
 - Questions must be answerable by yes/no/na during inspection.
 - Keep question text very simple and clear (single sentence).
 - This is one-step question generation. Do not create follow-up or conditional questions.
 - Keep recommendation concise, action-oriented, and workshop-friendly.
+- Keep description concise and professional (max 120 chars), and do not repeat only part number.
 - Never return markdown.
 `;
 
@@ -95,7 +97,7 @@ Rules:
     });
 
     const raw = completion.choices[0]?.message?.content ?? "{}";
-    let parsed: { questions?: unknown; recommendation?: unknown } = {};
+    let parsed: { questions?: unknown; recommendation?: unknown; description?: unknown } = {};
     try {
       parsed = JSON.parse(raw);
     } catch {
@@ -104,10 +106,12 @@ Rules:
 
     const questions = safeArrayQuestions(parsed.questions);
     const recommendation = String(parsed.recommendation ?? "").trim();
+    const generatedDescription = String(parsed.description ?? "").trim();
 
     return NextResponse.json({
       questions: questions.length > 0 ? questions : existingQuestions.length > 0 ? existingQuestions : fallbackQuestions,
       recommendation,
+      description: generatedDescription,
       meta: { aiUsed: true, source: resolved.source },
     });
   } catch (err) {

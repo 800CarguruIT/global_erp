@@ -603,14 +603,17 @@ export async function markLineItemsOrderedByIds(
   inspectionId: string,
   lineItemIds: string[]
 ): Promise<number> {
-  if (!lineItemIds.length) return 0;
+  const normalizedIds = lineItemIds
+    .map((id) => String(id ?? "").trim())
+    .filter((id) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id));
+  if (!normalizedIds.length) return 0;
   const sql = getSql();
   const rows = await sql`
     UPDATE line_items
     SET part_ordered = 1,
         order_status = 'Ordered'
     WHERE inspection_id = ${inspectionId}
-      AND id = ANY(${sql.array(lineItemIds)})
+      AND id::text = ANY(${sql.array(normalizedIds)})
     RETURNING id
   `;
   return rows.length;

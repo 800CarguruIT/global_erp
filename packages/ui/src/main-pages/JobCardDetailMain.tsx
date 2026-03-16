@@ -102,6 +102,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
   const [productOptions, setProductOptions] = useState<ProductOption[]>([]);
   const [activeWizardStep, setActiveWizardStep] = useState("quote");
   const [savingReceiveByItemId, setSavingReceiveByItemId] = useState<Record<string, boolean>>({});
+  const [receiveQtyByItemId, setReceiveQtyByItemId] = useState<Record<string, string>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -289,6 +290,24 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
       ),
     [itemsForReceivedChecks]
   );
+  const notFullyReceivedItems = useMemo(
+    () =>
+      itemsForReceivedChecks.filter((item) => {
+        const linked = Boolean(item.procurement_linked);
+        const orderedQtyRaw = Number(item.procurement_po_qty ?? item.quantity ?? 0);
+        const receivedQtyRaw = Number(item.procurement_po_received_qty ?? 0);
+        const orderedQty = Number.isFinite(orderedQtyRaw) ? Math.max(0, orderedQtyRaw) : 0;
+        const receivedQty = Number.isFinite(receivedQtyRaw) ? Math.max(0, receivedQtyRaw) : 0;
+        if (!linked) return true;
+        if (orderedQty <= 0) return true;
+        return receivedQty + 1e-9 < orderedQty;
+      }),
+    [itemsForReceivedChecks]
+  );
+  const allRequiredPartsFullyReceived = useMemo(
+    () => notFullyReceivedItems.length === 0,
+    [notFullyReceivedItems]
+  );
   const additionalItems = useMemo(
     () => items.filter((item) => Number(item.is_add ?? 0) === 1),
     [items]
@@ -395,6 +414,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
     if (activeWizardStep === "complete") {
       return [
         { label: "Job started", done: isJobStarted },
+        { label: "All required parts fully received", done: allRequiredPartsFullyReceived },
         { label: "Received part photos uploaded", done: hasAllReceivedPartPictures },
         { label: "Working video uploaded", done: hasSavedWorkingVideo },
       ];
@@ -417,6 +437,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
     isCollectCarDone,
     isJobStarted,
     isPreWorkDone,
+    allRequiredPartsFullyReceived,
     hasAllReceivedPartPictures,
     hasSavedWorkingVideo,
     isJobCompleted,
@@ -538,16 +559,27 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
 
   async function updateItemReceiveStatus(
     lineItemId: string,
-    nextStatus: "Received" | "Returned" | "Partially Received"
+    nextStatus: "Received" | "Returned" | "Partially Received",
+    quantityText?: string
   ) {
     setSavingReceiveByItemId((prev) => ({ ...prev, [lineItemId]: true }));
     try {
+      const quantityNum = Number(String(quantityText ?? "").trim());
+      if ((nextStatus === "Partially Received" || nextStatus === "Returned") && (!Number.isFinite(quantityNum) || quantityNum <= 0)) {
+        throw new Error(nextStatus === "Returned" ? "Enter return quantity." : "Enter received quantity.");
+      }
       const res = await fetch(
         `/api/company/${companyId}/workshop/job-cards/${jobCardId}/line-items/${lineItemId}`,
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ receiveStatus: nextStatus }),
+          body: JSON.stringify({
+            receiveStatus: nextStatus,
+            quantity:
+              nextStatus === "Partially Received" || nextStatus === "Returned"
+                ? quantityNum
+                : undefined,
+          }),
         }
       );
       if (!res.ok) {
@@ -564,8 +596,30 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
               String(item.id) === String(lineItemId)
                 ? {
                     ...item,
-                    po_status: nextStatus,
-                    order_status: nextStatus === "Partially Received" ? "Ordered" : nextStatus,
+                    po_status: json?.data?.receive_status ?? nextStatus,
+                    order_status:
+                      json?.data?.order_status ??
+                      (nextStatus === "Partially Received" ? "Ordered" : nextStatus),
+                    procurement_linked:
+                      json?.data?.procurement?.linked ?? item.procurement_linked ?? false,
+                    procurement_po_id:
+                      json?.data?.procurement?.poId ?? item.procurement_po_id ?? null,
+                    procurement_po_item_id:
+                      json?.data?.procurement?.poItemId ?? item.procurement_po_item_id ?? null,
+                    procurement_po_status:
+                      json?.data?.procurement?.poStatus ?? item.procurement_po_status ?? null,
+                    procurement_po_item_status:
+                      json?.data?.procurement?.poItemStatus ?? item.procurement_po_item_status ?? null,
+                    procurement_po_qty:
+                      json?.data?.procurement?.poItemOrderedQty ?? item.procurement_po_qty ?? null,
+                    procurement_po_received_qty:
+                      json?.data?.procurement?.poItemReceivedQty ?? item.procurement_po_received_qty ?? null,
+                    procurement_latest_grn_number:
+                      json?.data?.procurement?.latestGrnNumber ?? item.procurement_latest_grn_number ?? null,
+                    procurement_inventory_moved:
+                      json?.data?.procurement?.inventoryMoved ?? item.procurement_inventory_moved ?? false,
+                    procurement_accounting_posted:
+                      json?.data?.procurement?.accountingPosted ?? item.procurement_accounting_posted ?? false,
                   }
                 : item
             ),
@@ -578,6 +632,19 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
     } finally {
       setSavingReceiveByItemId((prev) => ({ ...prev, [lineItemId]: false }));
     }
+  }
+
+  function handleReceiveStatusClick(
+    lineItemId: string,
+    nextStatus: "Received" | "Returned" | "Partially Received",
+    quantityText: string,
+    isProcurementLinked: boolean
+  ) {
+    if (!isProcurementLinked) {
+      setToastMessage({ type: "error", text: "Link this part to procurement PO first." });
+      return;
+    }
+    void updateItemReceiveStatus(lineItemId, nextStatus, quantityText);
   }
 
   async function saveCollectCarStage() {
@@ -1637,6 +1704,8 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                         const currentStatus = normalizeReceiveStatus(item);
                         const selectedStatus = currentStatus === "Ordered" ? "" : currentStatus;
                         const isSavingStatus = Boolean(savingReceiveByItemId[itemId]);
+                        const isProcurementLinked = Boolean(item.procurement_linked);
+                        const qtyInput = String(receiveQtyByItemId[itemId] ?? "");
                         return (
                         <tr key={item.id ?? idx} className="border-b border-border/60 last:border-0">
                           <td className="px-2 py-1">{idx + 1}</td>
@@ -1676,6 +1745,17 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                                 </>
                               );
                             })()}
+                            <div className="mt-1 flex items-center gap-1">
+                              <span
+                                className={`rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase ${
+                                  isProcurementLinked
+                                    ? "bg-emerald-500/15 text-emerald-300"
+                                    : "bg-rose-500/15 text-rose-300"
+                                }`}
+                              >
+                                {isProcurementLinked ? "Linked To PO" : "Not Linked"}
+                              </span>
+                            </div>
                           </td>
                           <td className="px-2 py-1">
                             <FileUploader
@@ -1714,7 +1794,14 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                                             ? status.activeClass
                                             : "border-white/15 bg-white/[0.03] text-white/70 hover:bg-white/[0.08]"
                                         }`}
-                                        onClick={() => updateItemReceiveStatus(itemId, status.value)}
+                                        onClick={() =>
+                                          handleReceiveStatusClick(
+                                            itemId,
+                                            status.value,
+                                            qtyInput,
+                                            isProcurementLinked
+                                          )
+                                        }
                                         disabled={isSavingStatus}
                                       >
                                         <span className="flex items-center justify-center gap-1">
@@ -1725,9 +1812,61 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                                     );
                                   })}
                                 </div>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="1"
+                                  className={`${theme.input} h-8 w-full text-[10px]`}
+                                  value={qtyInput}
+                                  onChange={(e) =>
+                                    setReceiveQtyByItemId((prev) => ({
+                                      ...prev,
+                                      [itemId]: e.target.value,
+                                    }))
+                                  }
+                                  placeholder="Qty for Partial/Return"
+                                  disabled={isSavingStatus || !isProcurementLinked}
+                                />
+                                {!isProcurementLinked ? (
+                                  <div className="text-[10px] text-rose-300">
+                                    Link this part to procurement PO first.
+                                  </div>
+                                ) : null}
                                 {isSavingStatus ? (
                                   <div className="text-[10px] text-cyan-300">Saving status...</div>
                                 ) : null}
+                                <div className="grid grid-cols-3 gap-1 text-[10px]">
+                                  <div className="rounded border border-white/10 bg-white/[0.03] px-2 py-1">
+                                    <div className="text-white/50">GRN</div>
+                                    <div className="truncate text-white/90">
+                                      {String(item.procurement_latest_grn_number ?? "-")}
+                                    </div>
+                                  </div>
+                                  <div className="rounded border border-white/10 bg-white/[0.03] px-2 py-1">
+                                    <div className="text-white/50">Inventory</div>
+                                    <div
+                                      className={
+                                        item.procurement_inventory_moved
+                                          ? "text-emerald-300"
+                                          : "text-amber-300"
+                                      }
+                                    >
+                                      {item.procurement_inventory_moved ? "Moved" : "Pending"}
+                                    </div>
+                                  </div>
+                                  <div className="rounded border border-white/10 bg-white/[0.03] px-2 py-1">
+                                    <div className="text-white/50">Accounting</div>
+                                    <div
+                                      className={
+                                        item.procurement_accounting_posted
+                                          ? "text-emerald-300"
+                                          : "text-amber-300"
+                                      }
+                                    >
+                                      {item.procurement_accounting_posted ? "Posted" : "Pending"}
+                                    </div>
+                                  </div>
+                                </div>
                               </div>
                             ) : (
                               <span className="text-[10px] text-white/70">{currentStatus}</span>
@@ -1766,6 +1905,8 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                       const currentStatus = normalizeReceiveStatus(item);
                       const selectedStatus = currentStatus === "Ordered" ? "" : currentStatus;
                       const isSavingStatus = Boolean(savingReceiveByItemId[itemId]);
+                      const isProcurementLinked = Boolean(item.procurement_linked);
+                      const qtyInput = String(receiveQtyByItemId[itemId] ?? "");
                       return (
                       <div key={item.id ?? idx} className="rounded-md border border-white/10 bg-white/[0.02] p-3 text-xs">
                         <div className="mb-2 flex items-center justify-between gap-2">
@@ -1780,6 +1921,17 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                             }`}
                           >
                             {String(item.po_status ?? item.order_status ?? "Ordered")}
+                          </span>
+                        </div>
+                        <div className="mb-2">
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase ${
+                              isProcurementLinked
+                                ? "bg-emerald-500/15 text-emerald-300"
+                                : "bg-rose-500/15 text-rose-300"
+                            }`}
+                          >
+                            {isProcurementLinked ? "Linked To PO" : "Not Linked"}
                           </span>
                         </div>
                         <div className="grid grid-cols-2 gap-2 text-[11px]">
@@ -1814,7 +1966,14 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                                           ? status.activeClass
                                           : "border-white/15 bg-white/[0.03] text-white/70 hover:bg-white/[0.08]"
                                       }`}
-                                      onClick={() => updateItemReceiveStatus(itemId, status.value)}
+                                      onClick={() =>
+                                        handleReceiveStatusClick(
+                                          itemId,
+                                          status.value,
+                                          qtyInput,
+                                          isProcurementLinked
+                                        )
+                                      }
                                       disabled={isSavingStatus}
                                     >
                                       <span className="flex items-center justify-center gap-1">
@@ -1825,9 +1984,61 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                                   );
                                 })}
                               </div>
+                              <input
+                                type="number"
+                                min="0"
+                                step="1"
+                                className={`${theme.input} mt-2 h-9 w-full text-[11px]`}
+                                value={qtyInput}
+                                onChange={(e) =>
+                                  setReceiveQtyByItemId((prev) => ({
+                                    ...prev,
+                                    [itemId]: e.target.value,
+                                  }))
+                                }
+                                placeholder="Qty for Partial/Return"
+                                disabled={isSavingStatus || !isProcurementLinked}
+                              />
+                              {!isProcurementLinked ? (
+                                <div className="mt-1 text-[10px] text-rose-300">
+                                  Link this part to procurement PO first.
+                                </div>
+                              ) : null}
                               {isSavingStatus ? (
                                 <div className="mt-1 text-[10px] text-cyan-300">Saving status...</div>
                               ) : null}
+                              <div className="mt-2 grid grid-cols-3 gap-1 text-[10px]">
+                                <div className="rounded border border-white/10 bg-white/[0.03] px-2 py-1">
+                                  <div className="text-white/50">GRN</div>
+                                  <div className="truncate text-white/90">
+                                    {String(item.procurement_latest_grn_number ?? "-")}
+                                  </div>
+                                </div>
+                                <div className="rounded border border-white/10 bg-white/[0.03] px-2 py-1">
+                                  <div className="text-white/50">Inventory</div>
+                                  <div
+                                    className={
+                                      item.procurement_inventory_moved
+                                        ? "text-emerald-300"
+                                        : "text-amber-300"
+                                    }
+                                  >
+                                    {item.procurement_inventory_moved ? "Moved" : "Pending"}
+                                  </div>
+                                </div>
+                                <div className="rounded border border-white/10 bg-white/[0.03] px-2 py-1">
+                                  <div className="text-white/50">Accounting</div>
+                                  <div
+                                    className={
+                                      item.procurement_accounting_posted
+                                        ? "text-emerald-300"
+                                        : "text-amber-300"
+                                    }
+                                  >
+                                    {item.procurement_accounting_posted ? "Posted" : "Pending"}
+                                  </div>
+                                </div>
+                              </div>
                             </div>
                           )}
                           <div>
@@ -1956,6 +2167,15 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                   canProgressJobCard &&
                   jobCard?.start_at &&
                   !jobCard?.complete_at &&
+                  !allRequiredPartsFullyReceived && (
+                  <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[11px] font-medium text-amber-200">
+                    All required parts must be fully received before completing the job.
+                  </div>
+                )}
+                {isCompleteStep &&
+                  canProgressJobCard &&
+                  jobCard?.start_at &&
+                  !jobCard?.complete_at &&
                   !hasSavedWorkingVideo && (
                   <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[11px] font-medium text-amber-200">
                     Upload and save working video before completing.
@@ -1966,7 +2186,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                     type="button"
                     className="rounded-md bg-amber-400 px-5 py-2 text-xs font-semibold text-slate-900 disabled:cursor-not-allowed disabled:opacity-60 md:min-w-[130px]"
                     onClick={completeJobCard}
-                    disabled={!hasSavedWorkingVideo}
+                    disabled={!hasSavedWorkingVideo || !allRequiredPartsFullyReceived}
                   >
                     Complete Job
                   </button>

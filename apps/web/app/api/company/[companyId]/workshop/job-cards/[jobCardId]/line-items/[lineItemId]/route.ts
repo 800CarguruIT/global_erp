@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSql } from "@repo/ai-core/db";
+import { receivePoItems } from "@repo/ai-core/workshop/procurement/repository";
 import { getCurrentUserIdFromRequest } from "@/lib/auth/current-user";
 import { getUserContext } from "@/lib/auth/user-context";
 
@@ -16,6 +17,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const partPic = body?.partPic ?? undefined;
   const scrapPic = body?.scrapPic ?? undefined;
   const receiveStatusRaw = body?.receiveStatus ?? undefined;
+  const requestedQtyRaw = Number(body?.quantity ?? body?.receivedQty ?? 0);
 
   if (partPic === undefined && scrapPic === undefined && receiveStatusRaw === undefined) {
     return NextResponse.json({ error: "No updates provided" }, { status: 400 });
@@ -70,7 +72,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     }
   }
   const currentRows = await sql`
-    SELECT id, part_pic, scrap_pic
+    SELECT id, quantity, part_pic, scrap_pic, order_status
     FROM line_items
     WHERE id = ${lineItemId}
       AND job_card_id = ${jobCardId}
@@ -101,26 +103,24 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       { status: 400 }
     );
   }
+  if (normalizedReceiveStatusLabel === "Partially Received" && (!Number.isFinite(requestedQtyRaw) || requestedQtyRaw <= 0)) {
+    return NextResponse.json(
+      { error: "Enter received quantity for partially received status." },
+      { status: 400 }
+    );
+  }
+  if (normalizedReceiveStatusLabel === "Returned" && (!Number.isFinite(requestedQtyRaw) || requestedQtyRaw <= 0)) {
+    return NextResponse.json(
+      { error: "Enter return quantity for return status." },
+      { status: 400 }
+    );
+  }
 
   const rows = await sql`
     UPDATE line_items
     SET
       part_pic = COALESCE(${partPic ?? null}, part_pic),
-      scrap_pic = COALESCE(${scrapPic ?? null}, scrap_pic),
-      order_status = COALESCE(
-        ${
-          normalizedReceiveStatusLabel === "Received"
-            ? "Received"
-            : normalizedReceiveStatusLabel === "Returned"
-            ? "Returned"
-            : normalizedReceiveStatusLabel === "Partially Received"
-            ? "Ordered"
-            : normalizedReceiveStatusLabel === "Ordered"
-            ? "Ordered"
-            : null
-        },
-        order_status
-      )
+      scrap_pic = COALESCE(${scrapPic ?? null}, scrap_pic)
     WHERE id = ${lineItemId}
       AND job_card_id = ${jobCardId}
       AND company_id = ${companyId}
@@ -131,36 +131,190 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
+  let procurementSummary: any = null;
   if (normalizedReceiveStatusLabel) {
-    const partQuoteStatus =
-      normalizedReceiveStatusLabel === "Returned"
-        ? "Return"
-        : normalizedReceiveStatusLabel === "Partially Received"
-        ? "Partially Received"
-        : normalizedReceiveStatusLabel;
-    const deliveryNoteStatus =
+    const poLinkRows = await sql`
+      SELECT
+        poi.id AS po_item_id,
+        poi.purchase_order_id AS po_id,
+        poi.quantity AS po_qty,
+        poi.received_qty AS po_received_qty
+      FROM line_items li
+      LEFT JOIN part_quotes pq
+        ON pq.company_id = ${companyId}
+       AND pq.line_item_id = li.id
+      INNER JOIN purchase_order_items poi
+        ON (
+          poi.estimate_item_id = li.id
+          OR
+          poi.quote_id = pq.id
+          OR (
+            poi.estimate_item_id IS NOT NULL
+            AND pq.estimate_item_id IS NOT NULL
+            AND poi.estimate_item_id = pq.estimate_item_id
+          )
+        )
+      INNER JOIN purchase_orders po ON po.id = poi.purchase_order_id
+      WHERE li.company_id = ${companyId}
+        AND li.id = ${lineItemId}
+      ORDER BY
+        CASE
+          WHEN LOWER(COALESCE(po.status, '')) = 'issued' THEN 0
+          WHEN LOWER(COALESCE(po.status, '')) = 'partially_received' THEN 1
+          WHEN LOWER(COALESCE(po.status, '')) = 'received' THEN 2
+          ELSE 3
+        END,
+        po.updated_at DESC
+      LIMIT 1
+    `;
+
+    if (!poLinkRows.length) {
+      return NextResponse.json(
+        {
+          error:
+            "This part is not linked to procurement purchase order yet. Please order/link the part in procurement first.",
+        },
+        { status: 409 }
+      );
+    }
+
+    const poLink = poLinkRows[0];
+    const poQty = Math.max(0, Number(poLink.po_qty ?? current?.quantity ?? 0));
+    const poReceived = Math.max(0, Number(poLink.po_received_qty ?? 0));
+    const remaining = Math.max(poQty - poReceived, 0);
+    const normalizedRequestedQty = Number.isFinite(requestedQtyRaw) && requestedQtyRaw > 0 ? requestedQtyRaw : 0;
+    const qtyToApply =
       normalizedReceiveStatusLabel === "Received"
-        ? "delivery_received"
-        : normalizedReceiveStatusLabel === "Returned"
-        ? "delivery_returned"
+        ? remaining > 0
+          ? remaining
+          : normalizedRequestedQty
         : normalizedReceiveStatusLabel === "Partially Received"
-        ? "delivery_partially_received"
-        : "issued";
+        ? Math.max(1, remaining > 1 ? Math.min(normalizedRequestedQty || 1, remaining - 1) : 1)
+        : normalizedRequestedQty;
+
+    const action =
+      normalizedReceiveStatusLabel === "Returned"
+        ? "return"
+        : normalizedReceiveStatusLabel === "Partially Received"
+        ? "partial"
+        : "received";
+
+    if (normalizedReceiveStatusLabel === "Received" && qtyToApply <= 0) {
+      return NextResponse.json(
+        { error: "No remaining quantity to receive for this part." },
+        { status: 400 }
+      );
+    }
+
+    let procurementResult: Awaited<ReturnType<typeof receivePoItems>> | null = null;
+    try {
+      procurementResult = await receivePoItems(
+        companyId,
+        String(poLink.po_id),
+        [
+          {
+            itemId: String(poLink.po_item_id),
+            quantity: qtyToApply,
+            action,
+          },
+        ],
+        currentUserId
+      );
+    } catch (err: any) {
+      return NextResponse.json(
+        { error: err?.message ?? "Failed to sync receive status with procurement flow." },
+        { status: 400 }
+      );
+    }
+
+    const updatedPoItem = procurementResult?.items?.find((item) => String(item.id) === String(poLink.po_item_id)) ?? null;
+    const poStatus = procurementResult?.po?.status ?? null;
+    const latestGrnForPo = procurementResult?.grns?.[0] ?? null;
+    const nextLineOrderStatus =
+      String(updatedPoItem?.status ?? "").toLowerCase() === "received"
+        ? "Received"
+        : String(updatedPoItem?.status ?? "").toLowerCase() === "return"
+        ? "Returned"
+        : "Ordered";
     await sql`
-      UPDATE part_quotes
+      UPDATE line_items
       SET
-        status = ${partQuoteStatus},
-        delivery_note_status = ${deliveryNoteStatus},
+        part_ordered = 1,
+        order_status = ${nextLineOrderStatus},
         updated_at = NOW()
       WHERE company_id = ${companyId}
-        AND line_item_id = ${lineItemId}
+        AND id = ${lineItemId}
     `;
+    const accountingRows = await sql`
+      SELECT 1
+      FROM accounting_journals
+      WHERE company_id = ${companyId}
+        AND journal_no LIKE ${`GRN-${String(poLink.po_id)}-${String(poLink.po_item_id)}-%`}
+      LIMIT 1
+    `;
+    const accountingPosted = accountingRows.length > 0;
+
+    try {
+      await sql`
+        INSERT INTO job_card_part_receipt_logs (
+          company_id,
+          job_card_id,
+          line_item_id,
+          purchase_order_id,
+          purchase_order_item_id,
+          action,
+          quantity,
+          before_status,
+          after_status,
+          part_pic,
+          actor_user_id
+        ) VALUES (
+          ${companyId},
+          ${jobCardId},
+          ${lineItemId},
+          ${String(poLink.po_id)},
+          ${String(poLink.po_item_id)},
+          ${action},
+          ${Number(qtyToApply ?? 0)},
+          ${String(current?.order_status ?? "") || null},
+          ${String(updatedPoItem?.status ?? normalizedReceiveStatusLabel ?? "") || null},
+          ${nextPartPic},
+          ${currentUserId}
+        )
+      `;
+    } catch {
+      // ignore if migration not yet applied
+    }
+
+    procurementSummary = {
+      linked: true,
+      poId: String(poLink.po_id),
+      poItemId: String(poLink.po_item_id),
+      poStatus,
+      poItemStatus: updatedPoItem?.status ?? null,
+      poItemOrderedQty: Number(updatedPoItem?.quantity ?? poLink.po_qty ?? 0),
+      poItemReceivedQty: Number(updatedPoItem?.receivedQty ?? poLink.po_received_qty ?? 0),
+      latestGrnNumber: latestGrnForPo?.grnNumber ?? null,
+      inventoryMoved: Boolean(updatedPoItem?.movedToInventory),
+      accountingPosted,
+    };
   }
+
+  const latestRows = await sql`
+    SELECT id, part_pic, scrap_pic, order_status
+    FROM line_items
+    WHERE id = ${lineItemId}
+      AND job_card_id = ${jobCardId}
+      AND company_id = ${companyId}
+    LIMIT 1
+  `;
+  const latest = latestRows[0] ?? rows[0];
 
   return NextResponse.json({
     data: {
-      ...rows[0],
-      receive_status: normalizedReceiveStatusLabel ?? rows[0]?.order_status ?? null,
+      ...latest,
+      receive_status: normalizedReceiveStatusLabel ?? latest?.order_status ?? null,
+      procurement: procurementSummary,
     },
   });
 }

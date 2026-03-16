@@ -287,10 +287,80 @@ export async function GET(_req: NextRequest, { params }: Params) {
         },
       ])
     );
+    const procurementRows = await sql`
+      SELECT DISTINCT ON (li.id)
+        li.id AS line_item_id,
+        poi.purchase_order_id AS po_id,
+        poi.id AS po_item_id,
+        poi.quantity AS po_qty,
+        poi.received_qty AS po_received_qty,
+        poi.status AS po_item_status,
+        po.status AS po_status,
+        COALESCE((
+          SELECT im.grn_number
+          FROM inventory_movements im
+          WHERE im.purchase_order_id = poi.purchase_order_id
+            AND im.source_type = 'receipt'
+            AND im.grn_number IS NOT NULL
+          ORDER BY im.created_at DESC
+          LIMIT 1
+        ), NULL) AS latest_grn_number,
+        EXISTS (
+          SELECT 1
+          FROM accounting_journals aj
+          WHERE aj.company_id = ${companyId}
+            AND aj.journal_no LIKE ('GRN-' || poi.purchase_order_id::text || '-' || poi.id::text || '-%')
+        ) AS accounting_posted
+      FROM line_items li
+      LEFT JOIN part_quotes pq
+        ON pq.company_id = ${companyId}
+       AND pq.line_item_id = li.id
+      LEFT JOIN purchase_order_items poi
+        ON (
+          poi.estimate_item_id = li.id
+          OR
+          poi.quote_id = pq.id
+          OR (
+            poi.estimate_item_id IS NOT NULL
+            AND pq.estimate_item_id IS NOT NULL
+            AND poi.estimate_item_id = pq.estimate_item_id
+          )
+        )
+      LEFT JOIN purchase_orders po ON po.id = poi.purchase_order_id
+      WHERE li.id = ANY(${lineItemIds})
+      ORDER BY
+        li.id,
+        CASE
+          WHEN LOWER(COALESCE(po.status, '')) = 'issued' THEN 0
+          WHEN LOWER(COALESCE(po.status, '')) = 'partially_received' THEN 1
+          WHEN LOWER(COALESCE(po.status, '')) = 'received' THEN 2
+          ELSE 3
+        END,
+        po.updated_at DESC
+    `;
+    const procurementByLineItemId = new Map(
+      procurementRows.map((row: any) => [
+        String(row.line_item_id),
+        {
+          procurement_linked: Boolean(row.po_item_id),
+          procurement_po_id: row.po_id ?? null,
+          procurement_po_item_id: row.po_item_id ?? null,
+          procurement_po_status: row.po_status ?? null,
+          procurement_po_item_status: row.po_item_status ?? null,
+          procurement_po_qty: row.po_qty != null ? Number(row.po_qty) : null,
+          procurement_po_received_qty: row.po_received_qty != null ? Number(row.po_received_qty) : null,
+          procurement_latest_grn_number: row.latest_grn_number ?? null,
+          procurement_inventory_moved:
+            row.po_qty != null && row.po_received_qty != null ? Number(row.po_received_qty) >= Number(row.po_qty) : false,
+          procurement_accounting_posted: Boolean(row.accounting_posted),
+        },
+      ])
+    );
     mergedItems = items.map((row: any) => {
       const derived = derivedStatusByLineItemId.get(String(row.id));
       const deliveryMeta = deliveryNoteByLineItemId.get(String(row.id));
-      if (!derived && !deliveryMeta) return row;
+      const procurementMeta = procurementByLineItemId.get(String(row.id));
+      if (!derived && !deliveryMeta && !procurementMeta) return row;
       return {
         ...row,
         po_status: derived ?? row.po_status ?? row.order_status ?? null,
@@ -300,6 +370,16 @@ export async function GET(_req: NextRequest, { params }: Params) {
             : derived ?? row.order_status ?? null,
         delivery_note_no: deliveryMeta?.delivery_note_no ?? row.delivery_note_no ?? null,
         delivery_note_status: deliveryMeta?.delivery_note_status ?? row.delivery_note_status ?? null,
+        procurement_linked: procurementMeta?.procurement_linked ?? false,
+        procurement_po_id: procurementMeta?.procurement_po_id ?? null,
+        procurement_po_item_id: procurementMeta?.procurement_po_item_id ?? null,
+        procurement_po_status: procurementMeta?.procurement_po_status ?? null,
+        procurement_po_item_status: procurementMeta?.procurement_po_item_status ?? null,
+        procurement_po_qty: procurementMeta?.procurement_po_qty ?? null,
+        procurement_po_received_qty: procurementMeta?.procurement_po_received_qty ?? null,
+        procurement_latest_grn_number: procurementMeta?.procurement_latest_grn_number ?? null,
+        procurement_inventory_moved: procurementMeta?.procurement_inventory_moved ?? false,
+        procurement_accounting_posted: procurementMeta?.procurement_accounting_posted ?? false,
       };
     });
   }
@@ -1220,6 +1300,80 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (!workingVideoId) {
     return NextResponse.json(
       { error: "Working video is required before completing the job." },
+      { status: 400 }
+    );
+  }
+
+  const incompleteReceiptRows = await sql`
+    WITH required_items AS (
+      SELECT li.id, li.product_name
+      FROM line_items li
+      WHERE li.job_card_id = ${jobCardId}
+        AND li.company_id = ${companyId}
+        AND NOT (
+          COALESCE(li.is_add, 0) = 1
+          AND LOWER(COALESCE(li.order_status, 'pending')) = 'pending'
+        )
+    ),
+    linked_po_items AS (
+      SELECT
+        ri.id AS line_item_id,
+        ri.product_name,
+        poi.id AS po_item_id,
+        COALESCE(poi.quantity, 0)::numeric AS ordered_qty,
+        COALESCE(poi.received_qty, 0)::numeric AS received_qty
+      FROM required_items ri
+      LEFT JOIN part_quotes pq
+        ON pq.company_id = ${companyId}
+       AND pq.line_item_id = ri.id
+      LEFT JOIN purchase_order_items poi
+        ON (
+          poi.quote_id = pq.id
+          OR (
+            poi.estimate_item_id IS NOT NULL
+            AND pq.estimate_item_id IS NOT NULL
+            AND poi.estimate_item_id = pq.estimate_item_id
+          )
+        )
+    ),
+    receipt_rollup AS (
+      SELECT
+        line_item_id,
+        MAX(product_name) AS product_name,
+        COUNT(po_item_id) FILTER (WHERE po_item_id IS NOT NULL) AS po_item_count,
+        COALESCE(SUM(ordered_qty), 0)::numeric AS ordered_qty,
+        COALESCE(SUM(received_qty), 0)::numeric AS received_qty
+      FROM linked_po_items
+      GROUP BY line_item_id
+    )
+    SELECT
+      line_item_id,
+      product_name,
+      po_item_count,
+      ordered_qty,
+      received_qty,
+      GREATEST(ordered_qty - received_qty, 0)::numeric AS remaining_qty
+    FROM receipt_rollup
+    WHERE po_item_count = 0
+       OR ordered_qty <= 0
+       OR received_qty < ordered_qty
+    ORDER BY product_name ASC
+    LIMIT 10
+  `;
+  if (incompleteReceiptRows.length) {
+    const summary = incompleteReceiptRows
+      .map((row: any) => {
+        const name = String(row?.product_name ?? "Part").trim() || "Part";
+        const remaining = Number(row?.remaining_qty ?? 0);
+        if (remaining > 0) return `${name} (${remaining} remaining)`;
+        if (Number(row?.po_item_count ?? 0) <= 0) return `${name} (not linked to PO)`;
+        return `${name} (receipt pending)`;
+      })
+      .join(", ");
+    return NextResponse.json(
+      {
+        error: `Cannot complete job. All required parts must be fully received first: ${summary}.`,
+      },
       { status: 400 }
     );
   }

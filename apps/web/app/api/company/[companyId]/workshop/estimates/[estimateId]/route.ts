@@ -19,6 +19,15 @@ import { getSql } from "@repo/ai-core/db";
 
 type Params = { params: Promise<{ companyId: string; estimateId: string }> };
 
+function normalizeMatchText(value: unknown): string {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export async function GET(req: NextRequest, { params }: Params) {
   const { companyId, estimateId } = await params;
   const data = await getEstimateWithItems(companyId, estimateId);
@@ -26,6 +35,82 @@ export async function GET(req: NextRequest, { params }: Params) {
     return new NextResponse("Not found", { status: 404 });
   }
   const sql = getSql();
+  const lineItemIds = (data.items ?? [])
+    .map((item: any) => String(item?.inspectionItemId ?? "").trim())
+    .filter(Boolean);
+  if (lineItemIds.length > 0 || data.estimate?.inspectionId) {
+    const lineRows = await sql<any[]>`
+      SELECT
+        id,
+        product_name,
+        description,
+        quantity,
+        created_at,
+        status,
+        approved_type,
+        approved_cost,
+        approved_sale
+      FROM line_items
+      WHERE company_id = ${companyId}
+        AND (
+          (${lineItemIds.length > 0 ? sql`id::text = ANY(${sql.array(lineItemIds)})` : sql`FALSE`})
+          OR (${data.estimate?.inspectionId ? sql`inspection_id = ${data.estimate.inspectionId}` : sql`FALSE`})
+        )
+    `;
+    const lineById = new Map(lineRows.map((row: any) => [String(row.id), row]));
+    const sortedLineRows = [...lineRows].sort(
+      (a: any, b: any) => new Date(String(a?.created_at ?? 0)).getTime() - new Date(String(b?.created_at ?? 0)).getTime()
+    );
+    const usedLineIds = new Set<string>();
+    data.items = (data.items ?? []).map((item: any) => {
+      const inspectionItemId = String(item?.inspectionItemId ?? "").trim();
+      let linked = inspectionItemId ? lineById.get(inspectionItemId) : null;
+      if (!linked) {
+        const itemName = normalizeMatchText(item?.partName ?? "");
+        const itemDesc = normalizeMatchText(item?.description ?? "");
+        const itemQty = Number(item?.quantity ?? 1);
+        linked =
+          sortedLineRows.find((row: any) => {
+            const lineId = String(row?.id ?? "");
+            if (!lineId || usedLineIds.has(lineId)) return false;
+            if (normalizeMatchText(row?.product_name ?? "") !== itemName) return false;
+            if (Number(row?.quantity ?? 1) !== itemQty) return false;
+            const rowDesc = normalizeMatchText(row?.description ?? "");
+            if (!itemDesc || !rowDesc) return true;
+            return rowDesc === itemDesc;
+          }) ?? null;
+      }
+      if (!linked) {
+        linked =
+          sortedLineRows.find((row: any) => {
+            const lineId = String(row?.id ?? "");
+            if (!lineId || usedLineIds.has(lineId)) return false;
+            return true;
+          }) ?? null;
+      }
+      if (!linked) return item;
+      usedLineIds.add(String(linked.id));
+      const linkedStatus = String(linked.status ?? "").trim().toLowerCase();
+      const normalizedStatus =
+        linkedStatus === "approved"
+          ? "approved"
+          : linkedStatus === "rejected"
+          ? "rejected"
+          : linkedStatus === "inquiry"
+          ? "inquiry"
+          : item.status;
+      return {
+        ...item,
+        status: normalizedStatus,
+        approvedType: linked.approved_type ?? item.approvedType ?? null,
+        approvedCost:
+          linked.approved_cost != null ? Number(linked.approved_cost) : item.approvedCost ?? item.cost ?? null,
+        approvedSale:
+          linked.approved_sale != null ? Number(linked.approved_sale) : item.approvedSale ?? item.sale ?? null,
+        sale: linked.approved_sale != null ? Number(linked.approved_sale) : item.sale,
+      };
+    });
+  }
   let carSnapshot: {
     carId: string | null;
     make: string | null;
