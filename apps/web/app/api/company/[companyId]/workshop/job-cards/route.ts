@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSql } from "@repo/ai-core/db";
-import { getEstimateWithItems } from "@repo/ai-core/workshop/estimates/repository";
 import { requireUserId } from "../../../../../../lib/auth/current-user";
 
 type Params = { params: Promise<{ companyId: string }> };
@@ -123,8 +122,15 @@ export async function POST(req: NextRequest, { params }: Params) {
           .filter((id: string) => /^[0-9a-f-]{36}$/i.test(id))
       : [];
 
-    const estimateData = await getEstimateWithItems(companyId, body.estimateId);
-    const estimate = estimateData?.estimate ?? null;
+    const sql = getSql();
+    const estimateRows = await sql`
+      SELECT id, lead_id AS "leadId", inspection_id AS "inspectionId"
+      FROM estimates
+      WHERE company_id = ${companyId}
+        AND id = ${body.estimateId}
+      LIMIT 1
+    `;
+    const estimate = estimateRows[0] ?? null;
     if (!estimate) {
       return NextResponse.json({ error: "Estimate not found" }, { status: 404 });
     }
@@ -132,7 +138,6 @@ export async function POST(req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Inspection not found for estimate" }, { status: 400 });
     }
 
-    const sql = getSql();
     const existing =
       isAdd === 1
         ? await sql`
@@ -183,24 +188,30 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     if (requestedLineItemIds.length) {
       await sql`
-        UPDATE line_items
+        UPDATE line_items li
         SET job_card_id = ${jobCard.id}
-        WHERE company_id = ${companyId}
-          AND inspection_id = ${estimate.inspectionId}
-          AND status = 'Approved'
-          AND is_add = ${isAdd}
-          AND job_card_id IS NULL
-          AND id = ANY(${requestedLineItemIds}::uuid[])
+        WHERE li.company_id = ${companyId}
+          AND li.inspection_id = ${estimate.inspectionId}
+          AND li.is_add = ${isAdd}
+          AND li.job_card_id IS NULL
+          AND li.id = ANY(${requestedLineItemIds}::uuid[])
+          AND (
+            LOWER(COALESCE(li.customer_approval_status, '')) = 'approved'
+            OR LOWER(COALESCE(li.status, '')) = 'approved'
+          )
       `;
     } else {
       await sql`
-        UPDATE line_items
+        UPDATE line_items li
         SET job_card_id = ${jobCard.id}
-        WHERE company_id = ${companyId}
-          AND inspection_id = ${estimate.inspectionId}
-          AND status = 'Approved'
-          AND is_add = ${isAdd}
-          AND job_card_id IS NULL
+        WHERE li.company_id = ${companyId}
+          AND li.inspection_id = ${estimate.inspectionId}
+          AND li.is_add = ${isAdd}
+          AND li.job_card_id IS NULL
+          AND (
+            LOWER(COALESCE(li.customer_approval_status, '')) = 'approved'
+            OR LOWER(COALESCE(li.status, '')) = 'approved'
+          )
       `;
     }
 

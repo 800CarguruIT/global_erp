@@ -5,6 +5,11 @@ import { getUserContext } from "@/lib/auth/user-context";
 
 type Params = { params: Promise<{ companyId: string; jobCardId: string; lineItemId: string }> };
 
+function normalizeText(value: unknown): string | null {
+  const out = String(value ?? "").trim();
+  return out || null;
+}
+
 export async function PATCH(req: NextRequest, { params }: Params) {
   const { companyId, jobCardId, lineItemId } = await params;
   const body = await req.json().catch(() => ({}));
@@ -64,6 +69,39 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       );
     }
   }
+  const currentRows = await sql`
+    SELECT id, part_pic, scrap_pic
+    FROM line_items
+    WHERE id = ${lineItemId}
+      AND job_card_id = ${jobCardId}
+      AND company_id = ${companyId}
+    LIMIT 1
+  `;
+  if (!currentRows.length) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+  const current = currentRows[0];
+  const nextPartPic = normalizeText(partPic) ?? normalizeText(current?.part_pic);
+  const nextScrapPic = normalizeText(scrapPic) ?? normalizeText(current?.scrap_pic);
+  if (normalizedReceiveStatusLabel === "Received" && !nextPartPic) {
+    return NextResponse.json(
+      { error: "Part picture is required before marking as received." },
+      { status: 400 }
+    );
+  }
+  if (normalizedReceiveStatusLabel === "Partially Received" && !nextPartPic) {
+    return NextResponse.json(
+      { error: "Part picture is required before marking as partially received." },
+      { status: 400 }
+    );
+  }
+  if (normalizedReceiveStatusLabel === "Returned" && !nextPartPic) {
+    return NextResponse.json(
+      { error: "Upload part picture evidence before marking as return." },
+      { status: 400 }
+    );
+  }
+
   const rows = await sql`
     UPDATE line_items
     SET

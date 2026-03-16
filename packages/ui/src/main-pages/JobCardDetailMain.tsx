@@ -276,9 +276,9 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
       }),
     [primaryItems]
   );
-  const allPartsReceived = useMemo(() => {
+  const atLeastOnePartReceived = useMemo(() => {
     if (itemsForReceivedChecks.length === 0) return true;
-    return itemsForReceivedChecks.every(
+    return itemsForReceivedChecks.some(
       (item) => String(item.po_status ?? item.order_status ?? "").toLowerCase() === "received"
     );
   }, [itemsForReceivedChecks]);
@@ -313,49 +313,39 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
     () => primaryItems.filter((item) => !(item.part_pic ?? "")).length,
     [primaryItems]
   );
-  const scrapPicMissingCount = useMemo(
-    () => primaryItems.filter((item) => !(item.scrap_pic ?? "")).length,
-    [primaryItems]
-  );
-  const requiredUploadsPending = partPicMissingCount + scrapPicMissingCount;
+  const requiredUploadsPending = partPicMissingCount;
   const isEvidenceDone =
-    partPicMissingCount === 0 && scrapPicMissingCount === 0 && primaryItems.length > 0;
+    partPicMissingCount === 0 && primaryItems.length > 0;
   const receivedPartPicMissingCount = useMemo(
     () => receivedItems.filter((item) => !(item.part_pic ?? "")).length,
     [receivedItems]
   );
-  const receivedScrapPicMissingCount = useMemo(
-    () => receivedItems.filter((item) => !(item.scrap_pic ?? "")).length,
-    [receivedItems]
-  );
-  const receivedRequiredUploadsPending = receivedPartPicMissingCount + receivedScrapPicMissingCount;
+  const receivedRequiredUploadsPending = receivedPartPicMissingCount;
   const hasAllReceivedPartPictures =
     receivedItems.length === 0 || receivedRequiredUploadsPending === 0;
-  const receivedSparePartsMissingScrapCount = useMemo(
-    () =>
-      primaryItems.filter((item) => {
-        const status = String(item.po_status ?? item.order_status ?? "").toLowerCase();
-        const typeText = String(item.type ?? item.product_type ?? "").toLowerCase();
-        const isSparePart = typeText.includes("spare") && typeText.includes("part");
-        return status === "received" && isSparePart && !(item.scrap_pic ?? "");
-      }).length,
-    [primaryItems]
-  );
-  const hasAllReceivedSpareScrapPictures = receivedSparePartsMissingScrapCount === 0;
   const isQuoteStep = activeWizardStep === "quote";
   const isCollectCarStep = activeWizardStep === "collect_car";
   const isPreWorkStep = activeWizardStep === "pre_work";
+  const isPartsReceiveStep = activeWizardStep === "parts_receive";
   const isStartStep = activeWizardStep === "start";
   const isEvidenceStep = activeWizardStep === "evidence";
   const isCompleteStep = activeWizardStep === "complete";
   const isFinalInspectionStep = activeWizardStep === "final_inspection";
   const isVerificationStep = activeWizardStep === "verification";
-  const showPartsTable = isStartStep || isEvidenceStep || isCompleteStep || isFinalInspectionStep || isVerificationStep;
+  const showPartsTable =
+    isPreWorkStep ||
+    isPartsReceiveStep ||
+    isStartStep ||
+    isEvidenceStep ||
+    isCompleteStep ||
+    isFinalInspectionStep ||
+    isVerificationStep;
   const progressSteps = useMemo(
     () => [
       { key: "quote", label: "Quote Accepted", done: canProgressByQuote },
       { key: "collect_car", label: "Collect Car", done: isCollectCarDone },
       { key: "pre_work", label: "Pre-Work Check", done: isPreWorkDone },
+      { key: "parts_receive", label: "Parts Receive", done: atLeastOnePartReceived },
       { key: "start", label: "Start Job", done: isJobStarted },
       { key: "evidence", label: "Evidence Upload", done: isEvidenceDone },
       { key: "complete", label: "Completed", done: isJobCompleted },
@@ -366,6 +356,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
       canProgressByQuote,
       isCollectCarDone,
       isPreWorkDone,
+      atLeastOnePartReceived,
       isJobStarted,
       isEvidenceDone,
       isJobCompleted,
@@ -383,14 +374,20 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
     if (activeWizardStep === "pre_work") {
       return [
         { label: "Collect car saved", done: isCollectCarDone },
-        { label: "All parts received", done: allPartsReceived },
+      ];
+    }
+    if (activeWizardStep === "parts_receive") {
+      return [
+        { label: "Collect car saved", done: isCollectCarDone },
+        { label: "Pre-work check done", done: isPreWorkDone },
+        { label: "At least one part received", done: atLeastOnePartReceived },
       ];
     }
     if (activeWizardStep === "start") {
       return [
         { label: "Collect car saved", done: isCollectCarDone },
         { label: "Pre-work check done", done: isPreWorkDone },
-        { label: "All parts received", done: allPartsReceived },
+        { label: "At least one part received", done: atLeastOnePartReceived },
         { label: "Received part photos uploaded", done: hasAllReceivedPartPictures },
       ];
     }
@@ -398,7 +395,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
     if (activeWizardStep === "complete") {
       return [
         { label: "Job started", done: isJobStarted },
-        { label: "Received spare scrap photos uploaded", done: hasAllReceivedSpareScrapPictures },
+        { label: "Received part photos uploaded", done: hasAllReceivedPartPictures },
         { label: "Working video uploaded", done: hasSavedWorkingVideo },
       ];
     }
@@ -415,13 +412,12 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
     ];
   }, [
     activeWizardStep,
-    allPartsReceived,
+    atLeastOnePartReceived,
     canProgressByQuote,
     isCollectCarDone,
     isJobStarted,
     isPreWorkDone,
     hasAllReceivedPartPictures,
-    hasAllReceivedSpareScrapPictures,
     hasSavedWorkingVideo,
     isJobCompleted,
     isFinalInspectionDone,
@@ -507,7 +503,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
     }
   }
 
-  async function updateItemPic(lineItemId: string, field: "partPic" | "scrapPic", fileId: string | null) {
+  async function updateItemPic(lineItemId: string, field: "partPic", fileId: string | null) {
     try {
       const res = await fetch(
         `/api/company/${companyId}/workshop/job-cards/${jobCardId}/line-items/${lineItemId}`,
@@ -647,10 +643,6 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
       setToastMessage({ type: "error", text: "Enter valid car mileage in Pre-Work Check." });
       return;
     }
-    if (!allPartsReceived) {
-      setToastMessage({ type: "error", text: "All parts must be received before Pre-Work Check." });
-      return;
-    }
     setIsSavingPreWork(true);
     try {
       const res = await fetch(`/api/company/${companyId}/workshop/job-cards/${jobCardId}`, {
@@ -786,6 +778,45 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
       setIsSavingAdditionalItem(false);
     }
   }
+
+  const statusActionMeta: ReadonlyArray<{
+    label: string;
+    value: "Received" | "Partially Received" | "Returned";
+    activeClass: string;
+    icon: React.ReactNode;
+  }> = [
+    {
+      label: "Received",
+      value: "Received",
+      activeClass: "border-emerald-400/60 bg-emerald-500/20 text-emerald-200",
+      icon: (
+        <svg viewBox="0 0 16 16" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M3 8.5 6.2 11.5 13 4.5" />
+        </svg>
+      ),
+    },
+    {
+      label: "Partial",
+      value: "Partially Received",
+      activeClass: "border-amber-400/60 bg-amber-500/20 text-amber-200",
+      icon: (
+        <svg viewBox="0 0 16 16" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M2 5.5h12M2 10.5h6" />
+        </svg>
+      ),
+    },
+    {
+      label: "Return",
+      value: "Returned",
+      activeClass: "border-sky-400/60 bg-sky-500/20 text-sky-200",
+      icon: (
+        <svg viewBox="0 0 16 16" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M6 4 2.5 7.5 6 11" />
+          <path d="M3 7.5h6.5a3.5 3.5 0 1 1 0 7" />
+        </svg>
+      ),
+    },
+  ];
 
   async function saveFinalInspection() {
     if (!isJobCompleted) {
@@ -1369,6 +1400,17 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                 </div>
               </div>
               )}
+              {isPartsReceiveStep && (
+                <div className="space-y-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-3">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-amber-200">Parts Receive</div>
+                  <div className="text-[11px] text-white/70">
+                    Confirm receiving status for required parts from delivery notes before starting the job.
+                  </div>
+                  <div className="text-[11px] text-white/70">
+                    Minimum requirement to proceed: <span className="font-semibold text-white">at least one part received</span>.
+                  </div>
+                </div>
+              )}
               {isCompleteStep && (
                 <div className="space-y-3">
                   <div className="space-y-1">
@@ -1579,7 +1621,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                       <th className="px-2 py-1 text-left">Quantity</th>
                       <th className="px-2 py-1 text-left">Order Status</th>
                       <th className="px-2 py-1 text-left">Part Pic</th>
-                      <th className="px-2 py-1 text-left">Scrap Pic</th>
+                      <th className="px-2 py-1 text-left">Receive Status</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1590,7 +1632,12 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                         </td>
                       </tr>
                     ) : (
-                      primaryItems.map((item, idx) => (
+                      primaryItems.map((item, idx) => {
+                        const itemId = String(item.id ?? "");
+                        const currentStatus = normalizeReceiveStatus(item);
+                        const selectedStatus = currentStatus === "Ordered" ? "" : currentStatus;
+                        const isSavingStatus = Boolean(savingReceiveByItemId[itemId]);
+                        return (
                         <tr key={item.id ?? idx} className="border-b border-border/60 last:border-0">
                           <td className="px-2 py-1">{idx + 1}</td>
                           <td className="px-2 py-1 font-semibold">{item.product_name ?? item.productName ?? "-"}</td>
@@ -1616,7 +1663,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                             >
                               {partStatus}
                             </span>
-                            {(!(item.part_pic ?? "") || !(item.scrap_pic ?? "")) && (
+                            {!(item.part_pic ?? "") && (
                               <span className="ml-1 rounded-full bg-rose-500/15 px-2 py-0.5 text-[9px] font-semibold uppercase text-rose-300">
                                 Required
                               </span>
@@ -1653,29 +1700,42 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                             </div>
                           </td>
                           <td className="px-2 py-1">
-                            <FileUploader
-                              label=""
-                              kind="image"
-                              value={item.scrap_pic ?? ""}
-                              onChange={(id) => updateItemPic(item.id, "scrapPic", id ?? null)}
-                              buttonOnly
-                              showPreview
-                              buttonClassName="h-8 px-3 text-[10px]"
-                              containerClassName="w-fit"
-                              previewClassName="h-[100px] w-[100px]"
-                              chooseLabel="Upload Scrap Photo"
-                              replaceLabel="Replace Scrap Photo"
-                            />
-                            <div className="mt-1 text-[10px]">
-                              {(item.scrap_pic ?? "") ? (
-                                <span className="text-emerald-300">Done</span>
-                              ) : (
-                                <span className="text-amber-300">Missing</span>
-                              )}
-                            </div>
+                            {isPartsReceiveStep && Number(item.is_add ?? 0) !== 1 ? (
+                              <div className="min-w-[230px] space-y-1">
+                                <div className="grid grid-cols-3 gap-1">
+                                  {statusActionMeta.map((status) => {
+                                    const isActive = selectedStatus === status.value;
+                                    return (
+                                      <button
+                                        key={status.value}
+                                        type="button"
+                                        className={`h-8 rounded-md border px-2 text-[10px] font-semibold transition ${
+                                          isActive
+                                            ? status.activeClass
+                                            : "border-white/15 bg-white/[0.03] text-white/70 hover:bg-white/[0.08]"
+                                        }`}
+                                        onClick={() => updateItemReceiveStatus(itemId, status.value)}
+                                        disabled={isSavingStatus}
+                                      >
+                                        <span className="flex items-center justify-center gap-1">
+                                          {status.icon}
+                                          <span>{status.label}</span>
+                                        </span>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                                {isSavingStatus ? (
+                                  <div className="text-[10px] text-cyan-300">Saving status...</div>
+                                ) : null}
+                              </div>
+                            ) : (
+                              <span className="text-[10px] text-white/70">{currentStatus}</span>
+                            )}
                           </td>
                         </tr>
-                      ))
+                      );
+                      })
                     )}
                   </tbody>
                   {primaryItems.length > 0 ? (
@@ -1690,7 +1750,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                         </td>
                         <td className="px-2 py-2 text-amber-300">Pending Uploads: {requiredUploadsPending}</td>
                         <td className="px-2 py-2 text-amber-300">Part Missing: {partPicMissingCount}</td>
-                        <td className="px-2 py-2 text-amber-300">Scrap Missing: {scrapPicMissingCount}</td>
+                        <td className="px-2 py-2 text-white/60">Receive status per line item</td>
                       </tr>
                     </tfoot>
                   ) : null}
@@ -1701,7 +1761,12 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                       No parts assigned yet.
                     </div>
                   ) : (
-                    primaryItems.map((item, idx) => (
+                    primaryItems.map((item, idx) => {
+                      const itemId = String(item.id ?? "");
+                      const currentStatus = normalizeReceiveStatus(item);
+                      const selectedStatus = currentStatus === "Ordered" ? "" : currentStatus;
+                      const isSavingStatus = Boolean(savingReceiveByItemId[itemId]);
+                      return (
                       <div key={item.id ?? idx} className="rounded-md border border-white/10 bg-white/[0.02] p-3 text-xs">
                         <div className="mb-2 flex items-center justify-between gap-2">
                           <div className="font-semibold">{item.product_name ?? item.productName ?? "-"}</div>
@@ -1732,6 +1797,39 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                           </div>
                         </div>
                         <div className="mt-3 grid gap-3">
+                          {isPartsReceiveStep && Number(item.is_add ?? 0) !== 1 && (
+                            <div>
+                              <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-white/70">
+                                Receive Status
+                              </div>
+                              <div className="grid grid-cols-3 gap-1">
+                                {statusActionMeta.map((status) => {
+                                  const isActive = selectedStatus === status.value;
+                                  return (
+                                    <button
+                                      key={status.value}
+                                      type="button"
+                                      className={`h-9 rounded-md border px-2 text-[10px] font-semibold transition ${
+                                        isActive
+                                          ? status.activeClass
+                                          : "border-white/15 bg-white/[0.03] text-white/70 hover:bg-white/[0.08]"
+                                      }`}
+                                      onClick={() => updateItemReceiveStatus(itemId, status.value)}
+                                      disabled={isSavingStatus}
+                                    >
+                                      <span className="flex items-center justify-center gap-1">
+                                        {status.icon}
+                                        <span>{status.label}</span>
+                                      </span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                              {isSavingStatus ? (
+                                <div className="mt-1 text-[10px] text-cyan-300">Saving status...</div>
+                              ) : null}
+                            </div>
+                          )}
                           <div>
                             <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-white/70">Part Pic</div>
                             <FileUploader
@@ -1755,32 +1853,10 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                               )}
                             </div>
                           </div>
-                          <div>
-                            <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-white/70">Scrap Pic</div>
-                            <FileUploader
-                              label=""
-                              kind="image"
-                              value={item.scrap_pic ?? ""}
-                              onChange={(id) => updateItemPic(item.id, "scrapPic", id ?? null)}
-                              buttonOnly
-                              showPreview
-                              buttonClassName="h-9 w-full px-3 text-[10px]"
-                              containerClassName="w-full"
-                              previewClassName="h-[100px] w-[100px]"
-                              chooseLabel="Upload Scrap Photo"
-                              replaceLabel="Replace Scrap Photo"
-                            />
-                            <div className="mt-1 text-[10px]">
-                              {(item.scrap_pic ?? "") ? (
-                                <span className="text-emerald-300">Done</span>
-                              ) : (
-                                <span className="text-amber-300">Missing</span>
-                              )}
-                            </div>
-                          </div>
                         </div>
                       </div>
-                    ))
+                    );
+                    })
                   )}
                   {primaryItems.length > 0 ? (
                     <div className="rounded-md border border-white/10 bg-white/[0.02] px-3 py-2 text-[11px]">
@@ -1836,9 +1912,9 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                     Quote must be accepted before starting/completing this job card.
                   </div>
                 )}
-                {isStartStep && canProgressJobCard && !jobCard?.start_at && !jobCard?.complete_at && !allPartsReceived && (
+                {isStartStep && canProgressJobCard && !jobCard?.start_at && !jobCard?.complete_at && !atLeastOnePartReceived && (
                   <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[11px] font-medium text-amber-200">
-                    All parts must be received before starting the job card.
+                    At least one part must be received before starting the job card.
                   </div>
                 )}
                 {isStartStep && canProgressJobCard && !jobCard?.start_at && !jobCard?.complete_at && !isCollectCarDone && (
@@ -1857,14 +1933,14 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                   !jobCard?.complete_at &&
                   !hasAllReceivedPartPictures && (
                   <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[11px] font-medium text-amber-200">
-                    Upload part and scrap pictures for all received spare parts before starting.
+                    Upload part pictures for all received parts before starting.
                   </div>
                 )}
                 {isStartStep &&
                   canProgressJobCard &&
                   !jobCard?.start_at &&
                   !jobCard?.complete_at &&
-                  allPartsReceived &&
+                  atLeastOnePartReceived &&
                   isCollectCarDone &&
                   isPreWorkDone &&
                   hasAllReceivedPartPictures && (
@@ -1880,15 +1956,6 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                   canProgressJobCard &&
                   jobCard?.start_at &&
                   !jobCard?.complete_at &&
-                  !hasAllReceivedSpareScrapPictures && (
-                  <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[11px] font-medium text-amber-200">
-                    Upload scrap pictures for all received spare parts before completing.
-                  </div>
-                )}
-                {isCompleteStep &&
-                  canProgressJobCard &&
-                  jobCard?.start_at &&
-                  !jobCard?.complete_at &&
                   !hasSavedWorkingVideo && (
                   <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[11px] font-medium text-amber-200">
                     Upload and save working video before completing.
@@ -1899,7 +1966,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                     type="button"
                     className="rounded-md bg-amber-400 px-5 py-2 text-xs font-semibold text-slate-900 disabled:cursor-not-allowed disabled:opacity-60 md:min-w-[130px]"
                     onClick={completeJobCard}
-                    disabled={!hasAllReceivedSpareScrapPictures || !hasSavedWorkingVideo}
+                    disabled={!hasSavedWorkingVideo}
                   >
                     Complete Job
                   </button>

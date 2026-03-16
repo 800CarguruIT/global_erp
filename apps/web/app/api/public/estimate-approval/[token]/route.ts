@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getSql } from "@repo/ai-core/db";
-import { getEstimateWithItems, replaceEstimateItems, updateEstimateHeader } from "@repo/ai-core/workshop/estimates/repository";
+import { updateEstimateHeader } from "@repo/ai-core/workshop/estimates/repository";
 import type { EstimateItemCostType, EstimateItemStatus, EstimateStatus } from "@repo/ai-core/workshop/estimates/types";
 import { markLineItemsOrderedByIds } from "@repo/ai-core/workshop/inspections/repository";
 
@@ -72,8 +72,45 @@ async function resolveEstimateByToken(token: string) {
   `;
   const estimate = rows[0];
   if (!estimate) return null;
-  const estimateData = await getEstimateWithItems(String(estimate.company_id), String(estimate.id));
-  return { estimate, items: estimateData?.items ?? [] };
+  const lineItems = estimate.inspection_id
+    ? await sql`
+        SELECT
+          li.id,
+          li.inspection_id AS "inspectionItemId",
+          li.product_name AS "partName",
+          li.description,
+          li.quantity,
+          COALESCE(li.approved_sale, 0)::numeric AS sale,
+          li.status,
+          li.approved_type AS "approvedType",
+          COALESCE(li.approved_cost, 0)::numeric AS cost,
+          COALESCE(
+            li.quote_costs,
+            jsonb_build_object(
+              'oem', q.oem,
+              'oe', q.oe,
+              'aftm', q.aftm,
+              'used', q.used
+            )
+          ) AS "quoteCosts"
+        FROM line_items li
+        LEFT JOIN LATERAL (
+          SELECT
+            MIN(pq.oem) AS oem,
+            MIN(pq.oe) AS oe,
+            MIN(pq.aftm) AS aftm,
+            MIN(pq.used) AS used
+          FROM part_quotes pq
+          WHERE pq.line_item_id = li.id
+        ) q ON TRUE
+        WHERE li.company_id = ${estimate.company_id}
+          AND li.inspection_id = ${estimate.inspection_id}
+          AND COALESCE(li.is_add, 0) = 0
+          AND COALESCE(li.source, 'inspection') IN ('inspection', 'estimate')
+        ORDER BY li.created_at ASC
+      `
+    : [];
+  return { estimate, items: lineItems ?? [] };
 }
 
 function getTypeSaleOptions(
@@ -275,8 +312,24 @@ export async function POST(req: NextRequest, { params }: Params) {
       approvedCost: approvedCost,
     };
   });
-
-  await replaceEstimateItems(String(resolved.estimate.id), mappedItems as any);
+  const sql = getSql();
+  for (const item of mappedItems) {
+    const selected = selectedItemIds.includes(String(item.id));
+    const nextCustomerApprovalStatus = selected ? "approved" : "rejected";
+    const nextLineItemStatus = selected ? "Approved" : "Rejected";
+    await sql`
+      UPDATE line_items
+      SET
+        customer_approval_status = ${nextCustomerApprovalStatus},
+        status = ${nextLineItemStatus},
+        approved_type = ${item.approvedType ?? null},
+        approved_cost = ${item.approvedCost ?? null},
+        approved_sale = ${item.sale ?? null},
+        updated_at = NOW()
+      WHERE company_id = ${resolved.estimate.company_id}
+        AND id = ${item.id}
+    `;
+  }
 
   const approvedAt = new Date().toISOString();
   const nextMeta = {
@@ -301,8 +354,8 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   let orderedCount = 0;
   const selectedInspectionLineItemIds = mappedItems
-    .filter((item: any) => selectedItemIds.includes(String(item.id)) && item.inspectionItemId)
-    .map((item: any) => String(item.inspectionItemId))
+    .filter((item: any) => selectedItemIds.includes(String(item.id)))
+    .map((item: any) => String(item.id))
     .filter(Boolean);
   if (selectedInspectionLineItemIds.length > 0 && resolved.estimate.inspection_id) {
     orderedCount = await markLineItemsOrderedByIds(String(resolved.estimate.inspection_id), selectedInspectionLineItemIds);
@@ -311,7 +364,6 @@ export async function POST(req: NextRequest, { params }: Params) {
   let jobCardId: string | null = null;
   let jobCardCreated = false;
   if (selectedItemIds.length > 0) {
-    const sql = getSql();
     const existingJobCardRows = await sql<any[]>/* sql */ `
       SELECT id
       FROM job_cards
@@ -346,22 +398,22 @@ export async function POST(req: NextRequest, { params }: Params) {
     if (jobCardId && resolved.estimate.inspection_id) {
       if (selectedInspectionLineItemIds.length > 0) {
         await sql<any[]>/* sql */ `
-          UPDATE line_items
+          UPDATE line_items li
           SET job_card_id = ${jobCardId}
-          WHERE company_id = ${resolved.estimate.company_id}
-            AND inspection_id = ${resolved.estimate.inspection_id}
-            AND status = 'Approved'
-            AND job_card_id IS NULL
-            AND id = ANY(${sql.array(selectedInspectionLineItemIds)})
+          WHERE li.company_id = ${resolved.estimate.company_id}
+            AND li.inspection_id = ${resolved.estimate.inspection_id}
+            AND li.job_card_id IS NULL
+            AND li.id = ANY(${sql.array(selectedInspectionLineItemIds)})
+            AND LOWER(COALESCE(li.customer_approval_status, '')) = 'approved'
         `;
       } else {
         await sql<any[]>/* sql */ `
-          UPDATE line_items
+          UPDATE line_items li
           SET job_card_id = ${jobCardId}
-          WHERE company_id = ${resolved.estimate.company_id}
-            AND inspection_id = ${resolved.estimate.inspection_id}
-            AND status = 'Approved'
-            AND job_card_id IS NULL
+          WHERE li.company_id = ${resolved.estimate.company_id}
+            AND li.inspection_id = ${resolved.estimate.inspection_id}
+            AND li.job_card_id IS NULL
+            AND LOWER(COALESCE(li.customer_approval_status, '')) = 'approved'
         `;
       }
     }

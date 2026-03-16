@@ -36,6 +36,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       pq.oe_qty,
       pq.aftm_qty,
       pq.used_qty,
+      li.customer_approval_status AS line_item_customer_approval_status,
       pq.estimate_id,
       e.status AS estimate_status,
       ior.estimate_id AS request_estimate_id,
@@ -79,8 +80,10 @@ export async function POST(req: NextRequest, { params }: Params) {
   const estimateStatus = String(current.estimate_status ?? "").trim().toLowerCase();
   const requestEstimateStatus = String(current.request_estimate_status ?? "").trim().toLowerCase();
   const inspectionEstimateStatus = String(current.inspection_estimate_status ?? "").trim().toLowerCase();
+  const lineItemCustomerApprovalStatus = String(current.line_item_customer_approval_status ?? "").trim().toLowerCase();
   const customerApprovalStatus = String(current.customer_approval_status ?? "").trim().toLowerCase();
   const isCustomerApproved =
+    lineItemCustomerApprovalStatus === "approved" ||
     customerApprovalStatus === "approved" ||
     estimateStatus === "approved" ||
     requestEstimateStatus === "approved" ||
