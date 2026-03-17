@@ -468,6 +468,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     if (
       body?.action !== "start" &&
       body?.action !== "complete" &&
+      body?.action !== "collect_car_review" &&
       body?.action !== "collect_car" &&
       body?.action !== "pre_work_check" &&
       body?.action !== "working_video" &&
@@ -672,6 +673,43 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         RETURNING *
       `;
       return createMobileSuccessResponse(updated[0] ?? jobCard);
+    }
+
+    if (body?.action === "collect_car_review") {
+      if (!jobCard?.inspection_id) {
+        return createMobileErrorResponse("Inspection is not linked to this job card.", 400);
+      }
+      const carMediaReview = sanitizeCarMediaReview(body?.carMediaReview ?? {});
+      const carMediaReplacement = sanitizeTextMap(body?.carMediaReplacement ?? {});
+      const inspectionRows = await sql`
+        SELECT draft_payload
+        FROM inspections
+        WHERE company_id = ${companyId}
+          AND id = ${jobCard.inspection_id}
+        LIMIT 1
+      `;
+      const currentDraft =
+        (inspectionRows[0]?.draft_payload && typeof inspectionRows[0].draft_payload === "object"
+          ? inspectionRows[0].draft_payload
+          : {}) as Record<string, unknown>;
+      const nextDraft = {
+        ...currentDraft,
+        carMediaReview,
+        carMediaReplacement,
+        carMediaRejectNote: sanitizeTextMap(body?.carMediaRejectNote ?? {}),
+      };
+      await sql`
+        UPDATE inspections
+        SET draft_payload = ${nextDraft as any},
+            updated_at = NOW()
+        WHERE company_id = ${companyId}
+          AND id = ${jobCard.inspection_id}
+      `;
+      return createMobileSuccessResponse({
+        carMediaReview,
+        carMediaReplacement,
+        carMediaRejectNote: nextDraft.carMediaRejectNote,
+      });
     }
 
     if (body?.action === "collect_car") {
