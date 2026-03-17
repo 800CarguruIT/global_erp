@@ -1180,18 +1180,25 @@ export function InspectionDetailPageClient({
     inspectionIssueEntries?: InspectionIssueEntry[];
   }) => {
     if (!companyId || !inspectionId) return false;
+    // Preserve the current step; verify/reject/reopen shouldn't reset it.
+    const persistedStepRaw = Number((inspection?.draftPayload as any)?.inspectionStep);
+    const persistedStep = Number.isFinite(persistedStepRaw)
+      ? Math.min(6, Math.max(1, Math.trunc(persistedStepRaw)))
+      : inspectionStep;
     const nextReview = overrides?.review ?? carMediaReview;
     const nextReplacement = overrides?.replacement ?? carMediaReplacement;
     const nextProcessVerified = overrides?.processVerified ?? processMediaVerified;
     const nextRejectReason = overrides?.rejectReason ?? carMediaRejectReason;
     const nextRejectNote = overrides?.rejectNote ?? carMediaRejectNote;
     try {
+      const baseDraft = buildDraftPayload(inspectionLogs, parts);
       const res = await fetch(`/api/company/${companyId}/workshop/inspections/${inspectionId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           draftPayload: {
-            ...buildDraftPayload(inspectionLogs, parts),
+            ...baseDraft,
+            inspectionStep: persistedStep,
             inspectionIssueEntries: (overrides?.inspectionIssueEntries ?? inspectionIssueEntries).map((entry) => ({
               id: entry.id,
               description: entry.description,
