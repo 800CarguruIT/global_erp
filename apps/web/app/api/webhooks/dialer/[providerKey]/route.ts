@@ -2059,7 +2059,8 @@ async function handle(providerKey: string, req: NextRequest) {
 
   const shouldRunInboundAiFlow =
     update.direction === "inbound" &&
-    /(ring|incoming|initiated)/i.test(String(update.status ?? ""));
+    (/(ring|incoming|initiated)/i.test(String(update.status ?? "")) ||
+      isLikelyExternalNumber(update.fromNumber ?? null));
   if (shouldRunInboundAiFlow) {
     if (!update.companyId) {
       const inferredCompanyId = await resolveCompanyForInbound({
