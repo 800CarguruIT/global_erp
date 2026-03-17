@@ -38,6 +38,11 @@ export const dynamic = "force-dynamic";
 const WEBHOOK_LOG_PATH =
   process.env.DIALER_WEBHOOK_LOG_PATH?.trim() ||
   path.join(os.tmpdir(), "global-erp", "webhook-dialer.log");
+const WEBHOOK_LOG_FALLBACK_PATH = path.join(
+  os.tmpdir(),
+  "global-erp",
+  "webhook-dialer-fallback.log"
+);
 const liveExecutionSeen = new Map<string, number>();
 const yeastarTokenCache = (() => {
   const key = "__GLOBAL_ERP_YEASTAR_TOKEN_CACHE__";
@@ -66,8 +71,30 @@ async function logWebhookLine(line: Record<string, unknown>) {
     const dir = path.dirname(WEBHOOK_LOG_PATH);
     await mkdir(dir, { recursive: true });
     await appendFile(WEBHOOK_LOG_PATH, `${safeJson(line)}\n`, "utf8");
-  } catch {
-    // no-op: webhook must not fail because logging failed
+  } catch (error) {
+    // Keep webhook resilient, but surface diagnostics and preserve logs in fallback path.
+    console.error("dialer webhook log write failed", {
+      targetPath: WEBHOOK_LOG_PATH,
+      fallbackPath: WEBHOOK_LOG_FALLBACK_PATH,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    try {
+      const fallbackDir = path.dirname(WEBHOOK_LOG_FALLBACK_PATH);
+      await mkdir(fallbackDir, { recursive: true });
+      await appendFile(
+        WEBHOOK_LOG_FALLBACK_PATH,
+        `${safeJson({
+          ts: new Date().toISOString(),
+          stage: "log_write_fallback",
+          targetPath: WEBHOOK_LOG_PATH,
+          originalError: error instanceof Error ? error.message : String(error),
+          line,
+        })}\n`,
+        "utf8"
+      );
+    } catch {
+      // no-op: logging must never break webhook handling
+    }
   }
 }
 

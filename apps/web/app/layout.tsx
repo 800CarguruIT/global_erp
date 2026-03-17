@@ -15,12 +15,13 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const linkusSdkUrl = process.env.NEXT_PUBLIC_LINKUS_SDK_URL?.trim();
+  const linkusSdkUrl =
+    process.env.NEXT_PUBLIC_LINKUS_SDK_URL?.trim() || "/linkus-sdk.js";
 
   return (
     <html lang="en">
       <body suppressHydrationWarning>
-        {linkusSdkUrl ? <Script src={linkusSdkUrl} strategy="afterInteractive" /> : null}
+        <Script src={linkusSdkUrl} strategy="afterInteractive" />
         <GlobalUiProvider>
           <TranslationProvider>
             <ThemeProvider>
