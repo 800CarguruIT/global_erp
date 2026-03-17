@@ -1242,12 +1242,16 @@ export function InspectionDetailPageClient({
         const localYear = String(exact?.modelYear ?? exact?.model_year ?? "").trim();
         const localPlate = String(exact?.plateNumber ?? exact?.plate_number ?? "").trim();
         const hasLocalVehicleBasics = Boolean(localMake && localModel && localYear);
-        setInspectionMake((prev) => prev || localMake);
-        setInspectionModel((prev) => prev || localModel);
-        setInspectionYear((prev) => prev || localYear);
-        setInspectionPlate((prev) => prev || localPlate);
-        setTyreSizeFront((prev) => prev || String(exact?.tyreSizeFront ?? exact?.tyre_size_front ?? ""));
-        setTyreSizeRear((prev) => prev || String(exact?.tyreSizeBack ?? exact?.tyre_size_back ?? ""));
+        if (localMake) setInspectionMake(localMake);
+        if (localModel) setInspectionModel(localModel);
+        if (localYear) setInspectionYear(localYear);
+        if (localPlate) setInspectionPlate(localPlate);
+        {
+          const localTyreFront = String(exact?.tyreSizeFront ?? exact?.tyre_size_front ?? "").trim();
+          const localTyreRear = String(exact?.tyreSizeBack ?? exact?.tyre_size_back ?? "").trim();
+          if (localTyreFront) setTyreSizeFront(localTyreFront);
+          if (localTyreRear) setTyreSizeRear(localTyreRear);
+        }
         if (!form.carInMileage && (exact?.mileage ?? null) !== null) {
           setForm((prev) => ({ ...prev, carInMileage: String(exact?.mileage ?? "") }));
         }
@@ -1263,7 +1267,7 @@ export function InspectionDetailPageClient({
       }
 
       const vinRes = await fetch(
-        `/api/company/${companyId}/sales/leads/${leadId}/vin-lookup?vin=${encodeURIComponent(vin)}`,
+        `/api/company/${companyId}/sales/leads/${leadId}/vin-lookup?vin=${encodeURIComponent(vin)}&refresh=1`,
         { cache: "no-store" }
       );
       if (!vinRes.ok) {
@@ -1273,9 +1277,14 @@ export function InspectionDetailPageClient({
       const vinJson = await vinRes.json().catch(() => ({}));
       const vinCar = vinJson?.data?.car ?? null;
       if (vinCar) {
-        setInspectionMake((prev) => prev || String(vinCar?.make ?? vinCar?.brand?.name ?? ""));
-        setInspectionModel((prev) => prev || String(vinCar?.model ?? vinCar?.title ?? ""));
-        setInspectionYear((prev) => prev || String(vinCar?.year ?? vinCar?.modelYear ?? ""));
+        {
+          const vinMake = String(vinCar?.make ?? vinCar?.brand?.name ?? "").trim();
+          const vinModel = String(vinCar?.model ?? vinCar?.title ?? "").trim();
+          const vinYear = String(vinCar?.year ?? vinCar?.modelYear ?? "").trim();
+          if (vinMake) setInspectionMake(vinMake);
+          if (vinModel) setInspectionModel(vinModel);
+          if (vinYear) setInspectionYear(vinYear);
+        }
         setVinLookupNote("VIN decoded from catalog and vehicle fields auto-filled.");
       } else {
         setVinLookupNote("VIN lookup finished with no matched vehicle details.");

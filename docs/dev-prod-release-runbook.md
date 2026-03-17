@@ -144,5 +144,11 @@ docker compose -p global-erp-prod -f docker-compose.prod.yml --env-file .env.pro
 ## 7) Notes
 
 - Keep `dev` and `prod` env values separate (`.env.development` vs `.env.production`).
+- Compose project names:
+  - Dev: `global-erp-dev`
+  - Prod: `global-erp-prod`
+- Database names are fixed by compose files:
+  - Dev DB: `global_erp_dev`
+  - Prod DB: `global_erp_prod`
 - Always run migrations against dev first.
 - Never skip smoke test for customer approval -> invoice convert path.

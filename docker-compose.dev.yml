@@ -1,12 +1,11 @@
 services:
   postgres:
     image: postgres:16
-    container_name: global-erp-postgres-dev
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_DB: global_erp_dev
     ports:
       - "5432:5432"
     volumes:
@@ -14,7 +13,6 @@ services:
 
   adminer:
     image: adminer
-    container_name: global-erp-adminer-dev
     restart: unless-stopped
     ports:
       - "8081:8080"
@@ -26,14 +24,13 @@ services:
       context: .
       dockerfile: Dockerfile
       target: dev
-    container_name: global-erp-web-dev
     restart: unless-stopped
     depends_on:
       - postgres
     env_file:
       - .env.development
     environment:
-      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/global_erp_dev
       NODE_ENV: development
       PORT: 3000
       DIALER_WEBHOOK_LOG_PATH: /app/apps/web/data/logs/webhook-dialer.log

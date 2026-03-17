@@ -67,50 +67,53 @@ export async function GET(req: NextRequest, { params }: Params) {
   const search = new URL(req.url).searchParams;
   const vin = String(search.get("vin") ?? "").trim().toUpperCase();
   const requestedCarId = String(search.get("carId") ?? "").trim();
+  const refresh = String(search.get("refresh") ?? "").trim() === "1";
   if (!vin) return NextResponse.json({ error: "VIN is required." }, { status: 400 });
 
   const lead = await getLeadById(companyId, id);
   if (!lead) return NextResponse.json({ error: "Lead not found." }, { status: 404 });
 
   try {
-    const cachedCars = await getVinCatalogCarsByVin(vin);
-    if (cachedCars.length > 0) {
-      if (requestedCarId) {
-        const cachedSelected = await getVinCatalogSnapshotByVinAndCarId(vin, requestedCarId);
-        if (cachedSelected && cachedSelected.partsCount > 0) {
+    if (!refresh) {
+      const cachedCars = await getVinCatalogCarsByVin(vin);
+      if (cachedCars.length > 0) {
+        if (requestedCarId) {
+          const cachedSelected = await getVinCatalogSnapshotByVinAndCarId(vin, requestedCarId);
+          if (cachedSelected && cachedSelected.partsCount > 0) {
+            return NextResponse.json({
+              data: {
+                ...cachedSelected,
+                cars: cachedCars,
+                requiresCarSelection: false,
+                source: "cache",
+              },
+            });
+          }
+        } else if (cachedCars.length > 1) {
           return NextResponse.json({
             data: {
-              ...cachedSelected,
+              vin,
               cars: cachedCars,
-              requiresCarSelection: false,
+              car: null,
+              partsBrand: null,
+              parts: [],
+              partsCount: 0,
+              requiresCarSelection: true,
               source: "cache",
             },
           });
-        }
-      } else if (cachedCars.length > 1) {
-        return NextResponse.json({
-          data: {
-            vin,
-            cars: cachedCars,
-            car: null,
-            partsBrand: null,
-            parts: [],
-            partsCount: 0,
-            requiresCarSelection: true,
-            source: "cache",
-          },
-        });
-      } else {
-        const cachedSingle = await getVinCatalogSnapshotByVinAndCarId(vin, cachedCars[0]!.id);
-        if (cachedSingle && cachedSingle.partsCount > 0) {
-          return NextResponse.json({
-            data: {
-              ...cachedSingle,
-              cars: cachedCars,
-              requiresCarSelection: false,
-              source: "cache",
-            },
-          });
+        } else {
+          const cachedSingle = await getVinCatalogSnapshotByVinAndCarId(vin, cachedCars[0]!.id);
+          if (cachedSingle && cachedSingle.partsCount > 0) {
+            return NextResponse.json({
+              data: {
+                ...cachedSingle,
+                cars: cachedCars,
+                requiresCarSelection: false,
+                source: "cache",
+              },
+            });
+          }
         }
       }
     }
