@@ -24,6 +24,10 @@ import type { InspectionItem } from "@repo/ai-core/workshop/inspections/types";
 
 type Params = { params: Promise<{ companyId: string; inspectionId: string }> };
 type CollectCarSourceType = "recovery" | "walkin" | "unknown";
+type CollectCarSource = {
+  sourceType: CollectCarSourceType;
+  sourceMedia: Record<string, string>;
+};
 
 function normalizeFileId(value: unknown): string | null {
   const out = String(value ?? "").trim();
@@ -46,10 +50,7 @@ async function resolveCollectCarSource(
   sql: any,
   companyId: string,
   leadId: string | null | undefined,
-): Promise<{
-  sourceType: CollectCarSourceType;
-  sourceMedia: Record<string, string>;
-}> {
+): Promise<CollectCarSource> {
   if (!leadId) return { sourceType: "unknown", sourceMedia: {} };
   const leadRows = await sql<any[]>`
     SELECT
@@ -130,6 +131,27 @@ async function resolveCollectCarSource(
   return { sourceType: "walkin", sourceMedia: media };
 }
 
+function buildCollectCarReviewFromLog(
+  logRow: any,
+  fallbackSource: CollectCarSource,
+) {
+  if (!logRow) return null;
+  return {
+    completed: true,
+    hasDifference: Boolean(logRow?.has_difference),
+    note: String(logRow?.note ?? "").trim() || null,
+    sourceType: String(
+      logRow?.source_type ?? fallbackSource.sourceType ?? "unknown",
+    ) as CollectCarSourceType,
+    sourceMedia: normalizeMediaMap(
+      logRow?.source_media ?? fallbackSource.sourceMedia,
+    ),
+    reuploadMedia: normalizeMediaMap(logRow?.reupload_media ?? {}),
+    reviewedAt: logRow?.reviewed_at ?? logRow?.created_at ?? null,
+    reviewedBy: logRow?.reviewed_by ? String(logRow.reviewed_by) : null,
+  };
+}
+
 export async function GET(req: NextRequest, { params }: Params) {
   try {
     const userId = requireMobileUserId(req);
@@ -191,6 +213,7 @@ export async function GET(req: NextRequest, { params }: Params) {
       ORDER BY reviewed_at DESC
       LIMIT 20
     `.catch(() => []);
+    const latestCollectCarLog = ((collectCarLogs as any)?.rows ?? collectCarLogs)?.[0];
 
     const collectCarSource = await resolveCollectCarSource(
       sql,
@@ -199,7 +222,8 @@ export async function GET(req: NextRequest, { params }: Params) {
     );
     const latestCollectCarReview =
       ((inspection as any)?.draftPayload as Record<string, unknown> | null)
-        ?.collectCarReview ?? null;
+        ?.collectCarReview ??
+      buildCollectCarReviewFromLog(latestCollectCarLog, collectCarSource);
     const latestPreInspectionForm = inspection.leadId
       ? await getLatestFormForLeadOrRelated({
           companyId,
@@ -271,14 +295,43 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       return createMobileErrorResponse("Not found", 404);
     }
 
+    const sql = getSql();
     const currentDraft =
       (((current as any)?.draftPayload ?? {}) as Record<string, any>) ?? {};
     const collectCarReview = currentDraft?.collectCarReview ?? null;
     const incomingCollectCarReview =
       (((body?.draftPayload ?? {}) as Record<string, any>) ?? {})
         ?.collectCarReview ?? null;
+    const collectCarSource = await resolveCollectCarSource(
+      sql,
+      companyId,
+      current.leadId ?? null,
+    );
+    const collectCarLogRows = await sql /* sql */ `
+      SELECT
+        source_type,
+        source_media,
+        has_difference,
+        note,
+        reupload_media,
+        reviewed_by,
+        reviewed_at,
+        created_at
+      FROM inspection_collect_car_review_logs
+      WHERE company_id = ${companyId}
+        AND inspection_id = ${inspectionId}
+      ORDER BY reviewed_at DESC, created_at DESC
+      LIMIT 1
+    `.catch(() => []);
+    const latestCollectCarLog = ((collectCarLogRows as any)?.rows ?? collectCarLogRows)?.[0];
+    const loggedCollectCarReview = buildCollectCarReviewFromLog(
+      latestCollectCarLog,
+      collectCarSource,
+    );
     const collectCarCompleted = Boolean(
-      collectCarReview?.completed || incomingCollectCarReview?.completed,
+      collectCarReview?.completed ||
+        incomingCollectCarReview?.completed ||
+        loggedCollectCarReview?.completed,
     );
     const isCollectCarReviewAction = body?.action === "collect_car_review";
 
@@ -331,12 +384,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         );
       }
 
-      const sql = getSql();
-      const source = await resolveCollectCarSource(
-        sql,
-        companyId,
-        current.leadId ?? null,
-      );
+      const source = collectCarSource;
       const reviewedAt = new Date().toISOString();
       const nextCollectCarReview = {
         completed: true,
