@@ -3455,7 +3455,61 @@ export function InspectionDetailPageClient({
                               )}
                             </>
                           ) : (
-                            <div className="mt-2 text-[11px] text-white/50">No media uploaded.</div>
+                            <div className="mt-2 rounded border border-amber-500/30 bg-amber-500/5 p-2">
+                              <div className="text-[11px] text-amber-200">
+                                No media uploaded. Upload {key === "video" ? "360 video" : "image"} to continue.
+                              </div>
+                              <div className="mt-2">
+                                <FileUploader
+                                  label=""
+                                  kind={key === "video" ? "video" : "image"}
+                                  value={replacementId}
+                                  onChange={(id) => {
+                                    const nextReplacement = {
+                                      ...carMediaReplacement,
+                                      [key]: String(id ?? ""),
+                                    };
+                                    setCarMediaReplacement(nextReplacement);
+                                    void persistStep3MediaReview({ replacement: nextReplacement });
+                                  }}
+                                  disabled={isReadOnly || isCollectCarPending}
+                                  buttonOnly
+                                  showPreview
+                                  buttonClassName="h-9"
+                                  chooseLabel={`Upload ${key === "video" ? "Video" : "Image"}`}
+                                  replaceLabel={`Replace ${key === "video" ? "Video" : "Image"}`}
+                                />
+                              </div>
+                              {replacementId && (
+                                <div className="mt-2 flex items-center justify-between gap-2">
+                                  <a
+                                    href={`/api/files/${replacementId}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="text-[11px] text-primary hover:underline"
+                                  >
+                                    Open uploaded {key === "video" ? "video" : "image"}
+                                  </a>
+                                  {reviewStatus === "pending" && (
+                                    <button
+                                      type="button"
+                                      className="rounded-md bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white"
+                                      disabled={isReadOnly || isCollectCarPending}
+                                      onClick={async () => {
+                                        const nextReview = {
+                                          ...carMediaReview,
+                                          [key]: "verified" as CarMediaReviewStatus,
+                                        };
+                                        setCarMediaReview(nextReview);
+                                        await persistStep3MediaReview({ review: nextReview });
+                                      }}
+                                    >
+                                      Verify
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           )}
                         </div>
                       );

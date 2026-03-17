@@ -1,0 +1,76 @@
+diff --git a/packages/ai-core/src/workshop/inventory/repository.ts b/packages/ai-core/src/workshop/inventory/repository.ts
+index 003ff7f..745d970 100644
+@@ -463,7 +485,7 @@ async function nextTransferNumber(companyId: string): Promise<string> {
+   const prefix = `TR-${year}-`;
+   const rows = await sql/* sql */ `
+     SELECT transfer_number
+-    FROM inventory_transfers
++    FROM inventory_transfer_orders
+     WHERE company_id = ${companyId} AND transfer_number LIKE ${prefix + "%"}
+     ORDER BY transfer_number DESC
+     LIMIT 1
+@@ -485,7 +507,7 @@ export async function createTransferDraft(
+   const sql = getSql();
+   const transferNumber = await nextTransferNumber(companyId);
+   const rows = await sql/* sql */ `
+-    INSERT INTO inventory_transfers (
++    INSERT INTO inventory_transfer_orders (
+       company_id,
+       from_location_id,
+       to_location_id,
+@@ -534,7 +556,7 @@ export async function listTransfers(
+     : sql`company_id = ${companyId}`;
+   try {
+     const rows = await sql/* sql */ `
+-      SELECT * FROM inventory_transfers
++      SELECT * FROM inventory_transfer_orders
+       WHERE ${where}
+       ORDER BY created_at DESC
+     `;
+@@ -554,7 +576,7 @@ export async function getTransferWithItems(
+ ): Promise<{ transfer: InventoryTransfer; items: InventoryTransferItem[] } | null> {
+   const sql = getSql();
+   const rows =
+-    await sql/* sql */ `SELECT * FROM inventory_transfers WHERE company_id = ${companyId} AND id = ${transferId} LIMIT 1`;
++    await sql/* sql */ `SELECT * FROM inventory_transfer_orders WHERE company_id = ${companyId} AND id = ${transferId} LIMIT 1`;
+   if (!rows.length) return null;
+   const transfer = mapTransfer(rows[0]);
+   const items = await getTransferItems(transferId);
+@@ -571,10 +593,6 @@ async function getTransferItems(transferId: string): Promise<InventoryTransferIt
+   return rows.map(mapTransferItem);
+ }
+ 
+-function isMissingTable(err: any) {
+-  return err?.code === "42P01";
+-}
+-
+ export async function updateTransferDraft(
+   companyId: string,
+   transferId: string,
+@@ -583,7 +601,7 @@ export async function updateTransferDraft(
+   const sql = getSql();
+   if (patch.notes !== undefined) {
+     await sql/* sql */ `
+-      UPDATE inventory_transfers
++      UPDATE inventory_transfer_orders
+       SET notes = ${patch.notes}
+       WHERE company_id = ${companyId} AND id = ${transferId}
+     `;
+@@ -649,7 +667,7 @@ export async function startTransfer(
+   }
+ 
+   await sql/* sql */ `
+-    UPDATE inventory_transfers
++    UPDATE inventory_transfer_orders
+     SET status = ${"in_transit" as InventoryTransferStatus}
+     WHERE id = ${transferId}
+   `;
+@@ -695,7 +713,7 @@ export async function completeTransfer(
+   }
+ 
+   await sql/* sql */ `
+-    UPDATE inventory_transfers
++    UPDATE inventory_transfer_orders
+     SET status = ${"completed" as InventoryTransferStatus},
+         completed_by = ${userId ?? null},
+         completed_at = now()

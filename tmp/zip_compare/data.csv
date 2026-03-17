@@ -1,0 +1,3747 @@
+carpart.id,carpart.ts,carpart.title,carpart.price,carpart.ships_from,carpart.year_x_carpart_id,carpart.image_id,carpart.carpart_x_detail_id
+1,"2018-11-05 03:13:20","1997-1999 ACURA CL TEMPERATURE CONTROL 404098",$106.25,"Kansas City, Missouri","{
+    ""1"": {
+        ""year_x_carpart.id"": 1,
+        ""year.id"": 1,
+        ""year.ts"": ""2017-10-13 04:06:58"",
+        ""year.title"": ""1997 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    },
+    ""41"": {
+        ""year_x_carpart.id"": 41,
+        ""year.id"": 2,
+        ""year.ts"": ""2017-10-19 03:47:45"",
+        ""year.title"": ""1998 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    },
+    ""81"": {
+        ""year_x_carpart.id"": 81,
+        ""year.id"": 3,
+        ""year.ts"": ""2017-10-19 03:47:49"",
+        ""year.title"": ""1999 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    },
+    ""1309677"": {
+        ""year_x_carpart.id"": 1309677,
+        ""year.id"": 60415,
+        ""year.ts"": ""2017-10-23 12:20:09"",
+        ""year.title"": ""1997 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 10272,
+        ""type.ts"": ""2017-10-08 22:10:54"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 385,
+        ""accessory.ts"": ""2017-09-30 05:08:11"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""Other"",
+        ""category_1.id"": 7,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""Other""
+    },
+    ""1309703"": {
+        ""year_x_carpart.id"": 1309703,
+        ""year.id"": 60416,
+        ""year.ts"": ""2017-10-23 12:20:11"",
+        ""year.title"": ""1998 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 10272,
+        ""type.ts"": ""2017-10-08 22:10:54"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 385,
+        ""accessory.ts"": ""2017-09-30 05:08:11"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""Other"",
+        ""category_1.id"": 7,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""Other""
+    },
+    ""1309744"": {
+        ""year_x_carpart.id"": 1309744,
+        ""year.id"": 60417,
+        ""year.ts"": ""2017-10-23 12:20:23"",
+        ""year.title"": ""1999 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 10272,
+        ""type.ts"": ""2017-10-08 22:10:54"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 385,
+        ""accessory.ts"": ""2017-09-30 05:08:11"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""Other"",
+        ""category_1.id"": 7,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""Other""
+    }
+}","{
+    ""1"": {
+        ""image.id"": 1,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""1"": {
+                ""carpart_image.id"": 1,
+                ""carpart_image.path"": ""/6a/85/00/72/6a8500722205bead5efcdb1ce7d87ddd06e8ef8f.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//6a/85/00/72/6a8500722205bead5efcdb1ce7d87ddd06e8ef8f.JPG""
+            }
+        }
+    },
+    ""2"": {
+        ""image.id"": 2,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""2"": {
+                ""carpart_image.id"": 2,
+                ""carpart_image.path"": ""/ea/4b/7d/e7/ea4b7de7eb18645cc3062c138dc8d57735f62b81.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//ea/4b/7d/e7/ea4b7de7eb18645cc3062c138dc8d57735f62b81.JPG""
+            }
+        }
+    },
+    ""3"": {
+        ""image.id"": 3,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""3"": {
+                ""carpart_image.id"": 3,
+                ""carpart_image.path"": ""/2a/97/02/83/2a970283f2b63f3e37b8393f8ba2d9d200aa3b10.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//2a/97/02/83/2a970283f2b63f3e37b8393f8ba2d9d200aa3b10.JPG""
+            }
+        }
+    },
+    ""4"": {
+        ""image.id"": 4,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""4"": {
+                ""carpart_image.id"": 4,
+                ""carpart_image.path"": ""/2d/97/78/64/2d97786490f4b15545f6727a65e34243d6d2dc8e.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//2d/97/78/64/2d97786490f4b15545f6727a65e34243d6d2dc8e.JPG""
+            }
+        }
+    }
+}","{
+    ""1"": {
+        ""carpart_x_detail.id"": 1,
+        ""detail.id"": 1,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Designation"",
+        ""detail.value"": ""Used.""
+    },
+    ""2"": {
+        ""carpart_x_detail.id"": 2,
+        ""detail.id"": 2,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Genuine OEM"",
+        ""detail.value"": ""Yes.""
+    },
+    ""3"": {
+        ""carpart_x_detail.id"": 3,
+        ""detail.id"": 3,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""GTIN"",
+        ""detail.value"": ""Does not apply.""
+    },
+    ""4"": {
+        ""carpart_x_detail.id"": 4,
+        ""detail.id"": 4,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Interchange Part Number"",
+        ""detail.value"": ""655-50792.""
+    },
+    ""5"": {
+        ""carpart_x_detail.id"": 5,
+        ""detail.id"": 5,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Inventory ID"",
+        ""detail.value"": ""404098.""
+    },
+    ""6"": {
+        ""carpart_x_detail.id"": 6,
+        ""detail.id"": 6,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Mileage"",
+        ""detail.value"": ""193000.""
+    },
+    ""7"": {
+        ""carpart_x_detail.id"": 7,
+        ""detail.id"": 7,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Model"",
+        ""detail.value"": ""CL.""
+    },
+    ""8"": {
+        ""carpart_x_detail.id"": 8,
+        ""detail.id"": 8,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""PartNumber"",
+        ""detail.value"": ""655.""
+    },
+    ""9"": {
+        ""carpart_x_detail.id"": 9,
+        ""detail.id"": 9,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Placement"",
+        ""detail.value"": ""Temperature Control.""
+    },
+    ""10"": {
+        ""carpart_x_detail.id"": 10,
+        ""detail.id"": 10,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Stock Number"",
+        ""detail.value"": ""AC167.""
+    },
+    ""11"": {
+        ""carpart_x_detail.id"": 11,
+        ""detail.id"": 11,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Year"",
+        ""detail.value"": ""1997.""
+    }
+}"
+2,"2018-11-05 03:13:20","#5265F ACURA CL 1997-1999 OEM TEMP AC HEAT CLIMATE CONTROL PANEL UNIT SWITCH",$30.00,"Loganville, Georgia","{
+    ""2"": {
+        ""year_x_carpart.id"": 2,
+        ""year.id"": 1,
+        ""year.ts"": ""2017-10-13 04:06:58"",
+        ""year.title"": ""1997 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    },
+    ""50"": {
+        ""year_x_carpart.id"": 50,
+        ""year.id"": 2,
+        ""year.ts"": ""2017-10-19 03:47:45"",
+        ""year.title"": ""1998 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    },
+    ""98"": {
+        ""year_x_carpart.id"": 98,
+        ""year.id"": 3,
+        ""year.ts"": ""2017-10-19 03:47:49"",
+        ""year.title"": ""1999 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    }
+}","{
+    ""5"": {
+        ""image.id"": 5,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""5"": {
+                ""carpart_image.id"": 5,
+                ""carpart_image.path"": ""/68/b1/4a/96/68b14a965856728dcf66565160d27ea95a2b91fd.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//68/b1/4a/96/68b14a965856728dcf66565160d27ea95a2b91fd.JPG""
+            }
+        }
+    },
+    ""6"": {
+        ""image.id"": 6,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""6"": {
+                ""carpart_image.id"": 6,
+                ""carpart_image.path"": ""/a1/0e/2f/8a/a10e2f8aba794def041aa75bb69ebf0e663b7f1e.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//a1/0e/2f/8a/a10e2f8aba794def041aa75bb69ebf0e663b7f1e.JPG""
+            }
+        }
+    }
+}","{
+    ""12"": {
+        ""carpart_x_detail.id"": 12,
+        ""detail.id"": 12,
+        ""detail.ts"": ""2017-10-19 03:43:47"",
+        ""detail.key"": ""Manufacturer Part Number"",
+        ""detail.value"": ""CONTROLLER UNIT TN177200-7292.""
+    },
+    ""13"": {
+        ""carpart_x_detail.id"": 13,
+        ""detail.id"": 13,
+        ""detail.ts"": ""2017-10-19 03:43:47"",
+        ""detail.key"": ""Other Part Number"",
+        ""detail.value"": ""CENTER DASH DISPLAY TEMPERATURE A/C HEATER.""
+    }
+}"
+3,"2018-11-05 03:13:20","1997-1999 ACURA CL TEMPERATURE CONTROL 396791",$106.25,"Kansas City, Missouri","{
+    ""3"": {
+        ""year_x_carpart.id"": 3,
+        ""year.id"": 1,
+        ""year.ts"": ""2017-10-13 04:06:58"",
+        ""year.title"": ""1997 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    },
+    ""42"": {
+        ""year_x_carpart.id"": 42,
+        ""year.id"": 2,
+        ""year.ts"": ""2017-10-19 03:47:45"",
+        ""year.title"": ""1998 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    },
+    ""82"": {
+        ""year_x_carpart.id"": 82,
+        ""year.id"": 3,
+        ""year.ts"": ""2017-10-19 03:47:49"",
+        ""year.title"": ""1999 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    },
+    ""1309679"": {
+        ""year_x_carpart.id"": 1309679,
+        ""year.id"": 60415,
+        ""year.ts"": ""2017-10-23 12:20:09"",
+        ""year.title"": ""1997 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 10272,
+        ""type.ts"": ""2017-10-08 22:10:54"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 385,
+        ""accessory.ts"": ""2017-09-30 05:08:11"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""Other"",
+        ""category_1.id"": 7,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""Other""
+    },
+    ""1309713"": {
+        ""year_x_carpart.id"": 1309713,
+        ""year.id"": 60416,
+        ""year.ts"": ""2017-10-23 12:20:11"",
+        ""year.title"": ""1998 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 10272,
+        ""type.ts"": ""2017-10-08 22:10:54"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 385,
+        ""accessory.ts"": ""2017-09-30 05:08:11"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""Other"",
+        ""category_1.id"": 7,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""Other""
+    },
+    ""1309743"": {
+        ""year_x_carpart.id"": 1309743,
+        ""year.id"": 60417,
+        ""year.ts"": ""2017-10-23 12:20:23"",
+        ""year.title"": ""1999 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 10272,
+        ""type.ts"": ""2017-10-08 22:10:54"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 385,
+        ""accessory.ts"": ""2017-09-30 05:08:11"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""Other"",
+        ""category_1.id"": 7,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""Other""
+    }
+}","{
+    ""7"": {
+        ""image.id"": 7,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""7"": {
+                ""carpart_image.id"": 7,
+                ""carpart_image.path"": ""/6c/74/ae/d8/6c74aed80754f0ed3be9f5f47488a3480c11f54c.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//6c/74/ae/d8/6c74aed80754f0ed3be9f5f47488a3480c11f54c.JPG""
+            }
+        }
+    },
+    ""8"": {
+        ""image.id"": 8,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""8"": {
+                ""carpart_image.id"": 8,
+                ""carpart_image.path"": ""/ae/db/f9/8a/aedbf98a0741484ba8abb102c8dc683862ebab1f.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//ae/db/f9/8a/aedbf98a0741484ba8abb102c8dc683862ebab1f.JPG""
+            }
+        }
+    },
+    ""9"": {
+        ""image.id"": 9,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""9"": {
+                ""carpart_image.id"": 9,
+                ""carpart_image.path"": ""/31/95/9a/a1/31959aa155a726dc06ebd46cc9ba77704b329449.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//31/95/9a/a1/31959aa155a726dc06ebd46cc9ba77704b329449.JPG""
+            }
+        }
+    },
+    ""10"": {
+        ""image.id"": 10,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""10"": {
+                ""carpart_image.id"": 10,
+                ""carpart_image.path"": ""/c1/f3/19/1b/c1f3191b98a145d2ee280ebce8ac33f90407229b.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//c1/f3/19/1b/c1f3191b98a145d2ee280ebce8ac33f90407229b.JPG""
+            }
+        }
+    }
+}","{
+    ""15"": {
+        ""carpart_x_detail.id"": 15,
+        ""detail.id"": 1,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Designation"",
+        ""detail.value"": ""Used.""
+    },
+    ""16"": {
+        ""carpart_x_detail.id"": 16,
+        ""detail.id"": 2,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Genuine OEM"",
+        ""detail.value"": ""Yes.""
+    },
+    ""17"": {
+        ""carpart_x_detail.id"": 17,
+        ""detail.id"": 3,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""GTIN"",
+        ""detail.value"": ""Does not apply.""
+    },
+    ""18"": {
+        ""carpart_x_detail.id"": 18,
+        ""detail.id"": 4,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Interchange Part Number"",
+        ""detail.value"": ""655-50792.""
+    },
+    ""21"": {
+        ""carpart_x_detail.id"": 21,
+        ""detail.id"": 7,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Model"",
+        ""detail.value"": ""CL.""
+    },
+    ""22"": {
+        ""carpart_x_detail.id"": 22,
+        ""detail.id"": 8,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""PartNumber"",
+        ""detail.value"": ""655.""
+    },
+    ""23"": {
+        ""carpart_x_detail.id"": 23,
+        ""detail.id"": 9,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Placement"",
+        ""detail.value"": ""Temperature Control.""
+    },
+    ""25"": {
+        ""carpart_x_detail.id"": 25,
+        ""detail.id"": 11,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Year"",
+        ""detail.value"": ""1997.""
+    },
+    ""14"": {
+        ""carpart_x_detail.id"": 14,
+        ""detail.id"": 14,
+        ""detail.ts"": ""2017-10-19 03:43:56"",
+        ""detail.key"": ""Conditions & Options"",
+        ""detail.value"": ""TAB BROKE.""
+    },
+    ""19"": {
+        ""carpart_x_detail.id"": 19,
+        ""detail.id"": 19,
+        ""detail.ts"": ""2017-10-19 03:43:56"",
+        ""detail.key"": ""Inventory ID"",
+        ""detail.value"": ""396791.""
+    },
+    ""20"": {
+        ""carpart_x_detail.id"": 20,
+        ""detail.id"": 20,
+        ""detail.ts"": ""2017-10-19 03:43:56"",
+        ""detail.key"": ""Mileage"",
+        ""detail.value"": ""0.""
+    },
+    ""24"": {
+        ""carpart_x_detail.id"": 24,
+        ""detail.id"": 24,
+        ""detail.ts"": ""2017-10-19 03:43:56"",
+        ""detail.key"": ""Stock Number"",
+        ""detail.value"": ""AC112.""
+    }
+}"
+4,"2018-11-05 03:13:20","1997-1999 ACURA CL TEMP CONTROL HEATER AC CONTROL",$39.99,"Conshohocken, Pennsylvania","{
+    ""4"": {
+        ""year_x_carpart.id"": 4,
+        ""year.id"": 1,
+        ""year.ts"": ""2017-10-13 04:06:58"",
+        ""year.title"": ""1997 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    },
+    ""46"": {
+        ""year_x_carpart.id"": 46,
+        ""year.id"": 2,
+        ""year.ts"": ""2017-10-19 03:47:45"",
+        ""year.title"": ""1998 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    },
+    ""88"": {
+        ""year_x_carpart.id"": 88,
+        ""year.id"": 3,
+        ""year.ts"": ""2017-10-19 03:47:49"",
+        ""year.title"": ""1999 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    },
+    ""1309662"": {
+        ""year_x_carpart.id"": 1309662,
+        ""year.id"": 60415,
+        ""year.ts"": ""2017-10-23 12:20:09"",
+        ""year.title"": ""1997 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 10272,
+        ""type.ts"": ""2017-10-08 22:10:54"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 385,
+        ""accessory.ts"": ""2017-09-30 05:08:11"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""Other"",
+        ""category_1.id"": 7,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""Other""
+    },
+    ""1309710"": {
+        ""year_x_carpart.id"": 1309710,
+        ""year.id"": 60416,
+        ""year.ts"": ""2017-10-23 12:20:11"",
+        ""year.title"": ""1998 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 10272,
+        ""type.ts"": ""2017-10-08 22:10:54"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 385,
+        ""accessory.ts"": ""2017-09-30 05:08:11"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""Other"",
+        ""category_1.id"": 7,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""Other""
+    },
+    ""1309761"": {
+        ""year_x_carpart.id"": 1309761,
+        ""year.id"": 60417,
+        ""year.ts"": ""2017-10-23 12:20:23"",
+        ""year.title"": ""1999 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 10272,
+        ""type.ts"": ""2017-10-08 22:10:54"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 385,
+        ""accessory.ts"": ""2017-09-30 05:08:11"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""Other"",
+        ""category_1.id"": 7,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""Other""
+    }
+}","{
+    ""11"": {
+        ""image.id"": 11,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""11"": {
+                ""carpart_image.id"": 11,
+                ""carpart_image.path"": ""/e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG""
+            }
+        }
+    },
+    ""12"": {
+        ""image.id"": 12,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""12"": {
+                ""carpart_image.id"": 12,
+                ""carpart_image.path"": ""/e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG""
+            }
+        }
+    },
+    ""13"": {
+        ""image.id"": 13,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""14"": {
+                ""carpart_image.id"": 14,
+                ""carpart_image.path"": ""/e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG""
+            }
+        }
+    }
+}","{
+    ""27"": {
+        ""carpart_x_detail.id"": 27,
+        ""detail.id"": 1,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Designation"",
+        ""detail.value"": ""Used.""
+    },
+    ""28"": {
+        ""carpart_x_detail.id"": 28,
+        ""detail.id"": 2,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Genuine OEM"",
+        ""detail.value"": ""Yes.""
+    },
+    ""29"": {
+        ""carpart_x_detail.id"": 29,
+        ""detail.id"": 3,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""GTIN"",
+        ""detail.value"": ""Does not apply.""
+    },
+    ""30"": {
+        ""carpart_x_detail.id"": 30,
+        ""detail.id"": 4,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Interchange Part Number"",
+        ""detail.value"": ""655-50792.""
+    },
+    ""33"": {
+        ""carpart_x_detail.id"": 33,
+        ""detail.id"": 7,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Model"",
+        ""detail.value"": ""CL.""
+    },
+    ""34"": {
+        ""carpart_x_detail.id"": 34,
+        ""detail.id"": 8,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""PartNumber"",
+        ""detail.value"": ""655.""
+    },
+    ""36"": {
+        ""carpart_x_detail.id"": 36,
+        ""detail.id"": 11,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Year"",
+        ""detail.value"": ""1997.""
+    },
+    ""32"": {
+        ""carpart_x_detail.id"": 32,
+        ""detail.id"": 20,
+        ""detail.ts"": ""2017-10-19 03:43:56"",
+        ""detail.key"": ""Mileage"",
+        ""detail.value"": ""0.""
+    },
+    ""26"": {
+        ""carpart_x_detail.id"": 26,
+        ""detail.id"": 26,
+        ""detail.ts"": ""2017-10-19 03:43:58"",
+        ""detail.key"": ""Conditions & Options"",
+        ""detail.value"": ""(E), DIG TN177200-7291.""
+    },
+    ""31"": {
+        ""carpart_x_detail.id"": 31,
+        ""detail.id"": 31,
+        ""detail.ts"": ""2017-10-19 03:43:58"",
+        ""detail.key"": ""Inventory ID"",
+        ""detail.value"": ""28157.""
+    },
+    ""35"": {
+        ""carpart_x_detail.id"": 35,
+        ""detail.id"": 35,
+        ""detail.ts"": ""2017-10-19 03:43:58"",
+        ""detail.key"": ""Stock Number"",
+        ""detail.value"": ""110024.""
+    }
+}"
+5,"2018-11-05 03:13:20","1997-1999 ACURA CL TEMPERATURE CONTROL 422111",$50.00,"Mooresville, North Carolina","{
+    ""5"": {
+        ""year_x_carpart.id"": 5,
+        ""year.id"": 1,
+        ""year.ts"": ""2017-10-13 04:06:58"",
+        ""year.title"": ""1997 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    },
+    ""47"": {
+        ""year_x_carpart.id"": 47,
+        ""year.id"": 2,
+        ""year.ts"": ""2017-10-19 03:47:45"",
+        ""year.title"": ""1998 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    },
+    ""97"": {
+        ""year_x_carpart.id"": 97,
+        ""year.id"": 3,
+        ""year.ts"": ""2017-10-19 03:47:49"",
+        ""year.title"": ""1999 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    },
+    ""1309664"": {
+        ""year_x_carpart.id"": 1309664,
+        ""year.id"": 60415,
+        ""year.ts"": ""2017-10-23 12:20:09"",
+        ""year.title"": ""1997 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 10272,
+        ""type.ts"": ""2017-10-08 22:10:54"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 385,
+        ""accessory.ts"": ""2017-09-30 05:08:11"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""Other"",
+        ""category_1.id"": 7,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""Other""
+    },
+    ""1309708"": {
+        ""year_x_carpart.id"": 1309708,
+        ""year.id"": 60416,
+        ""year.ts"": ""2017-10-23 12:20:11"",
+        ""year.title"": ""1998 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 10272,
+        ""type.ts"": ""2017-10-08 22:10:54"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 385,
+        ""accessory.ts"": ""2017-09-30 05:08:11"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""Other"",
+        ""category_1.id"": 7,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""Other""
+    },
+    ""1309771"": {
+        ""year_x_carpart.id"": 1309771,
+        ""year.id"": 60417,
+        ""year.ts"": ""2017-10-23 12:20:23"",
+        ""year.title"": ""1999 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 10272,
+        ""type.ts"": ""2017-10-08 22:10:54"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 385,
+        ""accessory.ts"": ""2017-09-30 05:08:11"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""Other"",
+        ""category_1.id"": 7,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""Other""
+    }
+}",{},"{
+    ""38"": {
+        ""carpart_x_detail.id"": 38,
+        ""detail.id"": 1,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Designation"",
+        ""detail.value"": ""Used.""
+    },
+    ""39"": {
+        ""carpart_x_detail.id"": 39,
+        ""detail.id"": 2,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Genuine OEM"",
+        ""detail.value"": ""Yes.""
+    },
+    ""40"": {
+        ""carpart_x_detail.id"": 40,
+        ""detail.id"": 3,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""GTIN"",
+        ""detail.value"": ""Does not apply.""
+    },
+    ""41"": {
+        ""carpart_x_detail.id"": 41,
+        ""detail.id"": 4,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Interchange Part Number"",
+        ""detail.value"": ""655-50792.""
+    },
+    ""44"": {
+        ""carpart_x_detail.id"": 44,
+        ""detail.id"": 7,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Model"",
+        ""detail.value"": ""CL.""
+    },
+    ""45"": {
+        ""carpart_x_detail.id"": 45,
+        ""detail.id"": 8,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""PartNumber"",
+        ""detail.value"": ""655.""
+    },
+    ""43"": {
+        ""carpart_x_detail.id"": 43,
+        ""detail.id"": 20,
+        ""detail.ts"": ""2017-10-19 03:43:56"",
+        ""detail.key"": ""Mileage"",
+        ""detail.value"": ""0.""
+    },
+    ""37"": {
+        ""carpart_x_detail.id"": 37,
+        ""detail.id"": 37,
+        ""detail.ts"": ""2017-10-19 03:44:07"",
+        ""detail.key"": ""Conditions & Options"",
+        ""detail.value"": ""TAN TSTD.""
+    },
+    ""42"": {
+        ""carpart_x_detail.id"": 42,
+        ""detail.id"": 42,
+        ""detail.ts"": ""2017-10-19 03:44:08"",
+        ""detail.key"": ""Inventory ID"",
+        ""detail.value"": ""422111.""
+    },
+    ""46"": {
+        ""carpart_x_detail.id"": 46,
+        ""detail.id"": 46,
+        ""detail.ts"": ""2017-10-19 03:44:08"",
+        ""detail.key"": ""Stock Number"",
+        ""detail.value"": ""150355.""
+    },
+    ""47"": {
+        ""carpart_x_detail.id"": 47,
+        ""detail.id"": 47,
+        ""detail.ts"": ""2017-10-19 03:44:08"",
+        ""detail.key"": ""Year"",
+        ""detail.value"": ""1998.""
+    }
+}"
+6,"2018-11-05 03:13:20","1997-1999 ACURA CL TEMPERATURE CONTROL 425492",$106.25,"Kansas City, Missouri","{
+    ""6"": {
+        ""year_x_carpart.id"": 6,
+        ""year.id"": 1,
+        ""year.ts"": ""2017-10-13 04:06:58"",
+        ""year.title"": ""1997 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    },
+    ""43"": {
+        ""year_x_carpart.id"": 43,
+        ""year.id"": 2,
+        ""year.ts"": ""2017-10-19 03:47:45"",
+        ""year.title"": ""1998 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    },
+    ""83"": {
+        ""year_x_carpart.id"": 83,
+        ""year.id"": 3,
+        ""year.ts"": ""2017-10-19 03:47:49"",
+        ""year.title"": ""1999 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    },
+    ""1309683"": {
+        ""year_x_carpart.id"": 1309683,
+        ""year.id"": 60415,
+        ""year.ts"": ""2017-10-23 12:20:09"",
+        ""year.title"": ""1997 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 10272,
+        ""type.ts"": ""2017-10-08 22:10:54"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 385,
+        ""accessory.ts"": ""2017-09-30 05:08:11"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""Other"",
+        ""category_1.id"": 7,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""Other""
+    },
+    ""1309704"": {
+        ""year_x_carpart.id"": 1309704,
+        ""year.id"": 60416,
+        ""year.ts"": ""2017-10-23 12:20:11"",
+        ""year.title"": ""1998 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 10272,
+        ""type.ts"": ""2017-10-08 22:10:54"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 385,
+        ""accessory.ts"": ""2017-09-30 05:08:11"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""Other"",
+        ""category_1.id"": 7,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""Other""
+    },
+    ""1309745"": {
+        ""year_x_carpart.id"": 1309745,
+        ""year.id"": 60417,
+        ""year.ts"": ""2017-10-23 12:20:23"",
+        ""year.title"": ""1999 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 10272,
+        ""type.ts"": ""2017-10-08 22:10:54"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 385,
+        ""accessory.ts"": ""2017-09-30 05:08:11"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""Other"",
+        ""category_1.id"": 7,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""Other""
+    }
+}","{
+    ""14"": {
+        ""image.id"": 14,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""15"": {
+                ""carpart_image.id"": 15,
+                ""carpart_image.path"": ""/99/eb/03/be/99eb03be2664c4578ee653f195ff401562fb729b.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//99/eb/03/be/99eb03be2664c4578ee653f195ff401562fb729b.JPG""
+            }
+        }
+    },
+    ""15"": {
+        ""image.id"": 15,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""17"": {
+                ""carpart_image.id"": 17,
+                ""carpart_image.path"": ""/f3/fe/2e/a5/f3fe2ea5af6cc83be8aaaa97834187ecca6013fc.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//f3/fe/2e/a5/f3fe2ea5af6cc83be8aaaa97834187ecca6013fc.JPG""
+            }
+        }
+    },
+    ""16"": {
+        ""image.id"": 16,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""18"": {
+                ""carpart_image.id"": 18,
+                ""carpart_image.path"": ""/f3/fe/2e/a5/f3fe2ea5af6cc83be8aaaa97834187ecca6013fc.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//f3/fe/2e/a5/f3fe2ea5af6cc83be8aaaa97834187ecca6013fc.JPG""
+            }
+        }
+    },
+    ""17"": {
+        ""image.id"": 17,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""20"": {
+                ""carpart_image.id"": 20,
+                ""carpart_image.path"": ""/51/59/61/05/51596105c73b482987dcbd76d441b9d3da36bb6e.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//51/59/61/05/51596105c73b482987dcbd76d441b9d3da36bb6e.JPG""
+            }
+        }
+    }
+}","{
+    ""49"": {
+        ""carpart_x_detail.id"": 49,
+        ""detail.id"": 1,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Designation"",
+        ""detail.value"": ""Used.""
+    },
+    ""50"": {
+        ""carpart_x_detail.id"": 50,
+        ""detail.id"": 2,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Genuine OEM"",
+        ""detail.value"": ""Yes.""
+    },
+    ""51"": {
+        ""carpart_x_detail.id"": 51,
+        ""detail.id"": 3,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""GTIN"",
+        ""detail.value"": ""Does not apply.""
+    },
+    ""52"": {
+        ""carpart_x_detail.id"": 52,
+        ""detail.id"": 4,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Interchange Part Number"",
+        ""detail.value"": ""655-50792.""
+    },
+    ""55"": {
+        ""carpart_x_detail.id"": 55,
+        ""detail.id"": 7,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Model"",
+        ""detail.value"": ""CL.""
+    },
+    ""56"": {
+        ""carpart_x_detail.id"": 56,
+        ""detail.id"": 8,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""PartNumber"",
+        ""detail.value"": ""655.""
+    },
+    ""57"": {
+        ""carpart_x_detail.id"": 57,
+        ""detail.id"": 9,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Placement"",
+        ""detail.value"": ""Temperature Control.""
+    },
+    ""59"": {
+        ""carpart_x_detail.id"": 59,
+        ""detail.id"": 11,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Year"",
+        ""detail.value"": ""1997.""
+    },
+    ""48"": {
+        ""carpart_x_detail.id"": 48,
+        ""detail.id"": 48,
+        ""detail.ts"": ""2017-10-19 03:44:09"",
+        ""detail.key"": ""Conditions & Options"",
+        ""detail.value"": ""BLK,5/96.""
+    },
+    ""53"": {
+        ""carpart_x_detail.id"": 53,
+        ""detail.id"": 53,
+        ""detail.ts"": ""2017-10-19 03:44:09"",
+        ""detail.key"": ""Inventory ID"",
+        ""detail.value"": ""425492.""
+    },
+    ""54"": {
+        ""carpart_x_detail.id"": 54,
+        ""detail.id"": 54,
+        ""detail.ts"": ""2017-10-19 03:44:09"",
+        ""detail.key"": ""Mileage"",
+        ""detail.value"": ""215000.""
+    },
+    ""58"": {
+        ""carpart_x_detail.id"": 58,
+        ""detail.id"": 58,
+        ""detail.ts"": ""2017-10-19 03:44:09"",
+        ""detail.key"": ""Stock Number"",
+        ""detail.value"": ""AC368.""
+    }
+}"
+7,"2018-11-05 03:13:20","1997-1999 ACURA CL TEMPERATURE CONTROL SWITCH OEM GUARANTEE T-S-1971",$0.00,"Mamou, Louisiana","{
+    ""7"": {
+        ""year_x_carpart.id"": 7,
+        ""year.id"": 1,
+        ""year.ts"": ""2017-10-13 04:06:58"",
+        ""year.title"": ""1997 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    },
+    ""48"": {
+        ""year_x_carpart.id"": 48,
+        ""year.id"": 2,
+        ""year.ts"": ""2017-10-19 03:47:45"",
+        ""year.title"": ""1998 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    },
+    ""96"": {
+        ""year_x_carpart.id"": 96,
+        ""year.id"": 3,
+        ""year.ts"": ""2017-10-19 03:47:49"",
+        ""year.title"": ""1999 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    },
+    ""1309665"": {
+        ""year_x_carpart.id"": 1309665,
+        ""year.id"": 60415,
+        ""year.ts"": ""2017-10-23 12:20:09"",
+        ""year.title"": ""1997 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 10272,
+        ""type.ts"": ""2017-10-08 22:10:54"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 385,
+        ""accessory.ts"": ""2017-09-30 05:08:11"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""Other"",
+        ""category_1.id"": 7,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""Other""
+    },
+    ""1309716"": {
+        ""year_x_carpart.id"": 1309716,
+        ""year.id"": 60416,
+        ""year.ts"": ""2017-10-23 12:20:11"",
+        ""year.title"": ""1998 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 10272,
+        ""type.ts"": ""2017-10-08 22:10:54"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 385,
+        ""accessory.ts"": ""2017-09-30 05:08:11"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""Other"",
+        ""category_1.id"": 7,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""Other""
+    },
+    ""1309773"": {
+        ""year_x_carpart.id"": 1309773,
+        ""year.id"": 60417,
+        ""year.ts"": ""2017-10-23 12:20:23"",
+        ""year.title"": ""1999 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 10272,
+        ""type.ts"": ""2017-10-08 22:10:54"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 385,
+        ""accessory.ts"": ""2017-09-30 05:08:11"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""Other"",
+        ""category_1.id"": 7,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""Other""
+    }
+}","{
+    ""18"": {
+        ""image.id"": 18,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""21"": {
+                ""carpart_image.id"": 21,
+                ""carpart_image.path"": ""/e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG""
+            }
+        }
+    },
+    ""19"": {
+        ""image.id"": 19,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""22"": {
+                ""carpart_image.id"": 22,
+                ""carpart_image.path"": ""/e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG""
+            }
+        }
+    },
+    ""20"": {
+        ""image.id"": 20,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""23"": {
+                ""carpart_image.id"": 23,
+                ""carpart_image.path"": ""/e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG""
+            }
+        }
+    }
+}","{
+    ""61"": {
+        ""carpart_x_detail.id"": 61,
+        ""detail.id"": 1,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Designation"",
+        ""detail.value"": ""Used.""
+    },
+    ""63"": {
+        ""carpart_x_detail.id"": 63,
+        ""detail.id"": 2,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Genuine OEM"",
+        ""detail.value"": ""Yes.""
+    },
+    ""64"": {
+        ""carpart_x_detail.id"": 64,
+        ""detail.id"": 3,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""GTIN"",
+        ""detail.value"": ""Does not apply.""
+    },
+    ""65"": {
+        ""carpart_x_detail.id"": 65,
+        ""detail.id"": 4,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Interchange Part Number"",
+        ""detail.value"": ""655-50792.""
+    },
+    ""68"": {
+        ""carpart_x_detail.id"": 68,
+        ""detail.id"": 7,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Model"",
+        ""detail.value"": ""CL.""
+    },
+    ""69"": {
+        ""carpart_x_detail.id"": 69,
+        ""detail.id"": 8,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""PartNumber"",
+        ""detail.value"": ""655.""
+    },
+    ""67"": {
+        ""carpart_x_detail.id"": 67,
+        ""detail.id"": 20,
+        ""detail.ts"": ""2017-10-19 03:43:56"",
+        ""detail.key"": ""Mileage"",
+        ""detail.value"": ""0.""
+    },
+    ""71"": {
+        ""carpart_x_detail.id"": 71,
+        ""detail.id"": 47,
+        ""detail.ts"": ""2017-10-19 03:44:08"",
+        ""detail.key"": ""Year"",
+        ""detail.value"": ""1998.""
+    },
+    ""60"": {
+        ""carpart_x_detail.id"": 60,
+        ""detail.id"": 60,
+        ""detail.ts"": ""2017-10-19 03:44:12"",
+        ""detail.key"": ""Conditions & Options"",
+        ""detail.value"": ""TN79650SY8A01,1772007291.""
+    },
+    ""62"": {
+        ""carpart_x_detail.id"": 62,
+        ""detail.id"": 62,
+        ""detail.ts"": ""2017-10-19 03:44:12"",
+        ""detail.key"": ""eCommerce Description"",
+        ""detail.value"": ""1998 ACURA CL.""
+    },
+    ""66"": {
+        ""carpart_x_detail.id"": 66,
+        ""detail.id"": 66,
+        ""detail.ts"": ""2017-10-19 03:44:12"",
+        ""detail.key"": ""Inventory ID"",
+        ""detail.value"": ""4335.""
+    },
+    ""70"": {
+        ""carpart_x_detail.id"": 70,
+        ""detail.id"": 70,
+        ""detail.ts"": ""2017-10-19 03:44:12"",
+        ""detail.key"": ""Stock Number"",
+        ""detail.value"": ""MISC.""
+    }
+}"
+8,"2018-11-05 03:13:20","1997-1999 ACURA CL TEMPERATURE CONTROL 76410",$75.00,"Toledo, Ohio","{
+    ""8"": {
+        ""year_x_carpart.id"": 8,
+        ""year.id"": 1,
+        ""year.ts"": ""2017-10-13 04:06:58"",
+        ""year.title"": ""1997 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    },
+    ""45"": {
+        ""year_x_carpart.id"": 45,
+        ""year.id"": 2,
+        ""year.ts"": ""2017-10-19 03:47:45"",
+        ""year.title"": ""1998 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    },
+    ""84"": {
+        ""year_x_carpart.id"": 84,
+        ""year.id"": 3,
+        ""year.ts"": ""2017-10-19 03:47:49"",
+        ""year.title"": ""1999 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    },
+    ""1309691"": {
+        ""year_x_carpart.id"": 1309691,
+        ""year.id"": 60415,
+        ""year.ts"": ""2017-10-23 12:20:09"",
+        ""year.title"": ""1997 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 10272,
+        ""type.ts"": ""2017-10-08 22:10:54"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 385,
+        ""accessory.ts"": ""2017-09-30 05:08:11"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""Other"",
+        ""category_1.id"": 7,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""Other""
+    },
+    ""1309707"": {
+        ""year_x_carpart.id"": 1309707,
+        ""year.id"": 60416,
+        ""year.ts"": ""2017-10-23 12:20:11"",
+        ""year.title"": ""1998 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 10272,
+        ""type.ts"": ""2017-10-08 22:10:54"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 385,
+        ""accessory.ts"": ""2017-09-30 05:08:11"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""Other"",
+        ""category_1.id"": 7,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""Other""
+    },
+    ""1309748"": {
+        ""year_x_carpart.id"": 1309748,
+        ""year.id"": 60417,
+        ""year.ts"": ""2017-10-23 12:20:23"",
+        ""year.title"": ""1999 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 10272,
+        ""type.ts"": ""2017-10-08 22:10:54"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 385,
+        ""accessory.ts"": ""2017-09-30 05:08:11"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""Other"",
+        ""category_1.id"": 7,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""Other""
+    }
+}","{
+    ""21"": {
+        ""image.id"": 21,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""24"": {
+                ""carpart_image.id"": 24,
+                ""carpart_image.path"": ""/e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG""
+            }
+        }
+    },
+    ""22"": {
+        ""image.id"": 22,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""25"": {
+                ""carpart_image.id"": 25,
+                ""carpart_image.path"": ""/e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG""
+            }
+        }
+    },
+    ""23"": {
+        ""image.id"": 23,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""26"": {
+                ""carpart_image.id"": 26,
+                ""carpart_image.path"": ""/e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG""
+            }
+        }
+    },
+    ""24"": {
+        ""image.id"": 24,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""27"": {
+                ""carpart_image.id"": 27,
+                ""carpart_image.path"": ""/e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG""
+            }
+        }
+    }
+}","{
+    ""73"": {
+        ""carpart_x_detail.id"": 73,
+        ""detail.id"": 1,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Designation"",
+        ""detail.value"": ""Used.""
+    },
+    ""75"": {
+        ""carpart_x_detail.id"": 75,
+        ""detail.id"": 2,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Genuine OEM"",
+        ""detail.value"": ""Yes.""
+    },
+    ""76"": {
+        ""carpart_x_detail.id"": 76,
+        ""detail.id"": 3,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""GTIN"",
+        ""detail.value"": ""Does not apply.""
+    },
+    ""77"": {
+        ""carpart_x_detail.id"": 77,
+        ""detail.id"": 4,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Interchange Part Number"",
+        ""detail.value"": ""655-50792.""
+    },
+    ""80"": {
+        ""carpart_x_detail.id"": 80,
+        ""detail.id"": 7,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Model"",
+        ""detail.value"": ""CL.""
+    },
+    ""81"": {
+        ""carpart_x_detail.id"": 81,
+        ""detail.id"": 8,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""PartNumber"",
+        ""detail.value"": ""655.""
+    },
+    ""72"": {
+        ""carpart_x_detail.id"": 72,
+        ""detail.id"": 72,
+        ""detail.ts"": ""2017-10-19 03:44:17"",
+        ""detail.key"": ""Conditions & Options"",
+        ""detail.value"": ""TESTED SUPER.""
+    },
+    ""74"": {
+        ""carpart_x_detail.id"": 74,
+        ""detail.id"": 74,
+        ""detail.ts"": ""2017-10-19 03:44:17"",
+        ""detail.key"": ""eCommerce Description"",
+        ""detail.value"": ""05312017.""
+    },
+    ""78"": {
+        ""carpart_x_detail.id"": 78,
+        ""detail.id"": 78,
+        ""detail.ts"": ""2017-10-19 03:44:17"",
+        ""detail.key"": ""Inventory ID"",
+        ""detail.value"": ""76410.""
+    },
+    ""79"": {
+        ""carpart_x_detail.id"": 79,
+        ""detail.id"": 79,
+        ""detail.ts"": ""2017-10-19 03:44:17"",
+        ""detail.key"": ""Mileage"",
+        ""detail.value"": ""131000.""
+    },
+    ""82"": {
+        ""carpart_x_detail.id"": 82,
+        ""detail.id"": 82,
+        ""detail.ts"": ""2017-10-19 03:44:17"",
+        ""detail.key"": ""Stock Number"",
+        ""detail.value"": ""150047.""
+    },
+    ""83"": {
+        ""carpart_x_detail.id"": 83,
+        ""detail.id"": 83,
+        ""detail.ts"": ""2017-10-19 03:44:17"",
+        ""detail.key"": ""Year"",
+        ""detail.value"": ""1999.""
+    }
+}"
+9,"2018-11-05 03:13:20","1997-1999 Acura CL OEM A/C heating climate control temperature switch TN177200-7291",$39.95,"Pacoima, California","{
+    ""9"": {
+        ""year_x_carpart.id"": 9,
+        ""year.id"": 1,
+        ""year.ts"": ""2017-10-13 04:06:58"",
+        ""year.title"": ""1997 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    },
+    ""58"": {
+        ""year_x_carpart.id"": 58,
+        ""year.id"": 2,
+        ""year.ts"": ""2017-10-19 03:47:45"",
+        ""year.title"": ""1998 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    },
+    ""92"": {
+        ""year_x_carpart.id"": 92,
+        ""year.id"": 3,
+        ""year.ts"": ""2017-10-19 03:47:49"",
+        ""year.title"": ""1999 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    }
+}","{
+    ""25"": {
+        ""image.id"": 25,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""28"": {
+                ""carpart_image.id"": 28,
+                ""carpart_image.path"": ""/3a/ab/fb/7c/3aabfb7c619baeafe6062f721ed6ec229038e8a5.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//3a/ab/fb/7c/3aabfb7c619baeafe6062f721ed6ec229038e8a5.JPG""
+            }
+        }
+    },
+    ""26"": {
+        ""image.id"": 26,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""29"": {
+                ""carpart_image.id"": 29,
+                ""carpart_image.path"": ""/68/a1/0c/af/68a10caf7028ea4421b91d1d24aaa6e292f966a0.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//68/a1/0c/af/68a10caf7028ea4421b91d1d24aaa6e292f966a0.JPG""
+            }
+        }
+    },
+    ""27"": {
+        ""image.id"": 27,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""30"": {
+                ""carpart_image.id"": 30,
+                ""carpart_image.path"": ""/a1/52/96/08/a1529608ade8052185e99cae20fbbcdf1540b026.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//a1/52/96/08/a1529608ade8052185e99cae20fbbcdf1540b026.JPG""
+            }
+        }
+    },
+    ""28"": {
+        ""image.id"": 28,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""31"": {
+                ""carpart_image.id"": 31,
+                ""carpart_image.path"": ""/c2/62/cb/42/c262cb424d21e3e3856e2aad29f51142fe618cff.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//c2/62/cb/42/c262cb424d21e3e3856e2aad29f51142fe618cff.JPG""
+            }
+        }
+    }
+}","{
+    ""84"": {
+        ""carpart_x_detail.id"": 84,
+        ""detail.id"": 84,
+        ""detail.ts"": ""2017-10-19 03:44:21"",
+        ""detail.key"": ""Brand"",
+        ""detail.value"": ""Acura.""
+    },
+    ""85"": {
+        ""carpart_x_detail.id"": 85,
+        ""detail.id"": 85,
+        ""detail.ts"": ""2017-10-19 03:44:21"",
+        ""detail.key"": ""Manufacturer Part Number"",
+        ""detail.value"": ""TN177200-7291.""
+    }
+}"
+10,"2018-11-05 03:13:20","1997-1999 ACURA CL TEMPERATURE CONTROL 132304",$60.00,"Seymour, Connecticut","{
+    ""10"": {
+        ""year_x_carpart.id"": 10,
+        ""year.id"": 1,
+        ""year.ts"": ""2017-10-13 04:06:58"",
+        ""year.title"": ""1997 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    },
+    ""49"": {
+        ""year_x_carpart.id"": 49,
+        ""year.id"": 2,
+        ""year.ts"": ""2017-10-19 03:47:45"",
+        ""year.title"": ""1998 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    },
+    ""87"": {
+        ""year_x_carpart.id"": 87,
+        ""year.id"": 3,
+        ""year.ts"": ""2017-10-19 03:47:49"",
+        ""year.title"": ""1999 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    },
+    ""1309666"": {
+        ""year_x_carpart.id"": 1309666,
+        ""year.id"": 60415,
+        ""year.ts"": ""2017-10-23 12:20:09"",
+        ""year.title"": ""1997 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 10272,
+        ""type.ts"": ""2017-10-08 22:10:54"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 385,
+        ""accessory.ts"": ""2017-09-30 05:08:11"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""Other"",
+        ""category_1.id"": 7,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""Other""
+    },
+    ""1309718"": {
+        ""year_x_carpart.id"": 1309718,
+        ""year.id"": 60416,
+        ""year.ts"": ""2017-10-23 12:20:11"",
+        ""year.title"": ""1998 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 10272,
+        ""type.ts"": ""2017-10-08 22:10:54"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 385,
+        ""accessory.ts"": ""2017-09-30 05:08:11"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""Other"",
+        ""category_1.id"": 7,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""Other""
+    },
+    ""1309758"": {
+        ""year_x_carpart.id"": 1309758,
+        ""year.id"": 60417,
+        ""year.ts"": ""2017-10-23 12:20:23"",
+        ""year.title"": ""1999 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 10272,
+        ""type.ts"": ""2017-10-08 22:10:54"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 385,
+        ""accessory.ts"": ""2017-09-30 05:08:11"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""Other"",
+        ""category_1.id"": 7,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""Other""
+    }
+}","{
+    ""29"": {
+        ""image.id"": 29,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""32"": {
+                ""carpart_image.id"": 32,
+                ""carpart_image.path"": ""/20/a5/7f/73/20a57f732b7a7eefa5389e5329b413190260ef40.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//20/a5/7f/73/20a57f732b7a7eefa5389e5329b413190260ef40.JPG""
+            }
+        }
+    },
+    ""30"": {
+        ""image.id"": 30,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""33"": {
+                ""carpart_image.id"": 33,
+                ""carpart_image.path"": ""/1c/d3/a1/d2/1cd3a1d2cba182c4afe470a1890a00ec746ccdff.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//1c/d3/a1/d2/1cd3a1d2cba182c4afe470a1890a00ec746ccdff.JPG""
+            }
+        }
+    },
+    ""31"": {
+        ""image.id"": 31,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""34"": {
+                ""carpart_image.id"": 34,
+                ""carpart_image.path"": ""/4b/28/73/48/4b28734886fc559851b8083f7c239362bdc5f843.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//4b/28/73/48/4b28734886fc559851b8083f7c239362bdc5f843.JPG""
+            }
+        }
+    },
+    ""32"": {
+        ""image.id"": 32,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""35"": {
+                ""carpart_image.id"": 35,
+                ""carpart_image.path"": ""/0e/0b/0c/d1/0e0b0cd1c98eb5abc35640d9dc435f3a42b0a36f.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//0e/0b/0c/d1/0e0b0cd1c98eb5abc35640d9dc435f3a42b0a36f.JPG""
+            }
+        }
+    }
+}","{
+    ""86"": {
+        ""carpart_x_detail.id"": 86,
+        ""detail.id"": 1,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Designation"",
+        ""detail.value"": ""Used.""
+    },
+    ""87"": {
+        ""carpart_x_detail.id"": 87,
+        ""detail.id"": 2,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Genuine OEM"",
+        ""detail.value"": ""Yes.""
+    },
+    ""88"": {
+        ""carpart_x_detail.id"": 88,
+        ""detail.id"": 3,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""GTIN"",
+        ""detail.value"": ""Does not apply.""
+    },
+    ""89"": {
+        ""carpart_x_detail.id"": 89,
+        ""detail.id"": 4,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Interchange Part Number"",
+        ""detail.value"": ""655-50792.""
+    },
+    ""92"": {
+        ""carpart_x_detail.id"": 92,
+        ""detail.id"": 7,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Model"",
+        ""detail.value"": ""CL.""
+    },
+    ""93"": {
+        ""carpart_x_detail.id"": 93,
+        ""detail.id"": 8,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""PartNumber"",
+        ""detail.value"": ""655.""
+    },
+    ""94"": {
+        ""carpart_x_detail.id"": 94,
+        ""detail.id"": 9,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Placement"",
+        ""detail.value"": ""Temperature Control.""
+    },
+    ""96"": {
+        ""carpart_x_detail.id"": 96,
+        ""detail.id"": 11,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Year"",
+        ""detail.value"": ""1997.""
+    },
+    ""91"": {
+        ""carpart_x_detail.id"": 91,
+        ""detail.id"": 20,
+        ""detail.ts"": ""2017-10-19 03:43:56"",
+        ""detail.key"": ""Mileage"",
+        ""detail.value"": ""0.""
+    },
+    ""90"": {
+        ""carpart_x_detail.id"": 90,
+        ""detail.id"": 90,
+        ""detail.ts"": ""2017-10-19 03:44:25"",
+        ""detail.key"": ""Inventory ID"",
+        ""detail.value"": ""132304.""
+    },
+    ""95"": {
+        ""carpart_x_detail.id"": 95,
+        ""detail.id"": 95,
+        ""detail.ts"": ""2017-10-19 03:44:25"",
+        ""detail.key"": ""Stock Number"",
+        ""detail.value"": ""J11554.""
+    }
+}"
+11,"2018-11-05 03:13:20","1997-1999 ACURA CL TEMPERATURE CONTROL 1073420",$78.00,"Ames, Iowa","{
+    ""11"": {
+        ""year_x_carpart.id"": 11,
+        ""year.id"": 1,
+        ""year.ts"": ""2017-10-13 04:06:58"",
+        ""year.title"": ""1997 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    },
+    ""44"": {
+        ""year_x_carpart.id"": 44,
+        ""year.id"": 2,
+        ""year.ts"": ""2017-10-19 03:47:45"",
+        ""year.title"": ""1998 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    },
+    ""85"": {
+        ""year_x_carpart.id"": 85,
+        ""year.id"": 3,
+        ""year.ts"": ""2017-10-19 03:47:49"",
+        ""year.title"": ""1999 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    },
+    ""1309667"": {
+        ""year_x_carpart.id"": 1309667,
+        ""year.id"": 60415,
+        ""year.ts"": ""2017-10-23 12:20:09"",
+        ""year.title"": ""1997 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 10272,
+        ""type.ts"": ""2017-10-08 22:10:54"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 385,
+        ""accessory.ts"": ""2017-09-30 05:08:11"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""Other"",
+        ""category_1.id"": 7,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""Other""
+    },
+    ""1309695"": {
+        ""year_x_carpart.id"": 1309695,
+        ""year.id"": 60416,
+        ""year.ts"": ""2017-10-23 12:20:11"",
+        ""year.title"": ""1998 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 10272,
+        ""type.ts"": ""2017-10-08 22:10:54"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 385,
+        ""accessory.ts"": ""2017-09-30 05:08:11"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""Other"",
+        ""category_1.id"": 7,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""Other""
+    },
+    ""1309736"": {
+        ""year_x_carpart.id"": 1309736,
+        ""year.id"": 60417,
+        ""year.ts"": ""2017-10-23 12:20:23"",
+        ""year.title"": ""1999 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 10272,
+        ""type.ts"": ""2017-10-08 22:10:54"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 385,
+        ""accessory.ts"": ""2017-09-30 05:08:11"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""Other"",
+        ""category_1.id"": 7,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""Other""
+    }
+}","{
+    ""33"": {
+        ""image.id"": 33,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""36"": {
+                ""carpart_image.id"": 36,
+                ""carpart_image.path"": ""/e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG""
+            }
+        }
+    },
+    ""34"": {
+        ""image.id"": 34,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""37"": {
+                ""carpart_image.id"": 37,
+                ""carpart_image.path"": ""/e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG""
+            }
+        }
+    },
+    ""35"": {
+        ""image.id"": 35,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""38"": {
+                ""carpart_image.id"": 38,
+                ""carpart_image.path"": ""/e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG""
+            }
+        }
+    }
+}","{
+    ""98"": {
+        ""carpart_x_detail.id"": 98,
+        ""detail.id"": 1,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Designation"",
+        ""detail.value"": ""Used.""
+    },
+    ""100"": {
+        ""carpart_x_detail.id"": 100,
+        ""detail.id"": 2,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Genuine OEM"",
+        ""detail.value"": ""Yes.""
+    },
+    ""101"": {
+        ""carpart_x_detail.id"": 101,
+        ""detail.id"": 3,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""GTIN"",
+        ""detail.value"": ""Does not apply.""
+    },
+    ""102"": {
+        ""carpart_x_detail.id"": 102,
+        ""detail.id"": 4,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Interchange Part Number"",
+        ""detail.value"": ""655-50792.""
+    },
+    ""105"": {
+        ""carpart_x_detail.id"": 105,
+        ""detail.id"": 7,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Model"",
+        ""detail.value"": ""CL.""
+    },
+    ""106"": {
+        ""carpart_x_detail.id"": 106,
+        ""detail.id"": 8,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""PartNumber"",
+        ""detail.value"": ""655.""
+    },
+    ""108"": {
+        ""carpart_x_detail.id"": 108,
+        ""detail.id"": 83,
+        ""detail.ts"": ""2017-10-19 03:44:17"",
+        ""detail.key"": ""Year"",
+        ""detail.value"": ""1999.""
+    },
+    ""97"": {
+        ""carpart_x_detail.id"": 97,
+        ""detail.id"": 96,
+        ""detail.ts"": ""2017-10-22 22:07:52"",
+        ""detail.key"": ""Conditions & Options"",
+        ""detail.value"": ""TESTED GOOD.""
+    },
+    ""99"": {
+        ""carpart_x_detail.id"": 99,
+        ""detail.id"": 98,
+        ""detail.ts"": ""2017-10-22 22:07:52"",
+        ""detail.key"": ""eCommerce Description"",
+        ""detail.value"": ""9122017.""
+    },
+    ""103"": {
+        ""carpart_x_detail.id"": 103,
+        ""detail.id"": 102,
+        ""detail.ts"": ""2017-10-22 22:07:52"",
+        ""detail.key"": ""Inventory ID"",
+        ""detail.value"": ""1073420.""
+    },
+    ""104"": {
+        ""carpart_x_detail.id"": 104,
+        ""detail.id"": 103,
+        ""detail.ts"": ""2017-10-22 22:07:52"",
+        ""detail.key"": ""Mileage"",
+        ""detail.value"": ""178000.""
+    },
+    ""107"": {
+        ""carpart_x_detail.id"": 107,
+        ""detail.id"": 106,
+        ""detail.ts"": ""2017-10-22 22:07:52"",
+        ""detail.key"": ""Stock Number"",
+        ""detail.value"": ""V50979.""
+    }
+}"
+12,"2018-11-05 03:13:20","#7971F ACURA CL 1997-1999 OEM TEMP AC HEAT CLIMATE CONTROL PANEL UNIT SWITCH",$30.00,"Loganville, Georgia","{
+    ""12"": {
+        ""year_x_carpart.id"": 12,
+        ""year.id"": 1,
+        ""year.ts"": ""2017-10-13 04:06:58"",
+        ""year.title"": ""1997 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    },
+    ""61"": {
+        ""year_x_carpart.id"": 61,
+        ""year.id"": 2,
+        ""year.ts"": ""2017-10-19 03:47:45"",
+        ""year.title"": ""1998 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    }
+}","{
+    ""36"": {
+        ""image.id"": 36,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""40"": {
+                ""carpart_image.id"": 40,
+                ""carpart_image.path"": ""/e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG""
+            }
+        }
+    },
+    ""37"": {
+        ""image.id"": 37,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""42"": {
+                ""carpart_image.id"": 42,
+                ""carpart_image.path"": ""/e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG""
+            }
+        }
+    },
+    ""38"": {
+        ""image.id"": 38,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""43"": {
+                ""carpart_image.id"": 43,
+                ""carpart_image.path"": ""/e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG""
+            }
+        }
+    }
+}","{
+    ""110"": {
+        ""carpart_x_detail.id"": 110,
+        ""detail.id"": 13,
+        ""detail.ts"": ""2017-10-19 03:43:47"",
+        ""detail.key"": ""Other Part Number"",
+        ""detail.value"": ""CENTER DASH DISPLAY TEMPERATURE A/C HEATER.""
+    },
+    ""109"": {
+        ""carpart_x_detail.id"": 109,
+        ""detail.id"": 108,
+        ""detail.ts"": ""2017-10-22 22:08:00"",
+        ""detail.key"": ""Manufacturer Part Number"",
+        ""detail.value"": ""CONTROLLER UNIT TN177200-7292 8344A.""
+    }
+}"
+13,"2018-11-05 03:13:20","1997-1999 Acura CL Heater AC Temperature Controller Unit TN177200-7292 OEM LKQ",$34.77,"Lincoln, Nebraska","{
+    ""13"": {
+        ""year_x_carpart.id"": 13,
+        ""year.id"": 1,
+        ""year.ts"": ""2017-10-13 04:06:58"",
+        ""year.title"": ""1997 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    }
+}","{
+    ""39"": {
+        ""image.id"": 39,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""46"": {
+                ""carpart_image.id"": 46,
+                ""carpart_image.path"": ""/e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG""
+            }
+        }
+    },
+    ""40"": {
+        ""image.id"": 40,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""48"": {
+                ""carpart_image.id"": 48,
+                ""carpart_image.path"": ""/e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG""
+            }
+        }
+    },
+    ""41"": {
+        ""image.id"": 41,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""51"": {
+                ""carpart_image.id"": 51,
+                ""carpart_image.path"": ""/e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG""
+            }
+        }
+    },
+    ""42"": {
+        ""image.id"": 42,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""52"": {
+                ""carpart_image.id"": 52,
+                ""carpart_image.path"": ""/e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG""
+            }
+        }
+    }
+}","{
+    ""111"": {
+        ""carpart_x_detail.id"": 111,
+        ""detail.id"": 84,
+        ""detail.ts"": ""2017-10-19 03:44:21"",
+        ""detail.key"": ""Brand"",
+        ""detail.value"": ""Acura.""
+    },
+    ""112"": {
+        ""carpart_x_detail.id"": 112,
+        ""detail.id"": 111,
+        ""detail.ts"": ""2017-10-22 22:08:07"",
+        ""detail.key"": ""Manufacturer Part Number"",
+        ""detail.value"": ""TN177200-7292 - LKQ~131858206.""
+    },
+    ""113"": {
+        ""carpart_x_detail.id"": 113,
+        ""detail.id"": 112,
+        ""detail.ts"": ""2017-10-22 22:08:07"",
+        ""detail.key"": ""Warranty"",
+        ""detail.value"": ""Yes.""
+    },
+    ""114"": {
+        ""carpart_x_detail.id"": 114,
+        ""detail.id"": 113,
+        ""detail.ts"": ""2017-10-22 22:08:07"",
+        ""detail.key"": ""Warranty Length"",
+        ""detail.value"": ""90 Day Warranty (Parts ONLY - NO Labor).""
+    }
+}"
+14,"2018-11-05 03:13:20","TEMPERATURE CONTROL FITS 1997-1999 CL 295511",$95.00,"Defuniak Springs, Florida","{
+    ""14"": {
+        ""year_x_carpart.id"": 14,
+        ""year.id"": 1,
+        ""year.ts"": ""2017-10-13 04:06:58"",
+        ""year.title"": ""1997 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    },
+    ""65"": {
+        ""year_x_carpart.id"": 65,
+        ""year.id"": 2,
+        ""year.ts"": ""2017-10-19 03:47:45"",
+        ""year.title"": ""1998 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    },
+    ""86"": {
+        ""year_x_carpart.id"": 86,
+        ""year.id"": 3,
+        ""year.ts"": ""2017-10-19 03:47:49"",
+        ""year.title"": ""1999 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    },
+    ""1309726"": {
+        ""year_x_carpart.id"": 1309726,
+        ""year.id"": 60416,
+        ""year.ts"": ""2017-10-23 12:20:11"",
+        ""year.title"": ""1998 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 10272,
+        ""type.ts"": ""2017-10-08 22:10:54"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 385,
+        ""accessory.ts"": ""2017-09-30 05:08:11"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""Other"",
+        ""category_1.id"": 7,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""Other""
+    },
+    ""1309752"": {
+        ""year_x_carpart.id"": 1309752,
+        ""year.id"": 60417,
+        ""year.ts"": ""2017-10-23 12:20:23"",
+        ""year.title"": ""1999 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 10272,
+        ""type.ts"": ""2017-10-08 22:10:54"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 385,
+        ""accessory.ts"": ""2017-09-30 05:08:11"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""Other"",
+        ""category_1.id"": 7,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""Other""
+    }
+}","{
+    ""43"": {
+        ""image.id"": 43,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""54"": {
+                ""carpart_image.id"": 54,
+                ""carpart_image.path"": ""/e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG""
+            }
+        }
+    },
+    ""44"": {
+        ""image.id"": 44,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""56"": {
+                ""carpart_image.id"": 56,
+                ""carpart_image.path"": ""/e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG""
+            }
+        }
+    },
+    ""45"": {
+        ""image.id"": 45,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""58"": {
+                ""carpart_image.id"": 58,
+                ""carpart_image.path"": ""/e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG""
+            }
+        }
+    },
+    ""46"": {
+        ""image.id"": 46,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""62"": {
+                ""carpart_image.id"": 62,
+                ""carpart_image.path"": ""/e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG""
+            }
+        }
+    }
+}","{
+    ""115"": {
+        ""carpart_x_detail.id"": 115,
+        ""detail.id"": 1,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Designation"",
+        ""detail.value"": ""Used.""
+    },
+    ""116"": {
+        ""carpart_x_detail.id"": 116,
+        ""detail.id"": 2,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Genuine OEM"",
+        ""detail.value"": ""Yes.""
+    },
+    ""117"": {
+        ""carpart_x_detail.id"": 117,
+        ""detail.id"": 3,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""GTIN"",
+        ""detail.value"": ""Does not apply.""
+    },
+    ""118"": {
+        ""carpart_x_detail.id"": 118,
+        ""detail.id"": 4,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Interchange Part Number"",
+        ""detail.value"": ""655-50792.""
+    },
+    ""121"": {
+        ""carpart_x_detail.id"": 121,
+        ""detail.id"": 7,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Model"",
+        ""detail.value"": ""CL.""
+    },
+    ""122"": {
+        ""carpart_x_detail.id"": 122,
+        ""detail.id"": 8,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""PartNumber"",
+        ""detail.value"": ""655.""
+    },
+    ""124"": {
+        ""carpart_x_detail.id"": 124,
+        ""detail.id"": 83,
+        ""detail.ts"": ""2017-10-19 03:44:17"",
+        ""detail.key"": ""Year"",
+        ""detail.value"": ""1999.""
+    },
+    ""119"": {
+        ""carpart_x_detail.id"": 119,
+        ""detail.id"": 118,
+        ""detail.ts"": ""2017-10-22 22:08:13"",
+        ""detail.key"": ""Inventory ID"",
+        ""detail.value"": ""295511.""
+    },
+    ""120"": {
+        ""carpart_x_detail.id"": 120,
+        ""detail.id"": 119,
+        ""detail.ts"": ""2017-10-22 22:08:13"",
+        ""detail.key"": ""Mileage"",
+        ""detail.value"": ""145000.""
+    },
+    ""123"": {
+        ""carpart_x_detail.id"": 123,
+        ""detail.id"": 122,
+        ""detail.ts"": ""2017-10-22 22:08:13"",
+        ""detail.key"": ""Stock Number"",
+        ""detail.value"": ""170552.""
+    }
+}"
+15,"2018-11-05 03:13:20","TEMPERATURE CONTROL FITS 1997-1999 CL 178221",$54.99,"East Granby, Connecticut","{
+    ""15"": {
+        ""year_x_carpart.id"": 15,
+        ""year.id"": 1,
+        ""year.ts"": ""2017-10-13 04:06:58"",
+        ""year.title"": ""1997 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    },
+    ""67"": {
+        ""year_x_carpart.id"": 67,
+        ""year.id"": 2,
+        ""year.ts"": ""2017-10-19 03:47:45"",
+        ""year.title"": ""1998 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    },
+    ""94"": {
+        ""year_x_carpart.id"": 94,
+        ""year.id"": 3,
+        ""year.ts"": ""2017-10-19 03:47:49"",
+        ""year.title"": ""1999 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    },
+    ""1309671"": {
+        ""year_x_carpart.id"": 1309671,
+        ""year.id"": 60415,
+        ""year.ts"": ""2017-10-23 12:20:09"",
+        ""year.title"": ""1997 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 10272,
+        ""type.ts"": ""2017-10-08 22:10:54"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 385,
+        ""accessory.ts"": ""2017-09-30 05:08:11"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""Other"",
+        ""category_1.id"": 7,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""Other""
+    },
+    ""1309730"": {
+        ""year_x_carpart.id"": 1309730,
+        ""year.id"": 60416,
+        ""year.ts"": ""2017-10-23 12:20:11"",
+        ""year.title"": ""1998 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 10272,
+        ""type.ts"": ""2017-10-08 22:10:54"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 385,
+        ""accessory.ts"": ""2017-09-30 05:08:11"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""Other"",
+        ""category_1.id"": 7,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""Other""
+    },
+    ""1309770"": {
+        ""year_x_carpart.id"": 1309770,
+        ""year.id"": 60417,
+        ""year.ts"": ""2017-10-23 12:20:23"",
+        ""year.title"": ""1999 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 10272,
+        ""type.ts"": ""2017-10-08 22:10:54"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 385,
+        ""accessory.ts"": ""2017-09-30 05:08:11"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""Other"",
+        ""category_1.id"": 7,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""Other""
+    }
+}","{
+    ""47"": {
+        ""image.id"": 47,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""63"": {
+                ""carpart_image.id"": 63,
+                ""carpart_image.path"": ""/e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG""
+            }
+        }
+    },
+    ""48"": {
+        ""image.id"": 48,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""64"": {
+                ""carpart_image.id"": 64,
+                ""carpart_image.path"": ""/e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG""
+            }
+        }
+    },
+    ""49"": {
+        ""image.id"": 49,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""67"": {
+                ""carpart_image.id"": 67,
+                ""carpart_image.path"": ""/e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG""
+            }
+        }
+    },
+    ""50"": {
+        ""image.id"": 50,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""68"": {
+                ""carpart_image.id"": 68,
+                ""carpart_image.path"": ""/e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG""
+            }
+        }
+    }
+}","{
+    ""126"": {
+        ""carpart_x_detail.id"": 126,
+        ""detail.id"": 1,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Designation"",
+        ""detail.value"": ""Used.""
+    },
+    ""127"": {
+        ""carpart_x_detail.id"": 127,
+        ""detail.id"": 2,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Genuine OEM"",
+        ""detail.value"": ""Yes.""
+    },
+    ""128"": {
+        ""carpart_x_detail.id"": 128,
+        ""detail.id"": 3,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""GTIN"",
+        ""detail.value"": ""Does not apply.""
+    },
+    ""129"": {
+        ""carpart_x_detail.id"": 129,
+        ""detail.id"": 4,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Interchange Part Number"",
+        ""detail.value"": ""655-50792.""
+    },
+    ""132"": {
+        ""carpart_x_detail.id"": 132,
+        ""detail.id"": 7,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Model"",
+        ""detail.value"": ""CL.""
+    },
+    ""133"": {
+        ""carpart_x_detail.id"": 133,
+        ""detail.id"": 8,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""PartNumber"",
+        ""detail.value"": ""655.""
+    },
+    ""135"": {
+        ""carpart_x_detail.id"": 135,
+        ""detail.id"": 83,
+        ""detail.ts"": ""2017-10-19 03:44:17"",
+        ""detail.key"": ""Year"",
+        ""detail.value"": ""1999.""
+    },
+    ""125"": {
+        ""carpart_x_detail.id"": 125,
+        ""detail.id"": 124,
+        ""detail.ts"": ""2017-10-22 22:08:20"",
+        ""detail.key"": ""Conditions & Options"",
+        ""detail.value"": ""TESTED.""
+    },
+    ""130"": {
+        ""carpart_x_detail.id"": 130,
+        ""detail.id"": 129,
+        ""detail.ts"": ""2017-10-22 22:08:20"",
+        ""detail.key"": ""Inventory ID"",
+        ""detail.value"": ""178221.""
+    },
+    ""131"": {
+        ""carpart_x_detail.id"": 131,
+        ""detail.id"": 130,
+        ""detail.ts"": ""2017-10-22 22:08:20"",
+        ""detail.key"": ""Mileage"",
+        ""detail.value"": ""128000.""
+    },
+    ""134"": {
+        ""carpart_x_detail.id"": 134,
+        ""detail.id"": 133,
+        ""detail.ts"": ""2017-10-22 22:08:20"",
+        ""detail.key"": ""Stock Number"",
+        ""detail.value"": ""170122.""
+    }
+}"
+16,"2018-11-05 03:13:20","TEMPERATURE CONTROL FITS 1997-1999 CL 611182",$75.00,"North Vernon, Indiana","{
+    ""16"": {
+        ""year_x_carpart.id"": 16,
+        ""year.id"": 1,
+        ""year.ts"": ""2017-10-13 04:06:58"",
+        ""year.title"": ""1997 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    },
+    ""89"": {
+        ""year_x_carpart.id"": 89,
+        ""year.id"": 3,
+        ""year.ts"": ""2017-10-19 03:47:49"",
+        ""year.title"": ""1999 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    },
+    ""1309760"": {
+        ""year_x_carpart.id"": 1309760,
+        ""year.id"": 60417,
+        ""year.ts"": ""2017-10-23 12:20:23"",
+        ""year.title"": ""1999 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 10272,
+        ""type.ts"": ""2017-10-08 22:10:54"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 385,
+        ""accessory.ts"": ""2017-09-30 05:08:11"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""Other"",
+        ""category_1.id"": 7,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""Other""
+    }
+}","{
+    ""51"": {
+        ""image.id"": 51,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""70"": {
+                ""carpart_image.id"": 70,
+                ""carpart_image.path"": ""/e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG""
+            }
+        }
+    },
+    ""52"": {
+        ""image.id"": 52,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""72"": {
+                ""carpart_image.id"": 72,
+                ""carpart_image.path"": ""/e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG""
+            }
+        }
+    },
+    ""53"": {
+        ""image.id"": 53,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""73"": {
+                ""carpart_image.id"": 73,
+                ""carpart_image.path"": ""/e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG""
+            }
+        }
+    },
+    ""54"": {
+        ""image.id"": 54,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""75"": {
+                ""carpart_image.id"": 75,
+                ""carpart_image.path"": ""/e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG""
+            }
+        }
+    }
+}","{
+    ""138"": {
+        ""carpart_x_detail.id"": 138,
+        ""detail.id"": 1,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Designation"",
+        ""detail.value"": ""Used.""
+    },
+    ""140"": {
+        ""carpart_x_detail.id"": 140,
+        ""detail.id"": 2,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Genuine OEM"",
+        ""detail.value"": ""Yes.""
+    },
+    ""141"": {
+        ""carpart_x_detail.id"": 141,
+        ""detail.id"": 3,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""GTIN"",
+        ""detail.value"": ""Does not apply.""
+    },
+    ""142"": {
+        ""carpart_x_detail.id"": 142,
+        ""detail.id"": 4,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Interchange Part Number"",
+        ""detail.value"": ""655-50792.""
+    },
+    ""145"": {
+        ""carpart_x_detail.id"": 145,
+        ""detail.id"": 6,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Mileage"",
+        ""detail.value"": ""193000.""
+    },
+    ""146"": {
+        ""carpart_x_detail.id"": 146,
+        ""detail.id"": 7,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Model"",
+        ""detail.value"": ""CL.""
+    },
+    ""147"": {
+        ""carpart_x_detail.id"": 147,
+        ""detail.id"": 8,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""PartNumber"",
+        ""detail.value"": ""655.""
+    },
+    ""149"": {
+        ""carpart_x_detail.id"": 149,
+        ""detail.id"": 83,
+        ""detail.ts"": ""2017-10-19 03:44:17"",
+        ""detail.key"": ""Year"",
+        ""detail.value"": ""1999.""
+    },
+    ""136"": {
+        ""carpart_x_detail.id"": 136,
+        ""detail.id"": 84,
+        ""detail.ts"": ""2017-10-19 03:44:21"",
+        ""detail.key"": ""Brand"",
+        ""detail.value"": ""Acura.""
+    },
+    ""137"": {
+        ""carpart_x_detail.id"": 137,
+        ""detail.id"": 136,
+        ""detail.ts"": ""2017-10-22 22:08:24"",
+        ""detail.key"": ""Conditions & Options"",
+        ""detail.value"": ""DENSO,TN1772DO-7292.""
+    },
+    ""139"": {
+        ""carpart_x_detail.id"": 139,
+        ""detail.id"": 138,
+        ""detail.ts"": ""2017-10-22 22:08:24"",
+        ""detail.key"": ""eCommerce Description"",
+        ""detail.value"": ""10/4/2017.""
+    },
+    ""143"": {
+        ""carpart_x_detail.id"": 143,
+        ""detail.id"": 142,
+        ""detail.ts"": ""2017-10-22 22:08:24"",
+        ""detail.key"": ""Inventory ID"",
+        ""detail.value"": ""611182.""
+    },
+    ""144"": {
+        ""carpart_x_detail.id"": 144,
+        ""detail.id"": 143,
+        ""detail.ts"": ""2017-10-22 22:08:24"",
+        ""detail.key"": ""Manufacturer Part Number"",
+        ""detail.value"": ""1772007292.""
+    },
+    ""148"": {
+        ""carpart_x_detail.id"": 148,
+        ""detail.id"": 147,
+        ""detail.ts"": ""2017-10-22 22:08:24"",
+        ""detail.key"": ""Stock Number"",
+        ""detail.value"": ""169752.""
+    }
+}"
+17,"2018-11-05 03:13:20","TEMPERATURE CONTROL FITS 1997-1999 CL 172740",$54.99,"East Granby, Connecticut","{
+    ""17"": {
+        ""year_x_carpart.id"": 17,
+        ""year.id"": 1,
+        ""year.ts"": ""2017-10-13 04:06:58"",
+        ""year.title"": ""1997 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    },
+    ""68"": {
+        ""year_x_carpart.id"": 68,
+        ""year.id"": 2,
+        ""year.ts"": ""2017-10-19 03:47:45"",
+        ""year.title"": ""1998 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    },
+    ""95"": {
+        ""year_x_carpart.id"": 95,
+        ""year.id"": 3,
+        ""year.ts"": ""2017-10-19 03:47:49"",
+        ""year.title"": ""1999 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    },
+    ""1309670"": {
+        ""year_x_carpart.id"": 1309670,
+        ""year.id"": 60415,
+        ""year.ts"": ""2017-10-23 12:20:09"",
+        ""year.title"": ""1997 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 10272,
+        ""type.ts"": ""2017-10-08 22:10:54"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 385,
+        ""accessory.ts"": ""2017-09-30 05:08:11"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""Other"",
+        ""category_1.id"": 7,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""Other""
+    },
+    ""1309733"": {
+        ""year_x_carpart.id"": 1309733,
+        ""year.id"": 60416,
+        ""year.ts"": ""2017-10-23 12:20:11"",
+        ""year.title"": ""1998 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 10272,
+        ""type.ts"": ""2017-10-08 22:10:54"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 385,
+        ""accessory.ts"": ""2017-09-30 05:08:11"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""Other"",
+        ""category_1.id"": 7,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""Other""
+    },
+    ""1309768"": {
+        ""year_x_carpart.id"": 1309768,
+        ""year.id"": 60417,
+        ""year.ts"": ""2017-10-23 12:20:23"",
+        ""year.title"": ""1999 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 10272,
+        ""type.ts"": ""2017-10-08 22:10:54"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 385,
+        ""accessory.ts"": ""2017-09-30 05:08:11"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""Other"",
+        ""category_1.id"": 7,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""Other""
+    }
+}","{
+    ""55"": {
+        ""image.id"": 55,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""76"": {
+                ""carpart_image.id"": 76,
+                ""carpart_image.path"": ""/e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG""
+            }
+        }
+    },
+    ""56"": {
+        ""image.id"": 56,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""78"": {
+                ""carpart_image.id"": 78,
+                ""carpart_image.path"": ""/e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG""
+            }
+        }
+    },
+    ""57"": {
+        ""image.id"": 57,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""80"": {
+                ""carpart_image.id"": 80,
+                ""carpart_image.path"": ""/e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG""
+            }
+        }
+    }
+}","{
+    ""151"": {
+        ""carpart_x_detail.id"": 151,
+        ""detail.id"": 1,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Designation"",
+        ""detail.value"": ""Used.""
+    },
+    ""152"": {
+        ""carpart_x_detail.id"": 152,
+        ""detail.id"": 2,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Genuine OEM"",
+        ""detail.value"": ""Yes.""
+    },
+    ""153"": {
+        ""carpart_x_detail.id"": 153,
+        ""detail.id"": 3,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""GTIN"",
+        ""detail.value"": ""Does not apply.""
+    },
+    ""154"": {
+        ""carpart_x_detail.id"": 154,
+        ""detail.id"": 4,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Interchange Part Number"",
+        ""detail.value"": ""655-50792.""
+    },
+    ""157"": {
+        ""carpart_x_detail.id"": 157,
+        ""detail.id"": 7,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Model"",
+        ""detail.value"": ""CL.""
+    },
+    ""158"": {
+        ""carpart_x_detail.id"": 158,
+        ""detail.id"": 8,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""PartNumber"",
+        ""detail.value"": ""655.""
+    },
+    ""160"": {
+        ""carpart_x_detail.id"": 160,
+        ""detail.id"": 11,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Year"",
+        ""detail.value"": ""1997.""
+    },
+    ""150"": {
+        ""carpart_x_detail.id"": 150,
+        ""detail.id"": 124,
+        ""detail.ts"": ""2017-10-22 22:08:20"",
+        ""detail.key"": ""Conditions & Options"",
+        ""detail.value"": ""TESTED.""
+    },
+    ""155"": {
+        ""carpart_x_detail.id"": 155,
+        ""detail.id"": 154,
+        ""detail.ts"": ""2017-10-22 22:08:31"",
+        ""detail.key"": ""Inventory ID"",
+        ""detail.value"": ""172740.""
+    },
+    ""156"": {
+        ""carpart_x_detail.id"": 156,
+        ""detail.id"": 155,
+        ""detail.ts"": ""2017-10-22 22:08:31"",
+        ""detail.key"": ""Mileage"",
+        ""detail.value"": ""126000.""
+    },
+    ""159"": {
+        ""carpart_x_detail.id"": 159,
+        ""detail.id"": 158,
+        ""detail.ts"": ""2017-10-22 22:08:31"",
+        ""detail.key"": ""Stock Number"",
+        ""detail.value"": ""160635.""
+    }
+}"
+18,"2018-11-05 03:13:20","Acura CL 1997 Heating Climate Control Temperature Switch TN177200-7292 OEM",$45.00,"Selma, North Carolina","{
+    ""18"": {
+        ""year_x_carpart.id"": 18,
+        ""year.id"": 1,
+        ""year.ts"": ""2017-10-13 04:06:58"",
+        ""year.title"": ""1997 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    }
+}","{
+    ""58"": {
+        ""image.id"": 58,
+        ""image.ts"": ""2017-10-22 22:08:42"",
+        ""image.carpart_image_id"": {
+            ""82"": {
+                ""carpart_image.id"": 82,
+                ""carpart_image.path"": ""/46/70/53/70/46705370946502eade95b8b0a8e340a9f29843e1.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//46/70/53/70/46705370946502eade95b8b0a8e340a9f29843e1.JPG""
+            }
+        }
+    },
+    ""59"": {
+        ""image.id"": 59,
+        ""image.ts"": ""2017-10-22 22:08:42"",
+        ""image.carpart_image_id"": {
+            ""86"": {
+                ""carpart_image.id"": 86,
+                ""carpart_image.path"": ""/8d/ac/7b/ee/8dac7beeb77c69dd174b059bac079b32f4f58ae8.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//8d/ac/7b/ee/8dac7beeb77c69dd174b059bac079b32f4f58ae8.JPG""
+            }
+        }
+    },
+    ""60"": {
+        ""image.id"": 60,
+        ""image.ts"": ""2017-10-22 22:08:42"",
+        ""image.carpart_image_id"": {
+            ""89"": {
+                ""carpart_image.id"": 89,
+                ""carpart_image.path"": ""/1c/a9/19/c6/1ca919c6b2eed3b985011ec93830b8e81b96632b.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//1c/a9/19/c6/1ca919c6b2eed3b985011ec93830b8e81b96632b.JPG""
+            }
+        }
+    },
+    ""61"": {
+        ""image.id"": 61,
+        ""image.ts"": ""2017-10-22 22:08:42"",
+        ""image.carpart_image_id"": {
+            ""91"": {
+                ""carpart_image.id"": 91,
+                ""carpart_image.path"": ""/58/c7/12/05/58c71205ec3a9d8c0569c102133650a83f764883.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//58/c7/12/05/58c71205ec3a9d8c0569c102133650a83f764883.JPG""
+            }
+        }
+    }
+}","{
+    ""161"": {
+        ""carpart_x_detail.id"": 161,
+        ""detail.id"": 160,
+        ""detail.ts"": ""2017-10-22 22:08:42"",
+        ""detail.key"": ""Manufacturer Part Number"",
+        ""detail.value"": ""TN177200-7292.""
+    }
+}"
+19,"2018-11-05 03:13:20","TEMPERATURE CONTROL FITS 1997-1999 CL 1001020",$90.00,"Fredericksburg, Virginia","{
+    ""19"": {
+        ""year_x_carpart.id"": 19,
+        ""year.id"": 1,
+        ""year.ts"": ""2017-10-13 04:06:58"",
+        ""year.title"": ""1997 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    },
+    ""69"": {
+        ""year_x_carpart.id"": 69,
+        ""year.id"": 2,
+        ""year.ts"": ""2017-10-19 03:47:45"",
+        ""year.title"": ""1998 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    },
+    ""91"": {
+        ""year_x_carpart.id"": 91,
+        ""year.id"": 3,
+        ""year.ts"": ""2017-10-19 03:47:49"",
+        ""year.title"": ""1999 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    },
+    ""1309762"": {
+        ""year_x_carpart.id"": 1309762,
+        ""year.id"": 60417,
+        ""year.ts"": ""2017-10-23 12:20:23"",
+        ""year.title"": ""1999 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 10272,
+        ""type.ts"": ""2017-10-08 22:10:54"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 385,
+        ""accessory.ts"": ""2017-09-30 05:08:11"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""Other"",
+        ""category_1.id"": 7,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""Other""
+    }
+}","{
+    ""62"": {
+        ""image.id"": 62,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""94"": {
+                ""carpart_image.id"": 94,
+                ""carpart_image.path"": ""/e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG""
+            }
+        }
+    },
+    ""63"": {
+        ""image.id"": 63,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""97"": {
+                ""carpart_image.id"": 97,
+                ""carpart_image.path"": ""/e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG""
+            }
+        }
+    },
+    ""64"": {
+        ""image.id"": 64,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""98"": {
+                ""carpart_image.id"": 98,
+                ""carpart_image.path"": ""/e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG""
+            }
+        }
+    },
+    ""65"": {
+        ""image.id"": 65,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""101"": {
+                ""carpart_image.id"": 101,
+                ""carpart_image.path"": ""/e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG""
+            }
+        }
+    }
+}","{
+    ""163"": {
+        ""carpart_x_detail.id"": 163,
+        ""detail.id"": 1,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Designation"",
+        ""detail.value"": ""Used.""
+    },
+    ""164"": {
+        ""carpart_x_detail.id"": 164,
+        ""detail.id"": 2,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Genuine OEM"",
+        ""detail.value"": ""Yes.""
+    },
+    ""165"": {
+        ""carpart_x_detail.id"": 165,
+        ""detail.id"": 3,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""GTIN"",
+        ""detail.value"": ""Does not apply.""
+    },
+    ""166"": {
+        ""carpart_x_detail.id"": 166,
+        ""detail.id"": 4,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Interchange Part Number"",
+        ""detail.value"": ""655-50792.""
+    },
+    ""169"": {
+        ""carpart_x_detail.id"": 169,
+        ""detail.id"": 7,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Model"",
+        ""detail.value"": ""CL.""
+    },
+    ""170"": {
+        ""carpart_x_detail.id"": 170,
+        ""detail.id"": 8,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""PartNumber"",
+        ""detail.value"": ""655.""
+    },
+    ""172"": {
+        ""carpart_x_detail.id"": 172,
+        ""detail.id"": 83,
+        ""detail.ts"": ""2017-10-19 03:44:17"",
+        ""detail.key"": ""Year"",
+        ""detail.value"": ""1999.""
+    },
+    ""162"": {
+        ""carpart_x_detail.id"": 162,
+        ""detail.id"": 161,
+        ""detail.ts"": ""2017-10-22 22:08:45"",
+        ""detail.key"": ""Conditions & Options"",
+        ""detail.value"": ""AUTO.""
+    },
+    ""167"": {
+        ""carpart_x_detail.id"": 167,
+        ""detail.id"": 166,
+        ""detail.ts"": ""2017-10-22 22:08:45"",
+        ""detail.key"": ""Inventory ID"",
+        ""detail.value"": ""1001020.""
+    },
+    ""168"": {
+        ""carpart_x_detail.id"": 168,
+        ""detail.id"": 167,
+        ""detail.ts"": ""2017-10-22 22:08:45"",
+        ""detail.key"": ""Mileage"",
+        ""detail.value"": ""40000.""
+    },
+    ""171"": {
+        ""carpart_x_detail.id"": 171,
+        ""detail.id"": 170,
+        ""detail.ts"": ""2017-10-22 22:08:45"",
+        ""detail.key"": ""Stock Number"",
+        ""detail.value"": ""EE0890.""
+    }
+}"
+20,"2018-11-05 03:13:20","1997 TO 1999 ACURA CL COUPE ""2.2L"" (1-1997) TEMPERATURE CONTROL ASSY",$43.95,"Thomaston, Connecticut","{
+    ""20"": {
+        ""year_x_carpart.id"": 20,
+        ""year.id"": 1,
+        ""year.ts"": ""2017-10-13 04:06:58"",
+        ""year.title"": ""1997 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    },
+    ""100"": {
+        ""year_x_carpart.id"": 100,
+        ""year.id"": 3,
+        ""year.ts"": ""2017-10-19 03:47:49"",
+        ""year.title"": ""1999 Acura CL"",
+        ""year.type"": ""Acura CL"",
+        ""type.id"": 1,
+        ""type.ts"": ""2017-10-08 21:18:41"",
+        ""type.title"": ""Acura CL"",
+        ""type.accessory"": ""Acura"",
+        ""accessory.id"": 1,
+        ""accessory.ts"": ""2017-09-30 05:06:35"",
+        ""accessory.title"": ""Acura"",
+        ""accessory.category_1"": ""A/C & Heater Controls"",
+        ""category_1.id"": 1,
+        ""category_1.ts"": ""2017-09-30 05:05:04"",
+        ""category_1.title"": ""A/C & Heater Controls""
+    }
+}","{
+    ""66"": {
+        ""image.id"": 66,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""102"": {
+                ""carpart_image.id"": 102,
+                ""carpart_image.path"": ""/e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG""
+            }
+        }
+    },
+    ""67"": {
+        ""image.id"": 67,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""104"": {
+                ""carpart_image.id"": 104,
+                ""carpart_image.path"": ""/e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG""
+            }
+        }
+    },
+    ""68"": {
+        ""image.id"": 68,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""107"": {
+                ""carpart_image.id"": 107,
+                ""carpart_image.path"": ""/e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG""
+            }
+        }
+    },
+    ""69"": {
+        ""image.id"": 69,
+        ""image.ts"": ""2018-05-13 21:29:18"",
+        ""image.carpart_image_id"": {
+            ""110"": {
+                ""carpart_image.id"": 110,
+                ""carpart_image.path"": ""/e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG"",
+                ""carpart_image.media_1"": ""https://songer.datasn.com/data/api/v1/u_4db7936df78dfe468fc2/used_auto_parts/main/carpart_image//e3/84/43/c3/e38443c30a090212c7f1d35ee0e9c994030937e0.JPG""
+            }
+        }
+    }
+}","{
+    ""174"": {
+        ""carpart_x_detail.id"": 174,
+        ""detail.id"": 1,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Designation"",
+        ""detail.value"": ""Used.""
+    },
+    ""175"": {
+        ""carpart_x_detail.id"": 175,
+        ""detail.id"": 2,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Genuine OEM"",
+        ""detail.value"": ""Yes.""
+    },
+    ""176"": {
+        ""carpart_x_detail.id"": 176,
+        ""detail.id"": 3,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""GTIN"",
+        ""detail.value"": ""Does not apply.""
+    },
+    ""177"": {
+        ""carpart_x_detail.id"": 177,
+        ""detail.id"": 4,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Interchange Part Number"",
+        ""detail.value"": ""655-50792.""
+    },
+    ""180"": {
+        ""carpart_x_detail.id"": 180,
+        ""detail.id"": 7,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Model"",
+        ""detail.value"": ""CL.""
+    },
+    ""181"": {
+        ""carpart_x_detail.id"": 181,
+        ""detail.id"": 8,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""PartNumber"",
+        ""detail.value"": ""655.""
+    },
+    ""182"": {
+        ""carpart_x_detail.id"": 182,
+        ""detail.id"": 9,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Placement"",
+        ""detail.value"": ""Temperature Control.""
+    },
+    ""184"": {
+        ""carpart_x_detail.id"": 184,
+        ""detail.id"": 11,
+        ""detail.ts"": ""2017-10-19 03:43:43"",
+        ""detail.key"": ""Year"",
+        ""detail.value"": ""1997.""
+    },
+    ""179"": {
+        ""carpart_x_detail.id"": 179,
+        ""detail.id"": 20,
+        ""detail.ts"": ""2017-10-19 03:43:56"",
+        ""detail.key"": ""Mileage"",
+        ""detail.value"": ""0.""
+    },
+    ""173"": {
+        ""carpart_x_detail.id"": 173,
+        ""detail.id"": 172,
+        ""detail.ts"": ""2017-10-22 22:08:53"",
+        ""detail.key"": ""Conditions & Options"",
+        ""detail.value"": ""MT 2.2 CL CPE 1-97.""
+    },
+    ""178"": {
+        ""carpart_x_detail.id"": 178,
+        ""detail.id"": 177,
+        ""detail.ts"": ""2017-10-22 22:08:53"",
+        ""detail.key"": ""Inventory ID"",
+        ""detail.value"": ""158037.""
+    },
+    ""183"": {
+        ""carpart_x_detail.id"": 183,
+        ""detail.id"": 182,
+        ""detail.ts"": ""2017-10-22 22:08:53"",
+        ""detail.key"": ""Stock Number"",
+        ""detail.value"": ""110411.""
+    }
+}"

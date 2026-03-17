@@ -1,0 +1,20 @@
+{
+  "extends": "@repo/typescript-config/react-library.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "types": ["node", "react", "react-dom"],
+    "baseUrl": ".",
+    "paths": {
+      "@repo/ui": ["./src"],
+      "@repo/ui/*": ["./src/*"],
+      "@repo/ai-core": ["../ai-core/src"],
+      "@repo/ai-core/*": ["../ai-core/src/*"],
+      "@repo/ai-core/client": ["../ai-core/src/client.ts"],
+      "@repo/ai-core/server": ["../ai-core/src/index.ts"],
+      "@repo/ai-tools": ["../ai-tools/src"],
+      "@repo/ai-tools/*": ["../ai-tools/src/*"]
+    }
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "dist"]
+}

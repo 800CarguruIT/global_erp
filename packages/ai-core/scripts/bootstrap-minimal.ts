@@ -1,5 +1,9 @@
 /* eslint-disable no-console */
-import "dotenv/config";
+try {
+  // Optional in containerized runs where env vars are injected by Docker.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  require("dotenv/config");
+} catch {}
 import { randomUUID } from "crypto";
 import bcrypt from "bcryptjs";
 import { getSql } from "../src/db";

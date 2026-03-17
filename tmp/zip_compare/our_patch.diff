@@ -1,0 +1,121 @@
+diff --git a/packages/ai-core/src/workshop/inventory/repository.ts b/packages/ai-core/src/workshop/inventory/repository.ts
+index 003ff7f..745d970 100644
+--- a/packages/ai-core/src/workshop/inventory/repository.ts
++++ b/packages/ai-core/src/workshop/inventory/repository.ts
+@@ -167,26 +167,20 @@ async function ensureFleetLocationForVehicle(
+     return mapLocation(row);
+   }
+ 
+-  const baseCode = vehicle.code || vehicle.plate_number || `VEH-${String(vehicle.id).slice(0, 6)}`;
+-  let lastError: unknown;
+-  for (let attempt = 0; attempt < 3; attempt += 1) {
+-    const code = attempt === 0 ? baseCode : `${baseCode}-${attempt + 1}`;
+-    try {
+-      const loc = await createLocation(companyId, {
+-        code,
+-        name: vehicle.name || code,
+-        locationType: "fleet_vehicle" as InventoryLocationType,
+-        branchId: vehicle.branch_id,
+-        fleetVehicleId: vehicle.id,
+-      });
+-      return loc;
+-    } catch (err) {
+-      lastError = err;
+-    }
++  const fallbackName =
++    vehicle.name || vehicle.plate_number || `Fleet vehicle ${String(vehicle.id).slice(0, 6)}`;
++  try {
++    const loc = await createLocation(companyId, {
++      name: fallbackName,
++      locationType: "fleet_vehicle",
++      branchId: vehicle.branch_id,
++      fleetVehicleId: vehicle.id,
++    });
++    return loc;
++  } catch (err) {
++    console.error("ensureFleetLocationForVehicle failed", vehicle.id, err);
++    return null;
+   }
+-  // If we couldn't ensure a location after retries, log and continue
+-  console.error("ensureFleetLocationForVehicle failed", vehicle.id, lastError);
+-  return null;
+ }
+ 
+ export async function listLocations(companyId: string, opts: { branchId?: string | null } = {}): Promise<InventoryLocation[]> {
+@@ -230,28 +224,56 @@ export async function listLocations(companyId: string, opts: { branchId?: string
+ 
+ export async function createLocation(
+   companyId: string,
+-  input: { code: string; name: string; locationType: InventoryLocationType; branchId?: string | null; fleetVehicleId?: string | null }
++  input: {
++    code?: string | null;
++    name: string;
++    locationType: InventoryLocationType;
++    branchId?: string | null;
++    fleetVehicleId?: string | null;
++  }
+ ): Promise<InventoryLocation> {
+   const sql = getSql();
+-  const rows = await sql/* sql */ `
+-    INSERT INTO inventory_locations (
+-      company_id,
+-      code,
+-      name,
+-      location_type,
+-      branch_id,
+-      fleet_vehicle_id
+-    ) VALUES (
+-      ${companyId},
+-      ${input.code},
+-      ${input.name},
+-      ${input.locationType},
+-      ${input.branchId ?? null},
+-      ${input.fleetVehicleId ?? null}
+-    )
+-    RETURNING *
+-  `;
+-  return mapLocation(rows[0]);
++  const centralCount = await centralWarehouseCount(companyId);
++  const isCentral = isCentralWarehouseCandidate(input);
++  if (!centralCount && !isCentral) {
++    throw new Error("Create the central warehouse before adding branches, fleets, or other locations.");
++  }
++
++  const branchId = input.branchId ?? null;
++  const fleetVehicleId = input.fleetVehicleId ?? null;
++  let manualCode = input.code?.trim() ?? undefined;
++  if (manualCode) manualCode = manualCode.toUpperCase();
++  for (let attempt = 0; attempt < 5; attempt += 1) {
++    const code = manualCode ?? (await nextLocationCode(companyId, input.locationType));
++    try {
++      const rows = await sql/* sql */ `
++        INSERT INTO inventory_locations (
++          company_id,
++          code,
++          name,
++          location_type,
++          branch_id,
++          fleet_vehicle_id
++        ) VALUES (
++          ${companyId},
++          ${code},
++          ${input.name.trim()},
++          ${input.locationType},
++          ${branchId},
++          ${fleetVehicleId}
++        )
++        RETURNING *
++      `;
++      return mapLocation(rows[0]);
++    } catch (err: any) {
++      if (err?.code === "23505") {
++        manualCode = undefined;
++        continue;
++      }
++      throw err;
++    }
++  }
++  throw new Error("Unable to assign a unique location code, please retry.");
+ }
+ 
+ export async function updateLocation(

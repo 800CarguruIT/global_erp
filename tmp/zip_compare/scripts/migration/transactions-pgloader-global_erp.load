@@ -1,0 +1,12 @@
+LOAD DATABASE
+  FROM mysql://root:root123@host.docker.internal:3308/carguru2_tx
+  INTO postgresql://autoguru:autoguru@host.docker.internal:5432/global_erp
+
+ INCLUDING ONLY TABLE NAMES MATCHING 'transactions'
+
+ WITH include no drop, create tables, create indexes, reset sequences
+
+ CAST
+   type date to date using zero-dates-to-null,
+   type datetime to timestamptz using zero-dates-to-null,
+   type timestamp to timestamptz using zero-dates-to-null;

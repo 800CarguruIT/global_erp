@@ -104,13 +104,28 @@ async function resolveCollectCarSource(
     string,
     unknown
   >;
+  const rsaRows = await sql<any[]>`
+    SELECT
+      photo_front_file_id,
+      photo_rear_file_id,
+      photo_right_file_id,
+      photo_left_file_id,
+      cluster_image_file_id,
+      video_360_file_id
+    FROM rsa_inspections
+    WHERE company_id = ${companyId}
+      AND lead_id = ${leadId}
+    ORDER BY updated_at DESC NULLS LAST, created_at DESC NULLS LAST
+    LIMIT 1
+  `;
+  const rsaRow = ((rsaRows as any).rows ?? rsaRows)?.[0];
   const media = normalizeMediaMap({
-    video: leadRow.carin_video ?? workflowRequired.inspectionVideo360 ?? null,
-    front: workflowRequired.inspectionPhotoFront ?? null,
-    rear: workflowRequired.inspectionPhotoRear ?? null,
-    right: workflowRequired.inspectionPhotoRight ?? null,
-    left: workflowRequired.inspectionPhotoLeft ?? null,
-    cluster: workflowRequired.inspectionClusterImage ?? null,
+    video: leadRow.carin_video ?? workflowRequired.inspectionVideo360 ?? rsaRow?.video_360_file_id ?? null,
+    front: workflowRequired.inspectionPhotoFront ?? rsaRow?.photo_front_file_id ?? null,
+    rear: workflowRequired.inspectionPhotoRear ?? rsaRow?.photo_rear_file_id ?? null,
+    right: workflowRequired.inspectionPhotoRight ?? rsaRow?.photo_right_file_id ?? null,
+    left: workflowRequired.inspectionPhotoLeft ?? rsaRow?.photo_left_file_id ?? null,
+    cluster: workflowRequired.inspectionClusterImage ?? rsaRow?.cluster_image_file_id ?? null,
   });
   return { sourceType: "walkin", sourceMedia: media };
 }
