@@ -1,7 +1,8 @@
 FROM node:20-bookworm-slim AS base
 
 WORKDIR /app
-RUN corepack enable
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+RUN corepack enable && corepack prepare pnpm@9.0.0 --activate
 
 COPY . .
 RUN pnpm install --frozen-lockfile
@@ -21,7 +22,8 @@ RUN pnpm --filter web build
 FROM node:20-bookworm-slim AS prod
 
 WORKDIR /app
-RUN corepack enable
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+RUN corepack enable && corepack prepare pnpm@9.0.0 --activate
 COPY --from=build /app /app
 
 ENV NODE_ENV=production
