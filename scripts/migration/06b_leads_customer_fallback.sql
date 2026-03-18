@@ -21,7 +21,7 @@ BEGIN
   SELECT
     cm.customer_id,
     v_company,
-    'individual',
+    'Regular',
     format('CU-LEG-MISS-%s', cm.legacy_customer_id),
     format('Legacy Missing Customer %s', cm.legacy_customer_id),
     format('Auto-created from legacy leads fallback | legacy_customer_id=%s', cm.legacy_customer_id),

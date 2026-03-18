@@ -65,8 +65,8 @@ BEGIN
     m.customer_id,
     v_company_id,
     CASE
-      WHEN lower(trim(coalesce(c.type, ''))) IN ('company', 'corporate', 'business') THEN 'company'
-      ELSE 'individual'
+      WHEN lower(trim(coalesce(c.type, ''))) IN ('chsc', 'customer happiness service contract', 'service contract') THEN 'CHSC'
+      ELSE 'Regular'
     END AS customer_type,
     format('CU-LEG-%s', c.id),
     COALESCE(NULLIF(trim(c.name), ''), format('Legacy Customer %s', c.id)),
