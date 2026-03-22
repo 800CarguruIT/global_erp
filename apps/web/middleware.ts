@@ -14,6 +14,7 @@ const publicPaths = [
   "/api/cars",
   "/api/files",
   "/api/public/recovery-requests",
+  "/api/public/pre-inspection",
   "/api/public/estimate-approval",
   "/api/i18n-generate",
   "/api/yeastar",
@@ -25,6 +26,7 @@ const publicPaths = [
   "/favicon.ico",
   "/_next",
   "/assets",
+  "/pre-inspection",
   "/estimate-approval",
 ];
 

@@ -32,6 +32,10 @@ const submitSchema = z.object({
   }),
 });
 
+function isValidPublicToken(token: string): boolean {
+  return /^[a-f0-9]{48}$/i.test(String(token ?? "").trim());
+}
+
 function validateYesNeedsDetails(answers: Record<string, any>): string | null {
   for (const key of ["q1", "q2", "q3", "q4", "q5", "q6", "q7", "q8"]) {
     const answer = answers?.[key];
@@ -94,6 +98,9 @@ export async function GET(_req: NextRequest, { params }: Params) {
   if (!token) {
     return NextResponse.json({ error: "token is required" }, { status: 400 });
   }
+  if (!isValidPublicToken(token)) {
+    return NextResponse.json({ error: "invalid token format" }, { status: 400 });
+  }
   const data = await getPreInspectionFormByToken(token);
   if (!data) {
     return NextResponse.json({ error: "Form not found" }, { status: 404 });
@@ -105,6 +112,9 @@ export async function POST(req: NextRequest, { params }: Params) {
   const { token } = await Promise.resolve(params);
   if (!token) {
     return NextResponse.json({ error: "token is required" }, { status: 400 });
+  }
+  if (!isValidPublicToken(token)) {
+    return NextResponse.json({ error: "invalid token format" }, { status: 400 });
   }
   const parsed = submitSchema.safeParse(await req.json().catch(() => ({})));
   if (!parsed.success) {

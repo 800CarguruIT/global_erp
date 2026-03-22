@@ -10,28 +10,10 @@ import type { InspectionItem } from "@repo/ai-core/workshop/inspections/types";
 import { getCurrentUserIdFromRequest } from "@/lib/auth/current-user";
 import { getSql } from "@repo/ai-core/db";
 import { getLatestFormForLeadOrRelated, getPendingMandatoryFormForLead } from "@/lib/pre-inspection-form";
+import { normalizeMediaMap, resolveCollectCarSource } from "@/lib/collect-car-source";
 
 type Params = { params: Promise<{ companyId: string; inspectionId: string }> };
 type VerifyFineInput = { fineCode?: string | null; reason?: string | null; amount?: number | string | null };
-
-type CollectCarSourceType = "recovery" | "walkin" | "unknown";
-
-function normalizeFileId(value: unknown): string | null {
-  const out = String(value ?? "").trim();
-  return out || null;
-}
-
-function normalizeMediaMap(value: unknown): Record<string, string> {
-  if (!value || typeof value !== "object") return {};
-  const row = value as Record<string, unknown>;
-  const keys = ["video", "front", "rear", "right", "left", "cluster"] as const;
-  const out: Record<string, string> = {};
-  for (const key of keys) {
-    const id = normalizeFileId(row[key]);
-    if (id) out[key] = id;
-  }
-  return out;
-}
 
 function normalizeTextValue(value: unknown): string | null {
   const text = String(value ?? "").trim();
@@ -302,87 +284,6 @@ async function upsertInspectionCarAndLinks(args: {
   }
 
   return carId;
-}
-
-async function resolveCollectCarSource(sql: any, companyId: string, leadId: string | null | undefined): Promise<{
-  sourceType: CollectCarSourceType;
-  sourceMedia: Record<string, string>;
-}> {
-  if (!leadId) return { sourceType: "unknown", sourceMedia: {} };
-  const leadRows = await sql<any[]>`
-    SELECT
-      lead_type,
-      workshop_visit_mode,
-      pickup_from,
-      dropoff_to,
-      carin_video,
-      workflow_required
-    FROM leads
-    WHERE company_id = ${companyId}
-      AND id = ${leadId}
-    LIMIT 1
-  `;
-  const leadRow = ((leadRows as any).rows ?? leadRows)?.[0];
-  if (!leadRow) return { sourceType: "unknown", sourceMedia: {} };
-
-  const isRecovery =
-    String(leadRow.lead_type ?? "").toLowerCase() === "recovery" ||
-    String(leadRow.workshop_visit_mode ?? "").toLowerCase() === "recovery" ||
-    Boolean(String(leadRow.pickup_from ?? "").trim()) ||
-    Boolean(String(leadRow.dropoff_to ?? "").trim());
-
-  if (isRecovery) {
-    const recoveryRows = await sql<any[]>`
-      SELECT
-        pickup_video,
-        pickup_front_image,
-        pickup_rear_image,
-        pickup_right_image,
-        pickup_left_image,
-        pickup_cluster_image
-      FROM recovery_requests
-      WHERE lead_id = ${leadId}
-        AND type = 'pickup'
-      ORDER BY created_at DESC
-      LIMIT 1
-    `;
-    const recoveryRow = ((recoveryRows as any).rows ?? recoveryRows)?.[0];
-    const media = normalizeMediaMap({
-      video: recoveryRow?.pickup_video ?? null,
-      front: recoveryRow?.pickup_front_image ?? null,
-      rear: recoveryRow?.pickup_rear_image ?? null,
-      right: recoveryRow?.pickup_right_image ?? null,
-      left: recoveryRow?.pickup_left_image ?? null,
-      cluster: recoveryRow?.pickup_cluster_image ?? null,
-    });
-    return { sourceType: "recovery", sourceMedia: media };
-  }
-
-  const workflowRequired = (leadRow.workflow_required ?? {}) as Record<string, unknown>;
-  const rsaRows = await sql<any[]>`
-    SELECT
-      photo_front_file_id,
-      photo_rear_file_id,
-      photo_right_file_id,
-      photo_left_file_id,
-      cluster_image_file_id,
-      video_360_file_id
-    FROM rsa_inspections
-    WHERE company_id = ${companyId}
-      AND lead_id = ${leadId}
-    ORDER BY updated_at DESC NULLS LAST, created_at DESC NULLS LAST
-    LIMIT 1
-  `;
-  const rsaRow = ((rsaRows as any).rows ?? rsaRows)?.[0];
-  const media = normalizeMediaMap({
-    video: leadRow.carin_video ?? workflowRequired.inspectionVideo360 ?? rsaRow?.video_360_file_id ?? null,
-    front: workflowRequired.inspectionPhotoFront ?? rsaRow?.photo_front_file_id ?? null,
-    rear: workflowRequired.inspectionPhotoRear ?? rsaRow?.photo_rear_file_id ?? null,
-    right: workflowRequired.inspectionPhotoRight ?? rsaRow?.photo_right_file_id ?? null,
-    left: workflowRequired.inspectionPhotoLeft ?? rsaRow?.photo_left_file_id ?? null,
-    cluster: workflowRequired.inspectionClusterImage ?? rsaRow?.cluster_image_file_id ?? null,
-  });
-  return { sourceType: "walkin", sourceMedia: media };
 }
 
 function roundMoney(value: number) {

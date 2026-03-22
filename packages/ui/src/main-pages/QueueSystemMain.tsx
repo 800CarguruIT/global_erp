@@ -273,10 +273,11 @@ export function QueueSystemMain({ companyId }: QueueSystemMainProps) {
       (row) => {
         const lead = leadById[row.leadId];
         const alreadyCheckedIn = String(lead?.leadStatus ?? "").toLowerCase() === "car_in";
+        const formSubmitted = String(row.preServiceFormStatus ?? "").toLowerCase() === "submitted";
         return (
         row.bookingKind === "workshop_walkin" &&
         row.status === "active" &&
-        row.preServiceFormStatus === "submitted" &&
+        formSubmitted &&
           !alreadyCheckedIn
         );
       }

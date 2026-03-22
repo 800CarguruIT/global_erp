@@ -12,10 +12,8 @@ import {
 } from "@repo/ai-core/crm/leads/repository";
 import { getSql } from "@repo/ai-core/db";
 import { buildScopeContextFromRoute, requirePermission } from "@/lib/auth/permissions";
-import {
-  createOrUpdatePreInspectionFormRequest,
-  sendPreInspectionFormRequestIfPending,
-} from "@/lib/pre-inspection-form";
+import { getCurrentUserIdFromRequest } from "@/lib/auth/current-user";
+import { dispatchLeadBookingFlow } from "@/lib/workshop-booking-flow";
 
 const payloadSchema = z.object({
   carId: z.string().min(1),
@@ -30,6 +28,14 @@ const payloadSchema = z.object({
 });
 
 type ParamsCtx = { params: { id: string } } | { params: Promise<{ id: string }> };
+
+function parseScheduledAt(input: unknown): string | null {
+  const raw = String(input ?? "").trim();
+  if (!raw) return null;
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString();
+}
 
 export async function POST(req: NextRequest, routeCtx: ParamsCtx) {
   try {
@@ -92,15 +98,9 @@ export async function POST(req: NextRequest, routeCtx: ParamsCtx) {
         customerId: customer.id,
         carId: car.id,
         leadType: "workshop",
-        leadStage: "checkin",
+        leadStage: "new",
         source: "walk_in",
         serviceType,
-      });
-      const checkinAt = new Date().toISOString();
-      await updateLeadPartial(companyId, lead.id, {
-        leadStatus: "car_in",
-        leadStage: "checkin",
-        checkinAt,
       });
       if (remarks) {
         await updateLeadPartial(companyId, lead.id, { agentRemark: remarks });
@@ -108,8 +108,8 @@ export async function POST(req: NextRequest, routeCtx: ParamsCtx) {
       await appendLeadEvent({
         companyId,
         leadId: lead.id,
-        eventType: "car_in",
-        eventPayload: { checkinAt, remarks, serviceType, source: "customer_car_select" },
+        eventType: "lead_created",
+        eventPayload: { remarks, serviceType, source: "customer_car_select" },
       });
       return NextResponse.json({ data: lead }, { status: 201 });
     }
@@ -118,8 +118,13 @@ export async function POST(req: NextRequest, routeCtx: ParamsCtx) {
     if (!appointmentAt) {
       return NextResponse.json({ error: "appointmentAt is required" }, { status: 400 });
     }
+    const scheduledAt = parseScheduledAt(appointmentAt);
+    if (!scheduledAt) {
+      return NextResponse.json({ error: "appointmentAt is invalid" }, { status: 400 });
+    }
     const appointmentType = parsed.data.appointmentType ?? "walkin";
     const remarks = parsed.data.remarks?.trim() || null;
+    const currentUserId = await getCurrentUserIdFromRequest(req);
 
     if (appointmentType === "recovery") {
       const pickupLocation = (parsed.data.pickupLocation ?? "").trim();
@@ -140,25 +145,60 @@ export async function POST(req: NextRequest, routeCtx: ParamsCtx) {
         serviceType: "recovery",
         source: "walk_in",
       });
-      const recoveryRequestRows =
-        await sql/* sql */ `
-          INSERT INTO recovery_requests (
-            lead_id,
-            pickup_location,
-            dropoff_location,
-            type,
-            remarks
-          )
-          VALUES (
-            ${lead.id},
-            ${pickupLocation},
-            ${dropoffLocation},
-            ${recoveryType},
-            ${remarks}
-          )
-          RETURNING id
-        `;
-      const recoveryRequestId = recoveryRequestRows?.[0]?.id ?? null;
+      const bookingRows = await sql/* sql */ `
+        INSERT INTO lead_bookings (
+          company_id,
+          lead_id,
+          booking_kind,
+          scheduled_at,
+          pickup_location,
+          dropoff_location,
+          notes,
+          priority,
+          status,
+          created_by_user_id
+        )
+        VALUES (
+          ${companyId},
+          ${lead.id},
+          ${"recovery"},
+          ${scheduledAt},
+          ${pickupLocation},
+          ${dropoffLocation},
+          ${remarks},
+          ${"medium"},
+          ${"active"},
+          ${currentUserId ?? null}
+        )
+        ON CONFLICT (lead_id, booking_kind)
+        WHERE status = 'active'
+        DO UPDATE SET
+          scheduled_at = EXCLUDED.scheduled_at,
+          pickup_location = EXCLUDED.pickup_location,
+          dropoff_location = EXCLUDED.dropoff_location,
+          notes = EXCLUDED.notes,
+          priority = EXCLUDED.priority,
+          created_by_user_id = EXCLUDED.created_by_user_id,
+          updated_at = now()
+        RETURNING id
+      `;
+      const bookingId = String(bookingRows?.[0]?.id ?? "").trim() || null;
+      const flow = await dispatchLeadBookingFlow({
+        companyId,
+        leadId: lead.id,
+        lead: {
+          id: lead.id,
+          carId: (lead as any).carId ?? null,
+          customerId: (lead as any).customerId ?? null,
+          branchId: (lead as any).branchId ?? null,
+          workshopVisitMode: "recovery",
+        },
+        bookingKind: "recovery",
+        scheduledAt,
+        pickupLocation,
+        dropoffLocation,
+        notes: remarks,
+      });
       if (remarks) {
         await updateLeadPartial(companyId, lead.id, { agentRemark: remarks });
       }
@@ -170,19 +210,16 @@ export async function POST(req: NextRequest, routeCtx: ParamsCtx) {
           appointmentAt,
           appointmentType,
           recoveryType,
-          recoveryRequestId,
+          bookingId,
+          recoveryRequestId: flow.recoveryRequestId,
           remarks,
           source: "customer_car_select",
         },
       });
-      await createOrUpdatePreInspectionFormRequest({
-        companyId,
-        leadId: lead.id,
-        appointmentType: "recovery",
-        appointmentAt,
-        recoveryRequestId,
-      });
-      return NextResponse.json({ data: lead }, { status: 201 });
+      return NextResponse.json(
+        { data: lead, meta: { bookingId, recoveryRequestId: flow.recoveryRequestId } },
+        { status: 201 }
+      );
     }
 
     const lead = await createLead({
@@ -193,29 +230,73 @@ export async function POST(req: NextRequest, routeCtx: ParamsCtx) {
       leadStage: "new",
       source: "walk_in",
     });
+    const bookingRows = await sql/* sql */ `
+      INSERT INTO lead_bookings (
+        company_id,
+        lead_id,
+        booking_kind,
+        scheduled_at,
+        notes,
+        priority,
+        status,
+        created_by_user_id
+      )
+      VALUES (
+        ${companyId},
+        ${lead.id},
+        ${"workshop_walkin"},
+        ${scheduledAt},
+        ${remarks},
+        ${"medium"},
+        ${"active"},
+        ${currentUserId ?? null}
+      )
+      ON CONFLICT (lead_id, booking_kind)
+      WHERE status = 'active'
+      DO UPDATE SET
+        scheduled_at = EXCLUDED.scheduled_at,
+        notes = EXCLUDED.notes,
+        priority = EXCLUDED.priority,
+        created_by_user_id = EXCLUDED.created_by_user_id,
+        updated_at = now()
+      RETURNING id
+    `;
+    const bookingId = String(bookingRows?.[0]?.id ?? "").trim() || null;
+    const flow = await dispatchLeadBookingFlow({
+      companyId,
+      leadId: lead.id,
+      lead: {
+        id: lead.id,
+        carId: (lead as any).carId ?? null,
+        customerId: (lead as any).customerId ?? null,
+        branchId: (lead as any).branchId ?? null,
+        workshopVisitMode: "walkin",
+      },
+      bookingKind: "workshop_walkin",
+      scheduledAt,
+      notes: remarks,
+    });
     if (remarks) {
       await updateLeadPartial(companyId, lead.id, { agentRemark: remarks });
     }
     await appendLeadEvent({
       companyId,
       leadId: lead.id,
-      eventType: "appointment_created",
-      eventPayload: { appointmentAt, appointmentType, remarks, source: "customer_car_select" },
+        eventType: "appointment_created",
+      eventPayload: {
+        appointmentAt,
+        appointmentType,
+        remarks,
+        bookingId,
+        preInspectionFormId: flow.preInspectionFormId,
+        inspectionId: flow.inspectionId,
+        source: "customer_car_select",
+      },
     });
-    const form = await createOrUpdatePreInspectionFormRequest({
-      companyId,
-      leadId: lead.id,
-      appointmentType: "walkin",
-      appointmentAt,
-    });
-    const appointmentAtMs = new Date(appointmentAt).getTime();
-    if (Number.isFinite(appointmentAtMs) && appointmentAtMs - Date.now() <= 24 * 60 * 60 * 1000) {
-      await sendPreInspectionFormRequestIfPending({
-        formId: form.id,
-        reason: "direct",
-      }).catch(() => undefined);
-    }
-    return NextResponse.json({ data: lead }, { status: 201 });
+    return NextResponse.json(
+      { data: lead, meta: { bookingId, preInspectionFormId: flow.preInspectionFormId, inspectionId: flow.inspectionId } },
+      { status: 201 }
+    );
   } catch (error) {
     console.error("POST /api/customers/[id]/cars/select error:", error);
     return NextResponse.json({ error: "Failed to create lead" }, { status: 500 });

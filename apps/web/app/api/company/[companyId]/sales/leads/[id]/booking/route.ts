@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { appendLeadEvent, getLeadById, updateLeadPartial } from "@repo/ai-core/crm/leads/repository";
 import { getSql } from "@repo/ai-core/db";
 import { getCurrentUserIdFromRequest } from "@/lib/auth/current-user";
+import { dispatchLeadBookingFlow } from "@/lib/workshop-booking-flow";
 
 type Params = { params: Promise<{ companyId: string; id: string }> };
 
@@ -93,7 +94,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
       ? "recovery"
       : String(latest?.booking_kind ?? "").toLowerCase() === "workshop_walkin"
       ? "walkin"
-      : resolveWorkshopVisitMode(lead);
+      : normalizeWorkshopVisitMode(lead);
 
   return NextResponse.json({
     data: {
@@ -207,54 +208,22 @@ export async function POST(req: NextRequest, { params }: Params) {
         : undefined,
   });
 
-  let recoveryRequestId: string | null = null;
-  if (bookingKind === "recovery" || bookingKind === "workshop_recovery") {
-    const existingRows = await sql/* sql */ `
-      SELECT id
-      FROM recovery_requests
-      WHERE lead_id = ${id}
-        AND type = 'pickup'
-        AND status <> 'Done'
-      ORDER BY created_at DESC
-      LIMIT 1
-    `;
-    const existingId = String(existingRows?.[0]?.id ?? "").trim();
-    if (existingId) {
-      await sql/* sql */ `
-        UPDATE recovery_requests
-        SET
-          pickup_location = ${pickupLocation},
-          dropoff_location = ${dropoffLocation},
-          type = 'pickup',
-          scheduled_at = ${scheduledAt},
-          remarks = ${notes},
-          updated_at = now()
-        WHERE id = ${existingId}
-      `;
-      recoveryRequestId = existingId;
-    } else {
-      const inserted = await sql/* sql */ `
-        INSERT INTO recovery_requests (
-          lead_id,
-          pickup_location,
-          dropoff_location,
-          type,
-          remarks,
-          scheduled_at
-        )
-        VALUES (
-          ${id},
-          ${pickupLocation},
-          ${dropoffLocation},
-          'pickup',
-          ${notes},
-          ${scheduledAt}
-        )
-        RETURNING id
-      `;
-      recoveryRequestId = String(inserted?.[0]?.id ?? "").trim() || null;
-    }
-  }
+  const flow = await dispatchLeadBookingFlow({
+    companyId,
+    leadId: id,
+    lead: {
+      id: lead.id,
+      carId: (lead as any).carId ?? null,
+      customerId: (lead as any).customerId ?? null,
+      branchId: (lead as any).branchId ?? null,
+      workshopVisitMode: (lead as any).workshopVisitMode ?? null,
+    },
+    bookingKind,
+    scheduledAt,
+    pickupLocation,
+    dropoffLocation,
+    notes,
+  });
 
   await appendLeadEvent({
     companyId,
@@ -269,7 +238,9 @@ export async function POST(req: NextRequest, { params }: Params) {
       scheduledAt,
       pickupLocation,
       dropoffLocation,
-      recoveryRequestId,
+      recoveryRequestId: flow.recoveryRequestId,
+      preInspectionFormId: flow.preInspectionFormId,
+      inspectionId: flow.inspectionId,
     },
   });
 
@@ -278,7 +249,9 @@ export async function POST(req: NextRequest, { params }: Params) {
     data: {
       bookingId,
       bookingKind,
-      recoveryRequestId,
+      recoveryRequestId: flow.recoveryRequestId,
+      preInspectionFormId: flow.preInspectionFormId,
+      inspectionId: flow.inspectionId,
       lead: refreshed ?? lead,
     },
   });

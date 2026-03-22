@@ -21,6 +21,10 @@ const requestSchema = z.object({
   }),
 });
 
+function isValidPublicToken(token: string): boolean {
+  return /^[a-f0-9]{48}$/i.test(String(token ?? "").trim());
+}
+
 type ParsedAnswers = z.infer<typeof requestSchema>["answers"];
 
 function buildIssueLines(answers: ParsedAnswers): string[] {
@@ -84,6 +88,9 @@ export async function POST(req: NextRequest, { params }: Params) {
   const { token } = await Promise.resolve(params);
   if (!token) {
     return NextResponse.json({ error: "token is required" }, { status: 400 });
+  }
+  if (!isValidPublicToken(token)) {
+    return NextResponse.json({ error: "invalid token format" }, { status: 400 });
   }
 
   const form = await getPreInspectionFormByToken(token);

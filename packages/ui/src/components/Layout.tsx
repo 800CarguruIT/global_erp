@@ -112,6 +112,13 @@ type IncomingPopupState = {
   } | null;
 };
 
+type SdkNoticeState = {
+  key: string;
+  title: string;
+  message: string;
+  suggestions: string[];
+};
+
 function formatDuration(ms: number): string {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));
   const minutes = Math.floor(totalSeconds / 60);
@@ -267,6 +274,33 @@ function detectScope(pathname: string): ScopeInfo {
   return { scope: "global" };
 }
 
+function isWorkshopPortalPath(pathname: string): boolean {
+  const parts = pathname.split("/").filter(Boolean);
+  if (parts.length < 1) return false;
+
+  if (parts[0] === "company" && parts[1]) {
+    const section = parts[2] ?? "";
+    if (
+      section === "workshop" ||
+      section === "queue-system" ||
+      section === "car-in-dashboard" ||
+      section === "inspections"
+    ) {
+      return true;
+    }
+    if (section === "jobs" && parts[3] === "workshop") return true;
+    if (section === "branches" && parts[3] && parts[4] === "jobs" && parts[5] === "workshop") return true;
+    return false;
+  }
+
+  if (parts[0] === "branches" && parts[1]) {
+    const section = parts[2] ?? "";
+    return section === "workshop" || section === "queue-system" || section === "car-in-dashboard";
+  }
+
+  return false;
+}
+
 function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRealtime }: LayoutProps) {
   const pathname = usePathname() || "/";
   const router = useRouter();
@@ -291,6 +325,7 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
     message: null,
     extension: null,
   });
+  const [sdkNotice, setSdkNotice] = useState<SdkNoticeState | null>(null);
   const seenIncomingCallIdsRef = useRef<Map<string, number>>(new Map());
   const incomingPopupsRef = useRef<IncomingPopupState[]>([]);
   const agentTokensRef = useRef<Set<string>>(new Set());
@@ -298,9 +333,30 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
   const linkusClientRef = useRef(getLinkusClient());
   const signRefreshRef = useRef<{ key: string; at: number }>({ key: "", at: 0 });
   const settingsRefreshRef = useRef<{ key: string; at: number }>({ key: "", at: 0 });
+  const autoSdkApiPausedRef = useRef<{ settings: boolean; sign: boolean }>({
+    settings: false,
+    sign: false,
+  });
   const answeredPopupHideTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const terminalCallsRef = useRef<Map<string, number>>(new Map());
   const recentlyClosedTargetsRef = useRef<Map<string, number>>(new Map());
+  const sdkNoticeKeyRef = useRef<string>("");
+  const showSdkNotice = useCallback((notice: SdkNoticeState) => {
+    if (sdkNoticeKeyRef.current === notice.key) return;
+    sdkNoticeKeyRef.current = notice.key;
+    setSdkNotice(notice);
+  }, []);
+  const clearSdkNotice = useCallback(() => {
+    sdkNoticeKeyRef.current = "";
+    setSdkNotice(null);
+  }, []);
+  const resumeAutoSdkApi = useCallback(() => {
+    autoSdkApiPausedRef.current = { settings: false, sign: false };
+    settingsRefreshRef.current = { key: "", at: 0 };
+    signRefreshRef.current = { key: "", at: 0 };
+    sdkNoticeKeyRef.current = "";
+    setSdkNotice(null);
+  }, []);
   const readLinkusConfig = useCallback(() => {
     const extension = (() => {
       try {
@@ -373,6 +429,7 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
     scopeInfo.scope === "company" || scopeInfo.scope === "branch" || scopeInfo.scope === "vendor"
       ? String(scopeInfo.companyId ?? "").trim()
       : "";
+  const dialerEnabled = Boolean(sdkCompanyId) && !isWorkshopPortalPath(pathname);
 
   useEffect(() => {
     const isCompanyScope =
@@ -496,6 +553,7 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
   }, [incomingPopups]);
 
   useEffect(() => {
+    if (!dialerEnabled) return;
     const timer = window.setInterval(() => {
       const companyId =
         scopeInfo.scope === "company" || scopeInfo.scope === "branch" || scopeInfo.scope === "vendor"
@@ -545,9 +603,14 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
     return () => {
       window.clearInterval(timer);
     };
-  }, [scopeInfo.scope, scopeInfo.companyId]);
+  }, [dialerEnabled, scopeInfo.scope, scopeInfo.companyId]);
 
   useEffect(() => {
+    if (!dialerEnabled) {
+      clearSdkNotice();
+      setLinkusStatus({ state: "idle", message: null, extension: null });
+      return;
+    }
     let stopped = false;
     const client = linkusClientRef.current;
     const unsubscribe = client.subscribe((status) => {
@@ -559,6 +622,7 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
       token?: string | null;
       serverUrl?: string | null;
     }) => {
+      if (autoSdkApiPausedRef.current.sign) return cfg;
       const extension = String(cfg.extension ?? "").trim();
       const serverUrl = String(cfg.serverUrl ?? "").trim();
       const token = String(cfg.token ?? "").trim();
@@ -597,7 +661,19 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ extension }),
       }).catch(() => null);
-      if (!signRes?.ok) return cfg;
+      if (!signRes?.ok) {
+        autoSdkApiPausedRef.current.sign = true;
+        showSdkNotice({
+          key: `sign-failed:${sdkCompanyId}:${extension}`,
+          title: "Auto sign-in paused",
+          message: "Linkus sign API failed. Auto retry is stopped until manual resume.",
+          suggestions: [
+            "Check Dialer integration and extension assignment.",
+            "Click Resume Auto Setup after fixing configuration.",
+          ],
+        });
+        return cfg;
+      }
 
       const payload = await signRes.json().catch(() => ({}));
       const sign = String(payload?.sign ?? "").trim();
@@ -626,6 +702,7 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
       token?: string | null;
       serverUrl?: string | null;
     }) => {
+      if (autoSdkApiPausedRef.current.settings) return cfg;
       const extension = String(cfg.extension ?? "").trim();
       const serverUrl = String(cfg.serverUrl ?? "").trim();
       if ((!extension || !serverUrl) && sdkCompanyId) {
@@ -639,7 +716,19 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
           const res = await fetch(`/api/company/${sdkCompanyId}/dialer/linkus-settings`, {
             cache: "no-store",
           }).catch(() => null);
-          if (res?.ok) {
+          if (!res) {
+            autoSdkApiPausedRef.current.settings = true;
+            showSdkNotice({
+              key: `settings-fetch-failed:${sdkCompanyId}`,
+              title: "Dialer settings request failed",
+              message: "Could not load Linkus settings from server. Auto retry is stopped.",
+              suggestions: [
+                "Check network and reload the page.",
+                "Verify company dialer integration is active.",
+                "Click Resume Auto Setup after fixing configuration.",
+              ],
+            });
+          } else if (res.ok) {
             const payload = await res.json().catch(() => ({}));
             const server = String(payload?.serverUrl ?? "").trim();
             const ext = String(payload?.defaultExtension ?? "").trim();
@@ -651,6 +740,42 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
               window.localStorage.setItem("dialer_agent_extension", ext);
               cfg = { ...cfg, extension: ext };
             }
+            const missing: string[] = [];
+            if (!String(cfg.serverUrl ?? "").trim()) missing.push("Linkus server URL");
+            if (!String(cfg.extension ?? "").trim()) missing.push("PBX extension");
+            if (missing.length > 0) {
+              showSdkNotice({
+                key: `settings-missing:${sdkCompanyId}:${missing.join(",")}`,
+                title: "Linkus config is incomplete",
+                message: `Missing ${missing.join(" and ")}.`,
+                suggestions: [
+                  "Set server URL in Dialer integration settings.",
+                  "Assign your extension in User Extensions.",
+                ],
+              });
+            } else if (linkusStatus.state === "connected") {
+              clearSdkNotice();
+            }
+          } else {
+            autoSdkApiPausedRef.current.settings = true;
+            const payload = await res.json().catch(() => ({}));
+            const reason = String(payload?.error ?? `HTTP ${res.status}`).trim();
+            showSdkNotice({
+              key: `settings-http:${sdkCompanyId}:${res.status}:${reason}`,
+              title: "Linkus settings not available",
+              message: `${reason}. Auto retry is stopped.`,
+              suggestions:
+                res.status === 404
+                  ? [
+                      "Create/activate a Yeastar dialer integration.",
+                      "Assign your PBX extension in User Extensions.",
+                      "Click Resume Auto Setup after fixing configuration.",
+                    ]
+                  : [
+                      "Confirm permissions and integration setup, then retry.",
+                      "Click Resume Auto Setup after fixing configuration.",
+                    ],
+            });
           }
         }
       }
@@ -660,6 +785,29 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
       const current = client.getStatus().state;
       if (current === "connected" || current === "connecting") return;
       const cfg = await ensureSdkSign(await ensureSdkSettings(readLinkusConfig()));
+      const extension = String(cfg.extension ?? "").trim();
+      const serverUrl = String(cfg.serverUrl ?? "").trim();
+      if (!extension) {
+        showSdkNotice({
+          key: `missing-extension:${sdkCompanyId}`,
+          title: "PBX extension is not assigned",
+          message: "SDK cannot connect without an extension.",
+          suggestions: [
+            "Open User Extensions and assign your PBX extension.",
+            "Re-login after extension assignment if needed.",
+          ],
+        });
+      } else if (!serverUrl) {
+        showSdkNotice({
+          key: `missing-server:${sdkCompanyId}`,
+          title: "Linkus server URL is missing",
+          message: "SDK cannot connect without dialer server URL.",
+          suggestions: [
+            "Open Dialer Integration and set Linkus server URL.",
+            "Ensure the integration is active for this company.",
+          ],
+        });
+      }
       await client.connect(cfg);
     };
     void connectFromStorage();
@@ -673,9 +821,52 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
       window.clearInterval(timer);
       unsubscribe();
     };
-  }, [readLinkusConfig, sdkCompanyId]);
+  }, [clearSdkNotice, dialerEnabled, linkusStatus.state, readLinkusConfig, sdkCompanyId, showSdkNotice]);
 
   useEffect(() => {
+    if (!dialerEnabled) return;
+    if (linkusStatus.state === "connected") {
+      clearSdkNotice();
+      return;
+    }
+    if (linkusStatus.state !== "error") return;
+    const msg = String(linkusStatus.message ?? "").trim();
+    if (!msg) return;
+    const lower = msg.toLowerCase();
+    if (lower.includes("extension missing")) {
+      showSdkNotice({
+        key: `status-extension-missing:${sdkCompanyId}`,
+        title: "PBX extension is not assigned",
+        message: msg,
+        suggestions: [
+          "Open User Extensions and assign your PBX extension.",
+          "Refresh this page after saving.",
+        ],
+      });
+      return;
+    }
+    if (lower.includes("dialer_linkus_server missing")) {
+      showSdkNotice({
+        key: `status-server-missing:${sdkCompanyId}`,
+        title: "Linkus server URL is missing",
+        message: msg,
+        suggestions: [
+          "Open Dialer Integration and set Linkus server URL.",
+          "Verify Yeastar integration credentials are valid.",
+        ],
+      });
+      return;
+    }
+    showSdkNotice({
+      key: `status-error:${sdkCompanyId}:${msg}`,
+      title: "SDK connection error",
+      message: msg,
+      suggestions: ["Review dialer integration, extension assignment, and SDK token."],
+    });
+  }, [clearSdkNotice, dialerEnabled, linkusStatus.message, linkusStatus.state, sdkCompanyId, showSdkNotice]);
+
+  useEffect(() => {
+    if (!dialerEnabled) return;
     const timer = window.setInterval(() => {
       const now = Date.now();
       for (const [key, at] of terminalCallsRef.current.entries()) {
@@ -748,10 +939,10 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
       });
     }, 1000);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [dialerEnabled]);
 
   useEffect(() => {
-    if (disableIncomingCallRealtime) return;
+    if (disableIncomingCallRealtime || !dialerEnabled) return;
 
     const companyId =
       scopeInfo.scope === "company" || scopeInfo.scope === "branch" || scopeInfo.scope === "vendor"
@@ -1282,7 +1473,7 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
       }
       answeredPopupHideTimersRef.current.clear();
     };
-  }, [scopeInfo.scope, scopeInfo.companyId, disableIncomingCallRealtime]);
+  }, [dialerEnabled, scopeInfo.scope, scopeInfo.companyId, disableIncomingCallRealtime]);
 
   async function handleLookup() {
     if (!scopeInfo.companyId) return;
@@ -1961,36 +2152,85 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
           </div>
         )}
 
-      <div
-        className={`fixed right-4 z-[70] ${
-          incomingPopups.length > 0 ? "bottom-[22rem]" : "bottom-4"
-        }`}
-      >
-        <div className="rounded-full border border-white/15 bg-slate-950/90 px-3 py-1.5 text-[11px] shadow-lg backdrop-blur">
-          <span className="mr-2 text-slate-300">SDK</span>
-          <span
-            className={
-              linkusStatus.state === "connected"
-                ? "text-emerald-300"
-                : linkusStatus.state === "connecting"
-                ? "text-amber-300"
-                : linkusStatus.state === "error"
-                ? "text-rose-300"
-                : "text-slate-300"
-            }
-          >
-            {linkusStatus.state || "idle"}
-          </span>
-          {linkusStatus.extension ? (
-            <span className="ml-2 text-slate-400">ext {linkusStatus.extension}</span>
-          ) : null}
-          {linkusStatus.message ? (
-            <span className="ml-2 text-slate-500" title={linkusStatus.message}>
-              i
+      {dialerEnabled ? (
+        <div
+          className={`fixed right-4 z-[70] ${
+            incomingPopups.length > 0 ? "bottom-[22rem]" : "bottom-4"
+          }`}
+        >
+          <div className="rounded-full border border-white/15 bg-slate-950/90 px-3 py-1.5 text-[11px] shadow-lg backdrop-blur">
+            <span className="mr-2 text-slate-300">SDK</span>
+            <span
+              className={
+                linkusStatus.state === "connected"
+                  ? "text-emerald-300"
+                  : linkusStatus.state === "connecting"
+                  ? "text-amber-300"
+                  : linkusStatus.state === "error"
+                  ? "text-rose-300"
+                  : "text-slate-300"
+              }
+            >
+              {linkusStatus.state || "idle"}
             </span>
+            {linkusStatus.extension ? (
+              <span className="ml-2 text-slate-400">ext {linkusStatus.extension}</span>
+            ) : null}
+            {linkusStatus.message ? (
+              <span className="ml-2 text-slate-500" title={linkusStatus.message}>
+                i
+              </span>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+      {dialerEnabled && sdkNotice ? (
+        <div
+          className={`fixed right-4 z-[71] w-[22rem] rounded-xl border border-amber-400/30 bg-amber-950/90 p-3 text-xs shadow-lg backdrop-blur ${
+            incomingPopups.length > 0 ? "bottom-[25.5rem]" : "bottom-14"
+          }`}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="font-semibold text-amber-200">{sdkNotice.title}</div>
+            <button
+              type="button"
+              className="rounded-full border border-white/20 px-2 py-0.5 text-[10px] text-white/80 hover:text-white"
+              onClick={() => clearSdkNotice()}
+            >
+              Dismiss
+            </button>
+            <button
+              type="button"
+              className="rounded-full border border-white/20 px-2 py-0.5 text-[10px] text-white/80 hover:text-white"
+              onClick={() => resumeAutoSdkApi()}
+            >
+              Resume Auto Setup
+            </button>
+          </div>
+          <div className="mt-1 text-amber-100/90">{sdkNotice.message}</div>
+          <ul className="mt-2 list-disc space-y-1 pl-4 text-amber-100/80">
+            {sdkNotice.suggestions.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+          {sdkCompanyId ? (
+            <div className="mt-3 flex flex-wrap gap-2 text-[11px]">
+              <Link
+                href={`/company/${sdkCompanyId}/integrations/dialer/extensions`}
+                className="rounded-full border border-white/20 px-2.5 py-1 hover:border-white/40"
+              >
+                User Extensions
+              </Link>
+              <Link
+                href={`/company/${sdkCompanyId}/integrations/dialer`}
+                className="rounded-full border border-white/20 px-2.5 py-1 hover:border-white/40"
+              >
+                Dialer Integrations
+              </Link>
+            </div>
           ) : null}
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }
