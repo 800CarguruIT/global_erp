@@ -1546,6 +1546,7 @@ export function LeadDetailMain({
       }
       const json = await res.json().catch(() => ({}));
       const data = json?.data ?? {};
+      const partsCatalogPaused = Boolean(data?.partsCatalogPaused);
       const cars = Array.isArray(data?.cars) ? (data.cars as VinLookupCarOption[]) : [];
       const car = (data?.car as VinLookupCarOption | null) ?? null;
       if (Boolean(data?.requiresCarSelection) && cars.length > 1) {
@@ -1585,12 +1586,16 @@ export function LeadDetailMain({
       }
     }
 
-    if (changed === 0) {
-      setInspectionAutoFillNote("VIN auto-fill found no new values.");
-    } else if (partsCount !== null) {
-      setInspectionAutoFillNote(
-        `VIN auto-fill updated ${changed} field${changed > 1 ? "s" : ""}. Loaded ${partsCount} catalog parts.`
-      );
+      if (changed === 0) {
+        setInspectionAutoFillNote("VIN auto-fill found no new values.");
+      } else if (partsCatalogPaused) {
+        setInspectionAutoFillNote(
+          `VIN auto-fill updated ${changed} field${changed > 1 ? "s" : ""}. Parts catalog is paused.`
+        );
+      } else if (partsCount !== null) {
+        setInspectionAutoFillNote(
+          `VIN auto-fill updated ${changed} field${changed > 1 ? "s" : ""}. Loaded ${partsCount} catalog parts.`
+        );
     } else {
       setInspectionAutoFillNote(`VIN auto-fill updated ${changed} field${changed > 1 ? "s" : ""}.`);
     }
@@ -1619,6 +1624,7 @@ export function LeadDetailMain({
       }
       const json = await res.json().catch(() => ({}));
       const data = json?.data ?? {};
+      const partsCatalogPaused = Boolean(data?.partsCatalogPaused);
       const cars = Array.isArray(data?.cars) ? (data.cars as VinLookupCarOption[]) : [];
       const car = (data?.car as VinLookupCarOption | null) ?? null;
       const partsCount =
@@ -1628,7 +1634,11 @@ export function LeadDetailMain({
       if (car?.id) setSelectedVinCarId(String(car.id));
 
       const changed = applyVinCarToInspectionFields(car);
-      if (partsCount !== null) {
+      if (partsCatalogPaused) {
+        setInspectionAutoFillNote(
+          `Selected car applied${changed ? ` and updated ${changed} field${changed > 1 ? "s" : ""}` : ""}. Parts catalog is paused.`
+        );
+      } else if (partsCount !== null) {
         setInspectionAutoFillNote(
           `Loaded ${partsCount} catalog parts${changed ? ` and updated ${changed} field${changed > 1 ? "s" : ""}` : ""}.`
         );

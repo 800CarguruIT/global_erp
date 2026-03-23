@@ -62,6 +62,14 @@ type VinCatalogGroupOption = {
   label: string;
   level: number;
 };
+type VinLookupCar = {
+  id: string;
+  make: string;
+  model: string;
+  year: string;
+  title: string;
+  description: string;
+};
 type LineItemAiAnswerValue = "" | "yes" | "no" | "na";
 type LineItemAiQuestion = {
   id: string;
@@ -304,6 +312,8 @@ export function InspectionDetailPageClient({
   const [inspectionYear, setInspectionYear] = useState("");
   const [vinLookupLoading, setVinLookupLoading] = useState(false);
   const [vinLookupNote, setVinLookupNote] = useState<string | null>(null);
+  const [vinLookupCars, setVinLookupCars] = useState<VinLookupCar[]>([]);
+  const [vinLookupSelectedCarId, setVinLookupSelectedCarId] = useState("");
   const [customer, setCustomer] = useState<any | null>(null);
   const [car, setCar] = useState<any | null>(null);
   const [leadPlate, setLeadPlate] = useState("");
@@ -567,6 +577,7 @@ export function InspectionDetailPageClient({
         setInspectionMake(String(draft.inspectionMake ?? ""));
         setInspectionModel(String(draft.inspectionModel ?? ""));
         setInspectionYear(String(draft.inspectionYear ?? ""));
+        setVinLookupSelectedCarId(String(draft.vinLookupSelectedCarId ?? ""));
         initialRemarksRef.current = draft.inspectorRemarks ?? "";
         initialStatusRef.current = String(payload?.status ?? "pending").toLowerCase();
         setChecks(draft.checks ?? {});
@@ -926,6 +937,7 @@ export function InspectionDetailPageClient({
       inspectionMake: inspectionMake.trim(),
       inspectionModel: inspectionModel.trim(),
       inspectionYear: inspectionYear.trim(),
+      vinLookupSelectedCarId: vinLookupSelectedCarId.trim(),
       parts: rows.map((p) => ({
         id: p.id,
         productId: p.productId ?? null,
@@ -977,6 +989,7 @@ export function InspectionDetailPageClient({
       inspectionPlate,
       inspectionVin,
       inspectionYear,
+      vinLookupSelectedCarId,
       inspectionStep,
       lineItemAiAnswers,
       lineItemAiQuestionsByRow,
@@ -1263,6 +1276,8 @@ export function InspectionDetailPageClient({
           setForm((prev) => ({ ...prev, carInMileage: String(exact?.mileage ?? "") }));
         }
         if (hasLocalVehicleBasics) {
+          setVinLookupCars([]);
+          setVinLookupSelectedCarId("");
           setVinLookupNote(`VIN found in database${exact?.code ? ` (${exact.code})` : ""}. Car data loaded.`);
           return;
         }
@@ -1273,17 +1288,31 @@ export function InspectionDetailPageClient({
         return;
       }
 
-      const vinRes = await fetch(
-        `/api/company/${companyId}/sales/leads/${leadId}/vin-lookup?vin=${encodeURIComponent(vin)}&refresh=1`,
-        { cache: "no-store" }
-      );
+      const selectedCarId = vinLookupSelectedCarId.trim();
+      const vinUrl = new URL(`/api/company/${companyId}/sales/leads/${leadId}/vin-lookup`, window.location.origin);
+      vinUrl.searchParams.set("vin", vin);
+      vinUrl.searchParams.set("refresh", "1");
+      if (selectedCarId) vinUrl.searchParams.set("carId", selectedCarId);
+      const vinRes = await fetch(vinUrl.toString(), { cache: "no-store" });
       if (!vinRes.ok) {
         const err = await vinRes.json().catch(() => ({}));
         throw new Error(String(err?.error ?? "VIN lookup failed"));
       }
       const vinJson = await vinRes.json().catch(() => ({}));
+      const vinCarsRaw = Array.isArray(vinJson?.data?.cars) ? vinJson.data.cars : [];
+      const vinCars: VinLookupCar[] = vinCarsRaw.map((row: any) => ({
+        id: String(row?.id ?? "").trim(),
+        make: String(row?.make ?? row?.brand?.name ?? "").trim(),
+        model: String(row?.model ?? "").trim(),
+        year: String(row?.year ?? row?.modelYear ?? "").trim(),
+        title: String(row?.title ?? "").trim(),
+        description: String(row?.description ?? "").trim(),
+      }));
+      setVinLookupCars(vinCars);
       const vinCar = vinJson?.data?.car ?? null;
       if (vinCar) {
+        const selectedId = String(vinCar?.id ?? "").trim();
+        if (selectedId) setVinLookupSelectedCarId(selectedId);
         {
           const vinMake = String(vinCar?.make ?? vinCar?.brand?.name ?? "").trim();
           const vinModel = String(vinCar?.model ?? vinCar?.title ?? "").trim();
@@ -1293,11 +1322,51 @@ export function InspectionDetailPageClient({
           if (vinYear) setInspectionYear(vinYear);
         }
         setVinLookupNote("VIN decoded from catalog and vehicle fields auto-filled.");
+      } else if (vinCars.length > 1) {
+        setVinLookupSelectedCarId("");
+        setVinLookupNote(`Multiple cars found (${vinCars.length}). Select the correct car.`);
       } else {
+        setVinLookupSelectedCarId("");
         setVinLookupNote("VIN lookup finished with no matched vehicle details.");
       }
     } catch (err: any) {
       setVinLookupNote(err?.message ?? "VIN lookup failed.");
+    } finally {
+      setVinLookupLoading(false);
+    }
+  };
+
+  const applySelectedVinCar = async (carId: string) => {
+    const nextCarId = String(carId ?? "").trim();
+    setVinLookupSelectedCarId(nextCarId);
+    if (!nextCarId || !companyId || !leadId) return;
+    const vin = inspectionVin.trim().toUpperCase();
+    if (!vin) return;
+    setVinLookupLoading(true);
+    try {
+      const vinRes = await fetch(
+        `/api/company/${companyId}/sales/leads/${leadId}/vin-lookup?vin=${encodeURIComponent(vin)}&carId=${encodeURIComponent(nextCarId)}`,
+        { cache: "no-store" }
+      );
+      if (!vinRes.ok) {
+        const err = await vinRes.json().catch(() => ({}));
+        throw new Error(String(err?.error ?? "VIN lookup failed"));
+      }
+      const vinJson = await vinRes.json().catch(() => ({}));
+      const vinCar = vinJson?.data?.car ?? null;
+      if (!vinCar) {
+        setVinLookupNote("Selected car could not be resolved.");
+        return;
+      }
+      const vinMake = String(vinCar?.make ?? vinCar?.brand?.name ?? "").trim();
+      const vinModel = String(vinCar?.model ?? vinCar?.title ?? "").trim();
+      const vinYear = String(vinCar?.year ?? vinCar?.modelYear ?? "").trim();
+      if (vinMake) setInspectionMake(vinMake);
+      if (vinModel) setInspectionModel(vinModel);
+      if (vinYear) setInspectionYear(vinYear);
+      setVinLookupNote("Selected VIN car loaded.");
+    } catch (err: any) {
+      setVinLookupNote(err?.message ?? "Failed to apply selected VIN car.");
     } finally {
       setVinLookupLoading(false);
     }
@@ -3667,7 +3736,11 @@ export function InspectionDetailPageClient({
                         className={theme.input}
                         value={inspectionVin}
                         readOnly={isReadOnly || isCollectCarPending}
-                        onChange={(e) => setInspectionVin(e.target.value.toUpperCase())}
+                        onChange={(e) => {
+                          setInspectionVin(e.target.value.toUpperCase());
+                          setVinLookupCars([]);
+                          setVinLookupSelectedCarId("");
+                        }}
                         placeholder="Enter VIN"
                       />
                       <button
@@ -3679,6 +3752,40 @@ export function InspectionDetailPageClient({
                         {vinLookupLoading ? "Checking VIN..." : "Check VIN"}
                       </button>
                     </div>
+                    {vinLookupCars.length > 1 && (
+                      <div className="mt-2">
+                        <label className="text-[11px] text-white/70">Select matched car</label>
+                        <select
+                          className={`${theme.input} mt-1`}
+                          value={vinLookupSelectedCarId}
+                          disabled={isReadOnly || isCollectCarPending || vinLookupLoading}
+                          onChange={(e) => {
+                            const selectedId = e.target.value;
+                            setVinLookupSelectedCarId(selectedId);
+                            if (selectedId) {
+                              void applySelectedVinCar(selectedId);
+                            }
+                          }}
+                        >
+                          <option value="">Select car...</option>
+                          {vinLookupCars.map((candidate, idx) => {
+                            const label = [
+                              candidate.make,
+                              candidate.model,
+                              candidate.year,
+                              candidate.title && candidate.title !== candidate.model ? candidate.title : "",
+                            ]
+                              .filter(Boolean)
+                              .join(" | ");
+                            return (
+                              <option key={`${candidate.id || "row"}-${idx}`} value={candidate.id}>
+                                {label || candidate.id || `Candidate ${idx + 1}`}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      </div>
+                    )}
                   </div>
                   <div>
                     <label className="text-xs font-semibold text-white/70">Car Plate</label>

@@ -18,6 +18,7 @@ export async function GET(req: NextRequest) {
         "/api/v1/workshops/work-orders",
         "/api/v1/workshops/inspections",
         "/api/v1/workshops/invoices",
+        "/api/v1/workshops/vin-lookup",
       ],
     });
   } catch (error) {

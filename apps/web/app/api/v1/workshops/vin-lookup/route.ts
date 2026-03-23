@@ -1,35 +1,31 @@
 import { NextRequest } from "next/server";
 import { getLeadById } from "@repo/ai-core/crm/leads/repository";
-import { requireMobileUserId } from "@/lib/auth/mobile-auth";
-import { ensureCompanyAccess } from "@/lib/auth/mobile-company";
-import {
-  createMobileErrorResponse,
-  createMobileSuccessResponse,
-  handleMobileError,
-} from "@/app/api/mobile/utils";
+import { getVinCatalogCarsByVin, upsertVinCatalogCars } from "@repo/ai-core/crm/vin-catalog/repository";
 import { decodeVinWith17VinUsingConfig, prepareVin17Request } from "@/lib/vin17";
 import { getVin17ConfigForCompany } from "@/lib/vin17-config";
-import { getVinCatalogCarsByVin, upsertVinCatalogCars } from "@repo/ai-core/crm/vin-catalog/repository";
+import {
+  resolveWorkshopAccess,
+  workshopError,
+  workshopErrorFromUnknown,
+  workshopSuccess,
+} from "../utils";
 
-type Params = { params: Promise<{ companyId: string; leadId: string }> };
-
-export async function GET(req: NextRequest, { params }: Params) {
+export async function GET(req: NextRequest) {
   try {
-    const userId = requireMobileUserId(req);
-    const { companyId, leadId } = await params;
+    const access = resolveWorkshopAccess(req, "read");
     const search = new URL(req.url).searchParams;
     const vin = String(search.get("vin") ?? "").trim().toUpperCase();
+    const leadId = String(search.get("leadId") ?? "").trim();
     const requestedCarId = String(search.get("carId") ?? "").trim();
     const forceRefresh = String(search.get("refresh") ?? "").trim() === "1";
 
     if (!vin) {
-      return createMobileErrorResponse("VIN is required.", 400);
+      return workshopError("VIN is required.", 400);
     }
 
-    await ensureCompanyAccess(userId, companyId);
-    const lead = await getLeadById(companyId, leadId);
-    if (!lead) {
-      return createMobileErrorResponse("Lead not found.", 404);
+    if (leadId) {
+      const lead = await getLeadById(access.companyId, leadId);
+      if (!lead) return workshopError("Lead not found.", 404);
     }
 
     // Current parts catalog flow is intentionally paused.
@@ -40,7 +36,7 @@ export async function GET(req: NextRequest, { params }: Params) {
           (requestedCarId ? cachedCars.find((c) => String(c.id) === requestedCarId) ?? null : null) ??
           (cachedCars.length === 1 ? cachedCars[0] : null);
         const requiresCarSelection = cachedCars.length > 1 && !selectedCar;
-        return createMobileSuccessResponse({
+        return workshopSuccess({
           vin,
           cars: cachedCars,
           car: selectedCar,
@@ -50,11 +46,12 @@ export async function GET(req: NextRequest, { params }: Params) {
           requiresCarSelection,
           partsCatalogPaused: true,
           source: "global_erp",
+          companyId: access.companyId,
         });
       }
     }
 
-    const vin17Config = await getVin17ConfigForCompany(companyId);
+    const vin17Config = await getVin17ConfigForCompany(access.companyId);
     const decoded = await decodeVinWith17VinUsingConfig(vin, vin17Config ?? undefined);
     const cars = decoded.cars;
     if (cars.length > 0) {
@@ -75,7 +72,7 @@ export async function GET(req: NextRequest, { params }: Params) {
       (cars.length === 1 ? cars[0] : null);
     const requiresCarSelection = cars.length > 1 && !selectedCar;
 
-    return createMobileSuccessResponse({
+    return workshopSuccess({
       vin: decoded.vin,
       cars,
       car: selectedCar,
@@ -85,16 +82,17 @@ export async function GET(req: NextRequest, { params }: Params) {
       requiresCarSelection,
       partsCatalogPaused: true,
       source: "17vin",
+      companyId: access.companyId,
     });
   } catch (error: any) {
     try {
+      const access = resolveWorkshopAccess(req, "read");
       const search = new URL(req.url).searchParams;
       const vin = String(search.get("vin") ?? "").trim().toUpperCase();
       if (vin) {
-        const { companyId } = await params;
-        const vin17Config = await getVin17ConfigForCompany(companyId);
+        const vin17Config = await getVin17ConfigForCompany(access.companyId);
         const prepared = prepareVin17Request(vin, vin17Config ?? undefined);
-        return createMobileErrorResponse("Failed to decode VIN with 17vin.", 502, {
+        return workshopError("Failed to decode VIN with 17vin.", 502, {
           provider: "17vin",
           details: String(error?.message ?? "upstream_error"),
           signaturePreview: {
@@ -110,11 +108,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     } catch {
       // no-op
     }
-
-    console.error(
-      "GET /api/mobile/company/[companyId]/sales/leads/[leadId]/vin-lookup error:",
-      error,
-    );
-    return handleMobileError(error);
+    return workshopErrorFromUnknown(error);
   }
 }
+
