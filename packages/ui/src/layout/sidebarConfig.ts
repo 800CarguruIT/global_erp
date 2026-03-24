@@ -74,6 +74,7 @@ export const SIDEBAR_CONFIG: Record<NavScope, Partial<Record<NavCategory, Sideba
       { label: "Branches", href: "/company/[companyId]/branches" },
       { label: "Vendors", href: "/company/[companyId]/vendors" },
       { label: "Customers", href: "/company/[companyId]/customers" },
+      { label: "Data Center", href: "/company/[companyId]/data-center", permissionKeys: ["callcenter.view"] },
       { label: "Car In Dashboard", href: "/company/[companyId]/car-in-dashboard" },
       { label: "Revenue Dashboard", href: "/company/[companyId]/revenue-dashboard" },
       { label: "Inspections", href: "/company/[companyId]/inspections" },
@@ -83,6 +84,7 @@ export const SIDEBAR_CONFIG: Record<NavScope, Partial<Record<NavCategory, Sideba
       { labelKey: "global.nav.callCenter", href: "/company/[companyId]/call-center", permissionKeys: ["callcenter.view"] },
       { label: "Call history", href: "/company/[companyId]/call-center/history", permissionKeys: ["callcenter.history.view"] },
       { label: "Customers List", href: "/company/[companyId]/call-center/customers-list", permissionKeys: ["callcenter.view"] },
+      { label: "Data Center", href: "/company/[companyId]/data-center", permissionKeys: ["callcenter.view"] },
       { label: "User Extensions", href: "/company/[companyId]/integrations/dialer/extensions", permissionKeys: ["callcenter.view"] },
     ],
     Jobs: [
@@ -193,6 +195,7 @@ export const SIDEBAR_TREE: Partial<Record<NavScope, SidebarItem[]>> = {
         { label: "Overview", href: "/company/[companyId]/call-center", exactMatch: true, permissionKeys: ["callcenter.view"] },
         { label: "History", href: "/company/[companyId]/call-center/history", permissionKeys: ["callcenter.history.view"] },
         { label: "Customers List", href: "/company/[companyId]/call-center/customers-list", permissionKeys: ["callcenter.view"] },
+        { label: "Data Center", href: "/company/[companyId]/data-center", permissionKeys: ["callcenter.view"] },
         { label: "User Extensions", href: "/company/[companyId]/integrations/dialer/extensions", permissionKeys: ["callcenter.view"] },
       ],
     },
@@ -267,6 +270,7 @@ export const SIDEBAR_TREE: Partial<Record<NavScope, SidebarItem[]>> = {
     { label: "Recovery CC", href: "/company/[companyId]/recovery-cc", permissionKeys: ["jobs.view", "recovery.cc.view"] },
     { label: "Recovery Requests", href: "/company/[companyId]/recovery-requests", permissionKeys: ["jobs.view", "recovery.requests.view"] },
     { label: "Job Cards", href: "/company/[companyId]/workshop/job-cards", permissionKeys: ["jobs.view", "workshop.jobcards.view"] },
+    { label: "Data Center", href: "/company/[companyId]/data-center", permissionKeys: ["callcenter.view"] },
     { label: "Cars", href: "/company/[companyId]/cars", permissionKeys: ["fleet.cars.view"] },
     {
       label: "Marketing",

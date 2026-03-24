@@ -33,9 +33,10 @@ export async function listUsers(params: {
   activeOnly?: boolean;
   globalOnly?: boolean;
   status?: "all" | "active" | "inactive";
+  department?: string;
 }): Promise<UserListRow[]> {
   const sql = getSql();
-  const { q, limit = 50, offset = 0, companyId, branchId, vendorId, activeOnly = true, globalOnly = false } = params;
+  const { q, limit = 50, offset = 0, companyId, branchId, vendorId, activeOnly = true, globalOnly = false, department } = params;
   const resolvedStatus = params.status ?? (params.activeOnly === false ? "all" : "active");
   const search =
     q && q.trim().length
@@ -71,6 +72,7 @@ export async function listUsers(params: {
       : resolvedStatus === "inactive"
       ? sql`AND u.is_active = FALSE`
       : sql``;
+  const departmentFilter = department ? sql`AND e.department = ${department}` : sql``;
 
   const rows = await sql<UserListRow[]>`
     SELECT u.id, u.email, u.full_name, u.is_active, u.employee_id, u.created_at, u.updated_at, u.company_id,
@@ -87,6 +89,7 @@ export async function listUsers(params: {
       ${branchFilter}
       ${vendorFilter}
       ${statusFilter}
+      ${departmentFilter}
     ORDER BY u.created_at DESC
     LIMIT ${limit} OFFSET ${offset}
   `;

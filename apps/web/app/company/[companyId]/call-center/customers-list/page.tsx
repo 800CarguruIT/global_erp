@@ -6,7 +6,8 @@ import { useEffect, useMemo, useState } from "react";
 
 type Props = { params: { companyId: string } | Promise<{ companyId: string }> };
 
-type CustomerTab = "chsc" | "non-chsc" | "insurance" | "battery-warranty";
+type CustomerTab = "chsc" | "non-chsc" | "insurance";
+type InsuranceExpiryStatusFilter = "all" | "active" | "expire-soon" | "expired";
 type CustomerRow = {
   id: string;
   code: string | null;
@@ -14,14 +15,48 @@ type CustomerRow = {
   phone: string | null;
   email: string | null;
   customer_type: string | null;
+  policy_expiry?: string | null;
   created_at: string;
+  source?: "customers" | "insurance_data";
 };
+
+type ExpiryStatus = "Active" | "Expire Soon" | "Expired" | "-";
+
+function parseInsuranceDate(value: string | null | undefined): Date | null {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+  const normalized = raw
+    .replace(" 00:00:00", "")
+    .replace(/(\d{4})-(\d{2})-00\b/, "$1-$2-01");
+  const date = new Date(normalized);
+  if (Number.isNaN(date.getTime())) return null;
+  return date;
+}
+
+function formatInsuranceDate(value: string | null | undefined): string {
+  const date = parseInsuranceDate(value);
+  if (!date) return "-";
+  return date.toLocaleDateString("en-GB");
+}
+
+function getExpiryStatus(value: string | null | undefined): ExpiryStatus {
+  const date = parseInsuranceDate(value);
+  if (!date) return "-";
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const expireSoonLimit = new Date(today);
+  expireSoonLimit.setDate(expireSoonLimit.getDate() + 45);
+
+  if (date < today) return "Expired";
+  if (date <= expireSoonLimit) return "Expire Soon";
+  return "Active";
+}
 
 const tabs: Array<{ key: CustomerTab; label: string }> = [
   { key: "chsc", label: "CHSC Customers" },
   { key: "non-chsc", label: "Non CHSC Customers" },
   { key: "insurance", label: "Insurance Customers" },
-  { key: "battery-warranty", label: "Battery Warranty Customers" },
 ];
 
 export default function CompanyCallCenterCustomersListPage({ params }: Props) {
@@ -32,7 +67,6 @@ export default function CompanyCallCenterCustomersListPage({ params }: Props) {
     chsc: 0,
     "non-chsc": 0,
     insurance: 0,
-    "battery-warranty": 0,
   });
   const [rows, setRows] = useState<CustomerRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -46,6 +80,8 @@ export default function CompanyCallCenterCustomersListPage({ params }: Props) {
   const [sortBy, setSortBy] = useState<"created_at" | "name">("created_at");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [jumpPage, setJumpPage] = useState("");
+  const [expiryStatusFilter, setExpiryStatusFilter] = useState<InsuranceExpiryStatusFilter>("all");
+  const isInsuranceTab = activeTab === "insurance";
 
   useEffect(() => {
     Promise.resolve(params).then((p: any) => setCompanyId(String(p?.companyId ?? "").trim()));
@@ -73,7 +109,6 @@ export default function CompanyCallCenterCustomersListPage({ params }: Props) {
             chsc: Number(json.counts.chsc ?? 0),
             "non-chsc": Number(json.counts["non-chsc"] ?? 0),
             insurance: Number(json.counts.insurance ?? 0),
-            "battery-warranty": Number(json.counts["battery-warranty"] ?? 0),
           });
         }
       } catch {
@@ -101,6 +136,7 @@ export default function CompanyCallCenterCustomersListPage({ params }: Props) {
           pageSize,
           sortBy,
           sortDir,
+          ...(isInsuranceTab ? { expiryStatus: expiryStatusFilter } : {}),
           ...(debouncedSearch ? { search: debouncedSearch } : {}),
         });
         const res = await fetch(`/api/company/${companyId}/call-center/customers-list?${qs.toString()}`, { cache: "no-store" });
@@ -124,11 +160,11 @@ export default function CompanyCallCenterCustomersListPage({ params }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [companyId, activeTab, page, pageSize, debouncedSearch, sortBy, sortDir]);
+  }, [companyId, activeTab, page, pageSize, debouncedSearch, sortBy, sortDir, isInsuranceTab, expiryStatusFilter]);
 
   useEffect(() => {
     setPage(1);
-  }, [activeTab, pageSize, debouncedSearch, sortBy, sortDir]);
+  }, [activeTab, pageSize, debouncedSearch, sortBy, sortDir, expiryStatusFilter]);
 
   const pageNumbers = useMemo(() => {
     if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
@@ -184,7 +220,7 @@ export default function CompanyCallCenterCustomersListPage({ params }: Props) {
             <div className="text-sm font-semibold">{tabs.find((t) => t.key === activeTab)?.label}</div>
             <div className="text-xs text-muted-foreground">Total: {tabCounts[activeTab]}</div>
           </div>
-          <div className="mb-3 grid grid-cols-1 gap-2 md:grid-cols-3">
+          <div className={`mb-3 grid grid-cols-1 gap-2 ${isInsuranceTab ? "md:grid-cols-4" : "md:grid-cols-3"}`}>
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -209,6 +245,21 @@ export default function CompanyCallCenterCustomersListPage({ params }: Props) {
                 {sortDir === "asc" ? "Asc" : "Desc"}
               </button>
             </div>
+            {isInsuranceTab ? (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">Expiry:</span>
+                <select
+                  value={expiryStatusFilter}
+                  onChange={(e) => setExpiryStatusFilter(e.target.value as InsuranceExpiryStatusFilter)}
+                  className="rounded-md border border-slate-700/60 bg-slate-900/60 px-2 py-2 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                >
+                  <option value="all">All</option>
+                  <option value="active">Active</option>
+                  <option value="expire-soon">Expire Soon</option>
+                  <option value="expired">Expired</option>
+                </select>
+              </div>
+            ) : null}
             <div className="flex items-center justify-start gap-2 md:justify-end">
               <span className="text-xs text-muted-foreground">Rows:</span>
               <select
@@ -243,22 +294,54 @@ export default function CompanyCallCenterCustomersListPage({ params }: Props) {
                     <th className="px-4 py-3.5 border-b border-slate-700/60 text-[11px] font-semibold uppercase tracking-wide text-slate-300">Phone</th>
                     <th className="px-4 py-3.5 border-b border-slate-700/60 text-[11px] font-semibold uppercase tracking-wide text-slate-300">Email</th>
                     <th className="px-4 py-3.5 border-b border-slate-700/60 text-[11px] font-semibold uppercase tracking-wide text-slate-300">Type</th>
+                    {isInsuranceTab ? (
+                      <>
+                        <th className="px-4 py-3.5 border-b border-slate-700/60 text-[11px] font-semibold uppercase tracking-wide text-slate-300">Policy Expiry</th>
+                        <th className="px-4 py-3.5 border-b border-slate-700/60 text-[11px] font-semibold uppercase tracking-wide text-slate-300">Expiry Status</th>
+                      </>
+                    ) : null}
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((row, idx) => (
+                  {rows.map((row, idx) => {
+                    const expiryStatus = getExpiryStatus(row.policy_expiry);
+                    return (
                     <tr key={row.id} className={`transition-colors ${idx % 2 ? "bg-slate-900/25" : "bg-transparent"} hover:bg-slate-800/35`}>
                       <td className="px-4 py-3.5 border-b border-slate-300/25 text-slate-100">{row.code ?? "-"}</td>
                       <td className="px-4 py-3.5 border-b border-slate-300/25">
-                        <Link href={`/company/${companyId}/customers/${row.id}`} className="font-medium text-primary hover:underline">
-                          {row.name ?? "-"}
-                        </Link>
+                        {row.source === "customers" || !row.source ? (
+                          <Link href={`/company/${companyId}/customers/${row.id}`} className="font-medium text-primary hover:underline">
+                            {row.name ?? "-"}
+                          </Link>
+                        ) : (
+                          <span className="font-medium text-slate-100">{row.name ?? "-"}</span>
+                        )}
                       </td>
                       <td className="px-4 py-3.5 border-b border-slate-300/25 text-slate-100">{row.phone ?? "-"}</td>
                       <td className="px-4 py-3.5 border-b border-slate-300/25 text-slate-100">{row.email ?? "-"}</td>
                       <td className="px-4 py-3.5 border-b border-slate-300/25 text-slate-300">{row.customer_type ?? "-"}</td>
+                      {isInsuranceTab ? (
+                        <>
+                          <td className="px-4 py-3.5 border-b border-slate-300/25 text-slate-100">{formatInsuranceDate(row.policy_expiry)}</td>
+                          <td className="px-4 py-3.5 border-b border-slate-300/25">
+                            <span
+                              className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                                expiryStatus === "Active"
+                                  ? "border border-emerald-700/60 bg-emerald-950/40 text-emerald-300"
+                                  : expiryStatus === "Expire Soon"
+                                    ? "border border-amber-700/60 bg-amber-950/40 text-amber-300"
+                                    : expiryStatus === "Expired"
+                                      ? "border border-rose-700/60 bg-rose-950/40 text-rose-300"
+                                      : "border border-slate-700/60 bg-slate-950/40 text-slate-300"
+                              }`}
+                            >
+                              {expiryStatus}
+                            </span>
+                          </td>
+                        </>
+                      ) : null}
                     </tr>
-                  ))}
+                  )})}
                 </tbody>
               </table>
             </div>
