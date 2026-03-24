@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Global ERP — Scalability & Performance Architecture Plan</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --blue:    #2563eb;
+    --blue-lt: #eff6ff;
+    --red:     #dc2626;
+    --red-lt:  #fef2f2;
+    --yellow:  #d97706;
+    --yel-lt:  #fffbeb;
+    --green:   #16a34a;
+    --grn-lt:  #f0fdf4;
+    --gray-50:  #f8fafc;
+    --gray-100: #f1f5f9;
+    --gray-200: #e2e8f0;
+    --gray-300: #cbd5e1;
+    --gray-500: #64748b;
+    --gray-700: #334155;
+    --gray-900: #0f172a;
+    --radius: 8px;
+  }
+
+  html { font-size: 14px; }
+
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    color: var(--gray-900);
+    background: #fff;
+    line-height: 1.65;
+    padding: 0;
+    margin: 0;
+  }
+
+  /* ── PAGE LAYOUT ── */
+  .page {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 56px 64px;
+  }
+
+  /* ── COVER HEADER ── */
+  .cover {
+    border-bottom: 2px solid var(--gray-200);
+    margin-bottom: 40px;
+    padding-bottom: 32px;
+  }
+  .cover-tag {
+    display: inline-block;
+    background: var(--blue);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    border-radius: 4px;
+    margin-bottom: 14px;
+  }
+  .cover h1 {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--gray-900);
+    line-height: 1.25;
+    margin-bottom: 10px;
+  }
+  .cover-meta {
+    font-size: 12.5px;
+    color: var(--gray-500);
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+  }
+  .cover-meta span { display: flex; align-items: center; gap: 5px; }
+
+  /* ── SECTION HEADINGS ── */
+  h2 {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--gray-900);
+    margin: 40px 0 14px;
+    padding-bottom: 8px;
+    border-bottom: 1.5px solid var(--gray-200);
+  }
+  h3 {
+    font-size: 14.5px;
+    font-weight: 700;
+    color: var(--blue);
+    margin: 28px 0 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  h3 .num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px; height: 24px;
+    background: var(--blue);
+    color: #fff;
+    border-radius: 50%;
+    font-size: 11px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  h4 {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--gray-700);
+    margin: 16px 0 6px;
+  }
+
+  p { margin-bottom: 10px; color: var(--gray-700); }
+
+  /* ── ISSUE CARDS ── */
+  .weakness-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin: 16px 0;
+  }
+  .weakness-card {
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .weakness-card.critical { border-left: 3px solid var(--red); background: var(--red-lt); }
+  .weakness-card.medium   { border-left: 3px solid var(--yellow); background: var(--yel-lt); }
+  .badge {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 3px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .badge.critical { background: var(--red);    color: #fff; }
+  .badge.medium   { background: var(--yellow); color: #fff; }
+  .wk-body { flex: 1; }
+  .wk-title { font-weight: 600; font-size: 13px; color: var(--gray-900); margin-bottom: 2px; }
+  .wk-where { font-size: 11.5px; color: var(--gray-500); }
+  .wk-where code { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; background: rgba(0,0,0,.06); padding: 1px 4px; border-radius: 3px; }
+
+  /* ── COMPARISON TABLE ── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    margin: 14px 0 20px;
+  }
+  thead tr { background: var(--gray-900); color: #fff; }
+  thead th {
+    padding: 10px 14px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 12px;
+    letter-spacing: .04em;
+  }
+  thead th:first-child { border-radius: 6px 0 0 0; }
+  thead th:last-child  { border-radius: 0 6px 0 0; }
+  tbody tr { border-bottom: 1px solid var(--gray-200); }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:nth-child(even) { background: var(--gray-50); }
+  td { padding: 9px 14px; color: var(--gray-700); vertical-align: top; }
+  td:first-child { font-weight: 600; color: var(--gray-900); }
+  .recommended { background: var(--blue-lt) !important; }
+  .recommended td:first-child::after {
+    content: " ✓";
+    color: var(--blue);
+    font-size: 11px;
+  }
+
+  /* ── TIER BANNERS ── */
+  .tier-banner {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-radius: var(--radius);
+    margin: 24px 0 8px;
+  }
+  .tier-banner.t1 { background: #fef2f2; border: 1px solid #fecaca; }
+  .tier-banner.t2 { background: #fffbeb; border: 1px solid #fde68a; }
+  .tier-banner.t3 { background: #f0fdf4; border: 1px solid #bbf7d0; }
+  .tier-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    padding: 3px 10px;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+  .t1 .tier-label { background: var(--red);    color: #fff; }
+  .t2 .tier-label { background: var(--yellow); color: #fff; }
+  .t3 .tier-label { background: var(--green);  color: #fff; }
+  .tier-desc { font-size: 13px; color: var(--gray-700); font-weight: 500; }
+
+  /* ── SOLUTION CARDS ── */
+  .solution {
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius);
+    margin-bottom: 18px;
+    overflow: hidden;
+  }
+  .solution-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    background: var(--gray-50);
+    border-bottom: 1px solid var(--gray-200);
+  }
+  .solution-head .num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px; height: 26px;
+    background: var(--blue);
+    color: #fff;
+    border-radius: 50%;
+    font-size: 12px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .solution-head h3 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--gray-900);
+    border: none;
+    padding: 0;
+  }
+  .solution-body { padding: 14px 16px; }
+
+  /* ── PROBLEM / SOLUTION LABELS ── */
+  .label {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--gray-500);
+    margin-bottom: 4px;
+    margin-top: 12px;
+  }
+  .label:first-child { margin-top: 0; }
+
+  /* ── CODE BLOCKS ── */
+  pre {
+    background: #0f172a;
+    color: #e2e8f0;
+    border-radius: 6px;
+    padding: 14px 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11.5px;
+    line-height: 1.7;
+    overflow-x: auto;
+    margin: 10px 0;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+  pre .comment { color: #64748b; }
+  pre .keyword { color: #93c5fd; }
+  pre .string  { color: #86efac; }
+  pre .fn      { color: #fbbf24; }
+  code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11.5px;
+    background: var(--gray-100);
+    color: var(--blue);
+    padding: 2px 5px;
+    border-radius: 4px;
+  }
+  pre code { background: none; color: inherit; padding: 0; font-size: inherit; }
+
+  /* ── BULLET LISTS ── */
+  ul, ol { padding-left: 20px; margin-bottom: 10px; }
+  li { color: var(--gray-700); margin-bottom: 4px; font-size: 13px; }
+  li strong { color: var(--gray-900); }
+
+  /* ── FILES TABLE ── */
+  .files-table td:nth-child(1) { font-family: 'JetBrains Mono', monospace; font-size: 11.5px; color: var(--blue); }
+  .files-table td:nth-child(2) { font-size: 12.5px; }
+
+  /* ── PRIORITY LIST ── */
+  .priority-list { list-style: none; padding: 0; margin: 14px 0; }
+  .priority-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 10px 14px;
+    border-radius: 6px;
+    margin-bottom: 6px;
+    font-size: 13px;
+    color: var(--gray-700);
+    border: 1px solid var(--gray-200);
+  }
+  .priority-list li .dot {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .priority-list li.p-red    { background: var(--red-lt);  border-color: #fecaca; }
+  .priority-list li.p-yellow { background: var(--yel-lt);  border-color: #fde68a; }
+  .priority-list li.p-green  { background: var(--grn-lt);  border-color: #bbf7d0; }
+  .p-red    .dot { background: var(--red); }
+  .p-yellow .dot { background: var(--yellow); }
+  .p-green  .dot { background: var(--green); }
+
+  /* ── CALLOUT ── */
+  .callout {
+    border-left: 4px solid var(--blue);
+    background: var(--blue-lt);
+    border-radius: 0 6px 6px 0;
+    padding: 12px 16px;
+    margin: 14px 0;
+    font-size: 13px;
+    color: var(--gray-700);
+  }
+  .callout strong { color: var(--blue); }
+
+  /* ── PRINT ── */
+  @media print {
+    body { background: #fff; }
+    .page { padding: 36px 48px; max-width: 100%; }
+    h2 { page-break-after: avoid; }
+    .solution { page-break-inside: avoid; }
+    pre { page-break-inside: avoid; white-space: pre-wrap; word-break: break-word; }
+    .weakness-grid { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- COVER -->
+  <div class="cover">
+    <div class="cover-tag">Architecture Report</div>
+    <h1>Global ERP — Scalability &amp;<br>Performance Architecture Plan</h1>
+    <div class="cover-meta">
+      <span>📅 March 24, 2026</span>
+      <span>🗄️ PostgreSQL · Next.js · Multi-tenant SaaS</span>
+      <span>📦 164 migrations · Shared-schema design</span>
+    </div>
+  </div>
+
+  <!-- CONTEXT -->
+  <h2>Current Architecture Overview</h2>
+  <p>Global ERP uses a <strong>shared-schema multi-tenant PostgreSQL</strong> database — all companies share the same tables, isolated by <code>company_id</code>. This is the correct industry-standard approach used by Shopify, GitHub, and Linear. The goal is <em>not</em> to separate into per-company databases, but to fix real bottlenecks and add the right infrastructure layers to scale to hundreds of companies.</p>
+
+  <div class="callout">
+    <strong>Key insight:</strong> The data model is sound. The problems are in the <em>infrastructure around it</em> — connection pooling, caching, and query routing.
+  </div>
+
+  <h4>Current Weaknesses Identified</h4>
+  <div class="weakness-grid">
+    <div class="weakness-card critical">
+      <span class="badge critical">Critical</span>
+      <div class="wk-body">
+        <div class="wk-title">DB Connection Pool = 1</div>
+        <div class="wk-where"><code>packages/ai-core/src/db.ts</code></div>
+      </div>
+    </div>
+    <div class="weakness-card critical">
+      <span class="badge critical">Critical</span>
+      <div class="wk-body">
+        <div class="wk-title">No Caching Layer (Redis)</div>
+        <div class="wk-where">Entire application</div>
+      </div>
+    </div>
+    <div class="weakness-card medium">
+      <span class="badge medium">Medium</span>
+      <div class="wk-body">
+        <div class="wk-title">No Read/Write Separation</div>
+        <div class="wk-where">All list &amp; report queries</div>
+      </div>
+    </div>
+    <div class="weakness-card medium">
+      <span class="badge medium">Medium</span>
+      <div class="wk-body">
+        <div class="wk-title">No Table Partitioning</div>
+        <div class="wk-where">leads, customers, calls, inspections</div>
+      </div>
+    </div>
+    <div class="weakness-card medium">
+      <span class="badge medium">Medium</span>
+      <div class="wk-body">
+        <div class="wk-title">No Background Job Queue</div>
+        <div class="wk-where">Campaign sends, bulk reports</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- WHY NOT SEPARATE DB -->
+  <h2>Why NOT Separate Databases Per Company?</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Approach</th>
+        <th>Pros</th>
+        <th>Cons</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="recommended">
+        <td>Shared schema (current)</td>
+        <td>Simple · 1 migration to deploy · easy cross-company reporting</td>
+        <td>Needs indexing + partitioning</td>
+      </tr>
+      <tr>
+        <td>Schema-per-tenant</td>
+        <td>Better isolation</td>
+        <td>Complex migrations · harder to query across companies</td>
+      </tr>
+      <tr>
+        <td>DB-per-tenant</td>
+        <td>Total isolation</td>
+        <td>100 companies = 100 connection pools · migration nightmare · 10× infra cost</td>
+      </tr>
+    </tbody>
+  </table>
+  <p><strong>Decision: Stay with shared schema</strong> — fix the infrastructure around it.</p>
+
+  <!-- TIER 1 -->
+  <h2>Recommended Implementation Tiers</h2>
+
+  <div class="tier-banner t1">
+    <span class="tier-label">Tier 1</span>
+    <span class="tier-desc">Critical Fixes — Immediate, High Impact</span>
+  </div>
+
+  <div class="solution">
+    <div class="solution-head">
+      <span class="num">1</span>
+      <h3>Fix Connection Pooling</h3>
+    </div>
+    <div class="solution-body">
+      <div class="label">Problem</div>
+      <p><code>max: 1</code> means every concurrent API request queues behind the previous one. Next.js serverless API routes may each spawn a new Postgres connection, quickly exhausting the database's connection limit.</p>
+
+      <div class="label">Solution</div>
+      <p>Use <strong>PgBouncer</strong> (transaction-mode) in front of PostgreSQL, or a managed pooler:</p>
+      <ul>
+        <li><strong>Supabase</strong> — built-in PgBouncer, enable transaction pooling in dashboard</li>
+        <li><strong>Neon</strong> — built-in serverless pooler (<code>?pgbouncer=true</code> in connection string)</li>
+        <li><strong>Self-hosted</strong> — deploy PgBouncer sidecar with <code>pool_mode = transaction</code></li>
+      </ul>
+
+      <div class="label">Code Change in db.ts</div>
+<pre><span class="comment">// Before — single connection, everything queues</span>
+<span class="keyword">const</span> sql = <span class="fn">postgres</span>(connectionString, { max: <span class="string">1</span> });
+
+<span class="comment">// After — proper pool for serverless Next.js</span>
+<span class="keyword">const</span> sql = <span class="fn">postgres</span>(connectionString, {
+  max: <span class="string">10</span>,           <span class="comment">// pool size per serverless instance</span>
+  idle_timeout: <span class="string">20</span>,  <span class="comment">// release idle connections after 20s</span>
+  connect_timeout: <span class="string">10</span>,
+});
+<span class="comment">// Point connection string to PgBouncer port 6432, not Postgres 5432</span></pre>
+    </div>
+  </div>
+
+  <div class="solution">
+    <div class="solution-head">
+      <span class="num">2</span>
+      <h3>Redis Caching Layer</h3>
+    </div>
+    <div class="solution-body">
+      <div class="label">Problem</div>
+      <p>Every page load hits PostgreSQL, even for data that rarely changes (company config, permissions, chart of accounts).</p>
+
+      <div class="label">What to Cache (Immediate Wins)</div>
+      <table>
+        <thead><tr><th>Data</th><th>TTL</th></tr></thead>
+        <tbody>
+          <tr><td>Company configuration &amp; VIN credentials</td><td>5 min</td></tr>
+          <tr><td>User session + RBAC permissions</td><td>1 min</td></tr>
+          <tr><td>VIN lookup results</td><td>30 days</td></tr>
+          <tr><td>Branch list per company</td><td>5 min</td></tr>
+          <tr><td>Chart of Accounts per company</td><td>10 min</td></tr>
+        </tbody>
+      </table>
+
+      <div class="label">Implementation Pattern</div>
+      <p>Add <code>ioredis</code> or <code>@upstash/redis</code> (serverless-friendly) to <code>packages/ai-core</code>. Create a <code>withCache()</code> wrapper:</p>
+<pre><span class="comment">// packages/ai-core/src/cache.ts</span>
+<span class="keyword">export async function</span> <span class="fn">getCompanyById</span>(companyId: <span class="keyword">string</span>) {
+  <span class="keyword">return</span> <span class="fn">withCache</span>(`company:${companyId}`, <span class="string">300</span>, () =&gt;
+    sql`<span class="string">SELECT * FROM companies WHERE id = ${companyId}</span>`
+  );
+}</pre>
+    </div>
+  </div>
+
+  <!-- TIER 2 -->
+  <div class="tier-banner t2">
+    <span class="tier-label">Tier 2</span>
+    <span class="tier-desc">Scalability Improvements — 1 to 3 Months</span>
+  </div>
+
+  <div class="solution">
+    <div class="solution-head">
+      <span class="num">3</span>
+      <h3>PostgreSQL Table Partitioning by company_id</h3>
+    </div>
+    <div class="solution-body">
+      <div class="label">Target Tables</div>
+      <p>Tables that grow proportionally with companies × activity: <code>leads</code>, <code>lead_events</code>, <code>customers</code>, <code>calls</code>, <code>inspections</code>, <code>work_orders</code>, <code>accounting_journal_lines</code></p>
+
+      <div class="label">Strategy — PARTITION BY LIST (company_id)</div>
+<pre><span class="comment">-- Each company gets its own partition</span>
+<span class="keyword">CREATE TABLE</span> leads_partitioned (<span class="keyword">LIKE</span> leads)
+  <span class="keyword">PARTITION BY LIST</span> (company_id);
+
+<span class="keyword">CREATE TABLE</span> leads_company_1
+  <span class="keyword">PARTITION OF</span> leads_partitioned <span class="keyword">FOR VALUES IN</span> (<span class="string">'uuid-1'</span>);
+
+<span class="comment">-- Default catches all new companies automatically</span>
+<span class="keyword">CREATE TABLE</span> leads_default
+  <span class="keyword">PARTITION OF</span> leads_partitioned <span class="keyword">DEFAULT</span>;</pre>
+
+      <div class="label">Benefits</div>
+      <ul>
+        <li>Queries with <code>WHERE company_id = $1</code> hit only that company's partition → smaller index, faster scan</li>
+        <li>VACUUM and ANALYZE run per-partition → less lock contention</li>
+        <li>Archive or delete a company by dropping their partition</li>
+        <li><strong>Migration path:</strong> Non-breaking — new migration + data copy + rename swap</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="solution">
+    <div class="solution-head">
+      <span class="num">4</span>
+      <h3>Read Replica for Reports &amp; Lists</h3>
+    </div>
+    <div class="solution-body">
+      <div class="label">Problem</div>
+      <p>Heavy reads (customer lists with 10k+ rows, accounting reports, dashboard aggregates) compete with transactional writes (lead updates, invoice creation) on the same primary DB node.</p>
+
+      <div class="label">Solution</div>
+      <p>Add a PostgreSQL read replica and split connections in <code>db.ts</code>:</p>
+<pre><span class="comment">// packages/ai-core/src/db.ts</span>
+<span class="keyword">export const</span> sql = <span class="fn">postgres</span>(process.env.DATABASE_URL!);          <span class="comment">// primary (writes)</span>
+<span class="keyword">export const</span> readSql = <span class="fn">postgres</span>(process.env.DATABASE_READ_URL!); <span class="comment">// replica (reads)</span></pre>
+      <p>Route all <code>SELECT</code>-only queries in list/report repositories to <code>readSql</code>.</p>
+      <p><strong>Managed options:</strong> Supabase read replicas · Neon branching · AWS RDS read replica · Railway</p>
+    </div>
+  </div>
+
+  <div class="solution">
+    <div class="solution-head">
+      <span class="num">5</span>
+      <h3>Background Job Queue for Heavy Operations</h3>
+    </div>
+    <div class="solution-body">
+      <div class="label">Problem</div>
+      <p>Operations like campaign sends (10k+ push notifications), large report generation, and bulk CSV imports block API response threads and cause timeouts.</p>
+
+      <div class="label">Recommended Tools</div>
+      <ul>
+        <li><strong>BullMQ</strong> (Redis-backed) — best for Node.js, works cleanly in monorepo</li>
+        <li><strong>Inngest</strong> — serverless-friendly, no Redis required</li>
+      </ul>
+
+      <div class="label">Move These to Background Jobs</div>
+      <ul>
+        <li>Campaign send operations (marketing module)</li>
+        <li>Large report generation (accounting, HR)</li>
+        <li>Bulk customer imports</li>
+        <li>VIN batch lookups</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- TIER 3 -->
+  <div class="tier-banner t3">
+    <span class="tier-label">Tier 3</span>
+    <span class="tier-desc">Enterprise Scale — Only if 500+ Companies</span>
+  </div>
+  <ul>
+    <li><strong>Schema-per-tenant migration</strong> — each company gets <code>schema_&lt;company_id&gt;</code> PostgreSQL schema. Complex but enables per-company backups and true isolation.</li>
+    <li><strong>TimescaleDB</strong> — for <code>lead_events</code>, <code>calls</code>, <code>accounting_journal_lines</code> (time-series at scale).</li>
+    <li><strong>Horizontal sharding via Citus</strong> — distributes tables across multiple PG nodes by <code>company_id</code>.</li>
+  </ul>
+
+  <!-- FILES TO MODIFY -->
+  <h2>Critical Files to Modify</h2>
+  <table class="files-table">
+    <thead>
+      <tr><th>File</th><th>Change</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>packages/ai-core/src/db.ts</td>
+        <td>Fix pool settings (<code>max: 10</code>), add <code>readSql</code> export</td>
+      </tr>
+      <tr>
+        <td>packages/ai-core/src/index.ts</td>
+        <td>Export cache utilities</td>
+      </tr>
+      <tr>
+        <td>packages/ai-core/src/cache.ts <em>(new)</em></td>
+        <td>Redis <code>withCache()</code> wrapper</td>
+      </tr>
+      <tr>
+        <td>migrations/165_partition_leads.sql <em>(new)</em></td>
+        <td>Partition leads table by company_id</td>
+      </tr>
+      <tr>
+        <td>migrations/166_partition_customers.sql <em>(new)</em></td>
+        <td>Partition customers table by company_id</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- VERIFICATION -->
+  <h2>Verification &amp; Testing Plan</h2>
+  <ol>
+    <li><strong>Connection pool:</strong> Use <code>pg_stat_activity</code> to observe connection count. Run k6 or Artillery with 50 concurrent requests — response time should drop dramatically.</li>
+    <li><strong>Cache:</strong> Add hit/miss logging to <code>withCache()</code>. Expect 50–80% cache hit rate on company config and permissions.</li>
+    <li><strong>Partitioning:</strong> Run <code>EXPLAIN ANALYZE</code> on <code>SELECT * FROM leads WHERE company_id = $1</code> — should show partition pruning (<em>"Seq Scan on leads_company_X"</em> instead of full table scan).</li>
+    <li><strong>Read replica:</strong> Monitor primary DB CPU during report generation — should drop significantly once reads route to replica.</li>
+  </ol>
+
+  <!-- PRIORITY -->
+  <h2>Summary — Priority Order</h2>
+  <ul class="priority-list">
+    <li class="p-red">
+      <span class="dot"></span>
+      <div><strong>Fix <code>max: 1</code> connection pool</strong> — immediate win, zero business logic changes required. Single most impactful fix.</div>
+    </li>
+    <li class="p-red">
+      <span class="dot"></span>
+      <div><strong>Add Redis caching</strong> — cuts 50–80% of redundant DB reads. Company config, permissions, and VIN results are the biggest wins.</div>
+    </li>
+    <li class="p-yellow">
+      <span class="dot"></span>
+      <div><strong>Table partitioning</strong> — critical once any single company exceeds 100k rows in leads, customers, or journal lines.</div>
+    </li>
+    <li class="p-yellow">
+      <span class="dot"></span>
+      <div><strong>Read replica</strong> — add when dashboard and reports start impacting transactional write performance.</div>
+    </li>
+    <li class="p-green">
+      <span class="dot"></span>
+      <div><strong>Background jobs</strong> — implement when campaign sends or report generation start causing API timeouts.</div>
+    </li>
+  </ul>
+
+</div>
+</body>
+</html>

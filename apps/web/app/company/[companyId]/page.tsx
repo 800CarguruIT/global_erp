@@ -103,6 +103,12 @@ export default async function CompanyHomePage({ params }: Props) {
             >
               Reports Overview
             </Link>
+            <Link
+              href={`/company/${companyId}/data-center`}
+              className="inline-flex items-center rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition hover:bg-slate-50"
+            >
+              Data Center
+            </Link>
           </div>
         </div>
       </div>

@@ -32,6 +32,8 @@ export * as CallCenter from "./call-center/service";
 export * as CallCenterTypes from "./call-center/types";
 export * as CallAiPolicy from "./call-center/aiPolicy";
 export * as CallAiWorkflow from "./call-center/aiWorkflow";
+export * as CustomerDataCenter from "./customer-data-center/service";
+export * as CustomerDataCenterTypes from "./customer-data-center/types";
 export * as Vendors from "./vendors/service";
 export * as VendorTypes from "./vendors/types";
 export * as Branches from "./branches/repository";
