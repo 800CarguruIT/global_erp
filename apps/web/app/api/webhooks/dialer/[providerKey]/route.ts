@@ -1330,7 +1330,7 @@ async function resolveYeastarRecordingForCall(args: {
           stage: "recording_resolve_query",
           providerCallId: args.providerCallId,
           integrationId: integration.id,
-          tokenMode: tokenResult.mode ?? null,
+          tokenMode: tokenResult.mode ?? undefined,
           attempt: attempt + 1,
           found: true,
         });
@@ -1365,7 +1365,7 @@ async function resolveYeastarRecordingForCall(args: {
           sslVerify,
           providerCallId: args.providerCallId,
           integrationId: integration.id,
-          tokenMode: tokenResult.mode ?? null,
+          tokenMode: tokenResult.mode ?? undefined,
           attempt: attempt + 1,
           hints,
         }).catch(() => null);
@@ -1375,7 +1375,7 @@ async function resolveYeastarRecordingForCall(args: {
             stage: "recording_resolve_fallback_hit",
             providerCallId: args.providerCallId,
             integrationId: integration.id,
-            tokenMode: tokenResult.mode ?? null,
+            tokenMode: tokenResult.mode ?? undefined,
             attempt: attempt + 1,
             recordingUrl: fallbackResolved.recordingUrl ?? null,
             recordingId: fallbackResolved.recordingId ?? null,
@@ -2425,23 +2425,23 @@ async function handle(providerKey: string, req: NextRequest) {
 
   await CallCenter.handleDialerWebhookUpdate(update);
 
-  if (update.direction === "inbound") {
-    publishIncomingPopupEvent({
-      id: `${providerKey}-${update.providerCallId}-${Date.now()}`,
-      providerCallId: update.providerCallId,
-      providerKey,
-      direction: "inbound",
-      status: update.status,
-      fromNumber: update.fromNumber ?? null,
-      toNumber: update.toNumber ?? null,
-      ringingExtensions: update.ringingExtensions ?? null,
-      companyId: update.companyId ?? null,
-      branchId: update.branchId ?? null,
-      aiText: popupAiText,
-      pickupHint: popupPickupHint,
-      createdAt: new Date().toISOString(),
-    });
-  }
+  // Publish real-time event for ALL directions and statuses so the UI can track
+  // every transition (initiated → ringing → answered → ended) without polling.
+  publishIncomingPopupEvent({
+    id: `${providerKey}-${update.providerCallId}-${Date.now()}`,
+    providerCallId: update.providerCallId,
+    providerKey,
+    direction: (update.direction ?? "inbound") as "inbound" | "outbound",
+    status: update.status,
+    fromNumber: update.fromNumber ?? null,
+    toNumber: update.toNumber ?? null,
+    ringingExtensions: update.ringingExtensions ?? null,
+    companyId: update.companyId ?? null,
+    branchId: update.branchId ?? null,
+    aiText: popupAiText,
+    pickupHint: popupPickupHint,
+    createdAt: new Date().toISOString(),
+  });
 }
 
 export async function POST(req: NextRequest, ctx: ParamsCtx) {

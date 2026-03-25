@@ -86,6 +86,7 @@ type LayoutProps = {
 
 type IncomingPopupState = {
   callId: string;
+  direction?: "inbound" | "outbound";
   fromNumber: string;
   toNumber: string;
   ringingExtensions?: string[];
@@ -319,6 +320,10 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
   const [aiSimulationLoading, setAiSimulationLoading] = useState(false);
   const [incomingPopups, setIncomingPopups] = useState<IncomingPopupState[]>([]);
   const [expandedPopups, setExpandedPopups] = useState<Record<string, boolean>>({});
+  const [dialPadOpen, setDialPadOpen] = useState(false);
+  const [dialToNumber, setDialToNumber] = useState("");
+  const [isDialing, setIsDialing] = useState(false);
+  const [dialError, setDialError] = useState<string | null>(null);
   const [popupClock, setPopupClock] = useState(0);
   const [linkusStatus, setLinkusStatus] = useState<LinkusStatus>({
     state: "idle",
@@ -337,6 +342,8 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
     settings: false,
     sign: false,
   });
+  // Backoff delay for SDK reconnect attempts. Doubles on each failure, resets on success.
+  const sdkRetryDelayMsRef = useRef<number>(15_000);
   const answeredPopupHideTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const terminalCallsRef = useRef<Map<string, number>>(new Map());
   const recentlyClosedTargetsRef = useRef<Map<string, number>>(new Map());
@@ -784,6 +791,8 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
     const connectFromStorage = async () => {
       const current = client.getStatus().state;
       if (current === "connected" || current === "connecting") return;
+      // Don't retry if both API fetches are permanently paused (misconfiguration or IP block).
+      if (autoSdkApiPausedRef.current.settings && autoSdkApiPausedRef.current.sign) return;
       const cfg = await ensureSdkSign(await ensureSdkSettings(readLinkusConfig()));
       const extension = String(cfg.extension ?? "").trim();
       const serverUrl = String(cfg.serverUrl ?? "").trim();
@@ -797,7 +806,9 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
             "Re-login after extension assignment if needed.",
           ],
         });
-      } else if (!serverUrl) {
+        return;
+      }
+      if (!serverUrl) {
         showSdkNotice({
           key: `missing-server:${sdkCompanyId}`,
           title: "Linkus server URL is missing",
@@ -807,18 +818,36 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
             "Ensure the integration is active for this company.",
           ],
         });
+        return;
       }
       await client.connect(cfg);
     };
+    // On successful connection reset the delay; on error/disconnect increase it.
+    // The useEffect re-runs when linkusStatus.state changes, so each state transition
+    // triggers a fresh attempt with the current (possibly backed-off) delay.
+    if (linkusStatus.state === "connected") {
+      sdkRetryDelayMsRef.current = 15_000;
+      return () => { stopped = true; unsubscribe(); };
+    }
+
+    // Both API endpoints permanently paused — stop all auto-retry, require manual action.
+    if (autoSdkApiPausedRef.current.settings && autoSdkApiPausedRef.current.sign) {
+      return () => { stopped = true; unsubscribe(); };
+    }
+
+    // Attempt connection immediately, then schedule next retry with current backoff delay.
     void connectFromStorage();
 
-    const timer = window.setInterval(() => {
-      void connectFromStorage();
-    }, 4000);
+    const retryDelay = sdkRetryDelayMsRef.current;
+    sdkRetryDelayMsRef.current = Math.min(retryDelay * 2, 120_000);
+
+    const timer = window.setTimeout(() => {
+      if (!stopped) void connectFromStorage();
+    }, retryDelay);
 
     return () => {
       stopped = true;
-      window.clearInterval(timer);
+      window.clearTimeout(timer);
       unsubscribe();
     };
   }, [clearSdkNotice, dialerEnabled, linkusStatus.state, readLinkusConfig, sdkCompanyId, showSdkNotice]);
@@ -993,6 +1022,7 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
 
     async function handleIncomingCall(input: {
       callId: string;
+      direction?: "inbound" | "outbound";
       fromNumber?: string | null;
       toNumber?: string | null;
       ringingExtensions?: string[] | null;
@@ -1074,6 +1104,7 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
       setIncomingPopups((prev) => {
         const nextItem: IncomingPopupState = {
           callId,
+          direction: input.direction ?? "inbound",
           fromNumber: safeFromNumber || "Unknown",
           toNumber: toNumber || "Unknown",
           ringingExtensions,
@@ -1407,8 +1438,8 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
             return;
           }
 
-          if (direction !== "inbound") return;
-          if (!(status.includes("ring") || status.includes("incoming"))) return;
+          if (direction !== "inbound" && direction !== "outbound") return;
+          if (!(status.includes("ring") || status.includes("incoming") || status.includes("initiat"))) return;
           if (incomingCallId && terminalCallsRef.current.has(incomingCallId)) return;
           if (incomingCallId) {
             setIncomingPopups((prev) =>
@@ -1421,6 +1452,7 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
           }
           void handleIncomingCall({
             callId: incomingCallId,
+            direction: (direction === "outbound" ? "outbound" : "inbound") as "inbound" | "outbound",
             fromNumber: payload.fromNumber ?? null,
             toNumber: payload.toNumber ?? null,
             ringingExtensions: payload.ringingExtensions ?? null,
@@ -1516,6 +1548,59 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
     router.push("/auth/login");
+  }
+
+  const dialCompanyId =
+    scopeInfo.scope === "company" || scopeInfo.scope === "branch" || scopeInfo.scope === "vendor"
+      ? String(scopeInfo.companyId ?? "").trim()
+      : "";
+  const canDial = dialerEnabled && !!dialCompanyId;
+
+  async function handleDialOut() {
+    const toNumber = dialToNumber.trim();
+    if (!toNumber || !dialCompanyId) return;
+    setIsDialing(true);
+    setDialError(null);
+    try {
+      const res = await fetch(`/api/company/${dialCompanyId}/call-center/call`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          toNumber,
+          fromNumber: linkusStatus.extension || undefined,
+        }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.error ?? `HTTP ${res.status}`);
+      const callId = String(body?.providerCallId ?? body?.callId ?? body?.id ?? "").trim();
+      if (callId) {
+        // Show popup immediately — webhook will deliver ringing/answered updates.
+        setIncomingPopups((prev) => [
+          ...prev,
+          {
+            callId,
+            direction: "outbound",
+            fromNumber: linkusStatus.extension || "—",
+            toNumber,
+            createdAtMs: Date.now(),
+            stage: "new",
+            endReason: null,
+            connectionSinceMs: null,
+            syncDelay: false,
+            answeredAtMs: null,
+            endedAtMs: null,
+            lastEventAtMs: Date.now(),
+            customer: null,
+          },
+        ]);
+      }
+      setDialPadOpen(false);
+      setDialToNumber("");
+    } catch (err: any) {
+      setDialError(err?.message ?? "Call failed");
+    } finally {
+      setIsDialing(false);
+    }
   }
 
   function canSdkAnswerToNumber(
@@ -1750,6 +1835,17 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
               />
             </label>
           )}
+          {canDial && (
+            <button
+              type="button"
+              onClick={() => { setDialPadOpen((prev) => !prev); setDialError(null); }}
+              className="rounded-full border border-white/30 px-3 py-1 text-xs sm:text-sm hover:border-white"
+              aria-expanded={dialPadOpen}
+              aria-controls="navbar-dial-pad"
+            >
+              📞 Dial
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setLookupOpen((prev) => !prev)}
@@ -1773,6 +1869,35 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
           >
             Logout
           </button>
+
+          {dialPadOpen && canDial && (
+            <div
+              id="navbar-dial-pad"
+              className="absolute right-0 top-full z-50 mt-2 w-72 max-w-[90vw] rounded-2xl border border-white/10 bg-black p-3 shadow-xl"
+            >
+              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-white/60">New Outbound Call</div>
+              <div className="flex items-center gap-2">
+                <input
+                  autoFocus
+                  type="tel"
+                  value={dialToNumber}
+                  onChange={(e) => setDialToNumber(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") void handleDialOut(); }}
+                  placeholder="Enter phone number"
+                  className="h-9 w-full rounded-lg border border-white/15 bg-black/40 px-3 text-sm outline-none focus:ring-2 focus:ring-white/20"
+                />
+                <button
+                  type="button"
+                  onClick={() => void handleDialOut()}
+                  disabled={isDialing || !dialToNumber.trim()}
+                  className="shrink-0 rounded-lg border border-emerald-400/50 bg-emerald-500/20 px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-emerald-300 transition hover:bg-emerald-500/30 disabled:opacity-50"
+                >
+                  {isDialing ? "…" : "Call"}
+                </button>
+              </div>
+              {dialError && <div className="mt-2 text-xs text-red-400">{dialError}</div>}
+            </div>
+          )}
 
           {lookupOpen && (
             <div
@@ -1954,7 +2079,9 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <div className="text-xs uppercase tracking-[0.18em] text-emerald-300">Incoming Call</div>
+                  <div className={`text-xs uppercase tracking-[0.18em] ${popup.direction === "outbound" ? "text-cyan-300" : "text-emerald-300"}`}>
+                    {popup.direction === "outbound" ? "Outbound Call" : "Incoming Call"}
+                  </div>
                   {autoCompact ? (
                     <button
                       type="button"
@@ -1987,7 +2114,7 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
                     {labelForStage(popup.stage)}
                   </span>
                   {elapsedMs !== null ? (
-                    <span className="font-mono text-emerald-200">{formatDuration(elapsedMs)}</span>
+                    <span className={`font-mono ${popup.direction === "outbound" ? "text-cyan-200" : "text-emerald-200"}`}>{formatDuration(elapsedMs)}</span>
                   ) : null}
                 </div>
                 {popup.syncDelay ? (
@@ -2039,7 +2166,7 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
                 ) : null}
                 {!isCompact ? (
                   <div className="mt-2 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-sm">
-                    <div className="text-xs text-slate-300">Mobile No: {popup.customer?.phone ?? popup.fromNumber}</div>
+                    <div className="text-xs text-slate-300">Mobile No: {popup.customer?.phone ?? (popup.direction === "outbound" ? popup.toNumber : popup.fromNumber)}</div>
                     {popup.customer?.car ? (
                       <div className="text-xs text-slate-300">Car: {popup.customer.car}</div>
                     ) : null}
@@ -2052,6 +2179,7 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
                   </div>
                 ) : null}
                 <div className="mt-3 flex flex-col gap-2 text-[11px]">
+                  {popup.direction !== "outbound" ? (
                   <button
                     type="button"
                     className="w-full rounded-xl border border-emerald-300/50 bg-emerald-500/15 px-3 py-2 text-sm font-semibold text-emerald-100 hover:border-emerald-200/90 disabled:opacity-50"
@@ -2073,6 +2201,7 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
                   >
                     Answer (SDK)
                   </button>
+                  ) : null}
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"

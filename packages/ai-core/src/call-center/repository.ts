@@ -134,6 +134,7 @@ export async function updateCallSessionStatusByProviderCallId(
   providerCallId: string,
   patch: {
     status?: CallStatus;
+    direction?: "inbound" | "outbound";
     startedAt?: Date | null;
     endedAt?: Date | null;
     durationSeconds?: number | null;
@@ -149,10 +150,15 @@ export async function updateCallSessionStatusByProviderCallId(
   const patchStartedAt = patch.startedAt ?? null;
   const patchEndedAt = patch.endedAt ?? null;
   const patchDurationSeconds = patch.durationSeconds ?? null;
+  const upgradeToOutbound = patch.direction === "outbound";
   const result = await sql<{ id: string }[]>`
     UPDATE call_sessions
     SET
       status = COALESCE(${patch.status ?? null}, status),
+      direction = CASE
+        WHEN ${upgradeToOutbound}::boolean AND direction = 'inbound' THEN 'outbound'
+        ELSE direction
+      END,
       started_at = COALESCE(${patchStartedAt}::timestamptz, started_at),
       ended_at = COALESCE(${patchEndedAt}::timestamptz, ended_at),
       duration_seconds = CASE
