@@ -10,6 +10,7 @@ import {
   formatMmSs,
   lastNDaysRange,
 } from "../../../../(components)/call-center-dashboard/helpers";
+import { AIPanel } from "../../../../(components)/intelligence/AIPanel";
 
 type DashboardData = {
   period: { from: string; to: string };
@@ -76,6 +77,13 @@ export default function CompanyCallCenterDashboardPage({ params }: { params: { c
   return (
     <AppLayout>
       <div className="space-y-6 py-4 max-w-6xl mx-auto text-gray-100">
+        <AIPanel
+          companyId={companyId}
+          branchId={branchId || undefined}
+          engines={["e2", "e7", "e1"]}
+          from={new Date(from)}
+          to={new Date(to)}
+        />
         <div className="flex items-center justify-between gap-3">
           <h1 className="text-xl sm:text-2xl font-semibold">Company Call Center Dashboard</h1>
           <button

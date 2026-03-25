@@ -1196,6 +1196,7 @@ async function resolveYeastarRecordingForCall(args: {
   recordingUrl?: string;
   recordingId?: string;
   recordingDurationSeconds?: number;
+  integrationCompanyId?: string | null;
 } | null> {
   const provider = "yeastar";
   const hints = await getRecordingResolveHints(args).catch(() => ({
@@ -1339,6 +1340,7 @@ async function resolveYeastarRecordingForCall(args: {
           recordingDurationSeconds: Number.isFinite(recordingDurationSeconds)
             ? recordingDurationSeconds
             : undefined,
+          integrationCompanyId: integration.company_id ?? null,
         };
       }
 
@@ -1378,7 +1380,7 @@ async function resolveYeastarRecordingForCall(args: {
             recordingUrl: fallbackResolved.recordingUrl ?? null,
             recordingId: fallbackResolved.recordingId ?? null,
           });
-          return fallbackResolved;
+          return { ...fallbackResolved, integrationCompanyId: integration.company_id ?? null };
         }
       }
 
@@ -1416,12 +1418,13 @@ async function scheduleDeferredYeastarRecordingResolve(args: {
           companyId: args.companyId ?? null,
         });
         if (resolved?.recordingUrl || resolved?.recordingId) {
+          const effectiveCompanyId = args.companyId ?? resolved.integrationCompanyId ?? null;
           await CallCenter.handleDialerWebhookUpdate({
             providerKey: args.providerKey,
             providerCallId: args.providerCallId,
             status: args.status,
-            scope: args.companyId ? "company" : "global",
-            companyId: args.companyId ?? undefined,
+            scope: effectiveCompanyId ? "company" : "global",
+            companyId: effectiveCompanyId ?? undefined,
             recordingUrl: resolved.recordingUrl,
             recordingId: resolved.recordingId,
             recordingDurationSeconds: resolved.recordingDurationSeconds,
@@ -1431,7 +1434,7 @@ async function scheduleDeferredYeastarRecordingResolve(args: {
             stage: "recording_resolved_deferred",
             providerKey: args.providerKey,
             providerCallId: args.providerCallId,
-            companyId: args.companyId ?? null,
+            companyId: effectiveCompanyId,
             delayMs,
             recordingUrl: resolved.recordingUrl ?? null,
             recordingId: resolved.recordingId ?? null,
@@ -1843,11 +1846,27 @@ function mapYeastarWebhook(providerKey: string, payload: any): DialerWebhookUpda
   if (msgCallType.includes("outbound") || directionNormalized.includes("out")) {
     direction = "outbound";
   } else if (
+    // Yeastar P-Series PCIR (type 30020): "External" means extension→PSTN = outbound
+    msgCallType === "external"
+  ) {
+    direction = "outbound";
+  } else if (
     msgCallType.includes("inbound") ||
     directionNormalized.includes("in") ||
     [30011, 30016].includes(yeastarType)
   ) {
     direction = "inbound";
+  }
+
+  // Fallback heuristic for Yeastar type 30020 events with no explicit direction field:
+  // if fromNumber is a short internal extension (≤5 digits) and toNumber is an external
+  // number (≥7 digits), the call was originated by the extension → outbound.
+  if (direction === "inbound" && yeastarType === 30020) {
+    const fromDigits = String(fromRaw ?? "").replace(/\D+/g, "");
+    const toDigits = String(toRaw ?? "").replace(/\D+/g, "");
+    if (fromDigits.length <= 5 && toDigits.length >= 7) {
+      direction = "outbound";
+    }
   }
 
   let normalizedStatus = rawStatus;
@@ -2053,6 +2072,27 @@ async function handle(providerKey: string, req: NextRequest) {
     fromNumber: update.fromNumber ?? null,
     toNumber: update.toNumber ?? null,
   });
+
+  // For outbound calls (e.g. placed directly from Linkus), Yeastar payloads carry no companyId.
+  // Resolve it from the active integration so the session is stored under the correct company.
+  if (!update.companyId && update.direction === "outbound" && providerKey.toLowerCase() === "yeastar") {
+    const inferredCompanyId = await resolveCompanyForInbound({
+      providerKey: update.providerKey,
+      toNumber: update.toNumber ?? null,
+      rawPayload: update.rawPayload,
+    }).catch(() => null);
+    if (inferredCompanyId) {
+      update.companyId = inferredCompanyId;
+      update.scope = "company";
+      await logWebhookLine({
+        ts: new Date().toISOString(),
+        stage: "company_scope_resolved_outbound",
+        providerKey,
+        providerCallId: update.providerCallId,
+        companyId: inferredCompanyId,
+      });
+    }
+  }
 
   let popupAiText: string | null = null;
   let popupPickupHint: string | null = null;

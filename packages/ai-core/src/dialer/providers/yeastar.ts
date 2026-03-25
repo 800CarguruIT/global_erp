@@ -219,10 +219,42 @@ async function dialYeastarCall(args: {
   return { ok: true, raw };
 }
 
+async function subscribeYeastarEvents(args: {
+  base: string;
+  token: string;
+  webhookUrl: string;
+  sslVerify: boolean;
+  userAgent: string;
+}): Promise<void> {
+  await postJson({
+    url: `${args.base}/subscribe`,
+    body: {
+      url: args.webhookUrl,
+      user_agent: args.userAgent,
+      events: [
+        { type: "call" },
+        { type: "cdr" },
+      ],
+    },
+    sslVerify: args.sslVerify,
+    headers: { Authorization: args.token, "User-Agent": args.userAgent },
+  });
+}
+
 async function doYeastarHealthCheck(integration: DialerIntegration): Promise<IntegrationHealthStatus> {
   const credentials = getCredentials(integration, integration.credentials);
   const token = await requestYeastarToken(integration, credentials);
-  return token.ok ? "healthy" : "degraded";
+  if (!token.ok) throw new Error(token.error);
+
+  const base = normalizedBaseUrl(credentials.apiBaseUrl, credentials.apiPath);
+  const webhookUrl = String(credentials.webhookUrl ?? "").trim();
+  const sslVerify = toBool(credentials.sslVerify, true);
+  const userAgent = String(credentials.userAgent ?? "OpenAPI").trim() || "OpenAPI";
+  if (base && webhookUrl) {
+    await subscribeYeastarEvents({ base, token: token.token, webhookUrl, sslVerify, userAgent }).catch(() => {});
+  }
+
+  return "healthy";
 }
 
 export const yeastarProvider: DialerProvider = {

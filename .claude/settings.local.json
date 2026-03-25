@@ -18,7 +18,11 @@
       "Bash(node -e \"require\\(''puppeteer''\\)\")",
       "Bash(node -e \"require\\(''playwright''\\)\")",
       "Bash(find 'c:/Users/ABC/Documents/Global ERP/packages/ai-core/src' -type f \\\\\\(-name *.ts -o -name *.tsx \\\\\\))",
-      "Bash(node --input-type=module:*)"
+      "Bash(node --input-type=module:*)",
+      "Bash(find 'c:/Users/ABC/Documents/Global ERP' -type f \\\\\\(-name *yeastar* -o -name *dialer* -o -name *channel* \\\\\\))",
+      "WebSearch",
+      "WebFetch(domain:developers.cloudflare.com)",
+      "Bash(Get-Content \"C:\\\\Users\\\\ABC\\\\Documents\\\\Global ERP\\\\apps\\\\web\\\\tmp\\\\webhook-dialer.log\")"
     ]
   }
 }

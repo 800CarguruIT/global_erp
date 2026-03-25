@@ -72,6 +72,7 @@ export async function startOutboundCall(input: StartOutboundCallInput): Promise<
   const status: CallStatus = providerResult.success === false ? "failed" : "initiated";
   const session = await insertCallSession({
     ...input,
+    direction: "outbound",
     providerCallId: providerResult.callId ?? null,
     status,
     metadata: contextMetadata,

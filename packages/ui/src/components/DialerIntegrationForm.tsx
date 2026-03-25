@@ -314,7 +314,7 @@ export function DialerIntegrationForm({
                     {inputType === "checkbox" ? (
                       <input
                         type="checkbox"
-                        checked={Boolean(current)}
+                        checked={current !== undefined ? Boolean(current) : Boolean(field.defaultValue)}
                         onChange={(e) =>
                           handleDynamicChange(field.id, e.target.checked, field.section ?? "credentials")
                         }

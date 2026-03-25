@@ -23,6 +23,7 @@ export async function GET(req: NextRequest, { params }: Params) {
   const vendorId = searchParams.get("vendorId") ?? undefined;
 
   const status = (searchParams.get("status") ?? "all") as "all" | "active" | "inactive";
+  const department = searchParams.get("department") ?? undefined;
   const users = await UserRepository.listUsers({
     q,
     limit: pageSize,
@@ -31,6 +32,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     branchId,
     vendorId,
     status,
+    department,
   });
   return NextResponse.json({ data: users });
 }

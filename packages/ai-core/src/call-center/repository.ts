@@ -77,6 +77,7 @@ export async function insertCallSession(
     providerCallId?: string | null;
     status: CallStatus;
     providerResponse?: unknown;
+    direction?: "inbound" | "outbound";
   }
 ): Promise<CallSession> {
   const sql = getSql();

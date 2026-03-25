@@ -857,6 +857,18 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
       });
       return;
     }
+    if (lower.includes("dialer_linkus_token") && lower.includes("missing")) {
+      showSdkNotice({
+        key: `status-token-missing:${sdkCompanyId}`,
+        title: "Linkus token or password is missing",
+        message: msg,
+        suggestions: [
+          "Open Dialer Integration and save your Yeastar credentials.",
+          "A token will be fetched automatically once credentials are set.",
+        ],
+      });
+      return;
+    }
     showSdkNotice({
       key: `status-error:${sdkCompanyId}:${msg}`,
       title: "SDK connection error",

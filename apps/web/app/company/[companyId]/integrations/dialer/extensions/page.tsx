@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AppLayout } from "@repo/ui";
 
@@ -52,7 +52,7 @@ export default function CompanyDialerExtensionsPage({ params }: Params) {
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch(`/api/company/${companyId}/admin/users?status=all&pageSize=500`, {
+        const res = await fetch(`/api/company/${companyId}/admin/users?status=active&pageSize=500&department=RSA+Sales+Department`, {
           cache: "no-store",
         });
         if (!res.ok) throw new Error("Failed to load users");
@@ -74,7 +74,6 @@ export default function CompanyDialerExtensionsPage({ params }: Params) {
     };
   }, [companyId]);
 
-  const activeUsers = useMemo(() => users.filter((u) => u.is_active), [users]);
 
   async function saveUserExtension(user: UserRow) {
     if (!companyId) return;
@@ -145,7 +144,7 @@ export default function CompanyDialerExtensionsPage({ params }: Params) {
             <div className="text-sm opacity-70">Loading users...</div>
           ) : (
             <div className="space-y-2">
-              {activeUsers.map((user) => (
+              {users.map((user) => (
                 <div
                   key={user.id}
                   className="flex flex-col gap-2 rounded-xl border border-white/10 bg-white/5 p-3 sm:flex-row sm:items-center"
@@ -174,7 +173,7 @@ export default function CompanyDialerExtensionsPage({ params }: Params) {
                   </div>
                 </div>
               ))}
-              {activeUsers.length === 0 ? <div className="text-sm opacity-70">No active users found.</div> : null}
+              {users.length === 0 ? <div className="text-sm opacity-70">No active users found.</div> : null}
             </div>
           )}
         </div>

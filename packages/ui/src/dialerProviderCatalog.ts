@@ -6,6 +6,7 @@ export type DialerProviderField = {
   section?: "credentials" | "metadata";
   placeholder?: string;
   helpText?: string;
+  defaultValue?: unknown;
 };
 
 export type DialerProviderTemplate = {
@@ -147,11 +148,20 @@ export const DIALER_PROVIDER_TEMPLATES: DialerProviderTemplate[] = [
         placeholder: "OpenAPI",
       },
       {
+        id: "webhookUrl",
+        label: "Webhook URL",
+        type: "url",
+        section: "credentials",
+        helpText: "Public URL Yeastar will push call events to. e.g. http://192.168.50.169:3000/api/webhooks/dialer/yeastar",
+        placeholder: "http://your-server/api/webhooks/dialer/yeastar",
+      },
+      {
         id: "sslVerify",
         label: "Verify SSL Cert",
         type: "boolean",
         section: "credentials",
         helpText: "Disable only for trusted self-signed/local PBX certificates.",
+        defaultValue: true,
       },
     ],
   },

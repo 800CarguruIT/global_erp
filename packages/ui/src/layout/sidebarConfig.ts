@@ -8,7 +8,8 @@ export type NavCategory =
   | "Accounting"
   | "Reports"
   | "HR"
-  | "Analytics";
+  | "Analytics"
+  | "AI Intelligence";
 
 export interface SidebarItem {
   label?: string;
@@ -62,6 +63,7 @@ export const SIDEBAR_CONFIG: Record<NavScope, Partial<Record<NavCategory, Sideba
       { label: "Users", href: "/company/[companyId]/settings/security/users" },
       { label: "AI Config", href: "/company/[companyId]/settings/ai/config", permissionKeys: ["ai.config.view"] },
       { label: "AI Inquiries", href: "/company/[companyId]/settings/ai/inquiries", permissionKeys: ["ai.inquiries.view"] },
+      { label: "AI Intelligence", href: "/company/[companyId]/settings/ai/intelligence", permissionKeys: ["ai.config.view"] },
       { labelKey: "global.nav.finance", href: "/company/[companyId]/accounting" },
       { label: "Inventory", href: "/company/[companyId]/inventory" },
       { label: "Procurement", href: "/company/[companyId]/procurement" },
@@ -82,6 +84,8 @@ export const SIDEBAR_CONFIG: Record<NavScope, Partial<Record<NavCategory, Sideba
     ],
     "Call Center": [
       { labelKey: "global.nav.callCenter", href: "/company/[companyId]/call-center", permissionKeys: ["callcenter.view"] },
+      { label: "Dashboard", href: "/company/[companyId]/call-center/dashboard", permissionKeys: ["callcenter.view"] },
+      { label: "Outbound Dialer", href: "/company/[companyId]/call-center/outbound", permissionKeys: ["callcenter.view"] },
       { label: "Call history", href: "/company/[companyId]/call-center/history", permissionKeys: ["callcenter.history.view"] },
       { label: "Customers List", href: "/company/[companyId]/call-center/customers-list", permissionKeys: ["callcenter.view"] },
       { label: "Data Center", href: "/company/[companyId]/data-center", permissionKeys: ["callcenter.view"] },
@@ -107,6 +111,16 @@ export const SIDEBAR_CONFIG: Record<NavScope, Partial<Record<NavCategory, Sideba
     ],
     Reports: [{ label: "Overview", href: "/company/[companyId]/reports/overview", moduleKey: "reports" }],
     HR: [{ label: "Overview", href: "/company/[companyId]/hr/overview", moduleKey: "hr" }],
+    "AI Intelligence": [
+      { label: "Master", href: "/company/[companyId]/intelligence/master", permissionKeys: ["ai.config.view"] },
+      { label: "Inbound", href: "/company/[companyId]/intelligence/inbound", permissionKeys: ["callcenter.view"] },
+      { label: "Outbound", href: "/company/[companyId]/intelligence/outbound", permissionKeys: ["callcenter.view"] },
+      { label: "Portfolio", href: "/company/[companyId]/intelligence/portfolio", permissionKeys: ["crm.customers.view"] },
+      { label: "Agent", href: "/company/[companyId]/intelligence/agent", permissionKeys: ["callcenter.view"] },
+      { label: "Funnel", href: "/company/[companyId]/intelligence/funnel", permissionKeys: ["leads.view"] },
+      { label: "Collections", href: "/company/[companyId]/intelligence/collections", permissionKeys: ["accounting.view"] },
+      { label: "Settings", href: "/company/[companyId]/settings/ai/intelligence", permissionKeys: ["ai.config.view"] },
+    ],
   },
   branch: {
     Main: [
@@ -153,6 +167,7 @@ export const SIDEBAR_TREE: Partial<Record<NavScope, SidebarItem[]>> = {
         { label: "Car In Dashboard", href: "/company/[companyId]/car-in-dashboard", permissionKeys: ["company.dashboard.view"] },
         { label: "Parts Dashboard", href: "/company/[companyId]/parts-dashboard", permissionKeys: ["company.dashboard.view"] },
         { label: "Revenue Dashboard", href: "/company/[companyId]/revenue-dashboard", permissionKeys: ["company.dashboard.view"] },
+        { label: "Master Performance", href: "/company/[companyId]/master-dashboard", permissionKeys: ["company.dashboard.view"] },
       ],
     },
     {
@@ -193,6 +208,8 @@ export const SIDEBAR_TREE: Partial<Record<NavScope, SidebarItem[]>> = {
       permissionKeys: ["callcenter.view"],
       children: [
         { label: "Overview", href: "/company/[companyId]/call-center", exactMatch: true, permissionKeys: ["callcenter.view"] },
+        { label: "Dashboard", href: "/company/[companyId]/call-center/dashboard", permissionKeys: ["callcenter.view"] },
+        { label: "Outbound Dialer", href: "/company/[companyId]/call-center/outbound", permissionKeys: ["callcenter.view"] },
         { label: "History", href: "/company/[companyId]/call-center/history", permissionKeys: ["callcenter.history.view"] },
         { label: "Customers List", href: "/company/[companyId]/call-center/customers-list", permissionKeys: ["callcenter.view"] },
         { label: "Data Center", href: "/company/[companyId]/data-center", permissionKeys: ["callcenter.view"] },
@@ -323,6 +340,21 @@ export const SIDEBAR_TREE: Partial<Record<NavScope, SidebarItem[]>> = {
     { label: "Roles & Permissions", href: "/company/[companyId]/settings/security/roles", permissionKeys: ["company.roles.manage"] },
     { label: "AI Config", href: "/company/[companyId]/settings/ai/config", permissionKeys: ["ai.config.view"] },
     { label: "AI Inquiries", href: "/company/[companyId]/settings/ai/inquiries", permissionKeys: ["ai.inquiries.view"] },
+    {
+      label: "AI Intelligence",
+      href: "/company/[companyId]/intelligence/master",
+      permissionKeys: ["ai.config.view"],
+      children: [
+        { label: "Master", href: "/company/[companyId]/intelligence/master", permissionKeys: ["ai.config.view"] },
+        { label: "Inbound", href: "/company/[companyId]/intelligence/inbound", permissionKeys: ["callcenter.view"] },
+        { label: "Outbound", href: "/company/[companyId]/intelligence/outbound", permissionKeys: ["callcenter.view"] },
+        { label: "Portfolio", href: "/company/[companyId]/intelligence/portfolio", permissionKeys: ["crm.customers.view"] },
+        { label: "Agent", href: "/company/[companyId]/intelligence/agent", permissionKeys: ["callcenter.view"] },
+        { label: "Funnel", href: "/company/[companyId]/intelligence/funnel", permissionKeys: ["leads.view"] },
+        { label: "Collections", href: "/company/[companyId]/intelligence/collections", permissionKeys: ["accounting.view"] },
+        { label: "Settings", href: "/company/[companyId]/settings/ai/intelligence", permissionKeys: ["ai.config.view"] },
+      ],
+    },
     {
       label: "Accounts",
       href: "/company/[companyId]/accounting",

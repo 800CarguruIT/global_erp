@@ -112,6 +112,9 @@ export * as PushTypes from "./push/types";
 export * as EventAutomation from "./event-automation/service";
 
 export { getOpenAIClient, getOpenAIClientForCompany } from "./ai/client";
+export { getAnthropicClient, getAnthropicClientForCompany } from "./ai/anthropicClient";
+export * as Intelligence from "./intelligence";
+export type { EngineKey, EngineResult, Signal, EngineConfig } from "./intelligence";
 export { canUseAi } from "./ai/policy";
 export {
   clearCompanyAiProviderConfig,
@@ -121,3 +124,5 @@ export {
 } from "./ai/providerConfig";
 export * as Files from "./files/repository";
 export type { FileKind, FileRecord } from "./files/types";
+export * as MasterDashboard from "./master-dashboard/service";
+export type { MasterDashboardData, MasterDashboardFilter } from "./master-dashboard/types";

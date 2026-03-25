@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { CallCenter } from "@repo/ai-core";
+import { getCurrentUserIdFromRequest } from "../../../../../../lib/auth/current-user";
 
 type Params = { params: Promise<{ companyId: string }> };
 
@@ -12,13 +13,9 @@ const bodySchema = z.object({
   providerKey: z.string().min(1),
 });
 
-async function getCurrentUserId(req: NextRequest): Promise<string | null> {
-  return req.headers.get("x-user-id");
-}
-
 export async function POST(req: NextRequest, { params }: Params) {
   const { companyId } = await params;
-  const userId = await getCurrentUserId(req);
+  const userId = await getCurrentUserIdFromRequest(req);
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
