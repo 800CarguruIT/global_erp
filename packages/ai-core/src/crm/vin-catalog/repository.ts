@@ -9,6 +9,9 @@ type VinCatalogGroupInput = {
 type VinCatalogPartInput = {
   code?: string;
   name?: string;
+  nameZh?: string;
+  diagram?: string;
+  nameTranslated?: boolean;
   groups?: VinCatalogGroupInput[];
 };
 
@@ -49,6 +52,8 @@ type VinCatalogSnapshot = {
   parts: Array<{
     code: string;
     name: string;
+    nameZh: string;
+    diagram: string;
     groups: Array<{ id: string; level: number; name: string }>;
   }>;
   partsCount: number;
@@ -101,9 +106,11 @@ async function upsertCarRow(
   trx: any,
   vin: string,
   car: VinCatalogCarInput,
-  partsBrand?: unknown
+  partsBrand?: unknown,
+  epc?: string
 ): Promise<{ carRefId: string }> {
   const payload = buildCarUpsertPayload(car, partsBrand);
+  const epcValue = normalizeText(epc) || null;
   const carRows = await trx<{ id: string }[]>/* sql */ `
     INSERT INTO vin_catalog_cars (
       vin,
@@ -119,6 +126,7 @@ async function upsertCarRow(
       dest,
       grade,
       trans,
+      epc,
       raw_json,
       updated_at
     )
@@ -136,6 +144,7 @@ async function upsertCarRow(
       ${payload.descriptionMap.DEST ?? null},
       ${payload.descriptionMap.GRADE ?? null},
       ${payload.descriptionMap.TRANS ?? null},
+      ${epcValue},
       ${payload.rawJson},
       now()
     )
@@ -152,6 +161,7 @@ async function upsertCarRow(
       dest = EXCLUDED.dest,
       grade = EXCLUDED.grade,
       trans = EXCLUDED.trans,
+      epc = COALESCE(EXCLUDED.epc, vin_catalog_cars.epc),
       raw_json = EXCLUDED.raw_json,
       updated_at = now()
     RETURNING id
@@ -165,6 +175,7 @@ export async function upsertVinCatalogCars(params: {
   vin: string;
   cars: VinCatalogCarInput[];
   partsBrand?: unknown;
+  epc?: string;
 }): Promise<{ carRefIds: string[] }> {
   const vin = normalizeText(params.vin).toUpperCase();
   if (!vin) throw new Error("VIN is required");
@@ -175,7 +186,7 @@ export async function upsertVinCatalogCars(params: {
     const carRefIds: string[] = [];
     for (const car of cars) {
       if (!normalizeText(car?.id)) continue;
-      const { carRefId } = await upsertCarRow(trx, vin, car, params.partsBrand);
+      const { carRefId } = await upsertCarRow(trx, vin, car, params.partsBrand, params.epc);
       carRefIds.push(carRefId);
     }
     return { carRefIds };
@@ -199,12 +210,18 @@ export async function upsertVinCatalogSnapshot(params: UpsertVinCatalogParams): 
       const part = params.parts[idx] ?? {};
       const partNumber = normalizeText(part.code) || `unknown-${idx + 1}`;
       const partName = normalizeText(part.name);
+      const partNameZh = normalizeText(part.nameZh) || null;
+      const diagramUrl = normalizeText(part.diagram) || null;
+      const nameTranslated = Boolean(part.nameTranslated);
       const partRows = await trx<{ id: string }[]>/* sql */ `
         INSERT INTO vin_catalog_parts (
           car_ref_id,
           car_vin,
           part_number,
           part_name,
+          name_zh,
+          diagram_url,
+          name_translated,
           source_index,
           raw_json,
           updated_at
@@ -214,6 +231,9 @@ export async function upsertVinCatalogSnapshot(params: UpsertVinCatalogParams): 
           ${vin},
           ${partNumber},
           ${partName || null},
+          ${partNameZh},
+          ${diagramUrl},
+          ${nameTranslated},
           ${idx},
           ${part as any},
           now()
@@ -221,6 +241,9 @@ export async function upsertVinCatalogSnapshot(params: UpsertVinCatalogParams): 
         ON CONFLICT (car_ref_id, part_number, source_index)
         DO UPDATE SET
           part_name = EXCLUDED.part_name,
+          name_zh = EXCLUDED.name_zh,
+          diagram_url = EXCLUDED.diagram_url,
+          name_translated = EXCLUDED.name_translated,
           raw_json = EXCLUDED.raw_json,
           updated_at = now()
         RETURNING id
@@ -270,6 +293,7 @@ export async function getVinCatalogCarsByVin(vinInput: string): Promise<
     year: string;
     description: string;
     title: string;
+    epc: string;
   }>
 > {
   const vin = normalizeText(vinInput).toUpperCase();
@@ -292,6 +316,7 @@ export async function getVinCatalogCarsByVin(vinInput: string): Promise<
       year: row.year == null ? "" : String(row.year),
       description: normalizeText(row.description),
       title: normalizeText(row.title || sourceCar?.info?.title),
+      epc: normalizeText(row.epc),
     };
   });
 }
@@ -324,6 +349,8 @@ export async function getVinCatalogSnapshotByVinAndCarId(
       p.id AS part_id,
       p.part_number,
       p.part_name,
+      p.name_zh,
+      p.diagram_url,
       p.source_index,
       g.group_source_id,
       g.group_level,
@@ -335,7 +362,7 @@ export async function getVinCatalogSnapshotByVinAndCarId(
     ORDER BY p.source_index ASC, g.group_level ASC NULLS LAST, g.group_name ASC NULLS LAST
   `;
 
-  const partsMap = new Map<string, { code: string; name: string; groups: Array<{ id: string; level: number; name: string }> }>();
+  const partsMap = new Map<string, { code: string; name: string; nameZh: string; diagram: string; groups: Array<{ id: string; level: number; name: string }> }>();
   for (const row of flatRows) {
     const partId = normalizeText(row.part_id);
     if (!partId) continue;
@@ -343,6 +370,8 @@ export async function getVinCatalogSnapshotByVinAndCarId(
       partsMap.set(partId, {
         code: normalizeText(row.part_number),
         name: normalizeText(row.part_name),
+        nameZh: normalizeText(row.name_zh),
+        diagram: normalizeText(row.diagram_url),
         groups: [],
       });
     }

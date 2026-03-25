@@ -8,6 +8,9 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 type QuoteTypeKey = "oem" | "oe" | "aftm" | "used";
 type PartFormData = {
   attachmentName: string;
+  partNumber: string;
+  diagramFileId: string;
+  diagramFileName: string;
   remarks: string;
   oemBrand: string;
   oeBrand: string;
@@ -62,6 +65,9 @@ const MAKES = [
 
 const createEmptyPartForm = (): PartFormData => ({
   attachmentName: "",
+  partNumber: "",
+  diagramFileId: "",
+  diagramFileName: "",
   remarks: "",
   oemBrand: "",
   oeBrand: "",
@@ -169,6 +175,7 @@ export default function VendorDashboardPage() {
   const [partsLoading, setPartsLoading] = useState(false);
   const [partsError, setPartsError] = useState<string | null>(null);
   const [partForms, setPartForms] = useState<Record<string, PartFormData>>({});
+  const [diagramUploading, setDiagramUploading] = useState<Record<string, boolean>>({});
   const [submitStatus, setSubmitStatus] = useState<Record<string, "idle" | "saving" | "saved" | "error">>({});
   const [submitErrors, setSubmitErrors] = useState<Record<string, string>>({});
   const [submitAt, setSubmitAt] = useState<Record<string, string>>({});
@@ -291,7 +298,10 @@ export default function VendorDashboardPage() {
       const next = { ...prev };
       for (const row of partsRows) {
         if (!next[row.id]) {
-          next[row.id] = createEmptyPartForm();
+          next[row.id] = {
+            ...createEmptyPartForm(),
+            partNumber: String(row.partNumber ?? "").trim(),
+          };
         }
       }
       return next;
@@ -866,6 +876,8 @@ export default function VendorDashboardPage() {
     form: PartFormData | undefined
   ): string | null => {
     if (!form) return "Enter at least one quote amount.";
+    if (!String(form.diagramFileId ?? "").trim()) return "Upload a part diagram (required).";
+    if (!String(form.partNumber ?? "").trim()) return "Part number is required.";
     const amountKeys: Array<keyof PartFormData> = ["oemAmount", "oeAmount", "aftmAmount", "usedAmount"];
     const hasAnyAmount = amountKeys.some((key) => toPositiveNumber(form[key] as string) > 0);
     if (!hasAnyAmount) return "Enter at least one quote amount.";
@@ -1599,9 +1611,72 @@ export default function VendorDashboardPage() {
                         <div className="mt-3 grid gap-3 md:grid-cols-[1fr,1fr]">
                           <div className="space-y-2 rounded-lg border border-slate-700/60 bg-slate-950/30 p-3">
                             <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-300">Part Info</div>
-                            <div className="rounded border border-slate-700 bg-slate-950/80 px-2 py-1.5 text-xs text-slate-200">
-                              <span className="text-slate-400">Part Number: </span>
-                              {row.partNumber || "-"}
+                            <div>
+                              <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                                Part Number <span className="text-rose-400">*</span>
+                                <span className="ml-1 font-normal normal-case text-slate-500">Confirm or correct</span>
+                              </div>
+                              <input
+                                type="text"
+                                className="h-9 w-full rounded border border-slate-700 bg-slate-950/80 px-2 text-xs text-slate-100 placeholder:text-slate-500"
+                                placeholder="e.g. 4M0827211"
+                                value={form?.partNumber ?? ""}
+                                onChange={(e) => updatePartForm(row.id, "partNumber", e.target.value)}
+                                onBlur={() => markDraftSaved(row.id)}
+                              />
+                            </div>
+                            <div>
+                              <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                                Part Diagram <span className="text-rose-400">*</span>
+                              </div>
+                              {form?.diagramFileId ? (
+                                <div className="flex items-center justify-between rounded border border-emerald-700/50 bg-emerald-950/30 px-2 py-1.5 text-xs text-emerald-300">
+                                  <span className="truncate">{form.diagramFileName || "Diagram uploaded"}</span>
+                                  <button
+                                    type="button"
+                                    className="ml-2 shrink-0 text-slate-400 hover:text-rose-400"
+                                    onClick={() => {
+                                      updatePartForm(row.id, "diagramFileId", "");
+                                      updatePartForm(row.id, "diagramFileName", "");
+                                    }}
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              ) : (
+                                <DropzoneFileInput
+                                  accept={{ "image/*": [] }}
+                                  disabled={diagramUploading[row.id]}
+                                  onFileSelect={async (file) => {
+                                    if (!file) return;
+                                    setDiagramUploading((prev) => ({ ...prev, [row.id]: true }));
+                                    try {
+                                      const fd = new FormData();
+                                      fd.append("file", file);
+                                      fd.append("kind", "image");
+                                      const res = await fetch("/api/files/upload", { method: "POST", body: fd });
+                                      const body = await res.json().catch(() => ({}));
+                                      if (!res.ok) throw new Error(String(body?.error ?? "Upload failed"));
+                                      const fileId = String(body?.fileId ?? "").trim();
+                                      if (!fileId) throw new Error("No file ID returned");
+                                      updatePartForm(row.id, "diagramFileId", fileId);
+                                      updatePartForm(row.id, "diagramFileName", file.name);
+                                      markDraftSaved(row.id);
+                                    } catch (err: any) {
+                                      alert(err?.message ?? "Failed to upload diagram");
+                                    } finally {
+                                      setDiagramUploading((prev) => ({ ...prev, [row.id]: false }));
+                                    }
+                                  }}
+                                  selectedFileName={diagramUploading[row.id] ? "Uploading..." : ""}
+                                  idleText="Drag & drop diagram / photo"
+                                  activeText="Drop to upload"
+                                  buttonText={diagramUploading[row.id] ? "..." : "Browse"}
+                                  className="border-slate-700"
+                                  textClassName="truncate text-slate-300"
+                                  buttonClassName="border-slate-600 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-200"
+                                />
+                              )}
                             </div>
                             <DropzoneFileInput
                               onFileSelect={(file) => {
@@ -1785,6 +1860,8 @@ export default function VendorDashboardPage() {
                                     ...(selectedInquiry.sourceType === "inventory"
                                       ? { inventoryRequestId: selectedInquiry.inquiryId, inventoryRequestItemId: row.id }
                                       : { inspectionId: selectedInquiry.inquiryId, lineItemId: row.id }),
+                                    partNumber: form.partNumber ?? "",
+                                    diagramFileId: form.diagramFileId ?? "",
                                     oemBrand: form.oemBrand ?? "",
                                     oeBrand: form.oeBrand ?? "",
                                     aftmBrand: form.aftmBrand ?? "",

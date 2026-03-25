@@ -1081,6 +1081,23 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
       ) {
         return;
       }
+      // Suppress the agent-leg ring from Yeastar call/dial: Yeastar first calls the agent
+      // extension before bridging to the customer, which appears as an inbound ring with no
+      // external caller. Skip creating a second popup if there's already an active outbound call.
+      const isAgentLegRing =
+        input.direction !== "outbound" &&
+        !fromNumber &&
+        toNumber.length > 0 &&
+        toNumber.length <= 6 &&
+        /^\d+$/.test(toNumber) &&
+        hasAgentTokens &&
+        candidateTargets.every((t) => tokenMatchesAgent(agentTokensRef.current, t));
+      if (isAgentLegRing) {
+        const hasActiveOutbound = incomingPopupsRef.current.some(
+          (p) => p.direction === "outbound" && p.stage !== "ended"
+        );
+        if (hasActiveOutbound) return;
+      }
       const aiText = String(input.aiText ?? "").trim();
       const pickupHint = String(input.pickupHint ?? "").trim();
       const safeFromNumber = resolvedFromNumber && resolvedFromNumber.toLowerCase() !== "unknown" ? resolvedFromNumber : "";

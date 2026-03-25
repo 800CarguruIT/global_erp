@@ -228,6 +228,42 @@ export async function insertWebhookCallSession(params: {
   const existingRow = rowsFrom(existing)[0] as CallSessionRow | undefined;
   if (existingRow) return mapSession(existingRow);
 
+  // Detect the agent-leg of a Yeastar call/dial outbound call:
+  // When Yeastar places an outbound call it first rings the agent extension (caller leg).
+  // The webhook for this agent-ring arrives with no external fromNumber and toNumber = agent extension.
+  // Look for a recent outbound session where from_number = agent extension (toNumber here).
+  const agentExtension = params.toNumber.trim();
+  const isAgentLegRing =
+    params.direction !== "outbound" &&
+    (!params.fromNumber || params.fromNumber === "unknown") &&
+    agentExtension.length > 0 &&
+    agentExtension.length <= 6 &&
+    /^\d+$/.test(agentExtension);
+  if (isAgentLegRing) {
+    const windowStart = new Date(Date.now() - 3 * 60 * 1000).toISOString();
+    const outboundMatch = await sql<CallSessionRow[]>`
+      SELECT *
+      FROM call_sessions
+      WHERE direction = 'outbound'
+        AND status IN ('initiated', 'ringing', 'in_progress')
+        AND from_number = ${agentExtension}
+        AND created_at >= ${windowStart}::timestamptz
+      ORDER BY created_at DESC
+      LIMIT 1
+    `;
+    const outboundRow = rowsFrom(outboundMatch)[0] as CallSessionRow | undefined;
+    if (outboundRow) {
+      // Link the SIP channel ID to the outbound session so future CDR updates hit it.
+      await sql`
+        UPDATE call_sessions
+        SET provider_call_id = ${params.providerCallId}, updated_at = NOW()
+        WHERE id = ${outboundRow.id}
+          AND provider_call_id != ${params.providerCallId}
+      `;
+      return mapSession({ ...outboundRow, provider_call_id: params.providerCallId });
+    }
+  }
+
   const result = await sql<CallSessionRow[]>`
     INSERT INTO call_sessions (
       scope,

@@ -42,6 +42,11 @@ export type Vin17PartGroup = {
 export type Vin17Part = {
   code: string;
   name: string;
+<<<<<<< HEAD
+=======
+  nameZh: string;
+  diagram: string;
+>>>>>>> main
   groups: Vin17PartGroup[];
 };
 
@@ -160,12 +165,23 @@ export function prepareVin17PartsRequest(
   if (!lastCataCodeLevel) throw new Error("last_cata_code_level is required.");
 
   const auth = resolveVin17Auth(cfg);
+<<<<<<< HEAD
+=======
+
+  // Token is computed over required params only (matches 17VIN docs example).
+  // is_vin_filter_open defaults to 1 on the server so we omit it unless disabling.
+  // epc_id and js_id are included in the token string when present.
+>>>>>>> main
   const query = new URLSearchParams();
   query.set("action", "part");
   query.set("vin", vin);
   query.set("last_cata_code", lastCataCode);
   query.set("last_cata_code_level", lastCataCodeLevel);
+<<<<<<< HEAD
   query.set("is_vin_filter_open", isVinFilterOpen || "1");
+=======
+  if (isVinFilterOpen === "0") query.set("is_vin_filter_open", "0");
+>>>>>>> main
   if (epcId) query.set("epc_id", epcId);
   if (jsId) query.set("js_id", jsId);
 
@@ -254,10 +270,20 @@ function toCarFromModelListItem(vin: string, item: Record<string, unknown>): Vin
 function pickPartList(payload: unknown): unknown[] {
   const root = pickRootObject(payload);
   const candidates = [
+<<<<<<< HEAD
     root.list,
     (root as any).parts,
     (root as any).part_list,
     (root as any).partList,
+=======
+    (root as any).partlist,
+    (root as any).partList,
+    root.list,
+    (root as any).parts,
+    (root as any).part_list,
+    (payload as any)?.data?.partlist,
+    (payload as any)?.data?.partList,
+>>>>>>> main
     (payload as any)?.list,
     (payload as any)?.parts,
     (payload as any)?.data?.list,
@@ -276,9 +302,53 @@ function toPartGroup(row: Record<string, unknown>, index: number): Vin17PartGrou
   return { id, level, name };
 }
 
+<<<<<<< HEAD
 function toPartFrom17Vin(item: Record<string, unknown>, index: number): Vin17Part | null {
   const code = readFirstString(item, ["code", "part_number", "part_no", "partNo", "oe", "oe_no"]);
   const name = readFirstString(item, ["name", "part_name", "partName", "description"]);
+=======
+const VIN17_IMG_BASE = "https://images.17vin.com/img";
+
+function buildDiagramUrl(raw: string, epc: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return "";
+  // Already a full URL — use as-is (prefer HTTPS version).
+  if (trimmed.startsWith("http://resource.17vin.com/img/")) {
+    return trimmed.replace("http://resource.17vin.com/img/", `${VIN17_IMG_BASE}/`);
+  }
+  if (trimmed.startsWith("http") || trimmed.startsWith("//")) return trimmed;
+  // Relative path — prepend base + urlmake (epc).
+  const urlmake = epc.toLowerCase().trim();
+  const path = trimmed.startsWith("/") ? trimmed.slice(1) : trimmed;
+  return urlmake ? `${VIN17_IMG_BASE}/${urlmake}/${path}` : `${VIN17_IMG_BASE}/${path}`;
+}
+
+function toPartFrom17Vin(item: Record<string, unknown>, index: number, epc?: string): Vin17Part | null {
+  const code = readFirstString(item, [
+    "partnumber",
+    "partnumber_original",
+    "engineer_partnumber",
+    "code",
+    "part_number",
+    "part_no",
+    "partNo",
+    "oe",
+    "oe_no",
+  ]);
+  const nameZh = readFirstString(item, ["name_zh", "std_name_zh"]);
+  const name = readFirstString(item, [
+    "name_en",
+    "std_name_en",
+    "name_zh",
+    "std_name_zh",
+    "name",
+    "part_name",
+    "partName",
+    "description",
+  ]);
+  const diagramRaw = readFirstString(item, ["illustration_img_address", "img", "image", "img_url"]);
+  const diagram = buildDiagramUrl(diagramRaw, epc ?? "");
+>>>>>>> main
   const groupsRaw = Array.isArray(item.groups)
     ? (item.groups as unknown[])
     : Array.isArray((item as any).group_list)
@@ -294,6 +364,11 @@ function toPartFrom17Vin(item: Record<string, unknown>, index: number): Vin17Par
   return {
     code: code || `unknown-${index + 1}`,
     name,
+<<<<<<< HEAD
+=======
+    nameZh,
+    diagram,
+>>>>>>> main
     groups,
   };
 }
@@ -390,9 +465,16 @@ export async function fetchVin17PartsUsingConfig(
   }
   const payload = await res.json().catch(() => ({}));
   const rows = pickPartList(payload);
+<<<<<<< HEAD
   const parts = rows
     .map((row, idx) =>
       row && typeof row === "object" ? toPartFrom17Vin(row as Record<string, unknown>, idx) : null
+=======
+  const epcForUrl = normalizeText(input.epc).toLowerCase();
+  const parts = rows
+    .map((row, idx) =>
+      row && typeof row === "object" ? toPartFrom17Vin(row as Record<string, unknown>, idx, epcForUrl) : null
+>>>>>>> main
     )
     .filter(Boolean) as Vin17Part[];
   const root = pickRootObject(payload);
