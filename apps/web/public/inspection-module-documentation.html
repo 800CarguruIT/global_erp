@@ -1,0 +1,1150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Inspection Module — Business &amp; Technical Documentation</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 12.5px; }
+  body { font-family: "Segoe UI", Arial, sans-serif; background: #f8fafc; color: #1e293b; line-height: 1.6; }
+
+  /* Layout */
+  .page { max-width: 900px; margin: 0 auto; padding: 40px 48px; }
+
+  /* Cover */
+  .cover {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f4c81 100%);
+    color: #fff; border-radius: 12px; padding: 60px 52px 48px; margin-bottom: 40px;
+    position: relative; overflow: hidden;
+  }
+  .cover::before {
+    content: ""; position: absolute; top: -60px; right: -60px;
+    width: 280px; height: 280px; border-radius: 50%;
+    background: rgba(99,179,237,0.08);
+  }
+  .cover::after {
+    content: ""; position: absolute; bottom: -40px; left: 40%;
+    width: 200px; height: 200px; border-radius: 50%;
+    background: rgba(99,179,237,0.05);
+  }
+  .cover .pre-tag {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 20px; padding: 5px 16px;
+    font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;
+    color: #93c5fd; margin-bottom: 22px;
+  }
+  .cover h1 { font-size: 38px; font-weight: 800; letter-spacing: -0.5px; line-height: 1.12; margin-bottom: 14px; }
+  .cover .sub { font-size: 14px; color: rgba(255,255,255,0.6); max-width: 520px; margin-bottom: 36px; }
+  .cover .chips { display: flex; gap: 10px; flex-wrap: wrap; }
+  .cover .chip {
+    background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 6px; padding: 6px 14px;
+    font-size: 11px; color: rgba(255,255,255,0.7);
+  }
+  .cover .chip strong { color: #fff; display: block; font-size: 13px; }
+
+  /* TOC */
+  .toc { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 20px 24px; margin-bottom: 36px; }
+  .toc h2 { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #94a3b8; margin-bottom: 14px; }
+  .toc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 24px; }
+  .toc-item { display: flex; gap: 8px; align-items: center; font-size: 11.5px; padding: 3px 0; color: #334155; }
+  .toc-item .toc-num { width: 20px; height: 20px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 800; color: #fff; flex-shrink: 0; }
+
+  /* Section headings */
+  .part-banner {
+    display: flex; align-items: center; gap: 0;
+    margin: 48px 0 28px;
+    border-radius: 8px; overflow: hidden;
+  }
+  .part-banner .part-num {
+    padding: 10px 20px; font-size: 11px; font-weight: 800;
+    letter-spacing: 1.5px; text-transform: uppercase; color: #fff;
+    white-space: nowrap;
+  }
+  .part-banner .part-title {
+    padding: 10px 20px; font-size: 16px; font-weight: 700; color: #0f172a;
+    background: #f1f5f9; flex: 1;
+  }
+
+  .sec-head {
+    display: flex; align-items: center; gap: 12px;
+    margin: 32px 0 14px; padding-bottom: 8px;
+    border-bottom: 2px solid #e2e8f0;
+  }
+  .sec-head .num {
+    width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 800; color: #fff; flex-shrink: 0;
+  }
+  .sec-head h2 { font-size: 16px; font-weight: 700; color: #0f172a; }
+
+  /* Cards */
+  .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 18px 20px; margin-bottom: 14px; }
+  .card h3 { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #64748b; margin-bottom: 12px; }
+  .card-accent { border-left: 4px solid; }
+
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; font-size: 11.5px; margin-bottom: 14px; }
+  thead th {
+    background: #f1f5f9; color: #475569; font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.6px;
+    padding: 8px 12px; text-align: left; border-bottom: 1px solid #e2e8f0;
+  }
+  tbody td { padding: 8px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: top; color: #334155; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: #fafafa; }
+
+  /* Code */
+  code { font-family: "Cascadia Code", "Fira Code", Consolas, monospace; font-size: 10.5px; background: #f1f5f9; border-radius: 3px; padding: 1px 5px; color: #0f172a; }
+  .code-block {
+    font-family: "Cascadia Code", "Fira Code", Consolas, monospace; font-size: 10px;
+    background: #0f172a; color: #e2e8f0; border-radius: 8px;
+    padding: 14px 16px; margin: 10px 0 14px; overflow-x: auto; line-height: 1.7;
+    white-space: pre;
+  }
+  .code-block .cm { color: #64748b; } /* comment */
+  .code-block .kw { color: #93c5fd; } /* keyword */
+  .code-block .st { color: #86efac; } /* string */
+  .code-block .nu { color: #fca5a5; } /* number/type */
+  .code-block .fn { color: #fde68a; } /* function */
+
+  /* Badges */
+  .b-green  { background:#dcfce7; color:#166534; border-radius:4px; padding:2px 8px; font-size:10px; font-weight:700; display:inline-block; }
+  .b-amber  { background:#fef3c7; color:#92400e; border-radius:4px; padding:2px 8px; font-size:10px; font-weight:700; display:inline-block; }
+  .b-red    { background:#fee2e2; color:#991b1b; border-radius:4px; padding:2px 8px; font-size:10px; font-weight:700; display:inline-block; }
+  .b-blue   { background:#dbeafe; color:#1e40af; border-radius:4px; padding:2px 8px; font-size:10px; font-weight:700; display:inline-block; }
+  .b-purple { background:#ede9fe; color:#5b21b6; border-radius:4px; padding:2px 8px; font-size:10px; font-weight:700; display:inline-block; }
+  .b-cyan   { background:#cffafe; color:#0e7490; border-radius:4px; padding:2px 8px; font-size:10px; font-weight:700; display:inline-block; }
+  .b-slate  { background:#f1f5f9; color:#475569; border-radius:4px; padding:2px 8px; font-size:10px; font-weight:700; display:inline-block; }
+
+  /* Info boxes */
+  .info { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 10px 14px; font-size: 11.5px; color: #1e40af; margin-bottom: 12px; }
+  .warn { background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 10px 14px; font-size: 11.5px; color: #92400e; margin-bottom: 12px; }
+
+  /* Grid */
+  .g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+  .g3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+
+  /* Def list */
+  .dl { font-size: 11.5px; }
+  .dl-row { display: grid; grid-template-columns: 180px 1fr; gap: 8px 16px; padding: 6px 0; border-bottom: 1px solid #f1f5f9; align-items: start; }
+  .dl-row:last-child { border-bottom: none; }
+  .dl-key { font-weight: 700; color: #475569; font-size: 11px; padding-top: 1px; }
+  .dl-val { color: #334155; }
+
+  /* Flow */
+  .flow { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 10px 0; }
+  .flow-box { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 5px 12px; font-size: 11px; font-weight: 600; color: #334155; }
+  .flow-arrow { color: #94a3b8; font-size: 16px; }
+
+  /* Step timeline */
+  .timeline { position: relative; padding-left: 28px; }
+  .timeline::before { content: ""; position: absolute; left: 10px; top: 4px; bottom: 4px; width: 2px; background: #e2e8f0; }
+  .tl-item { position: relative; margin-bottom: 16px; }
+  .tl-item::before {
+    content: ""; position: absolute; left: -22px; top: 4px;
+    width: 12px; height: 12px; border-radius: 50%; background: #3b82f6; border: 2px solid #fff;
+    box-shadow: 0 0 0 2px #3b82f6;
+  }
+  .tl-item h4 { font-size: 12px; font-weight: 700; color: #0f172a; margin-bottom: 4px; }
+  .tl-item p { font-size: 11.5px; color: #475569; }
+
+  /* Print */
+  @media print {
+    body { background: #fff; font-size: 11px; }
+    .page { padding: 18px 28px; max-width: 100%; }
+    .cover { padding: 36px 36px 28px; border-radius: 6px; }
+    .part-banner { margin: 32px 0 18px; }
+    .sec-head { margin: 22px 0 10px; }
+    .page-break { page-break-before: always; }
+    .no-break { page-break-inside: avoid; }
+    .code-block { font-size: 9px; }
+    table { font-size: 10.5px; }
+  }
+
+  /* Color palette */
+  .bg1 { background: #3b82f6; }
+  .bg2 { background: #0f172a; }
+  .bg3 { background: #6366f1; }
+  .bg4 { background: #10b981; }
+  .bg5 { background: #f59e0b; }
+  .bg6 { background: #ef4444; }
+  .bg7 { background: #8b5cf6; }
+  .bg8 { background: #06b6d4; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- ══ COVER ══════════════════════════════════════════════════ -->
+<div class="cover">
+  <div class="pre-tag">Global ERP &nbsp;·&nbsp; Module Documentation</div>
+  <h1>Vehicle Inspection<br>Module</h1>
+  <p class="sub">Complete business process and technical implementation documentation for the inspection module — covering workflows, database schema, API contracts, AI integration, and vendor flows.</p>
+  <div class="chips">
+    <div class="chip"><strong>Version</strong>2026</div>
+    <div class="chip"><strong>Stack</strong>Next.js 15 · PostgreSQL · Claude AI</div>
+    <div class="chip"><strong>Scope</strong>Inspection · Parts · Vendors · Reports</div>
+    <div class="chip"><strong>Classification</strong>Internal / Technical</div>
+  </div>
+</div>
+
+<!-- ══ TABLE OF CONTENTS ══════════════════════════════════════ -->
+<div class="toc">
+  <h2>Contents</h2>
+  <div class="toc-grid">
+    <div class="toc-item"><span class="toc-num bg1">A</span>Business Overview &amp; Objectives</div>
+    <div class="toc-item"><span class="toc-num bg2">B</span>Stakeholders &amp; Roles</div>
+    <div class="toc-item"><span class="toc-num bg1">1</span>6-Step Inspection Workflow</div>
+    <div class="toc-item"><span class="toc-num bg3">2</span>Database Schema</div>
+    <div class="toc-item"><span class="toc-num bg4">3</span>API Reference</div>
+    <div class="toc-item"><span class="toc-num bg5">4</span>VIN &amp; Parts Catalog Integration</div>
+    <div class="toc-item"><span class="toc-num bg7">5</span>AI Integration</div>
+    <div class="toc-item"><span class="toc-num bg8">6</span>Vendor &amp; Part Quotes Flow</div>
+    <div class="toc-item"><span class="toc-num bg6">7</span>State Management &amp; Autosave</div>
+    <div class="toc-item"><span class="toc-num bg2">8</span>Media Management</div>
+    <div class="toc-item"><span class="toc-num bg4">9</span>Reporting &amp; PDF Export</div>
+    <div class="toc-item"><span class="toc-num bg3">10</span>Data Flow Diagrams</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- PART A — BUSINESS -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<div class="part-banner">
+  <div class="part-num bg1" style="background:#1e3a5f;">PART A</div>
+  <div class="part-title">Business Context</div>
+</div>
+
+<!-- A1: Overview -->
+<div class="sec-head"><div class="num bg1">A</div><h2>Business Overview &amp; Objectives</h2></div>
+
+<div class="card no-break">
+  <h3>What This Module Does</h3>
+  <p style="font-size:12px;color:#334155;line-height:1.7;">The Inspection Module is the core workflow engine for vehicle assessment in the workshop. When a customer brings in a car (or a recovery team collects it), the system guides an inspector through a structured 6-step process — from receiving the vehicle, through detailed technical assessment, to delivering a professional PDF report. The entire journey is digitized, auditable, and AI-assisted.</p>
+</div>
+
+<div class="g2 no-break">
+  <div class="card">
+    <h3>Business Problems Solved</h3>
+    <ul style="font-size:11.5px;color:#334155;padding-left:16px;line-height:2;">
+      <li>Eliminates paper-based inspection forms</li>
+      <li>Creates legal record of vehicle condition at check-in</li>
+      <li>Standardizes inspection quality across all inspectors</li>
+      <li>Links vehicle findings directly to vendor part quotes</li>
+      <li>Gives customers a transparent, professional report</li>
+      <li>AI reduces missed items and improves diagnostic accuracy</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>Key Business Outcomes</h3>
+    <ul style="font-size:11.5px;color:#334155;padding-left:16px;line-height:2;">
+      <li>Faster inspection completion with AI guidance</li>
+      <li>Reduced disputes via photo-documented condition</li>
+      <li>Parts procurement triggered directly from findings</li>
+      <li>Workshop health scores for performance tracking</li>
+      <li>Customer approval workflow before work begins</li>
+      <li>Full audit trail from car-in to job completion</li>
+    </ul>
+  </div>
+</div>
+
+<!-- A2: Stakeholders -->
+<div class="sec-head"><div class="num bg2">B</div><h2>Stakeholders &amp; Roles</h2></div>
+
+<table class="no-break">
+  <thead>
+    <tr><th>Role</th><th>System Access</th><th>Primary Responsibilities</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Inspector</strong></td>
+      <td>Full inspection edit access</td>
+      <td>Execute all 6 steps; photograph findings; classify severity; use AI tools; complete report</td>
+    </tr>
+    <tr>
+      <td><strong>Service Advisor</strong></td>
+      <td>Create inspection; approve findings</td>
+      <td>Create inspection from customer lead; review AI recommendations; approve line items for ordering</td>
+    </tr>
+    <tr>
+      <td><strong>Customer</strong></td>
+      <td>Read-only report view</td>
+      <td>Receive PDF inspection report; approve/reject recommended work</td>
+    </tr>
+    <tr>
+      <td><strong>Vendor / Parts Supplier</strong></td>
+      <td>Vendor portal (separate)</td>
+      <td>Receive part inquiry; submit quotes with price, brand, ETD, and part diagram</td>
+    </tr>
+    <tr>
+      <td><strong>Workshop Manager</strong></td>
+      <td>Read-only list + reports</td>
+      <td>Monitor inspection throughput; track part orders; review health scores</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- PART B — WORKFLOW -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<div class="part-banner page-break">
+  <div class="part-num" style="background:#1e3a5f;">PART B</div>
+  <div class="part-title">Inspection Workflow — 6 Steps</div>
+</div>
+
+<div class="sec-head"><div class="num bg1">1</div><h2>Step-by-Step Workflow</h2></div>
+
+<div class="info">Each step is <strong>gated</strong> — the system enforces that previous steps are complete before unlocking the next one. The entire form state is continuously auto-saved to a <code>draft_payload</code> JSONB column in the database.</div>
+
+<!-- Step 1 -->
+<div class="card card-accent no-break" style="border-left-color:#3b82f6;">
+  <h3 style="color:#1e40af;">Step 1 — Collect Car &nbsp;<span class="b-blue">Gate / Reception</span></h3>
+  <div class="dl">
+    <div class="dl-row"><span class="dl-key">Trigger</span><span class="dl-val">Inspection created by Service Advisor from a customer lead (recovery pickup or walk-in)</span></div>
+    <div class="dl-row"><span class="dl-key">Source Types</span><span class="dl-val"><code>recovery</code> — car collected by recovery team &nbsp;|&nbsp; <code>walkin</code> — customer drove in</span></div>
+    <div class="dl-row"><span class="dl-key">Source Media</span><span class="dl-val">5 files uploaded at collection time: Front, Rear, Right, Left images + 360° Video</span></div>
+    <div class="dl-row"><span class="dl-key">Inspector Action</span><span class="dl-val">Compare actual car vs. source media. Select "No difference" or "Yes — difference found" (with description). Mark complete.</span></div>
+    <div class="dl-row"><span class="dl-key">Pre-inspection Form</span><span class="dl-val">Customer-reported issues (up to 5 questions: performance, sound/vibration, warning lights, fluid leaks, urgent priority) — shown read-only</span></div>
+    <div class="dl-row"><span class="dl-key">Completion Condition</span><span class="dl-val">Inspector explicitly marks "Collect Car Complete". Persisted as <code>collectCarCompleted = true</code> in draft_payload.</span></div>
+    <div class="dl-row"><span class="dl-key">DB Persistence</span><span class="dl-val">Saved to <code>inspections.draft_payload.collectCar</code> — difference flag, note, reupload media, review logs</span></div>
+  </div>
+</div>
+
+<!-- Step 2 -->
+<div class="card card-accent no-break" style="border-left-color:#06b6d4;">
+  <h3 style="color:#0e7490;">Step 2 — Start Inspection &nbsp;<span class="b-cyan">Bay / Workshop</span></h3>
+  <div class="dl">
+    <div class="dl-row"><span class="dl-key">Purpose</span><span class="dl-val">Records the official inspection start timestamp — begins the audit trail for time-tracking</span></div>
+    <div class="dl-row"><span class="dl-key">Unlock Condition</span><span class="dl-val">Step 1 must be marked complete</span></div>
+    <div class="dl-row"><span class="dl-key">Action</span><span class="dl-val">Inspector clicks "Start Inspection" button. System records <code>startedAt</code> timestamp.</span></div>
+    <div class="dl-row"><span class="dl-key">DB Persistence</span><span class="dl-val">PATCH <code>inspections</code> — sets <code>started_at</code> timestamp and status transitions begin</span></div>
+  </div>
+</div>
+
+<!-- Step 3 -->
+<div class="card card-accent no-break" style="border-left-color:#f59e0b;">
+  <h3 style="color:#92400e;">Step 3 — Checks &amp; Notes &nbsp;<span class="b-amber">Visual Inspection</span></h3>
+  <div class="dl">
+    <div class="dl-row"><span class="dl-key">Part A: Media Verification</span><span class="dl-val">Inspector reviews all 5 check-in media files. Each must be <span class="b-green">Verified</span> or <span class="b-red">Rejected</span>.</span></div>
+    <div class="dl-row"><span class="dl-key">Rejection Flow</span><span class="dl-val">Select reject reason (Blur / Wrong angle / Not same car / Blocked view / Poor lighting), add note, upload replacement file. Old file is retained; replacement is linked.</span></div>
+    <div class="dl-row"><span class="dl-key">Completion Blocker</span><span class="dl-val">Any rejected media without a replacement upload blocks progression to Step 4</span></div>
+    <div class="dl-row"><span class="dl-key">Part B: Issue Notes</span><span class="dl-val">Inspector adds damage/issue notes (description + photo). Unlimited entries. Saved as array in <code>draft_payload.inspectionIssueEntries</code></span></div>
+    <div class="dl-row"><span class="dl-key">DB Persistence</span><span class="dl-val">PATCH inspections — <code>draft_payload.carMediaReview</code>, <code>carMediaReplacement</code>, <code>carMediaRejectReason</code>, <code>carMediaRejectNote</code>, <code>inspectionIssueEntries</code></span></div>
+  </div>
+</div>
+
+<!-- Step 4 -->
+<div class="card card-accent no-break" style="border-left-color:#8b5cf6;">
+  <h3 style="color:#5b21b6;">Step 4 — Vehicle Data &amp; VIN &nbsp;<span class="b-purple">Data Entry</span></h3>
+  <div class="dl">
+    <div class="dl-row"><span class="dl-key">Required Fields</span><span class="dl-val">VIN (17 chars), Car Plate, Mileage (km), Front Tyre Size, Rear Tyre Size</span></div>
+    <div class="dl-row"><span class="dl-key">VIN Decode</span><span class="dl-val">Click "Check VIN" → 17VIN API lookup → auto-fills Make, Model, Year. If multiple variants, dropdown shown for selection.</span></div>
+    <div class="dl-row"><span class="dl-key">VIN Catalog Link</span><span class="dl-val">Confirmed VIN + EPC unlocks Parts Catalog in Step 5. The EPC (e.g. <code>audi_vw</code>) is stored and used for catalog API calls.</span></div>
+    <div class="dl-row"><span class="dl-key">Tyre Options</span><span class="dl-val">195/65R15, 205/55R16, 215/55R17, 225/45R17, 225/55R18, 235/55R19, 245/45R19 — custom saved values also preserved</span></div>
+    <div class="dl-row"><span class="dl-key">Completion Condition</span><span class="dl-val">All 5 required fields filled. System validates each field non-empty.</span></div>
+    <div class="dl-row"><span class="dl-key">DB Persistence</span><span class="dl-val">PATCH inspections — <code>draft_payload.inspectionVin</code>, <code>inspectionPlate</code>, <code>inspectionMake</code>, <code>inspectionModel</code>, <code>inspectionYear</code>, <code>tyreSizeFront</code>, <code>tyreSizeRear</code>, <code>carInMileage</code></span></div>
+  </div>
+</div>
+
+<!-- Step 5 -->
+<div class="card card-accent no-break" style="border-left-color:#10b981;">
+  <h3 style="color:#065f46;">Step 5 — Inspection Findings &amp; Parts &nbsp;<span class="b-green">Core Work</span></h3>
+
+  <p style="font-size:11.5px;color:#334155;margin-bottom:12px;">The main step — divided into two sub-sections.</p>
+
+  <div style="font-size:11.5px;font-weight:700;color:#065f46;margin-bottom:8px;">5A — Inspection Checks (Process Checks)</div>
+  <div class="dl" style="margin-bottom:14px;">
+    <div class="dl-row"><span class="dl-key">Checks</span><span class="dl-val">Oil Check, Battery Check, Tyre Check, OBD Check</span></div>
+    <div class="dl-row"><span class="dl-key">Status per Check</span><span class="dl-val"><span class="b-green">OK</span> <span class="b-amber">Issue</span> <span class="b-slate">N/A</span></span></div>
+    <div class="dl-row"><span class="dl-key">Issue Note</span><span class="dl-val">If "Issue" selected, a description textarea appears. Inspector describes the problem.</span></div>
+    <div class="dl-row"><span class="dl-key">Media</span><span class="dl-val">Multiple photos can be uploaded per check (e.g. oil level dipstick, OBD screenshot). Stored as <code>processCheckMediaMulti[key][]</code></span></div>
+  </div>
+
+  <div style="font-size:11.5px;font-weight:700;color:#065f46;margin-bottom:8px;">5B — Findings / Parts Needed (Line Items)</div>
+  <div class="dl">
+    <div class="dl-row"><span class="dl-key">Adding via Catalog</span><span class="dl-val">Click "+ Add Line Item" → Parts Catalog modal opens → navigate Level 1-4 → check parts → "Add Selected Parts"</span></div>
+    <div class="dl-row"><span class="dl-key">Adding Manually</span><span class="dl-val">When no VIN catalog available: amber manual panel shows → select category, severity, observation, part name, part number, qty → "Add to Findings"</span></div>
+    <div class="dl-row"><span class="dl-key">Severity Levels</span><span class="dl-val"><span class="b-red">Safety Risk</span> <span class="b-amber">Mandatory</span> <span class="b-blue">Recommended</span> <span class="b-green">Optional</span></span></div>
+    <div class="dl-row"><span class="dl-key">AI per Part</span><span class="dl-val">AI generates 3–6 diagnostic questions per part. Inspector answers Yes/No/N/A. AI produces recommendation and description text.</span></div>
+    <div class="dl-row"><span class="dl-key">Smart Suggestions</span><span class="dl-val">After each part added, AI suggests related components commonly found defective together (e.g. brake pads → suggest brake discs, fluid, sensor)</span></div>
+    <div class="dl-row"><span class="dl-key">Completion Condition</span><span class="dl-val">At least one saved line item. All saved items have part name and quantity.</span></div>
+    <div class="dl-row"><span class="dl-key">DB Persistence</span><span class="dl-val">Each line item: INSERT into <code>line_items</code> table. AI fields saved in <code>ai_questions</code>, <code>ai_answers</code>, <code>ai_recommendation</code> JSONB columns.</span></div>
+  </div>
+</div>
+
+<!-- Step 6 -->
+<div class="card card-accent no-break" style="border-left-color:#ef4444;">
+  <h3 style="color:#991b1b;">Step 6 — Inspector Remarks &amp; Report &nbsp;<span class="b-red">Final Step</span></h3>
+  <div class="dl">
+    <div class="dl-row"><span class="dl-key">Inspector Remarks</span><span class="dl-val">Free-text overall summary — vehicle condition, main concerns, priority recommendations</span></div>
+    <div class="dl-row"><span class="dl-key">PDF Report</span><span class="dl-val">Click "Download Inspection Report (PDF)" → system generates PDF from inspection data → browser downloads file</span></div>
+    <div class="dl-row"><span class="dl-key">Report Contents</span><span class="dl-val">Workshop logo, vehicle info, customer details, all line items with severity, process check results, issue photos, health score, inspector remarks</span></div>
+    <div class="dl-row"><span class="dl-key">Health Score</span><span class="dl-val">Auto-calculated weighted score (0–100) using category weights: Brakes 16%, Engine 15%, Transmission 12%, etc.</span></div>
+    <div class="dl-row"><span class="dl-key">Post-completion</span><span class="dl-val">Inspection becomes read-only (except for advisor to add estimate items). Status transitions to <code>completed</code>.</span></div>
+  </div>
+</div>
+
+<!-- Post-inspection flow -->
+<div class="card no-break">
+  <h3>Post-Inspection Approval Flow</h3>
+  <div class="flow">
+    <div class="flow-box">Inspector Completes</div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-box">Advisor Reviews</div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-box">Advisor Approves Items</div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-box">Part Inquiry Sent to Vendors</div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-box">Vendor Submits Quotes</div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-box">Customer Approves</div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-box">Job Card Created</div>
+  </div>
+  <table style="margin-top:10px;">
+    <thead><tr><th>Status</th><th>Meaning</th><th>Edit Allowed</th></tr></thead>
+    <tbody>
+      <tr><td><span class="b-amber">pending</span></td><td>Inspection in progress</td><td>Full edit by inspector</td></tr>
+      <tr><td><span class="b-blue">completed</span></td><td>Inspector finished; awaiting advisor review</td><td>Advisor can add estimate items only</td></tr>
+      <tr><td><span class="b-green">verified</span></td><td>Advisor approved; customer notified</td><td>Read-only (locked)</td></tr>
+      <tr><td><span class="b-red">cancelled</span></td><td>Inspection voided</td><td>Read-only with cancellation reason</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- PART C — DATABASE -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<div class="part-banner page-break">
+  <div class="part-num" style="background:#1e3a5f;">PART C</div>
+  <div class="part-title">Database Schema</div>
+</div>
+
+<div class="sec-head"><div class="num bg3">2</div><h2>Database Tables &amp; Migrations</h2></div>
+
+<div class="info">All tables are in the <code>public</code> schema in PostgreSQL. Migrations are numbered sequentially in <code>packages/ai-core/migrations/</code>.</div>
+
+<!-- inspections table -->
+<div class="card no-break">
+  <h3>Table: inspections &nbsp;<span class="b-slate">Migration 013</span></h3>
+  <table>
+    <thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>id</code></td><td>UUID PK</td><td>Primary key, auto-generated</td></tr>
+      <tr><td><code>company_id</code></td><td>UUID FK</td><td>Owning workshop/company</td></tr>
+      <tr><td><code>lead_id</code></td><td>UUID FK</td><td>Customer lead linked to this inspection</td></tr>
+      <tr><td><code>car_id</code></td><td>UUID FK</td><td>Vehicle record</td></tr>
+      <tr><td><code>customer_id</code></td><td>UUID FK</td><td>Customer record</td></tr>
+      <tr><td><code>branch_id</code></td><td>UUID FK</td><td>Workshop branch (added migration 052)</td></tr>
+      <tr><td><code>inspector_employee_id</code></td><td>UUID FK</td><td>Assigned inspector</td></tr>
+      <tr><td><code>advisor_employee_id</code></td><td>UUID FK</td><td>Assigned service advisor</td></tr>
+      <tr><td><code>status</code></td><td>TEXT</td><td><code>pending</code> | <code>completed</code> | <code>cancelled</code></td></tr>
+      <tr><td><code>health_engine</code> … <code>health_overall</code></td><td>NUMERIC</td><td>Per-system health scores + overall weighted score</td></tr>
+      <tr><td><code>remarks</code></td><td>TEXT</td><td>Inspector final remarks</td></tr>
+      <tr><td><code>ai_summary</code></td><td>TEXT</td><td>AI-generated inspection summary</td></tr>
+      <tr><td><code>draft_payload</code></td><td>JSONB</td><td>Complete autosaved form state (see §7)</td></tr>
+      <tr><td><code>media_summary</code></td><td>JSONB</td><td>Snapshot of media file references</td></tr>
+      <tr><td><code>started_at</code></td><td>TIMESTAMPTZ</td><td>When Step 2 "Start" was clicked</td></tr>
+      <tr><td><code>completed_at</code></td><td>TIMESTAMPTZ</td><td>Auto-set when status → completed</td></tr>
+      <tr><td><code>verified_by / verified_at</code></td><td>TEXT / TIMESTAMPTZ</td><td>Advisor verification (migration 119)</td></tr>
+      <tr><td><code>cancelled_by / cancelled_at / cancel_remarks</code></td><td>TEXT/TIMESTAMPTZ/TEXT</td><td>Cancellation details (migration 119)</td></tr>
+      <tr><td><code>created_at / updated_at</code></td><td>TIMESTAMPTZ</td><td>Auto-managed via triggers</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- line_items table -->
+<div class="card no-break">
+  <h3>Table: line_items &nbsp;<span class="b-slate">Migrations 065–072, 124, 139, 159</span></h3>
+  <table>
+    <thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>id</code></td><td>UUID PK</td><td>Row identifier</td></tr>
+      <tr><td><code>company_id</code></td><td>UUID</td><td>Scoping</td></tr>
+      <tr><td><code>lead_id</code></td><td>UUID FK</td><td>Parent lead</td></tr>
+      <tr><td><code>inspection_id</code></td><td>UUID FK</td><td>Parent inspection</td></tr>
+      <tr><td><code>product_id</code></td><td>UUID FK nullable</td><td>Linked product from catalog (optional)</td></tr>
+      <tr><td><code>product_name</code></td><td>TEXT</td><td>Part/product display name</td></tr>
+      <tr><td><code>part_number</code></td><td>TEXT</td><td>OEM or catalog part number (migration 159)</td></tr>
+      <tr><td><code>catalog_group_key</code></td><td>TEXT</td><td>VIN catalog group identifier (migration 159)</td></tr>
+      <tr><td><code>client_row_key</code></td><td>TEXT</td><td>Client-side unique row ID for optimistic UI (migration 159)</td></tr>
+      <tr><td><code>description</code></td><td>TEXT</td><td>Inspector note / AI-generated description</td></tr>
+      <tr><td><code>quantity</code></td><td>INTEGER</td><td>Quantity required</td></tr>
+      <tr><td><code>reason</code></td><td>TEXT</td><td>Severity: Safety Risk / Mandatory / Recommended / Optional</td></tr>
+      <tr><td><code>status</code></td><td>TEXT</td><td>Pending / Approved / Inquiry / Rejected</td></tr>
+      <tr><td><code>source</code></td><td>TEXT</td><td><code>inspection</code> | <code>estimate</code> (migration 068)</td></tr>
+      <tr><td><code>is_add</code></td><td>BOOLEAN</td><td>Additional item added by advisor post-inspection (migration 072)</td></tr>
+      <tr><td><code>media_file_id</code></td><td>TEXT</td><td>Photo attachment file ID</td></tr>
+      <tr><td><code>ai_questions</code></td><td>JSONB</td><td>Array of AI-generated diagnostic questions (migration 159)</td></tr>
+      <tr><td><code>ai_answers</code></td><td>JSONB</td><td>Object of inspector answers keyed by question ID (migration 159)</td></tr>
+      <tr><td><code>ai_recommendation</code></td><td>TEXT</td><td>AI recommendation text (migration 159)</td></tr>
+      <tr><td><code>part_ordered</code></td><td>BOOLEAN</td><td>Whether part has been ordered (migration 066)</td></tr>
+      <tr><td><code>order_status</code></td><td>TEXT</td><td>Pending / Ordered / Received / Returned (migration 067)</td></tr>
+      <tr><td><code>approved_type</code></td><td>TEXT</td><td>oe / oem / aftm / used — which quote type was approved (migration 124)</td></tr>
+      <tr><td><code>discount_percent</code></td><td>NUMERIC</td><td>Discount applied (migration 139)</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- part_quotes table -->
+<div class="card no-break">
+  <h3>Table: part_quotes &nbsp;<span class="b-slate">Migration 078 + 161–163</span></h3>
+  <table>
+    <thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>id</code></td><td>UUID PK</td><td></td></tr>
+      <tr><td><code>company_id / vendor_id</code></td><td>UUID</td><td>Owning company and vendor</td></tr>
+      <tr><td><code>line_item_id</code></td><td>UUID FK</td><td>Inspection line item this quote is for</td></tr>
+      <tr><td><code>estimate_id / estimate_item_id</code></td><td>UUID FK nullable</td><td>Estimate link if from estimate flow</td></tr>
+      <tr><td><code>part_number</code></td><td>TEXT</td><td>Vendor-confirmed part number</td></tr>
+      <tr><td><code>part_brand</code></td><td>TEXT</td><td>Resolved brand (first non-null of oem/oe/aftm/used brand)</td></tr>
+      <tr><td><code>oem_brand / oe_brand / aftm_brand / used_brand</code></td><td>TEXT</td><td>Per-type brand names (migration 161)</td></tr>
+      <tr><td><code>oem / oe / aftm / used</code></td><td>NUMERIC</td><td>Price per quote type</td></tr>
+      <tr><td><code>oem_qty / oe_qty / aftm_qty / used_qty</code></td><td>INTEGER</td><td>Available quantity per type</td></tr>
+      <tr><td><code>oem_etd / oe_etd / aftm_etd / used_etd</code></td><td>TEXT</td><td>Estimated time to deliver per type</td></tr>
+      <tr><td><code>oem_time / oe_time / aftm_time / used_time</code></td><td>TEXT</td><td>Delivery time note per type</td></tr>
+      <tr><td><code>diagram_url</code></td><td>TEXT</td><td>Vendor-uploaded part diagram file ID (migration 078)</td></tr>
+      <tr><td><code>remarks</code></td><td>TEXT</td><td>Vendor notes</td></tr>
+      <tr><td><code>status</code></td><td>TEXT</td><td>Quote lifecycle status</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Migrations list -->
+<div class="card no-break">
+  <h3>Migration History — Inspection Module</h3>
+  <table>
+    <thead><tr><th>Migration</th><th>Change</th></tr></thead>
+    <tbody>
+      <tr><td><code>013</code></td><td>Create inspections, inspection_items, inspection_media, inspection_versions tables</td></tr>
+      <tr><td><code>052</code></td><td>Add branch_id scoping to inspections</td></tr>
+      <tr><td><code>060</code></td><td>Add indexes for company/branch/lead scoping</td></tr>
+      <tr><td><code>061</code></td><td>Add created_at/updated_at triggers on inspections</td></tr>
+      <tr><td><code>065</code></td><td>Create line_items table (modern replacement for inspection_items)</td></tr>
+      <tr><td><code>066</code></td><td>Add part_ordered flag to line_items</td></tr>
+      <tr><td><code>067</code></td><td>Add normalized order_status column to line_items</td></tr>
+      <tr><td><code>068</code></td><td>Add source field (inspection vs estimate) to line_items</td></tr>
+      <tr><td><code>072</code></td><td>Add is_add flag to line_items (advisor-added items)</td></tr>
+      <tr><td><code>078</code></td><td>Create part_quotes table with full pricing structure + diagram_url</td></tr>
+      <tr><td><code>119</code></td><td>Add verified_by/at and cancelled_by/at/remarks to inspections</td></tr>
+      <tr><td><code>120</code></td><td>Add inspection earnings tracking</td></tr>
+      <tr><td><code>124</code></td><td>Add approved_type to line_items (which quote type was selected)</td></tr>
+      <tr><td><code>139</code></td><td>Add discount_percent to line_items</td></tr>
+      <tr><td><code>158</code></td><td>Add inspection collect car review logs tracking table</td></tr>
+      <tr><td><code>159</code></td><td>Add AI fields to line_items (part_number, catalog_group_key, client_row_key, ai_questions, ai_answers, ai_recommendation)</td></tr>
+      <tr><td><code>161</code></td><td>Add per-option brand columns to part_quotes (oem_brand, oe_brand, aftm_brand, used_brand)</td></tr>
+      <tr><td><code>162</code></td><td>Add delivery notes and delivery logs to part_quotes</td></tr>
+      <tr><td><code>163</code></td><td>Add job card part receipt logs table</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- PART D — API -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<div class="part-banner page-break">
+  <div class="part-num" style="background:#1e3a5f;">PART D</div>
+  <div class="part-title">API Reference</div>
+</div>
+
+<div class="sec-head"><div class="num bg4">3</div><h2>API Endpoints</h2></div>
+
+<div class="info">All endpoints are Next.js Route Handlers under <code>apps/web/app/api/</code>. Auth is enforced via company scoping on every request.</div>
+
+<!-- Inspection APIs -->
+<div class="card no-break">
+  <h3>Inspection Core Endpoints</h3>
+  <table>
+    <thead><tr><th>Method</th><th>Path</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><span class="b-blue">GET</span></td><td><code>/api/company/{cid}/workshop/inspections</code></td><td>List all inspections. Query: <code>status</code> filter.</td></tr>
+      <tr><td><span class="b-green">POST</span></td><td><code>/api/company/{cid}/workshop/inspections</code></td><td>Create new inspection. Body: leadId, carId, customerId, branchId, inspectorEmployeeId, advisorEmployeeId.</td></tr>
+      <tr><td><span class="b-blue">GET</span></td><td><code>/api/company/{cid}/workshop/inspections/{iid}</code></td><td>Get full inspection detail including pre-inspection form, collect car media, review logs.</td></tr>
+      <tr><td><span class="b-amber">PATCH</span></td><td><code>/api/company/{cid}/workshop/inspections/{iid}</code></td><td>Update inspection. Body: any subset of status, remarks, health metrics, draft_payload, car/customer links.</td></tr>
+      <tr><td><span class="b-blue">GET</span></td><td><code>/api/company/{cid}/workshop/inspections/{iid}/print</code></td><td>Generate and stream PDF inspection report.</td></tr>
+      <tr><td><span class="b-blue">GET</span></td><td><code>/api/company/{cid}/workshop/inspections/{iid}/line-items</code></td><td>List line items. Query: <code>source</code>, <code>isAdd</code>. Returns with merged quote cost data.</td></tr>
+      <tr><td><span class="b-green">POST</span></td><td><code>/api/company/{cid}/workshop/inspections/{iid}/line-items</code></td><td>Create line item. Body: productName, partNumber, catalogGroupKey, clientRowKey, description, quantity, reason, source, aiQuestions, aiAnswers, aiRecommendation.</td></tr>
+      <tr><td><span class="b-amber">PATCH</span></td><td><code>/api/company/{cid}/workshop/inspections/{iid}/line-items</code></td><td>Mark all Approved items as Ordered.</td></tr>
+      <tr><td><span class="b-purple">PUT</span></td><td><code>/api/company/{cid}/workshop/inspections/{iid}/line-items/{lid}</code></td><td>Update specific line item fields.</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- AI APIs -->
+<div class="card no-break">
+  <h3>AI Endpoints</h3>
+  <table>
+    <thead><tr><th>Method</th><th>Path</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><span class="b-green">POST</span></td>
+        <td><code>/api/company/{cid}/workshop/inspections/ai-line-item</code></td>
+        <td>Generate AI diagnostic questions + recommendation for a single line item.<br>
+          Input: <code>{ context: { partName, partNumber, groupName, description, status }, existingQuestions, answers }</code><br>
+          Output: <code>{ questions: [{id, text, critical}], recommendation: string, description: string }</code></td>
+      </tr>
+      <tr>
+        <td><span class="b-green">POST</span></td>
+        <td><code>/api/company/{cid}/workshop/inspections/ai-related-suggestions</code></td>
+        <td>Get related parts to check (smart fault suggestions).<br>
+          Input: inspection context + current line items list<br>
+          Output: <code>{ suggestions: [{id, label, reason}] }</code></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- VIN APIs -->
+<div class="card no-break">
+  <h3>VIN &amp; Catalog Endpoints</h3>
+  <table>
+    <thead><tr><th>Method</th><th>Path</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><span class="b-blue">GET</span></td><td><code>/api/company/{cid}/workshop/vin-lookup?vin=XXX</code></td><td>Decode VIN → returns car make/model/year. Queries 17VIN API and local DB.</td></tr>
+      <tr><td><span class="b-green">POST</span></td><td><code>/api/company/{cid}/sales/leads/{lid}/vin-lookup</code></td><td>Fetch catalog level. Body: <code>vin, epc, catalog_action (cata1-4), cata1/2/3 codes</code>. Returns <code>{ nodes: [{code, name, level, isLast}] }</code></td></tr>
+      <tr><td><span class="b-green">POST</span></td><td><code>/api/company/{cid}/workshop/inspections/line-item-diagram</code></td><td>Get part diagram URL from VIN catalog by part code.</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Part Quotes -->
+<div class="card no-break">
+  <h3>Part Quote Endpoints</h3>
+  <table>
+    <thead><tr><th>Method</th><th>Path</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><span class="b-blue">GET</span></td><td><code>/api/company/{cid}/part-quotes</code></td><td>List quotes. Query: <code>status</code> (quoted/completed/returns).</td></tr>
+      <tr><td><span class="b-green">POST</span></td><td><code>/api/company/{cid}/part-quotes</code></td><td>Create quote from inspector side.</td></tr>
+      <tr><td><span class="b-green">POST</span></td><td><code>/api/company/{cid}/vendors/{vid}/part-quotes</code></td><td>Vendor submits a quote. Requires: partNumber, diagramFileId, at least one pricing type with brand. Validates: no duplicate per line_item+vendor.</td></tr>
+      <tr><td><span class="b-green">POST</span></td><td><code>/api/company/{cid}/part-quotes/order</code></td><td>Mark quotes as ordered / received.</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- PART E — VIN INTEGRATION -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<div class="part-banner page-break">
+  <div class="part-num" style="background:#1e3a5f;">PART E</div>
+  <div class="part-title">VIN &amp; Parts Catalog Integration</div>
+</div>
+
+<div class="sec-head"><div class="num bg5">4</div><h2>17VIN API Integration</h2></div>
+
+<div class="info">Integration with the <strong>17VIN third-party API</strong> (<code>api.17vin.com</code>) for VIN decode and vehicle parts catalog. Authentication uses MD5-signed requests. File: <code>apps/web/lib/vin17.ts</code>.</div>
+
+<div class="card no-break">
+  <h3>Authentication &amp; Request Signing</h3>
+  <p style="font-size:11.5px;color:#334155;margin-bottom:10px;">Every request to 17VIN is signed using an MD5 token computed over the request parameters. Credentials are loaded from environment variables.</p>
+  <div class="code-block"><span class="cm">// Environment variables required</span>
+VIN17_BASE_URL=http://api.17vin.com:8080
+VIN17_USERNAME=&lt;workshop_username&gt;
+VIN17_PASSWORD=&lt;workshop_password&gt;
+
+<span class="cm">// Token generation (lib/vin17.ts)</span>
+<span class="kw">const</span> <span class="fn">token</span> = <span class="fn">md5Hex</span>(usernameHash + passwordHash + urlParameter);</div>
+</div>
+
+<div class="card no-break">
+  <h3>VIN Decode Flow</h3>
+  <div class="flow">
+    <div class="flow-box">User enters VIN</div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-box">prepareVin17Request()</div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-box">GET api.17vin.com/{epc}?action=vin</div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-box">Parse model_list</div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-box">Return VinLookupCar[]</div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-box">Auto-fill Make/Model/Year</div>
+  </div>
+  <p style="font-size:11px;color:#64748b;margin-top:4px;">If multiple cars match the VIN, user selects the correct variant from a dropdown. Selected variant's EPC is stored for catalog lookup.</p>
+</div>
+
+<div class="card no-break">
+  <h3>Parts Catalog Hierarchy (cata1 → cata4)</h3>
+  <p style="font-size:11.5px;color:#334155;margin-bottom:10px;">The catalog is a 2–4 level hierarchy. The system navigates it progressively — each level selection fetches the next level options.</p>
+  <table>
+    <thead><tr><th>Level</th><th>API Action</th><th>Example</th><th>Parameters Required</th></tr></thead>
+    <tbody>
+      <tr><td>cata1</td><td><code>action=cata1</code></td><td>Engine, Transmission, Brakes…</td><td>vin, epc</td></tr>
+      <tr><td>cata2</td><td><code>action=cata2</code></td><td>Engine Block, Timing System…</td><td>vin, epc, cata1</td></tr>
+      <tr><td>cata3</td><td><code>action=cata3</code></td><td>Timing Chain, Tensioner…</td><td>vin, epc, cata1, cata2</td></tr>
+      <tr><td>cata4</td><td><code>action=cata4</code></td><td>Chain Set, Guide…</td><td>vin, epc, cata1, cata2, cata3</td></tr>
+      <tr><td>parts</td><td><code>action=part</code></td><td>Returns actual parts list</td><td>vin, epc, lastCataCode, lastCataCodeLevel</td></tr>
+    </tbody>
+  </table>
+  <p style="font-size:11px;color:#64748b;margin-top:6px;">When a node is marked <code>isLast=true</code>, clicking it calls <code>action=part</code> directly instead of fetching another level.</p>
+</div>
+
+<div class="card no-break">
+  <h3>Parts Response &amp; Diagram URLs</h3>
+  <div class="dl">
+    <div class="dl-row"><span class="dl-key">Part fields</span><span class="dl-val"><code>partnumber</code>, <code>name_en</code>, <code>name_zh</code>, <code>illustration_img_address</code> (relative path)</span></div>
+    <div class="dl-row"><span class="dl-key">Diagram URL formula</span><span class="dl-val"><code>https://images.17vin.com/img/{epc}/{illustration_img_address}</code></span></div>
+    <div class="dl-row"><span class="dl-key">EPC example</span><span class="dl-val"><code>audi_vw</code>, <code>toyota</code>, <code>bmw</code> — the brand identifier used as CDN path prefix</span></div>
+    <div class="dl-row"><span class="dl-key">Fallback</span><span class="dl-val">If no diagram, UI shows Google Images search link: <code>https://www.google.com/search?tbm=isch&q={partNumber}</code></span></div>
+  </div>
+  <div class="code-block"><span class="cm">// buildDiagramUrl() — lib/vin17.ts</span>
+<span class="kw">function</span> <span class="fn">buildDiagramUrl</span>(raw: string, epc: string): string {
+  <span class="kw">const</span> trimmed = raw.trim();
+  <span class="kw">if</span> (!trimmed) <span class="kw">return</span> <span class="st">""</span>;
+  <span class="cm">// Already an absolute URL → return as-is</span>
+  <span class="kw">if</span> (trimmed.startsWith(<span class="st">"http"</span>) || trimmed.startsWith(<span class="st">"//"</span>)) <span class="kw">return</span> trimmed;
+  <span class="cm">// Relative path → prepend CDN base + epc</span>
+  <span class="kw">return</span> <span class="st">`https://images.17vin.com/img/${epc}/${path}`</span>;
+}</div>
+</div>
+
+<div class="card no-break">
+  <h3>Synthetic Group Injection (Group Label Fix)</h3>
+  <p style="font-size:11.5px;color:#334155;margin-bottom:10px;">The <code>action=part</code> response never returns <code>groups[]</code> per part (a known 17VIN API limitation). Without groups, all line items would show "Unknown Group". The system solves this by injecting a synthetic group entry after each leaf selection.</p>
+  <div class="code-block"><span class="cm">// fetchPartsForLeaf() — inspection page.tsx</span>
+<span class="kw">const</span> baseGroups = <span class="fn">buildVinCatalogGroupOptions</span>(normalizedParts);
+<span class="kw">const</span> syntheticGroup: VinCatalogGroupOption = {
+  key: lastCataCode,          <span class="cm">// e.g. "ENG_123"</span>
+  label: groupLabel,          <span class="cm">// e.g. "Engine › Timing Chain"</span>
+  level: lastCataCodeLevel,
+};
+<span class="fn">setVinCatalogGroups</span>([...baseGroups, syntheticGroup]);</div>
+  <p style="font-size:11px;color:#64748b;margin-top:6px;">The breadcrumb label is computed from selected node names at each level (e.g. <code>"Engine › Timing › Chain Set"</code>) and passed through <code>fetchPartsForLeaf(code, level, label)</code>.</p>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- PART F — AI -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<div class="part-banner page-break">
+  <div class="part-num" style="background:#1e3a5f;">PART F</div>
+  <div class="part-title">AI Integration</div>
+</div>
+
+<div class="sec-head"><div class="num bg7">5</div><h2>AI Features</h2></div>
+
+<div class="g2 no-break">
+  <div class="card">
+    <h3>AI Line Item Assistant</h3>
+    <p style="font-size:11.5px;color:#334155;margin-bottom:8px;">For each part added, the AI generates targeted diagnostic questions that help the inspector assess the part properly.</p>
+    <div class="dl">
+      <div class="dl-row"><span class="dl-key">Endpoint</span><span class="dl-val"><code>POST /ai-line-item</code></span></div>
+      <div class="dl-row"><span class="dl-key">Input</span><span class="dl-val">partName, partNumber, groupName (catalog category), description, severity status</span></div>
+      <div class="dl-row"><span class="dl-key">Output</span><span class="dl-val">3–6 questions, recommendation text, description suggestion</span></div>
+      <div class="dl-row"><span class="dl-key">Storage</span><span class="dl-val">Saved to <code>line_items.ai_questions</code>, <code>ai_answers</code>, <code>ai_recommendation</code></span></div>
+    </div>
+  </div>
+  <div class="card">
+    <h3>Smart Fault Suggestions</h3>
+    <p style="font-size:11.5px;color:#334155;margin-bottom:8px;">After parts are added, the AI suggests related components that are commonly defective in the same system.</p>
+    <div class="dl">
+      <div class="dl-row"><span class="dl-key">Endpoint</span><span class="dl-val"><code>POST /ai-related-suggestions</code></span></div>
+      <div class="dl-row"><span class="dl-key">Input</span><span class="dl-val">Current line items, vehicle context, catalog group labels</span></div>
+      <div class="dl-row"><span class="dl-key">Output</span><span class="dl-val">Array of <code>{id, label, reason}</code> suggestions</span></div>
+      <div class="dl-row"><span class="dl-key">Fallback</span><span class="dl-val">Local pattern matching if AI unavailable</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="card no-break">
+  <h3>AI Answer Types &amp; Question Format</h3>
+  <table>
+    <thead><tr><th>Field</th><th>Type</th><th>Example</th></tr></thead>
+    <tbody>
+      <tr><td><code>ai_questions</code></td><td>JSONB Array</td><td><code>[{id: "q1", text: "Is there any oil leakage visible?", critical: true}]</code></td></tr>
+      <tr><td><code>ai_answers</code></td><td>JSONB Object</td><td><code>{"q1": "yes", "q2": "no", "q3": "na"}</code></td></tr>
+      <tr><td>Answer values</td><td>Enum</td><td><code>"yes"</code> | <code>"no"</code> | <code>"na"</code> | <code>""</code> (unanswered)</td></tr>
+      <tr><td><code>ai_recommendation</code></td><td>TEXT</td><td>Free text recommendation based on answers</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="card no-break">
+  <h3>AI Global Line Item Insights Panel</h3>
+  <p style="font-size:11.5px;color:#334155;margin-bottom:8px;">A blue banner at the top of the Findings section shows aggregate AI insights across all line items added so far.</p>
+  <div class="dl">
+    <div class="dl-row"><span class="dl-key">Questions shown</span><span class="dl-val">Diagnostic questions the inspector should consider for the overall inspection (based on all parts combined)</span></div>
+    <div class="dl-row"><span class="dl-key">Suggestions shown</span><span class="dl-val">Recommended checks and part additions not yet in the findings list</span></div>
+    <div class="dl-row"><span class="dl-key">Empty state</span><span class="dl-val">When no parts added: AI shows "Add parts using the Parts Catalog to begin AI-assisted inspection"</span></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- PART G — VENDOR -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<div class="part-banner page-break">
+  <div class="part-num" style="background:#1e3a5f;">PART G</div>
+  <div class="part-title">Vendor &amp; Part Quotes Flow</div>
+</div>
+
+<div class="sec-head"><div class="num bg8">6</div><h2>Vendor Integration</h2></div>
+
+<div class="card no-break">
+  <h3>End-to-End Parts Procurement Flow</h3>
+  <div class="timeline">
+    <div class="tl-item">
+      <h4>1. Inspector Adds Findings</h4>
+      <p>Line items created during Step 5. Each has a part name, number, quantity, and severity.</p>
+    </div>
+    <div class="tl-item">
+      <h4>2. Advisor Reviews &amp; Approves</h4>
+      <p>Service Advisor sets line item status from <span class="b-amber">Pending</span> → <span class="b-green">Approved</span>. Items marked <span class="b-red">Rejected</span> are dropped.</p>
+    </div>
+    <div class="tl-item">
+      <h4>3. Part Inquiry Sent to Vendors</h4>
+      <p>Approved items trigger inquiries to selected vendors. Vendors see the part name, number, and required quantity in their portal.</p>
+    </div>
+    <div class="tl-item">
+      <h4>4. Vendor Submits Quote</h4>
+      <p>Vendor opens the inquiry, confirms/edits the part number, uploads a part diagram photo, and fills in pricing for up to 4 types: OEM, OE, After Market, Used — each with brand, quantity, ETD, and delivery time.</p>
+    </div>
+    <div class="tl-item">
+      <h4>5. Quote Validation</h4>
+      <p>System validates: part number required, diagram required, each quote type with price must have a brand selected, at least one type submitted, no duplicate quote per vendor+line_item.</p>
+    </div>
+    <div class="tl-item">
+      <h4>6. Advisor Selects Quote</h4>
+      <p>Advisor compares quotes (OEM vs OE vs After Market vs Used). Selects approved_type. Line item <code>order_status</code> → <span class="b-amber">Ordered</span>.</p>
+    </div>
+    <div class="tl-item">
+      <h4>7. Parts Received</h4>
+      <p>When parts arrive, <code>order_status</code> → <span class="b-green">Received</span>. Job card proceeds to workshop execution.</p>
+    </div>
+  </div>
+</div>
+
+<div class="card no-break">
+  <h3>Part Quote Validation Rules (API)</h3>
+  <table>
+    <thead><tr><th>Rule</th><th>Error Message</th></tr></thead>
+    <tbody>
+      <tr><td>vendorPartNumber required</td><td>"Part number is required."</td></tr>
+      <tr><td>diagramFileId required</td><td>"Part diagram is required."</td></tr>
+      <tr><td>Any type with price must have brand</td><td>"Select brand for {OEM/OE/After Market/Used}."</td></tr>
+      <tr><td>At least one type with brand required</td><td>"Select at least one quote type with brand."</td></tr>
+      <tr><td>lineItemId OR inventoryRequestId+ItemId required</td><td>"lineItemId or inventoryRequestId/inventoryRequestItemId required"</td></tr>
+      <tr><td>Duplicate quote per vendor+lineItem</td><td>"Quote already submitted for this part." (HTTP 409)</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="card no-break">
+  <h3>Part Quote Type Options</h3>
+  <table>
+    <thead><tr><th>Type</th><th>Meaning</th><th>Typical Use</th></tr></thead>
+    <tbody>
+      <tr><td><strong>OEM</strong></td><td>Original Equipment Manufacturer — brand new factory part</td><td>High-quality, most expensive, longest availability</td></tr>
+      <tr><td><strong>OE</strong></td><td>Original Equipment — same spec as OEM but from authorized alternate supplier</td><td>Good quality, slightly cheaper</td></tr>
+      <tr><td><strong>After Market (AFTM)</strong></td><td>Third-party manufactured part meeting same specifications</td><td>Cost-effective option, wide availability</td></tr>
+      <tr><td><strong>Used</strong></td><td>Salvaged part in working condition</td><td>Budget option for non-critical parts</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- PART H — STATE -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<div class="part-banner page-break">
+  <div class="part-num" style="background:#1e3a5f;">PART H</div>
+  <div class="part-title">State Management &amp; Autosave</div>
+</div>
+
+<div class="sec-head"><div class="num bg6">7</div><h2>State Management</h2></div>
+
+<div class="card no-break">
+  <h3>Draft Payload — Autosave Architecture</h3>
+  <p style="font-size:11.5px;color:#334155;margin-bottom:10px;">The entire inspection form state is serialized into a single <code>draft_payload</code> JSONB column on the <code>inspections</code> table. This enables full state recovery if the browser is closed or refreshed mid-inspection.</p>
+  <div class="code-block"><span class="cm">// draft_payload structure (simplified)</span>
+{
+  inspectionStep: <span class="nu">4</span>,
+  <span class="cm">// Step 1</span>
+  collectCar: {
+    difference: <span class="st">"no"</span>,
+    note: <span class="st">""</span>,
+    reuploadMedia: { front: <span class="st">"file-id"</span>, ... },
+    completed: <span class="kw">true</span>
+  },
+  <span class="cm">// Step 2</span>
+  startedAt: <span class="st">"2026-03-25T08:30:00Z"</span>,
+  <span class="cm">// Step 3</span>
+  carMediaReview: { front: <span class="st">"verified"</span>, rear: <span class="st">"rejected"</span>, ... },
+  carMediaReplacement: { rear: <span class="st">"new-file-id"</span> },
+  carMediaRejectReason: { rear: <span class="st">"Blur"</span> },
+  carMediaRejectNote: { rear: <span class="st">"Too dark to see"</span> },
+  inspectionIssueEntries: [{ id: <span class="st">"..."</span>, description: <span class="st">"Scratch on door"</span>, imageFileId: <span class="st">"..."</span> }],
+  <span class="cm">// Step 4</span>
+  inspectionVin: <span class="st">"WBAFR9C50BC123456"</span>,
+  inspectionPlate: <span class="st">"ABC 1234"</span>,
+  inspectionMake: <span class="st">"BMW"</span>,
+  inspectionModel: <span class="st">"3 Series"</span>,
+  inspectionYear: <span class="st">"2011"</span>,
+  tyreSizeFront: <span class="st">"225/45R17"</span>,
+  tyreSizeRear: <span class="st">"225/45R17"</span>,
+  carInMileage: <span class="st">"112450"</span>,
+  <span class="cm">// Step 5</span>
+  processChecks: { oil: <span class="st">"ok"</span>, battery: <span class="st">"issue"</span>, tyre: <span class="st">"ok"</span>, obd: <span class="st">"na"</span> },
+  processCheckIssueNotes: { battery: <span class="st">"Corroded terminals, low voltage 11.2V"</span> },
+  processCheckMediaMulti: { battery: [<span class="st">"file-id-1"</span>, <span class="st">"file-id-2"</span>] },
+  <span class="cm">// Step 6</span>
+  inspectorRemarks: <span class="st">"Vehicle in good condition overall..."</span>
+}</div>
+</div>
+
+<div class="card no-break">
+  <h3>Key State Variables (Inspection Page)</h3>
+  <div class="g2">
+    <div>
+      <p style="font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;margin-bottom:6px;">Navigation &amp; UI</p>
+      <ul style="font-size:11px;color:#334155;padding-left:14px;line-height:2;">
+        <li><code>inspectionStep</code> (1–6)</li>
+        <li><code>loading, saving, nextStepSaving</code></li>
+        <li><code>isReadOnly</code> (completed/cancelled)</li>
+        <li><code>isCollectCarPending</code></li>
+        <li><code>catalogModalOpen</code></li>
+        <li><code>manualPanelOpen</code></li>
+        <li><code>vin17CatalogFetchDone</code></li>
+      </ul>
+    </div>
+    <div>
+      <p style="font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;margin-bottom:6px;">Line Items</p>
+      <ul style="font-size:11px;color:#334155;padding-left:14px;line-height:2;">
+        <li><code>parts[]</code> — all line item rows</li>
+        <li><code>lineItemAiQuestionsByRow</code></li>
+        <li><code>lineItemAiAnswers</code></li>
+        <li><code>lineItemAiRecommendationByRow</code></li>
+        <li><code>lineItemSmartSuggestionsByRow</code></li>
+        <li><code>expandedLineItemsByRow</code></li>
+        <li><code>dismissedSmartSuggestionsByRow</code></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="card no-break">
+  <h3>Key Functions</h3>
+  <table>
+    <thead><tr><th>Function</th><th>What It Does</th></tr></thead>
+    <tbody>
+      <tr><td><code>buildLineItemDraftFromCatalog()</code></td><td>Creates a new draft line item object with clientRowKey, groupKey, part name, code, defaults</td></tr>
+      <tr><td><code>addSelectedCatalogParts()</code></td><td>Converts selected catalog part codes → draft rows → sets state → fires AI per row → closes modal</td></tr>
+      <tr><td><code>addManualLineItem()</code></td><td>Creates draft from manualDraft form state → adds to parts array → fires AI → resets form</td></tr>
+      <tr><td><code>saveAllDraftLineItems()</code></td><td>Iterates parts[] for isSaved=false → calls saveLineItem() for each → marks saved</td></tr>
+      <tr><td><code>requestLineItemAi(rowKey, context)</code></td><td>POST to AI endpoint → updates ai_questions and ai_recommendation for the row</td></tr>
+      <tr><td><code>requestSmartFaultSuggestions(rowKey)</code></td><td>POST to suggestions endpoint → updates smart suggestions for the row</td></tr>
+      <tr><td><code>fetchVin17CatalogLevel(action, opts)</code></td><td>Fetches cata1/2/3/4 or parts from 17VIN → updates corresponding option state</td></tr>
+      <tr><td><code>autoFillVehicleFromVin()</code></td><td>Decodes VIN via API → fills Make/Model/Year → triggers cata1 fetch</td></tr>
+      <tr><td><code>persistStep3MediaReview(overrides)</code></td><td>PATCH inspection with media review state (review, rejection, replacement, issue entries)</td></tr>
+      <tr><td><code>downloadInspectionReportPdf()</code></td><td>GET /print endpoint → receives blob → triggers browser download as PDF file</td></tr>
+      <tr><td><code>resetCatalogSection()</code></td><td>Clears all catalog level selections and parts — resets catalog modal to initial state</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- PART I — MEDIA -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<div class="part-banner page-break">
+  <div class="part-num" style="background:#1e3a5f;">PART I</div>
+  <div class="part-title">Media Management</div>
+</div>
+
+<div class="sec-head"><div class="num bg2">8</div><h2>Media Files &amp; Upload System</h2></div>
+
+<div class="card no-break">
+  <h3>Media Across Inspection Steps</h3>
+  <table>
+    <thead><tr><th>Step</th><th>Media Type</th><th>Description</th><th>Storage</th></tr></thead>
+    <tbody>
+      <tr><td>Step 1</td><td>Source Media (5 files)</td><td>Front, Rear, Right, Left images + 360° video at car collection</td><td><code>collectCar.sourceMedia</code> in draft_payload</td></tr>
+      <tr><td>Step 3</td><td>Replacement Media</td><td>Replacement files for rejected check-in photos</td><td><code>carMediaReplacement[key]</code> in draft_payload</td></tr>
+      <tr><td>Step 3</td><td>Issue Note Photos</td><td>Photos attached to damage/issue notes</td><td><code>inspectionIssueEntries[].imageFileId</code></td></tr>
+      <tr><td>Step 5</td><td>Process Check Photos</td><td>Multiple photos per check (oil/battery/tyre/OBD)</td><td><code>processCheckMediaMulti[key][]</code> in draft_payload</td></tr>
+      <tr><td>Step 5</td><td>Line Item Photo</td><td>Single photo per line item showing the defect</td><td><code>line_items.media_file_id</code></td></tr>
+      <tr><td>Vendor</td><td>Part Diagram</td><td>Vendor-uploaded part photo/diagram (required for quote submission)</td><td><code>part_quotes.diagram_url</code></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="g2 no-break">
+  <div class="card">
+    <h3>File Upload System</h3>
+    <div class="dl">
+      <div class="dl-row"><span class="dl-key">Upload Endpoint</span><span class="dl-val"><code>POST /api/files/upload</code> — accepts <code>multipart/form-data</code></span></div>
+      <div class="dl-row"><span class="dl-key">Returns</span><span class="dl-val"><code>{ fileId: string }</code></span></div>
+      <div class="dl-row"><span class="dl-key">Serve Endpoint</span><span class="dl-val"><code>GET /api/files/{fileId}</code></span></div>
+      <div class="dl-row"><span class="dl-key">UI Component</span><span class="dl-val"><code>FileUploader</code> from <code>@repo/ui</code> — supports image + video kinds, preview, replace</span></div>
+    </div>
+  </div>
+  <div class="card">
+    <h3>Media Review States</h3>
+    <div class="dl">
+      <div class="dl-row"><span class="dl-key"><span class="b-amber">pending</span></span><span class="dl-val">Not yet reviewed by inspector</span></div>
+      <div class="dl-row"><span class="dl-key"><span class="b-green">verified</span></span><span class="dl-val">Inspector confirmed it matches car</span></div>
+      <div class="dl-row"><span class="dl-key"><span class="b-red">rejected</span></span><span class="dl-val">Inspector rejected; replacement required before Step 4</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- PART J — REPORTING -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<div class="part-banner page-break">
+  <div class="part-num" style="background:#1e3a5f;">PART J</div>
+  <div class="part-title">Reporting &amp; PDF Export</div>
+</div>
+
+<div class="sec-head"><div class="num bg4">9</div><h2>Inspection Report</h2></div>
+
+<div class="card no-break">
+  <h3>Report Generation</h3>
+  <div class="dl">
+    <div class="dl-row"><span class="dl-key">Trigger</span><span class="dl-val">Inspector clicks "Download Inspection Report (PDF)" in Step 6</span></div>
+    <div class="dl-row"><span class="dl-key">API</span><span class="dl-val"><code>GET /api/company/{cid}/workshop/inspections/{iid}/print</code></span></div>
+    <div class="dl-row"><span class="dl-key">Format</span><span class="dl-val">A4 PDF, generated server-side, streamed as binary blob to browser</span></div>
+    <div class="dl-row"><span class="dl-key">Filename</span><span class="dl-val"><code>inspection-report-{inspectionId}.pdf</code></span></div>
+  </div>
+</div>
+
+<div class="card no-break">
+  <h3>Report Contents</h3>
+  <table>
+    <thead><tr><th>Section</th><th>Data Source</th></tr></thead>
+    <tbody>
+      <tr><td>Workshop header (logo, name, contact)</td><td>Company branding settings</td></tr>
+      <tr><td>Report title + inspection date/ID</td><td><code>inspections</code> table</td></tr>
+      <tr><td>Customer name, phone, email</td><td>Linked customer record</td></tr>
+      <tr><td>Vehicle plate, make, model, year, mileage</td><td><code>draft_payload</code></td></tr>
+      <tr><td>Overall health score (0–100)</td><td>Computed from <code>health_overall</code></td></tr>
+      <tr><td>Process check results (oil, battery, tyre, OBD)</td><td><code>draft_payload.processChecks</code></td></tr>
+      <tr><td>Findings table (all line items with severity)</td><td><code>line_items</code> table</td></tr>
+      <tr><td>Issue notes with photos</td><td><code>draft_payload.inspectionIssueEntries</code></td></tr>
+      <tr><td>Inspector remarks</td><td><code>inspections.remarks</code></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="card no-break">
+  <h3>Health Score Calculation</h3>
+  <p style="font-size:11.5px;color:#334155;margin-bottom:8px;">The overall vehicle health score is computed using weighted category importance:</p>
+  <div class="g3">
+    <div class="field-pill" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;padding:8px 12px;">
+      <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:4px;">Brakes</div>
+      <div style="font-size:14px;font-weight:800;color:#ef4444;">16%</div>
+    </div>
+    <div class="field-pill" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;padding:8px 12px;">
+      <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:4px;">Engine</div>
+      <div style="font-size:14px;font-weight:800;color:#f59e0b;">15%</div>
+    </div>
+    <div class="field-pill" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;padding:8px 12px;">
+      <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:4px;">Transmission</div>
+      <div style="font-size:14px;font-weight:800;color:#f59e0b;">12%</div>
+    </div>
+    <div class="field-pill" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;padding:8px 12px;">
+      <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:4px;">Suspension</div>
+      <div style="font-size:14px;font-weight:800;color:#3b82f6;">12%</div>
+    </div>
+    <div class="field-pill" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;padding:8px 12px;">
+      <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:4px;">Steering</div>
+      <div style="font-size:14px;font-weight:800;color:#3b82f6;">10%</div>
+    </div>
+    <div class="field-pill" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;padding:8px 12px;">
+      <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:4px;">Tires &amp; Wheels</div>
+      <div style="font-size:14px;font-weight:800;color:#3b82f6;">10%</div>
+    </div>
+    <div class="field-pill" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;padding:8px 12px;">
+      <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:4px;">Electrical</div>
+      <div style="font-size:14px;font-weight:800;color:#6366f1;">10%</div>
+    </div>
+    <div class="field-pill" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;padding:8px 12px;">
+      <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:4px;">Body &amp; Exterior</div>
+      <div style="font-size:14px;font-weight:800;color:#10b981;">7%</div>
+    </div>
+    <div class="field-pill" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;padding:8px 12px;">
+      <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:4px;">Interior + Fluids</div>
+      <div style="font-size:14px;font-weight:800;color:#10b981;">4%+4%</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- PART K — DATA FLOW -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<div class="part-banner page-break">
+  <div class="part-num" style="background:#1e3a5f;">PART K</div>
+  <div class="part-title">Data Flow Overview</div>
+</div>
+
+<div class="sec-head"><div class="num bg3">10</div><h2>System Data Flow</h2></div>
+
+<div class="card no-break">
+  <h3>Complete Inspection Data Flow</h3>
+  <table>
+    <thead><tr><th>Actor</th><th>Action</th><th>Data Written</th></tr></thead>
+    <tbody>
+      <tr><td>Service Advisor</td><td>Create inspection</td><td>INSERT into <code>inspections</code> with lead/car/customer links</td></tr>
+      <tr><td>Inspector</td><td>Step 1 — confirm collect car</td><td>PATCH <code>draft_payload.collectCar</code></td></tr>
+      <tr><td>Inspector</td><td>Step 2 — start inspection</td><td>PATCH <code>inspections.started_at</code></td></tr>
+      <tr><td>Inspector</td><td>Step 3 — verify media</td><td>PATCH <code>draft_payload.carMediaReview / replacement / rejectNote</code></td></tr>
+      <tr><td>Inspector</td><td>Step 3 — add damage notes</td><td>PATCH <code>draft_payload.inspectionIssueEntries[]</code></td></tr>
+      <tr><td>Inspector</td><td>Step 4 — enter VIN + vehicle data</td><td>PATCH <code>draft_payload</code> (vin, plate, make, model, year, mileage, tyres)</td></tr>
+      <tr><td>17VIN API</td><td>VIN decode + catalog</td><td>Read-only: returns car info + parts list (not stored in DB)</td></tr>
+      <tr><td>Inspector</td><td>Step 5 — add line items</td><td>INSERT into <code>line_items</code> per part; PATCH <code>draft_payload.processChecks</code></td></tr>
+      <tr><td>AI Service</td><td>Generate questions + suggestions</td><td>Returned to client; saved via UPDATE <code>line_items.ai_questions/answers/recommendation</code></td></tr>
+      <tr><td>Inspector</td><td>Step 6 — add remarks, download PDF</td><td>PATCH <code>inspections.remarks</code>; GET /print → PDF stream</td></tr>
+      <tr><td>Service Advisor</td><td>Approve/reject line items</td><td>PATCH <code>line_items.status</code></td></tr>
+      <tr><td>System</td><td>Send inquiry to vendor</td><td>Creates part inquiry record linking vendor + line_item</td></tr>
+      <tr><td>Vendor</td><td>Submit quote</td><td>INSERT into <code>part_quotes</code> with all pricing data</td></tr>
+      <tr><td>Service Advisor</td><td>Select quote &amp; order</td><td>UPDATE <code>line_items.approved_type</code>, <code>order_status → Ordered</code></td></tr>
+      <tr><td>Workshop</td><td>Mark parts received</td><td>UPDATE <code>line_items.order_status → Received</code></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="card no-break">
+  <h3>Entity Relationships</h3>
+  <div class="code-block">leads
+  ├── inspections (one-to-one per visit)
+  │     ├── line_items[] (one-to-many per inspection)
+  │     │     └── part_quotes[] (one-to-many per line_item, from vendors)
+  │     ├── inspection_media[] (legacy)
+  │     └── inspection_versions[] (PDF history)
+  ├── cars (vehicle record)
+  └── customers (customer record)
+
+companies
+  ├── inspections (scoped)
+  ├── vendors
+  │     └── part_quotes (vendor submits quotes)
+  └── employees (inspector + advisor)</div>
+</div>
+
+<div class="card no-break">
+  <h3>Technology Stack</h3>
+  <table>
+    <thead><tr><th>Layer</th><th>Technology</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td>Frontend</td><td>Next.js 15 (App Router) + React</td><td>Multi-step inspection form, real-time state</td></tr>
+      <tr><td>Styling</td><td>Tailwind CSS</td><td>Dark-theme workshop UI</td></tr>
+      <tr><td>Database</td><td>PostgreSQL + <code>postgres</code> npm client</td><td>All inspection data, JSONB autosave</td></tr>
+      <tr><td>AI — Questions</td><td>Anthropic Claude / OpenAI GPT</td><td>Diagnostic questions + recommendations per part</td></tr>
+      <tr><td>AI — Suggestions</td><td>Anthropic Claude + local patterns</td><td>Smart fault suggestions + related part recommendations</td></tr>
+      <tr><td>VIN Decode</td><td>17VIN API (third-party)</td><td>VIN decode + 4-level parts catalog</td></tr>
+      <tr><td>File Storage</td><td>Internal file service</td><td>All media uploads (photos, videos, diagrams)</td></tr>
+      <tr><td>PDF Generation</td><td>Server-side rendering → PDF stream</td><td>Inspection report generation</td></tr>
+      <tr><td>Monorepo</td><td>pnpm workspaces + Turborepo</td><td>Shared packages: <code>@repo/ai-core</code>, <code>@repo/ui</code></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ══ FOOTER ═════════════════════════════════════════════════ -->
+<div style="margin-top:52px;padding-top:20px;border-top:2px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;font-size:10.5px;color:#94a3b8;">
+  <span><strong style="color:#475569;">Global ERP</strong> — Inspection Module Documentation</span>
+  <span>Business &amp; Technical Reference · 2026</span>
+  <span>Internal / Confidential</span>
+</div>
+
+</div>
+</body>
+</html>

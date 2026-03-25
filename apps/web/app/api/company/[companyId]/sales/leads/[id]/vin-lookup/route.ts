@@ -7,6 +7,7 @@ import {
   prepareVin17CatalogRequest,
   prepareVin17PartsRequest,
   prepareVin17Request,
+  type Vin17Part,
 } from "@/lib/vin17";
 import { getVin17ConfigForCompany } from "@/lib/vin17-config";
 import {
@@ -15,6 +16,7 @@ import {
   upsertVinCatalogCars,
   upsertVinCatalogSnapshot,
 } from "@repo/ai-core/crm/vin-catalog/repository";
+import { getOpenAIClientForCompany } from "@repo/ai-core";
 
 type Params = { params: Promise<{ companyId: string; id: string }> };
 
@@ -49,14 +51,17 @@ export async function GET(req: NextRequest, { params }: Params) {
         (requestedCarId ? cachedCars.find((c) => String(c.id) === requestedCarId) ?? null : null) ??
         (cachedCars.length === 1 ? cachedCars[0] : null);
       const requiresCarSelection = cachedCars.length > 1 && !selectedCar;
+      // For parts lookup, fall back to first car when no specific car is selected
+      const carForParts = selectedCar ?? (wantsParts && cachedCars.length > 0 ? cachedCars[0] : null);
       const cachedPartsSnapshot =
-        wantsParts && selectedCar
-          ? await getVinCatalogSnapshotByVinAndCarId(vin, String(selectedCar.id)).catch(() => null)
+        wantsParts && carForParts
+          ? await getVinCatalogSnapshotByVinAndCarId(vin, String(carForParts.id)).catch(() => null)
           : null;
+      const cachedEpc = carForParts?.epc || selectedCar?.epc || cachedCars.find((c) => c.epc)?.epc || null;
       return NextResponse.json({
         data: {
           vin,
-          epc: null,
+          epc: cachedEpc,
           cars: cachedCars,
           car: selectedCar,
           partsBrand: cachedPartsSnapshot?.partsBrand ?? null,
@@ -115,9 +120,11 @@ export async function GET(req: NextRequest, { params }: Params) {
 
     const decoded = await decodeVinWith17VinUsingConfig(vin, vin17Config ?? undefined);
     const cars = decoded.cars;
+    const resolvedEpcFromDecode = String((decoded.raw as any)?.data?.epc ?? (decoded.raw as any)?.epc ?? "").trim();
     if (cars.length > 0) {
       await upsertVinCatalogCars({
         vin,
+        epc: epc || resolvedEpcFromDecode || undefined,
         cars: cars.map((car) => ({
           id: car.id,
           make: car.make,
@@ -132,13 +139,15 @@ export async function GET(req: NextRequest, { params }: Params) {
       (requestedCarId ? cars.find((c) => String(c.id) === requestedCarId) ?? null : null) ??
       (cars.length === 1 ? cars[0] : null);
     const requiresCarSelection = cars.length > 1 && !selectedCar;
-    const resolvedEpc = epc || String((decoded.raw as any)?.data?.epc ?? (decoded.raw as any)?.epc ?? "").trim();
+    // For parts fetch, fall back to first car when no specific car is selected (multi-variant VINs)
+    const carForParts = selectedCar ?? (wantsParts && cars.length > 0 ? cars[0] : null);
+    const resolvedEpc = epc || resolvedEpcFromDecode;
     let partsBrand: unknown = null;
-    let parts: Array<{ code: string; name: string; groups: Array<{ id: string; level: number; name: string }> }> = [];
+    let parts: Vin17Part[] = [];
     let partsCount = 0;
 
     let partsUrl: string | null = null;
-    if (wantsParts && selectedCar) {
+    if (wantsParts && carForParts) {
       if (!resolvedEpc) {
         return NextResponse.json(
           { error: "epc is required to fetch parts for this VIN.", provider: "17vin" },
@@ -161,15 +170,54 @@ export async function GET(req: NextRequest, { params }: Params) {
       parts = partsResult.parts;
       partsCount = partsResult.partsCount;
       partsUrl = partsResult.requestUrl;
+
+      // Translate Chinese names where English is missing
+      const needsTranslation = parts.filter((p) => !p.name && p.nameZh);
+      if (needsTranslation.length > 0) {
+        const aiClient = await getOpenAIClientForCompany(companyId).catch(() => ({ client: null }));
+        if (aiClient.client) {
+          try {
+            const model = process.env.OPENAI_MODEL?.trim() || "gpt-4.1-mini";
+            const inputMap = Object.fromEntries(needsTranslation.map((p, i) => [String(i), p.nameZh]));
+            const completion = await aiClient.client.chat.completions.create({
+              model,
+              temperature: 0,
+              response_format: { type: "json_object" },
+              messages: [
+                {
+                  role: "system",
+                  content:
+                    "You are an automotive parts translator. Translate Chinese automotive part names to concise English. Return a JSON object where each key matches the input key and the value is the English translation. Keep names short and technical.",
+                },
+                {
+                  role: "user",
+                  content: JSON.stringify(inputMap),
+                },
+              ],
+            });
+            const translations = JSON.parse(completion.choices[0]?.message?.content ?? "{}") as Record<string, string>;
+            needsTranslation.forEach((p, i) => {
+              const translated = String(translations[String(i)] ?? "").trim();
+              if (translated) {
+                p.name = translated;
+                (p as any).nameTranslated = true;
+              }
+            });
+          } catch {
+            // translation failed — keep Chinese name as fallback
+          }
+        }
+      }
+
       await upsertVinCatalogSnapshot({
         vin,
         car: {
-          id: selectedCar.id,
-          make: selectedCar.make,
-          model: selectedCar.model,
-          year: selectedCar.year,
-          title: selectedCar.title,
-          description: selectedCar.description,
+          id: carForParts.id,
+          make: carForParts.make,
+          model: carForParts.model,
+          year: carForParts.year,
+          title: carForParts.title,
+          description: carForParts.description,
         },
         parts,
         partsBrand,

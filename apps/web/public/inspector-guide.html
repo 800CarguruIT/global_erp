@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Vehicle Inspection — Inspector Guide</title>
+<style>
+  /* ── Base ─────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 13px; }
+  body {
+    font-family: "Segoe UI", Arial, sans-serif;
+    background: #f8fafc;
+    color: #1e293b;
+    line-height: 1.55;
+  }
+
+  /* ── Layout ──────────────────────────────────── */
+  .page {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 40px 48px;
+  }
+
+  /* ── Cover ──────────────────────────────────── */
+  .cover {
+    background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 60%, #0f4c81 100%);
+    color: #fff;
+    border-radius: 12px;
+    padding: 56px 48px 48px;
+    margin-bottom: 40px;
+    position: relative;
+    overflow: hidden;
+  }
+  .cover::after {
+    content: "";
+    position: absolute;
+    right: -40px; bottom: -40px;
+    width: 260px; height: 260px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.04);
+  }
+  .cover .badge {
+    display: inline-block;
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 20px;
+    padding: 4px 14px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: #93c5fd;
+    margin-bottom: 20px;
+  }
+  .cover h1 {
+    font-size: 36px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    line-height: 1.15;
+    margin-bottom: 12px;
+  }
+  .cover .subtitle {
+    font-size: 14px;
+    color: rgba(255,255,255,0.65);
+    max-width: 480px;
+    margin-bottom: 32px;
+  }
+  .cover .meta-row {
+    display: flex;
+    gap: 32px;
+    flex-wrap: wrap;
+  }
+  .cover .meta-item { font-size: 11px; color: rgba(255,255,255,0.55); }
+  .cover .meta-item strong { display: block; color: rgba(255,255,255,0.85); font-size: 13px; }
+
+  /* ── Steps overview chips ─────────────────── */
+  .steps-strip {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 40px;
+  }
+  .step-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 30px;
+    padding: 6px 14px 6px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #475569;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  .step-chip .num {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px;
+    font-weight: 800;
+    color: #fff;
+  }
+
+  /* ── Section heading ─────────────────────── */
+  .section-head {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-top: 44px;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #e2e8f0;
+  }
+  .section-head .step-badge {
+    min-width: 36px; height: 36px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+    font-weight: 800;
+    color: #fff;
+    flex-shrink: 0;
+  }
+  .section-head h2 {
+    font-size: 18px;
+    font-weight: 700;
+    color: #0f172a;
+  }
+  .section-head .tag {
+    margin-left: auto;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 3px 10px;
+    border-radius: 4px;
+  }
+
+  /* ── Card ────────────────────────────────── */
+  .card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 18px 20px;
+    margin-bottom: 14px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .card h3 {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: #64748b;
+    margin-bottom: 10px;
+  }
+
+  /* ── Action list ─────────────────────────── */
+  .action-list { list-style: none; }
+  .action-list li {
+    display: flex;
+    gap: 10px;
+    padding: 7px 0;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 12px;
+    color: #334155;
+    align-items: flex-start;
+  }
+  .action-list li:last-child { border-bottom: none; }
+  .action-list li .icon {
+    width: 20px; height: 20px;
+    border-radius: 5px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  /* ── Tip box ─────────────────────────────── */
+  .tip {
+    display: flex;
+    gap: 10px;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 11.5px;
+    color: #1e40af;
+    margin-bottom: 14px;
+  }
+  .tip .tip-icon { font-size: 15px; flex-shrink: 0; }
+
+  .warn {
+    background: #fffbeb;
+    border-color: #fde68a;
+    color: #92400e;
+  }
+  .danger {
+    background: #fff1f2;
+    border-color: #fecdd3;
+    color: #9f1239;
+  }
+
+  /* ── Two-col grid ────────────────────────── */
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+  .grid-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+
+  /* ── Field pill ──────────────────────────── */
+  .field-pill {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 7px;
+    padding: 8px 12px;
+    font-size: 11px;
+  }
+  .field-pill .label { color: #94a3b8; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 3px; }
+  .field-pill .value { color: #334155; font-weight: 600; }
+
+  /* ── Status badges ───────────────────────── */
+  .badge-green  { display:inline-block; background:#dcfce7; color:#166534; border-radius:4px; padding:2px 8px; font-size:10px; font-weight:700; }
+  .badge-amber  { display:inline-block; background:#fef3c7; color:#92400e; border-radius:4px; padding:2px 8px; font-size:10px; font-weight:700; }
+  .badge-red    { display:inline-block; background:#fee2e2; color:#991b1b; border-radius:4px; padding:2px 8px; font-size:10px; font-weight:700; }
+  .badge-blue   { display:inline-block; background:#dbeafe; color:#1e40af; border-radius:4px; padding:2px 8px; font-size:10px; font-weight:700; }
+  .badge-purple { display:inline-block; background:#ede9fe; color:#5b21b6; border-radius:4px; padding:2px 8px; font-size:10px; font-weight:700; }
+
+  /* ── Flow arrow ──────────────────────────── */
+  .flow {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin: 12px 0;
+  }
+  .flow-box {
+    background: #fff;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    padding: 5px 12px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #475569;
+  }
+  .flow-arrow { color: #94a3b8; font-size: 14px; }
+
+  /* ── Severity table ──────────────────────── */
+  .sev-table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+  .sev-table th {
+    background: #f1f5f9;
+    color: #64748b;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    padding: 7px 12px;
+    text-align: left;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .sev-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid #f1f5f9;
+    vertical-align: top;
+  }
+  .sev-table tr:last-child td { border-bottom: none; }
+
+  /* ── Summary checklist ─────────────────── */
+  .checklist { list-style: none; }
+  .checklist li {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    font-size: 12px;
+    padding: 6px 0;
+    border-bottom: 1px solid #f1f5f9;
+    color: #334155;
+  }
+  .checklist li:last-child { border-bottom: none; }
+  .checklist li .box {
+    width: 18px; height: 18px;
+    border: 2px solid #cbd5e1;
+    border-radius: 4px;
+    flex-shrink: 0;
+  }
+
+  /* ── Page break ──────────────────────────── */
+  .page-break { page-break-before: always; }
+
+  /* ── Print settings ─────────────────────── */
+  @media print {
+    body { background: #fff; }
+    .page { padding: 20px 30px; max-width: 100%; }
+    .cover { border-radius: 6px; padding: 36px 32px 32px; }
+    .section-head { margin-top: 32px; }
+    .no-break { page-break-inside: avoid; }
+  }
+
+  /* ── Color palette per step ──────────────── */
+  .c1 { background: #3b82f6; }
+  .c2 { background: #06b6d4; }
+  .c3 { background: #f59e0b; }
+  .c4 { background: #8b5cf6; }
+  .c5 { background: #10b981; }
+  .c6 { background: #ef4444; }
+
+  .border-c1 { border-left: 4px solid #3b82f6; }
+  .border-c2 { border-left: 4px solid #06b6d4; }
+  .border-c3 { border-left: 4px solid #f59e0b; }
+  .border-c4 { border-left: 4px solid #8b5cf6; }
+  .border-c5 { border-left: 4px solid #10b981; }
+  .border-c6 { border-left: 4px solid #ef4444; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ══ COVER ══════════════════════════════════════════════════ -->
+  <div class="cover">
+    <div class="badge">Inspector Reference Guide</div>
+    <h1>Vehicle Inspection<br>Process Flow</h1>
+    <p class="subtitle">Step-by-step guide for completing a full vehicle inspection using the Global ERP system — from car collection to final report.</p>
+    <div class="meta-row">
+      <div class="meta-item"><strong>Total Steps</strong>6 Steps</div>
+      <div class="meta-item"><strong>Role</strong>Inspector</div>
+      <div class="meta-item"><strong>System</strong>Global ERP — Inspection Module</div>
+      <div class="meta-item"><strong>Version</strong>2026</div>
+    </div>
+  </div>
+
+  <!-- ══ OVERVIEW CHIPS ═══════════════════════════════════════ -->
+  <div class="steps-strip">
+    <div class="step-chip"><span class="num c1">1</span>Collect Car</div>
+    <div class="step-chip"><span class="num c2">2</span>Start Inspection</div>
+    <div class="step-chip"><span class="num c3">3</span>Checks &amp; Notes</div>
+    <div class="step-chip"><span class="num c4">4</span>Vehicle Data</div>
+    <div class="step-chip"><span class="num c5">5</span>Findings / Parts</div>
+    <div class="step-chip"><span class="num c6">6</span>Remarks &amp; Report</div>
+  </div>
+
+  <!-- ══ HOW THE SYSTEM WORKS ══════════════════════════════════ -->
+  <div class="card no-break">
+    <h3>How the System Works</h3>
+    <ul class="action-list">
+      <li>
+        <span class="icon" style="background:#eff6ff;color:#3b82f6;">📋</span>
+        <span>The inspection is created by the <strong>Service Advisor</strong> from a customer lead. You (the inspector) will receive the assigned inspection and work through it step-by-step.</span>
+      </li>
+      <li>
+        <span class="icon" style="background:#f0fdf4;color:#16a34a;">🔒</span>
+        <span>Each step is <strong>locked</strong> until the previous step is completed. The system will block you from advancing if mandatory fields are missing.</span>
+      </li>
+      <li>
+        <span class="icon" style="background:#fffbeb;color:#d97706;">💾</span>
+        <span>Your progress is <strong>auto-saved as a draft</strong> continuously. You can close and reopen the page — your work will be preserved.</span>
+      </li>
+      <li>
+        <span class="icon" style="background:#fdf4ff;color:#9333ea;">🤖</span>
+        <span>The system has an <strong>AI assistant</strong> that suggests related parts, asks guided questions, and flags potential issues based on the vehicle and findings.</span>
+      </li>
+    </ul>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <!-- STEP 1 -->
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <div class="section-head no-break">
+    <div class="step-badge c1">1</div>
+    <h2>Collect Car</h2>
+    <span class="tag" style="background:#dbeafe;color:#1e40af;">Gate / Reception</span>
+  </div>
+
+  <div class="tip">
+    <span class="tip-icon">ℹ️</span>
+    <span>This step is completed <strong>before</strong> the car enters the workshop bay. You review the media uploaded at the time the car was received (recovery pickup or walk-in check-in).</span>
+  </div>
+
+  <div class="card no-break">
+    <h3>What You Will See</h3>
+    <ul class="action-list">
+      <li>
+        <span class="icon" style="background:#eff6ff;color:#3b82f6;">🚗</span>
+        <span><strong>Source Type</strong> — Shows whether the car came in via <em>Recovery Pickup</em> or <em>Walk-in Check-in</em>.</span>
+      </li>
+      <li>
+        <span class="icon" style="background:#f0fdf4;color:#16a34a;">📸</span>
+        <span><strong>Source Media</strong> — Photos and video uploaded at the time of car collection (Front, Rear, Right, Left, 360 Video).</span>
+      </li>
+      <li>
+        <span class="icon" style="background:#fffbeb;color:#d97706;">🔍</span>
+        <span><strong>Pre-inspection Form</strong> — Customer-reported issues, complaints, and notes submitted before the car arrived.</span>
+      </li>
+    </ul>
+  </div>
+
+  <div class="card no-break">
+    <h3>Your Actions</h3>
+    <ul class="action-list">
+      <li>
+        <span class="icon" style="background:#f0fdf4;color:#16a34a;">✅</span>
+        <span>Compare the <strong>actual car in front of you</strong> with the source media photos.</span>
+      </li>
+      <li>
+        <span class="icon" style="background:#fee2e2;color:#dc2626;">⚠️</span>
+        <span>Select <strong>"Yes, there is a difference"</strong> if the car condition does not match the source photos. Describe what is different.</span>
+      </li>
+      <li>
+        <span class="icon" style="background:#eff6ff;color:#3b82f6;">✔️</span>
+        <span>Select <strong>"No difference"</strong> if the car matches exactly.</span>
+      </li>
+      <li>
+        <span class="icon" style="background:#f0fdf4;color:#16a34a;">✅</span>
+        <span>Click <strong>"Mark Collect Car Complete"</strong> to finish Step 1 and unlock Step 2.</span>
+      </li>
+    </ul>
+  </div>
+
+  <div class="tip warn">
+    <span class="tip-icon">⚠️</span>
+    <span>You <strong>cannot skip</strong> this step. If there is a difference between the media and the actual car, you <em>must</em> document it before proceeding. This protects the workshop against liability claims.</span>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <!-- STEP 2 -->
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <div class="section-head no-break page-break">
+    <div class="step-badge c2">2</div>
+    <h2>Start Inspection</h2>
+    <span class="tag" style="background:#cffafe;color:#0e7490;">Bay / Workshop</span>
+  </div>
+
+  <div class="tip">
+    <span class="tip-icon">ℹ️</span>
+    <span>This step officially <strong>starts the inspection clock</strong>. The system records the timestamp when you click Start. Always click Start when you physically begin working on the car.</span>
+  </div>
+
+  <div class="card no-break">
+    <h3>Your Actions</h3>
+    <ul class="action-list">
+      <li>
+        <span class="icon" style="background:#f0fdf4;color:#16a34a;">✅</span>
+        <span>Review the confirmation message that Step 1 (Collect Car) is complete.</span>
+      </li>
+      <li>
+        <span class="icon" style="background:#cffafe;color:#0e7490;">▶️</span>
+        <span>Click the <strong>"Start Inspection"</strong> button to record the start time and move to Step 3.</span>
+      </li>
+    </ul>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <!-- STEP 3 -->
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <div class="section-head no-break">
+    <div class="step-badge c3">3</div>
+    <h2>Checks &amp; Notes</h2>
+    <span class="tag" style="background:#fef3c7;color:#92400e;">Visual + Initial Checks</span>
+  </div>
+
+  <div class="tip">
+    <span class="tip-icon">ℹ️</span>
+    <span>This step covers two tasks: (1) verifying the car photos/video uploaded at check-in, and (2) documenting any visible damages or issues with supporting photos.</span>
+  </div>
+
+  <div class="card no-break">
+    <h3>Part A — Car Media Verification</h3>
+    <p style="font-size:11.5px;color:#475569;margin-bottom:10px;">You will see all check-in photos and the 360° video. For each one, you must either <strong>Verify</strong> or <strong>Reject</strong> it.</p>
+    <ul class="action-list">
+      <li>
+        <span class="icon" style="background:#f0fdf4;color:#16a34a;">✅</span>
+        <span><strong>Verify</strong> — The photo/video is clear, correct angle, and matches the car. Click "Verify" to approve it.</span>
+      </li>
+      <li>
+        <span class="icon" style="background:#fee2e2;color:#dc2626;">❌</span>
+        <span><strong>Reject</strong> — The photo is blurry, wrong angle, or does not show the car clearly. Click "Reject", select a reject reason, add a note, and upload a replacement photo.</span>
+      </li>
+    </ul>
+    <div class="grid-3" style="margin-top:12px;">
+      <div class="field-pill">
+        <div class="label">Reject Reasons</div>
+        <div class="value">Blur · Wrong angle · Not same car · Blocked view · Poor lighting</div>
+      </div>
+      <div class="field-pill">
+        <div class="label">Required</div>
+        <div class="value">All rejected media must have a replacement upload before Step 4 unlocks</div>
+      </div>
+      <div class="field-pill">
+        <div class="label">Media Types</div>
+        <div class="value">Front · Rear · Right · Left · 360 Video</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card no-break">
+    <h3>Part B — Issues / Damage Notes</h3>
+    <p style="font-size:11.5px;color:#475569;margin-bottom:10px;">Document any scratches, dents, rust, broken parts, or other visible damage found during your initial walk-around.</p>
+    <ul class="action-list">
+      <li>
+        <span class="icon" style="background:#eff6ff;color:#3b82f6;">➕</span>
+        <span>Click <strong>"+ Add Note"</strong> to open the damage entry form.</span>
+      </li>
+      <li>
+        <span class="icon" style="background:#fffbeb;color:#d97706;">✍️</span>
+        <span>Write a clear description of the damage (e.g. <em>"Deep scratch on rear bumper, left side"</em>).</span>
+      </li>
+      <li>
+        <span class="icon" style="background:#f0fdf4;color:#16a34a;">📷</span>
+        <span>Upload a photo of the damage. Tap <strong>"Add Note"</strong> to save it.</span>
+      </li>
+      <li>
+        <span class="icon" style="background:#eff6ff;color:#3b82f6;">🔁</span>
+        <span>Repeat for each separate damage point. You can add as many notes as needed.</span>
+      </li>
+    </ul>
+  </div>
+
+  <div class="tip">
+    <span class="tip-icon">💡</span>
+    <span>Document <em>every</em> damage note here — even minor ones. These notes are included in the final inspection report and protect both the customer and the workshop.</span>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <!-- STEP 4 -->
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <div class="section-head no-break page-break">
+    <div class="step-badge c4">4</div>
+    <h2>Vehicle Data &amp; VIN</h2>
+    <span class="tag" style="background:#ede9fe;color:#5b21b6;">Data Entry</span>
+  </div>
+
+  <div class="tip">
+    <span class="tip-icon">ℹ️</span>
+    <span>This step records the vehicle's identifying information and uses the <strong>VIN (Vehicle Identification Number)</strong> to automatically look up make, model, year, and parts catalog.</span>
+  </div>
+
+  <div class="card no-break">
+    <h3>Fields to Complete</h3>
+    <div class="grid-2">
+      <div class="field-pill">
+        <div class="label">VIN ★ Required</div>
+        <div class="value">17-character Vehicle Identification Number — found on the dashboard (driver side) or door jamb</div>
+      </div>
+      <div class="field-pill">
+        <div class="label">Car Plate ★ Required</div>
+        <div class="value">Vehicle license plate number</div>
+      </div>
+      <div class="field-pill">
+        <div class="label">Car Make</div>
+        <div class="value">Auto-filled from VIN (e.g. Toyota, BMW)</div>
+      </div>
+      <div class="field-pill">
+        <div class="label">Car Model</div>
+        <div class="value">Auto-filled from VIN (e.g. Camry, 3 Series)</div>
+      </div>
+      <div class="field-pill">
+        <div class="label">Car Year</div>
+        <div class="value">Auto-filled from VIN decode</div>
+      </div>
+      <div class="field-pill">
+        <div class="label">Car Mileage ★ Required</div>
+        <div class="value">Current odometer reading in km</div>
+      </div>
+      <div class="field-pill">
+        <div class="label">Tyre Size — Front ★</div>
+        <div class="value">Select from standard sizes (e.g. 225/45R17)</div>
+      </div>
+      <div class="field-pill">
+        <div class="label">Tyre Size — Rear ★</div>
+        <div class="value">May differ from front on some vehicles</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card no-break">
+    <h3>Using the VIN Check Feature</h3>
+    <ul class="action-list">
+      <li>
+        <span class="icon" style="background:#eff6ff;color:#3b82f6;">1️⃣</span>
+        <span>Type or scan the VIN into the <strong>VIN field</strong>. VIN must be exactly 17 characters.</span>
+      </li>
+      <li>
+        <span class="icon" style="background:#eff6ff;color:#3b82f6;">2️⃣</span>
+        <span>Click <strong>"Check VIN"</strong>. The system will look up the vehicle details automatically.</span>
+      </li>
+      <li>
+        <span class="icon" style="background:#eff6ff;color:#3b82f6;">3️⃣</span>
+        <span>If <strong>multiple matches</strong> are found, a dropdown will appear — select the correct vehicle variant.</span>
+      </li>
+      <li>
+        <span class="icon" style="background:#f0fdf4;color:#16a34a;">✅</span>
+        <span>The fields for Make, Model, and Year will be auto-filled. The VIN also unlocks the <strong>Parts Catalog</strong> in Step 5.</span>
+      </li>
+    </ul>
+  </div>
+
+  <div class="tip warn">
+    <span class="tip-icon">⚠️</span>
+    <span>All four required fields (VIN, Plate, Mileage, both Tyre sizes) must be completed before you can advance to Step 5. Double-check the mileage matches the odometer in the car.</span>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <!-- STEP 5 — MAIN STEP -->
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <div class="section-head no-break page-break">
+    <div class="step-badge c5">5</div>
+    <h2>Inspection Findings &amp; Parts</h2>
+    <span class="tag" style="background:#d1fae5;color:#065f46;">Core Inspection Work</span>
+  </div>
+
+  <div class="tip">
+    <span class="tip-icon">ℹ️</span>
+    <span>This is the main inspection step where you document all required parts and findings. There are two sections: <strong>Inspection Checks</strong> (quick system checks with photos) and <strong>Findings / Parts Needed</strong> (detailed line items).</span>
+  </div>
+
+  <!-- 5A: Process Checks -->
+  <div class="card no-break">
+    <h3>Part A — Inspection Checks (Oil · Battery · Tyre · OBD)</h3>
+    <p style="font-size:11.5px;color:#475569;margin-bottom:10px;">Four quick system checks that must be documented with a status and supporting photos.</p>
+    <table class="sev-table" style="margin-bottom:4px;">
+      <thead>
+        <tr>
+          <th>Check</th>
+          <th>Status Options</th>
+          <th>What to Do</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Oil Check</strong></td>
+          <td><span class="badge-green">OK</span> &nbsp;<span class="badge-amber">Issue</span> &nbsp;<span class="badge-blue">N/A</span></td>
+          <td>Inspect oil level and color. Upload dipstick or engine bay photo.</td>
+        </tr>
+        <tr>
+          <td><strong>Battery Check</strong></td>
+          <td><span class="badge-green">OK</span> &nbsp;<span class="badge-amber">Issue</span> &nbsp;<span class="badge-blue">N/A</span></td>
+          <td>Check battery terminals and voltage. Upload battery photo.</td>
+        </tr>
+        <tr>
+          <td><strong>Tyre Check</strong></td>
+          <td><span class="badge-green">OK</span> &nbsp;<span class="badge-amber">Issue</span> &nbsp;<span class="badge-blue">N/A</span></td>
+          <td>Check tread depth and pressure on all 4 tyres. Upload tyre photo.</td>
+        </tr>
+        <tr>
+          <td><strong>OBD Check</strong></td>
+          <td><span class="badge-green">OK</span> &nbsp;<span class="badge-amber">Issue</span> &nbsp;<span class="badge-blue">N/A</span></td>
+          <td>Connect OBD scanner. Upload screenshot of fault codes or "no faults" screen.</td>
+        </tr>
+      </tbody>
+    </table>
+    <p style="font-size:11px;color:#64748b;margin-top:8px;">If any check shows <strong>Issue</strong>, a description field will appear — describe the problem in detail.</p>
+  </div>
+
+  <!-- 5B: AI Assistant -->
+  <div class="card no-break" style="border-left:4px solid #06b6d4;">
+    <h3 style="color:#0e7490;">AI Line Item Assistant</h3>
+    <p style="font-size:11.5px;color:#475569;margin-bottom:10px;">The blue banner at the top of the Findings section shows AI-generated guidance based on the vehicle and parts already added.</p>
+    <ul class="action-list">
+      <li>
+        <span class="icon" style="background:#cffafe;color:#0e7490;">❓</span>
+        <span><strong>Questions</strong> — The AI asks diagnostic questions to help you think of parts you might have missed (e.g. "Have you checked the brake fluid level?").</span>
+      </li>
+      <li>
+        <span class="icon" style="background:#cffafe;color:#0e7490;">💡</span>
+        <span><strong>Suggestions</strong> — The AI recommends related parts commonly replaced alongside the ones you've already added.</span>
+      </li>
+    </ul>
+    <div class="tip" style="margin-top:10px;margin-bottom:0;">
+      <span class="tip-icon">💡</span>
+      <span>Read the AI questions before finalizing the inspection — they often catch parts that are easy to overlook during a busy day.</span>
+    </div>
+  </div>
+
+  <!-- 5C: Adding Parts via Catalog -->
+  <div class="card no-break">
+    <h3>Part B — Adding Parts via VIN Catalog (Parts Catalog Modal)</h3>
+    <p style="font-size:11.5px;color:#475569;margin-bottom:10px;">Click <strong>"+ Add Line Item"</strong> (top right of Findings section, or bottom of the list) to open the <strong>Parts Catalog popup</strong>.</p>
+
+    <div class="flow" style="margin-bottom:14px;">
+      <div class="flow-box">Click + Add Line Item</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-box">Catalog Modal Opens</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-box">Select Category Levels</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-box">Pick Parts</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-box">Add Selected Parts</div>
+    </div>
+
+    <ul class="action-list">
+      <li>
+        <span class="icon" style="background:#f0fdf4;color:#16a34a;">1️⃣</span>
+        <span><strong>EPC field</strong> — Auto-filled from the VIN lookup. If empty, enter the brand code manually (e.g. <code>audi_vw</code>, <code>toyota</code>). Then click <strong>Reload</strong> to load the catalog.</span>
+      </li>
+      <li>
+        <span class="icon" style="background:#f0fdf4;color:#16a34a;">2️⃣</span>
+        <span><strong>Level 1 — Main Category</strong> — Select the system area (e.g. Engine, Transmission, Brakes, Body).</span>
+      </li>
+      <li>
+        <span class="icon" style="background:#f0fdf4;color:#16a34a;">3️⃣</span>
+        <span><strong>Level 2 / 3 / 4</strong> — Drill down through sub-categories until the parts list appears. Some vehicles have 2 levels; others have up to 4.</span>
+      </li>
+      <li>
+        <span class="icon" style="background:#f0fdf4;color:#16a34a;">4️⃣</span>
+        <span><strong>Select parts</strong> — Tick the checkboxes next to each part you need. Use <strong>Search</strong> to filter by part name or number. Use <strong>Select All</strong> to select all visible parts.</span>
+      </li>
+      <li>
+        <span class="icon" style="background:#f0fdf4;color:#16a34a;">5️⃣</span>
+        <span>Click <strong>"Add Selected Parts"</strong>. The modal closes and the parts appear as new line items in the Findings table.</span>
+      </li>
+      <li>
+        <span class="icon" style="background:#eff6ff;color:#3b82f6;">🔁</span>
+        <span>Repeat for each system/category. Open the modal again and select a different Level 1 category to add more parts.</span>
+      </li>
+    </ul>
+  </div>
+
+  <!-- 5D: Manual Entry -->
+  <div class="card no-break border-c3">
+    <h3 style="color:#92400e;">Part C — Manual Entry (When No Catalog is Available)</h3>
+    <p style="font-size:11.5px;color:#475569;margin-bottom:10px;">If the system cannot find a VIN catalog for this vehicle, an <strong>amber "Manual Inspection Entry"</strong> panel will automatically appear.</p>
+    <ul class="action-list">
+      <li>
+        <span class="icon" style="background:#fffbeb;color:#d97706;">1️⃣</span>
+        <span>Click <strong>"+ Add Manual Entry"</strong> to expand the form.</span>
+      </li>
+      <li>
+        <span class="icon" style="background:#fffbeb;color:#d97706;">2️⃣</span>
+        <span>Select the <strong>System / Category</strong> (Engine, Gearbox, Brakes, Suspension, Electrical, Body, Other).</span>
+      </li>
+      <li>
+        <span class="icon" style="background:#fffbeb;color:#d97706;">3️⃣</span>
+        <span>Select the <strong>Severity</strong> (Safety Risk, Mandatory, Recommended, Optional).</span>
+      </li>
+      <li>
+        <span class="icon" style="background:#fffbeb;color:#d97706;">4️⃣</span>
+        <span>In <strong>"What did you observe?"</strong> — describe what you physically saw or heard (e.g. <em>"Worn brake pads, metal-on-metal grinding when braking"</em>).</span>
+      </li>
+      <li>
+        <span class="icon" style="background:#fffbeb;color:#d97706;">5️⃣</span>
+        <span>Enter the <strong>Part Name</strong> and <strong>Part Number</strong> if known. Part number can be left blank — the vendor will confirm it.</span>
+      </li>
+      <li>
+        <span class="icon" style="background:#fffbeb;color:#d97706;">6️⃣</span>
+        <span>Set the <strong>Quantity</strong> (default is 1). Click <strong>"Add to Findings"</strong>.</span>
+      </li>
+    </ul>
+  </div>
+
+  <!-- 5E: Line Item Table -->
+  <div class="card no-break page-break">
+    <h3>Part D — Working with Line Items (Findings Table)</h3>
+    <p style="font-size:11.5px;color:#475569;margin-bottom:10px;">Each part added from the catalog or manual entry appears as a row in the Findings table. Expand each row to complete the details.</p>
+    <ul class="action-list">
+      <li>
+        <span class="icon" style="background:#f0fdf4;color:#16a34a;">🔽</span>
+        <span><strong>Expand a row</strong> — Click the row or the expand button to open its full detail panel.</span>
+      </li>
+      <li>
+        <span class="icon" style="background:#eff6ff;color:#3b82f6;">🔢</span>
+        <span><strong>Part Name / Number / Qty</strong> — Edit the auto-filled fields if needed. Part name comes from the catalog; edit it if incorrect.</span>
+      </li>
+      <li>
+        <span class="icon" style="background:#fee2e2;color:#dc2626;">⚡</span>
+        <span><strong>Severity / Status</strong> — Set to: <span class="badge-red">Safety Risk</span> <span class="badge-amber">Mandatory</span> <span class="badge-blue">Recommended</span> <span class="badge-green">Optional</span></span>
+      </li>
+      <li>
+        <span class="icon" style="background:#fdf4ff;color:#9333ea;">🤖</span>
+        <span><strong>AI Questions</strong> — Answer the per-part AI questions (Yes / No / N/A). These help the AI generate better suggestions for related parts.</span>
+      </li>
+      <li>
+        <span class="icon" style="background:#f0fdf4;color:#16a34a;">🖼️</span>
+        <span><strong>Part Diagram</strong> — If available, a diagram image is shown inline. If not, a <em>"Search Diagram"</em> Google Images link is shown for that part number.</span>
+      </li>
+      <li>
+        <span class="icon" style="background:#fffbeb;color:#d97706;">✍️</span>
+        <span><strong>Inspector Note</strong> — Add any additional observation about this specific part (optional but helpful for vendors).</span>
+      </li>
+      <li>
+        <span class="icon" style="background:#f0fdf4;color:#16a34a;">💾</span>
+        <span><strong>Save the row</strong> — Click <strong>"Save"</strong> on each row, or use <strong>"Save All Draft"</strong> at the top to save all unsaved rows at once.</span>
+      </li>
+      <li>
+        <span class="icon" style="background:#fee2e2;color:#dc2626;">🗑️</span>
+        <span><strong>Remove a row</strong> — Click the remove/delete button on the row to delete an incorrectly added part.</span>
+      </li>
+    </ul>
+  </div>
+
+  <!-- 5F: Severity guide -->
+  <div class="card no-break">
+    <h3>Severity Level Guide</h3>
+    <table class="sev-table">
+      <thead>
+        <tr>
+          <th style="width:120px;">Level</th>
+          <th>Meaning</th>
+          <th>Examples</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="badge-red">Safety Risk</span></td>
+          <td>Vehicle is unsafe to drive. Repair is urgent and cannot be delayed.</td>
+          <td>Failed brakes, no steering fluid, bald tyres, cracked windshield</td>
+        </tr>
+        <tr>
+          <td><span class="badge-amber">Mandatory</span></td>
+          <td>Must be repaired. Vehicle may break down without this fix.</td>
+          <td>Engine misfires, transmission slipping, coolant leak</td>
+        </tr>
+        <tr>
+          <td><span class="badge-blue">Recommended</span></td>
+          <td>Should be done soon to prevent bigger problems.</td>
+          <td>Worn brake pads (30%), dirty filters, cracked belts</td>
+        </tr>
+        <tr>
+          <td><span class="badge-green">Optional</span></td>
+          <td>Nice to fix but not urgent. Customer can decide.</td>
+          <td>Cosmetic scratches, minor interior trim, cabin air filter</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 5G: AI Smart Suggestions -->
+  <div class="card no-break" style="border-left:4px solid #8b5cf6;">
+    <h3 style="color:#5b21b6;">AI Smart Fault Suggestions</h3>
+    <p style="font-size:11.5px;color:#475569;margin-bottom:10px;">After you add a line item from the catalog, the AI analyzes the category and vehicle, then suggests <strong>other parts commonly affected</strong> in the same system.</p>
+    <ul class="action-list">
+      <li>
+        <span class="icon" style="background:#ede9fe;color:#7c3aed;">💡</span>
+        <span>Suggestions appear below the Findings table header. Each suggestion has a <strong>label</strong> and <strong>reason</strong> explaining why this part may also need attention.</span>
+      </li>
+      <li>
+        <span class="icon" style="background:#ede9fe;color:#7c3aed;">➕</span>
+        <span>Click <strong>"Add"</strong> next to a suggestion to instantly add it as a new line item. The AI reason becomes the Inspector Note for that row.</span>
+      </li>
+      <li>
+        <span class="icon" style="background:#ede9fe;color:#7c3aed;">🔄</span>
+        <span>Suggestions update automatically each time you add or save a new line item.</span>
+      </li>
+    </ul>
+  </div>
+
+  <div class="tip">
+    <span class="tip-icon">💡</span>
+    <span>Use <strong>"Save All Draft"</strong> regularly as you work. This ensures nothing is lost if the page is accidentally refreshed.</span>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <!-- STEP 6 -->
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <div class="section-head no-break page-break">
+    <div class="step-badge c6">6</div>
+    <h2>Inspector Remarks &amp; Final Report</h2>
+    <span class="tag" style="background:#fee2e2;color:#991b1b;">Final Step</span>
+  </div>
+
+  <div class="tip">
+    <span class="tip-icon">ℹ️</span>
+    <span>This is the final step. You write your overall inspection remarks, then generate and download the PDF inspection report for the customer and service advisor.</span>
+  </div>
+
+  <div class="card no-break">
+    <h3>Inspector Remarks</h3>
+    <ul class="action-list">
+      <li>
+        <span class="icon" style="background:#fee2e2;color:#dc2626;">✍️</span>
+        <span>Write a <strong>final summary note</strong> in the remarks field. Cover the overall condition of the vehicle, your main concerns, and any special observations.</span>
+      </li>
+      <li>
+        <span class="icon" style="background:#fee2e2;color:#dc2626;">📝</span>
+        <span>Example: <em>"Vehicle is in generally good condition. Main concern is safety — the front brake pads are worn to metal and must be replaced immediately. The engine oil is overdue for a change. Recommend full fluid service alongside brake work."</em></span>
+      </li>
+    </ul>
+  </div>
+
+  <div class="card no-break">
+    <h3>Inspection Report</h3>
+    <p style="font-size:11.5px;color:#475569;margin-bottom:10px;">The system automatically compiles all inspection data into a professional PDF report. Click <strong>"Download Inspection Report (PDF)"</strong> to generate and save it.</p>
+    <div class="grid-2">
+      <div class="field-pill">
+        <div class="label">Report Includes</div>
+        <div class="value">Workshop logo · Vehicle details · Customer info · All findings with severity · Inspector remarks · Issue photos · Process check results</div>
+      </div>
+      <div class="field-pill">
+        <div class="label">Health Score</div>
+        <div class="value">Auto-calculated score (0–100) based on severity of all findings and system category weights</div>
+      </div>
+    </div>
+    <ul class="action-list" style="margin-top:8px;">
+      <li>
+        <span class="icon" style="background:#f0fdf4;color:#16a34a;">📄</span>
+        <span>The report is formatted for A4 print and can be emailed to the customer or presented on screen.</span>
+      </li>
+      <li>
+        <span class="icon" style="background:#f0fdf4;color:#16a34a;">✅</span>
+        <span>After completing remarks and downloading the report, the inspection is marked as complete and becomes <strong>read-only</strong>.</span>
+      </li>
+    </ul>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <!-- FINAL CHECKLIST -->
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <div class="section-head no-break page-break" style="border-bottom-color:#0f172a;">
+    <div class="step-badge" style="background:#0f172a;">✓</div>
+    <h2>Pre-Submission Checklist</h2>
+    <span class="tag" style="background:#f1f5f9;color:#475569;">Review Before Completing</span>
+  </div>
+
+  <div class="card no-break">
+    <ul class="checklist">
+      <li><span class="box"></span>Step 1 — Collect car review completed; difference noted or confirmed</li>
+      <li><span class="box"></span>Step 2 — Inspection start time recorded</li>
+      <li><span class="box"></span>Step 3 — All car media (Front/Rear/Right/Left/Video) verified or rejected with replacement</li>
+      <li><span class="box"></span>Step 3 — All visible damages documented with photos and descriptions</li>
+      <li><span class="box"></span>Step 4 — VIN entered and verified (17 characters)</li>
+      <li><span class="box"></span>Step 4 — Car plate, mileage, front and rear tyre sizes filled</li>
+      <li><span class="box"></span>Step 5 — Oil, Battery, Tyre, and OBD checks completed with photos</li>
+      <li><span class="box"></span>Step 5 — All parts/findings added as line items</li>
+      <li><span class="box"></span>Step 5 — Severity set for every line item</li>
+      <li><span class="box"></span>Step 5 — AI smart suggestions reviewed; relevant ones added</li>
+      <li><span class="box"></span>Step 5 — All draft line items saved ("Save All Draft")</li>
+      <li><span class="box"></span>Step 6 — Inspector remarks written</li>
+      <li><span class="box"></span>Step 6 — Inspection PDF report downloaded</li>
+    </ul>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <!-- QUICK REFERENCE -->
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <div class="section-head no-break">
+    <div class="step-badge" style="background:#475569;">?</div>
+    <h2>Quick Reference</h2>
+    <span class="tag" style="background:#f1f5f9;color:#475569;">Tips &amp; Reminders</span>
+  </div>
+
+  <div class="grid-2">
+    <div class="card no-break">
+      <h3>Common Mistakes to Avoid</h3>
+      <ul class="action-list">
+        <li><span class="icon" style="background:#fee2e2;color:#dc2626;">✗</span><span>Do not skip the VIN Check — the parts catalog will not load without a valid VIN.</span></li>
+        <li><span class="icon" style="background:#fee2e2;color:#dc2626;">✗</span><span>Do not set all parts to "Recommended" — use the correct severity level for each finding.</span></li>
+        <li><span class="icon" style="background:#fee2e2;color:#dc2626;">✗</span><span>Do not forget to Save All Draft before moving to Step 6.</span></li>
+        <li><span class="icon" style="background:#fee2e2;color:#dc2626;">✗</span><span>Do not reject a media photo without uploading a replacement — Step 4 will remain locked.</span></li>
+        <li><span class="icon" style="background:#fee2e2;color:#dc2626;">✗</span><span>Do not leave the Part Number blank for Safety Risk items — vendors need it to source parts quickly.</span></li>
+      </ul>
+    </div>
+    <div class="card no-break">
+      <h3>Best Practices</h3>
+      <ul class="action-list">
+        <li><span class="icon" style="background:#f0fdf4;color:#16a34a;">✓</span><span>Take clear, well-lit photos from multiple angles for each damage note.</span></li>
+        <li><span class="icon" style="background:#f0fdf4;color:#16a34a;">✓</span><span>Add parts in logical groups — all brake parts together, all engine parts together.</span></li>
+        <li><span class="icon" style="background:#f0fdf4;color:#16a34a;">✓</span><span>Review AI suggestions after adding each group of parts.</span></li>
+        <li><span class="icon" style="background:#f0fdf4;color:#16a34a;">✓</span><span>Write observation notes on each line item — this helps vendors price accurately.</span></li>
+        <li><span class="icon" style="background:#f0fdf4;color:#16a34a;">✓</span><span>Check the OBD for fault codes even if the customer didn't mention warning lights.</span></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ══ FOOTER ═════════════════════════════════════════════════ -->
+  <div style="margin-top:48px;padding-top:20px;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;font-size:10px;color:#94a3b8;">
+    <span>Global ERP — Vehicle Inspection Module</span>
+    <span>Inspector Reference Guide · 2026</span>
+    <span>For internal use only</span>
+  </div>
+
+</div>
+</body>
+</html>

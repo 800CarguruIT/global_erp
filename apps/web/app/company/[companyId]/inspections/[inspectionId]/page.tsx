@@ -55,6 +55,8 @@ type VinCatalogPartGroup = {
 type VinCatalogPart = {
   code: string;
   name: string;
+  nameZh: string;
+  diagram: string;
   groups: VinCatalogPartGroup[];
 };
 type VinCatalogGroupOption = {
@@ -337,6 +339,7 @@ export function InspectionDetailPageClient({
   const [vinPartsEpcIdState, setVinPartsEpcIdState] = useState("");
   const [vinPartsJsIdState, setVinPartsJsIdState] = useState("");
   const [vin17CatalogLoading, setVin17CatalogLoading] = useState(false);
+  const [vin17CatalogFetchDone, setVin17CatalogFetchDone] = useState(false);
   const [vin17CatalogAction, setVin17CatalogAction] = useState<"cata1" | "cata2" | "cata3" | "cata4">("cata1");
   const [vin17CatalogNodes, setVin17CatalogNodes] = useState<Vin17CatalogNodeOption[]>([]);
   const [vin17Cata1Options, setVin17Cata1Options] = useState<Vin17CatalogNodeOption[]>([]);
@@ -389,8 +392,19 @@ export function InspectionDetailPageClient({
   const [vinCatalogParts, setVinCatalogParts] = useState<VinCatalogPart[]>([]);
   const [vinCatalogGroups, setVinCatalogGroups] = useState<VinCatalogGroupOption[]>([]);
   const [vinCatalogLoading, setVinCatalogLoading] = useState(false);
+  const [manualPanelOpen, setManualPanelOpen] = useState(false);
+  const [catalogModalOpen, setCatalogModalOpen] = useState(false);
+  const [manualDraft, setManualDraft] = useState({
+    category: "",
+    observation: "",
+    part: "",
+    partNumber: "",
+    qty: "1",
+    reason: "Mandatory" as string,
+  });
   const vinCatalogLoadedVinRef = useRef("");
   const vin17AutoCatalogKeyRef = useRef("");
+  const partsCatalogRef = useRef<HTMLDivElement>(null);
   const [checks, setChecks] = useState<Record<string, CheckValue>>({});
   const [lineItemErrors, setLineItemErrors] = useState<Record<number, { part?: string; qty?: string; media?: string }>>(
     {}
@@ -1518,13 +1532,14 @@ export function InspectionDetailPageClient({
       }));
       setVin17CatalogNodes(nodes);
       setVin17CatalogAction(action);
-      if (action === "cata1") setVin17Cata1Options(nodes);
+      if (action === "cata1") { setVin17Cata1Options(nodes); setVin17CatalogFetchDone(true); }
       if (action === "cata2") setVin17Cata2Options(nodes);
       if (action === "cata3") setVin17Cata3Options(nodes);
       if (action === "cata4") setVin17Cata4Options(nodes);
       if (!opts?.quiet) toast.success(`Loaded ${nodes.length} item(s) for ${action.toUpperCase()}.`);
       return nodes;
     } catch (err: any) {
+      if (action === "cata1") setVin17CatalogFetchDone(true);
       toast.error(err?.message ?? "Failed to load 17VIN catalog level.");
       return [];
     } finally {
@@ -1535,7 +1550,6 @@ export function InspectionDetailPageClient({
   const selectCatalogLeaf = (code: string, level: number) => {
     setVinPartsLastCataCodeState(code);
     setVinPartsLastCataCodeLevelState(String(level));
-    toast.success(`Selected catalog leaf (L${level}). Parts will be loaded from this section.`);
   };
 
   const onSelectCata1 = async (code: string) => {
@@ -1550,12 +1564,15 @@ export function InspectionDetailPageClient({
     setVinPartsLastCataCodeLevelState("");
     const node = vin17Cata1Options.find((n) => n.code === code);
     if (!node || !code) return;
+    const label1 = node.name || code;
     if (node.isLast) {
-      selectCatalogLeaf(code, 1);
+      void fetchPartsForLeaf(code, 1, label1);
       return;
     }
     const next = await fetchVin17CatalogLevel("cata2", { cata1CodeOverride: code, quiet: true });
-    if (!next.length) selectCatalogLeaf(code, 1);
+    if (!next.length) {
+      void fetchPartsForLeaf(code, 1, label1);
+    }
   };
 
   const onSelectCata2 = async (code: string) => {
@@ -1568,8 +1585,10 @@ export function InspectionDetailPageClient({
     setVinPartsLastCataCodeLevelState("");
     const node = vin17Cata2Options.find((n) => n.code === code);
     if (!node || !code) return;
+    const cata1Name = vin17Cata1Options.find((n) => n.code === vin17Cata1Code)?.name ?? "";
+    const label2 = [cata1Name, node.name].filter(Boolean).join(" › ");
     if (node.isLast) {
-      selectCatalogLeaf(code, 2);
+      void fetchPartsForLeaf(code, 2, label2);
       return;
     }
     const next = await fetchVin17CatalogLevel("cata3", {
@@ -1577,7 +1596,7 @@ export function InspectionDetailPageClient({
       cata2CodeOverride: code,
       quiet: true,
     });
-    if (!next.length) selectCatalogLeaf(code, 2);
+    if (!next.length) void fetchPartsForLeaf(code, 2, label2);
   };
 
   const onSelectCata3 = async (code: string) => {
@@ -1588,8 +1607,11 @@ export function InspectionDetailPageClient({
     setVinPartsLastCataCodeLevelState("");
     const node = vin17Cata3Options.find((n) => n.code === code);
     if (!node || !code) return;
+    const cata1Name = vin17Cata1Options.find((n) => n.code === vin17Cata1Code)?.name ?? "";
+    const cata2Name = vin17Cata2Options.find((n) => n.code === vin17Cata2Code)?.name ?? "";
+    const label3 = [cata1Name, cata2Name, node.name].filter(Boolean).join(" › ");
     if (node.isLast) {
-      selectCatalogLeaf(code, 3);
+      void fetchPartsForLeaf(code, 3, label3);
       return;
     }
     const next = await fetchVin17CatalogLevel("cata4", {
@@ -1598,14 +1620,18 @@ export function InspectionDetailPageClient({
       cata3CodeOverride: code,
       quiet: true,
     });
-    if (!next.length) selectCatalogLeaf(code, 3);
+    if (!next.length) void fetchPartsForLeaf(code, 3, label3);
   };
 
   const onSelectCata4 = (code: string) => {
     setVin17Cata4Code(code);
     const node = vin17Cata4Options.find((n) => n.code === code);
     if (!node || !code) return;
-    selectCatalogLeaf(code, 4);
+    const cata1Name = vin17Cata1Options.find((n) => n.code === vin17Cata1Code)?.name ?? "";
+    const cata2Name = vin17Cata2Options.find((n) => n.code === vin17Cata2Code)?.name ?? "";
+    const cata3Name = vin17Cata3Options.find((n) => n.code === vin17Cata3Code)?.name ?? "";
+    const label4 = [cata1Name, cata2Name, cata3Name, node.name].filter(Boolean).join(" › ");
+    void fetchPartsForLeaf(code, 4, label4);
   };
 
   useEffect(() => {
@@ -1643,7 +1669,16 @@ export function InspectionDetailPageClient({
     setVin17Cata2Code("");
     setVin17Cata3Code("");
     setVin17Cata4Code("");
+    setVin17CatalogFetchDone(false);
+    setManualPanelOpen(false);
   }, [inspectionVin, vinLookupSelectedCarId]);
+
+  // Auto-open manual panel when catalog is confirmed unavailable.
+  useEffect(() => {
+    if (vin17CatalogFetchDone && vin17Cata1Options.length === 0) {
+      setManualPanelOpen(true);
+    }
+  }, [vin17CatalogFetchDone, vin17Cata1Options.length]);
 
   const buildVinCatalogGroupOptions = (partsList: VinCatalogPart[]): VinCatalogGroupOption[] => {
     const map = new Map<string, VinCatalogGroupOption>();
@@ -1661,6 +1696,91 @@ export function InspectionDetailPageClient({
     }
     return Array.from(map.values()).sort((a, b) => a.level - b.level || a.label.localeCompare(b.label));
   };
+
+  const fetchPartsForLeaf = useCallback(
+    async (lastCataCode: string, lastCataCodeLevel: number, groupLabel?: string) => {
+      const vin = inspectionVin.trim().toUpperCase();
+      const epc = vinPartsEpcState.trim();
+      setVinPartsLastCataCodeState(lastCataCode);
+      setVinPartsLastCataCodeLevelState(String(lastCataCodeLevel));
+      setBulkAddPartCodes([]);
+      setBulkPartSearch("");
+      setVinCatalogParts([]);
+      setVinCatalogGroups([]);
+      vinCatalogLoadedVinRef.current = "";
+      if (!companyId || !leadId || !vin || !epc) return;
+      setVinCatalogLoading(true);
+      try {
+        const buildUrl = (refresh: boolean) => {
+          const url = new URL(
+            `/api/company/${companyId}/sales/leads/${leadId}/vin-lookup`,
+            window.location.origin
+          );
+          url.searchParams.set("vin", vin);
+          url.searchParams.set("epc", epc);
+          url.searchParams.set("last_cata_code", lastCataCode);
+          url.searchParams.set("last_cata_code_level", String(lastCataCodeLevel));
+          if (refresh) url.searchParams.set("refresh", "1");
+          if (vinLookupSelectedCarId) url.searchParams.set("carId", vinLookupSelectedCarId);
+          return url.toString();
+        };
+        // Always refresh — DB cache stores the last category's parts, not the current one.
+        const res = await fetch(buildUrl(true), { cache: "no-store" });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(String(body?.error ?? "Failed to load parts"));
+        const rawParts = Array.isArray(body?.data?.parts) ? body.data.parts : [];
+        const normalizedParts: VinCatalogPart[] = rawParts.map((part: any) => ({
+          code: String(part?.code ?? "").trim(),
+          name: String(part?.name ?? "").trim(),
+          nameZh: String(part?.nameZh ?? "").trim(),
+          diagram: String(part?.diagram ?? "").trim(),
+          groups: Array.isArray(part?.groups)
+            ? part.groups.map((group: any) => ({
+                id: String(group?.id ?? "").trim(),
+                level: Number(group?.level ?? 0) || 0,
+                name: String(group?.name ?? "").trim(),
+              }))
+            : [],
+        }));
+        setVinCatalogParts(normalizedParts);
+        // Inject a synthetic group entry keyed by lastCataCode so line items can resolve
+        // a human-readable label even when 17VIN parts don't carry group metadata.
+        const baseGroups = buildVinCatalogGroupOptions(normalizedParts);
+        const syntheticLabel = groupLabel?.trim() || lastCataCode;
+        const syntheticGroup: VinCatalogGroupOption = {
+          key: lastCataCode,
+          label: syntheticLabel,
+          level: lastCataCodeLevel,
+        };
+        setVinCatalogGroups([...baseGroups, syntheticGroup]);
+        vinCatalogLoadedVinRef.current = vin;
+        if (!normalizedParts.length) toast.error("No parts found for this category.");
+        else toast.success(`${normalizedParts.length} part(s) loaded.`);
+      } catch (err: any) {
+        toast.error(err?.message ?? "Failed to load parts.");
+      } finally {
+        setVinCatalogLoading(false);
+      }
+    },
+    [companyId, inspectionVin, leadId, vinLookupSelectedCarId, vinPartsEpcState]
+  );
+
+  const resetCatalogSection = useCallback(() => {
+    setVin17Cata1Code("");
+    setVin17Cata2Code("");
+    setVin17Cata3Code("");
+    setVin17Cata4Code("");
+    setVin17Cata2Options([]);
+    setVin17Cata3Options([]);
+    setVin17Cata4Options([]);
+    setVinPartsLastCataCodeState("");
+    setVinPartsLastCataCodeLevelState("");
+    setVinCatalogParts([]);
+    setVinCatalogGroups([]);
+    setBulkAddPartCodes([]);
+    setBulkPartSearch("");
+    vinCatalogLoadedVinRef.current = "";
+  }, []);
 
   const ensureVinCatalogForLineItems = useCallback(async () => {
     const vin = inspectionVin.trim().toUpperCase();
@@ -1743,6 +1863,8 @@ export function InspectionDetailPageClient({
       const normalizedParts: VinCatalogPart[] = rawParts.map((part: any) => ({
         code: String(part?.code ?? "").trim(),
         name: String(part?.name ?? "").trim(),
+        nameZh: String(part?.nameZh ?? "").trim(),
+        diagram: String(part?.diagram ?? "").trim(),
         groups: Array.isArray(part?.groups)
           ? part.groups.map((group: any) => ({
               id: String(group?.id ?? "").trim(),
@@ -2817,6 +2939,90 @@ export function InspectionDetailPageClient({
     }),
     [makeLineItemClientRowKey]
   );
+
+  const addSelectedCatalogParts = useCallback(() => {
+    if (!bulkAddPartCodes.length) {
+      toast.error("Select at least one part.");
+      return;
+    }
+    const selectedParts = bulkAddPartCodes
+      .map((code) => vinCatalogParts.find((p) => p.code === code))
+      .filter(Boolean) as VinCatalogPart[];
+    if (!selectedParts.length) {
+      toast.error("No valid parts selected.");
+      return;
+    }
+    // Use the leaf catalog code as the group key — fetchPartsForLeaf registers a synthetic
+    // VinCatalogGroupOption with this key so the label resolves correctly in line items.
+    const groupKey = vinPartsLastCataCodeState || "manual";
+    const groupLabel = vinCatalogGroups.find((g) => g.key === groupKey)?.label ?? groupKey;
+    const newRows = selectedParts.map((part) =>
+      buildLineItemDraftFromCatalog(part.name || part.code || "", part.code || "", groupKey)
+    );
+    setParts((prev) => [...prev, ...newRows]);
+    setExpandedLineItemsByRow((prev) => {
+      const next = { ...prev };
+      for (const row of newRows) {
+        const key = String(row.clientRowKey ?? "");
+        if (key) next[key] = false;
+      }
+      return next;
+    });
+    setBulkAddPartCodes([]);
+    for (const row of newRows) {
+      if (!row.clientRowKey || !row.part) continue;
+      void requestLineItemAi(
+        row.clientRowKey,
+        {
+          partName: row.part,
+          partNumber: row.catalogPartCode ?? "",
+          groupName: groupLabel,
+          description: row.description ?? "",
+          status: row.reason ?? "",
+        },
+        undefined,
+        undefined
+      );
+    }
+    toast.success(`${newRows.length} line item(s) added.`);
+    setCatalogModalOpen(false);
+  }, [bulkAddPartCodes, buildLineItemDraftFromCatalog, requestLineItemAi, vinCatalogGroups, vinCatalogParts, vinPartsLastCataCodeState]);
+
+  const addManualLineItem = useCallback(() => {
+    const part = manualDraft.part.trim();
+    if (!part) {
+      toast.error("Part name is required.");
+      return;
+    }
+    const groupKey = manualDraft.category || "manual";
+    const newRow = buildLineItemDraftFromCatalog(part, manualDraft.partNumber.trim(), groupKey, {
+      qty: manualDraft.qty || "1",
+      reason: manualDraft.reason || "Mandatory",
+      description: manualDraft.observation.trim(),
+    });
+    setParts((prev) => [...prev, newRow]);
+    setExpandedLineItemsByRow((prev) => {
+      const key = String(newRow.clientRowKey ?? "");
+      return key ? { ...prev, [key]: false } : prev;
+    });
+    if (newRow.clientRowKey && newRow.part) {
+      void requestLineItemAi(
+        newRow.clientRowKey,
+        {
+          partName: newRow.part,
+          partNumber: newRow.catalogPartCode ?? "",
+          groupName: manualDraft.category,
+          description: newRow.description ?? "",
+          status: newRow.reason ?? "",
+        },
+        undefined,
+        undefined
+      );
+    }
+    setManualDraft({ category: manualDraft.category, observation: "", part: "", partNumber: "", qty: "1", reason: "Mandatory" });
+    toast.success("Part added to findings.");
+  }, [buildLineItemDraftFromCatalog, manualDraft, requestLineItemAi]);
+
   const addSmartSuggestionAsLineItem = useCallback(
     async (
       index: number,
@@ -4367,11 +4573,11 @@ export function InspectionDetailPageClient({
                       </button>
                       <button
                         type="button"
-                        className="rounded-md bg-teal-600 px-2.5 py-1 text-[11px] font-semibold text-white"
-                        onClick={addLineItemRow}
-                        disabled={vinCatalogLoading || (parts.length > 0 && parts.some((p) => !p.isSaved))}
+                        className="rounded-md bg-teal-600 px-2.5 py-1 text-[11px] font-semibold text-white disabled:opacity-50"
+                        disabled={vin17CatalogLoading || vinCatalogLoading}
+                        onClick={() => { resetCatalogSection(); setCatalogModalOpen(true); }}
                       >
-                        {vinCatalogLoading ? "Loading..." : "+ Add Line Item"}
+                        + Add Line Item
                       </button>
                     </>
                   )}
@@ -4398,244 +4604,117 @@ export function InspectionDetailPageClient({
                   </div>
                 </div>
               </div>
-              {!isReadOnly && !isCollectCarPending && (
-                <div className="mt-2 rounded-md border border-emerald-500/20 bg-emerald-500/5 p-3">
-                  <div className="text-[11px] font-semibold uppercase tracking-wide text-emerald-200">
-                    17VIN Multi-Level Catalog
-                  </div>
-                  <div className="mt-2 grid gap-2 lg:grid-cols-[1fr_auto] lg:items-end">
-                    <div>
-                      <div className="text-[10px] font-semibold uppercase tracking-wide text-emerald-100/80">
-                        EPC
-                      </div>
-                      <input
-                        type="text"
-                        className={`${theme.input} h-10 w-full`}
-                        value={vinPartsEpcState}
-                        onChange={(e) => setVinPartsEpcState(e.target.value)}
-                        placeholder="Auto from VIN (e.g. toyota)"
-                      />
+              {/* Manual Inspection Entry — only visible when catalog check is done and no catalog found */}
+              {!isReadOnly && !isCollectCarPending && vin17CatalogFetchDone && vin17Cata1Options.length === 0 && (
+                <div className="mt-2 rounded-md border border-amber-500/20 bg-amber-500/5 p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-amber-200">
+                      Manual Inspection Entry
                     </div>
                     <button
                       type="button"
-                      className="h-10 rounded-md bg-emerald-600 px-3 text-xs font-semibold text-white disabled:opacity-50"
-                      disabled={vin17CatalogLoading || !vinPartsEpcState}
-                      onClick={() => void fetchVin17CatalogLevel("cata1")}
+                      className="rounded-md border border-amber-500/30 px-2 py-1 text-[10px] font-semibold text-amber-200 hover:bg-amber-500/10"
+                      onClick={() => setManualPanelOpen((v) => !v)}
                     >
-                      {vin17CatalogLoading ? "Loading..." : "Reload Level 1"}
+                      {manualPanelOpen ? "Hide" : "+ Add Manual Entry"}
                     </button>
                   </div>
-
-                  <div className="mt-2 grid gap-2 lg:grid-cols-2">
-                    <div>
-                      <div className="text-[10px] font-semibold uppercase tracking-wide text-emerald-100/80">
-                        Level 1 Category
+                  {manualPanelOpen && (
+                    <div className="mt-3 space-y-2">
+                      <div className="rounded-md border border-amber-400/10 bg-black/20 px-3 py-2 text-[11px] text-amber-100/80">
+                        Describe what you observed — AI will assist with part suggestions based on the category.
                       </div>
-                      <select
-                        className={`${theme.input} h-10 w-full`}
-                        value={vin17Cata1Code}
-                        onChange={(e) => void onSelectCata1(e.target.value)}
-                        disabled={vin17CatalogLoading || vin17Cata1Options.length === 0}
-                      >
-                        <option value="">Select level 1</option>
-                        {vin17Cata1Options.map((row, idx) => (
-                          <option key={`c1-${row.code}`} value={row.code}>
-                            {toCatalogDisplayLabel(row.name, idx)}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <div className="text-[10px] font-semibold uppercase tracking-wide text-emerald-100/80">
-                        Level 2 Category
+                      <div className="grid gap-2 lg:grid-cols-2">
+                        <div>
+                          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-amber-100/80">System / Category</div>
+                          <select
+                            className={`${theme.input} h-10 w-full`}
+                            value={manualDraft.category}
+                            onChange={(e) => setManualDraft((d) => ({ ...d, category: e.target.value }))}
+                          >
+                            <option value="">Select category</option>
+                            <option value="Engine">Engine</option>
+                            <option value="Gearbox">Gearbox</option>
+                            <option value="Brakes">Brakes</option>
+                            <option value="Suspension">Suspension</option>
+                            <option value="Electrical">Electrical</option>
+                            <option value="Body">Body</option>
+                            <option value="Other">Other</option>
+                          </select>
+                        </div>
+                        <div>
+                          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-amber-100/80">Severity</div>
+                          <select
+                            className={`${theme.input} h-10 w-full`}
+                            value={manualDraft.reason}
+                            onChange={(e) => setManualDraft((d) => ({ ...d, reason: e.target.value }))}
+                          >
+                            <option value="Safety Risk">Safety Risk</option>
+                            <option value="Mandatory">Mandatory</option>
+                            <option value="Recommended">Recommended</option>
+                            <option value="Optional">Optional</option>
+                          </select>
+                        </div>
                       </div>
-                      <select
-                        className={`${theme.input} h-10 w-full`}
-                        value={vin17Cata2Code}
-                        onChange={(e) => void onSelectCata2(e.target.value)}
-                        disabled={vin17CatalogLoading || !vin17Cata1Code || vin17Cata2Options.length === 0}
-                      >
-                        <option value="">Select level 2</option>
-                        {vin17Cata2Options.map((row, idx) => (
-                          <option key={`c2-${row.code}`} value={row.code}>
-                            {toCatalogDisplayLabel(row.name, idx)}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <div className="text-[10px] font-semibold uppercase tracking-wide text-emerald-100/80">
-                        Level 3 Category
-                      </div>
-                      <select
-                        className={`${theme.input} h-10 w-full`}
-                        value={vin17Cata3Code}
-                        onChange={(e) => void onSelectCata3(e.target.value)}
-                        disabled={vin17CatalogLoading || !vin17Cata2Code || vin17Cata3Options.length === 0}
-                      >
-                        <option value="">Select level 3</option>
-                        {vin17Cata3Options.map((row, idx) => (
-                          <option key={`c3-${row.code}`} value={row.code}>
-                            {toCatalogDisplayLabel(row.name, idx)}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <div className="text-[10px] font-semibold uppercase tracking-wide text-emerald-100/80">
-                        Level 4 Category
-                      </div>
-                      <select
-                        className={`${theme.input} h-10 w-full`}
-                        value={vin17Cata4Code}
-                        onChange={(e) => onSelectCata4(e.target.value)}
-                        disabled={vin17CatalogLoading || !vin17Cata3Code || vin17Cata4Options.length === 0}
-                      >
-                        <option value="">Select level 4</option>
-                        {vin17Cata4Options.map((row, idx) => (
-                          <option key={`c4-${row.code}`} value={row.code}>
-                            {toCatalogDisplayLabel(row.name, idx)}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="mt-2 text-[11px] text-emerald-100/90">
-                    {vinPartsLastCataCodeState
-                      ? "Category section selected. Parts will be loaded from this section."
-                      : "Select category levels until a leaf is reached; parts will then load from that section."}
-                  </div>
-                </div>
-              )}
-              {vinCatalogGroups.length > 0 && !isReadOnly && !isCollectCarPending && (
-                <div className="mt-2 rounded-md border border-cyan-500/20 bg-cyan-500/5 p-3">
-                  <div className="text-[11px] font-semibold uppercase tracking-wide text-cyan-200">
-                    Add Multiple Line Items By Group
-                  </div>
-                  <div className="mt-2 grid gap-2 lg:grid-cols-[1.2fr_auto] lg:items-end">
-                    <div className="space-y-1">
-                      <div className="text-[10px] font-semibold uppercase tracking-wide text-cyan-100/80">Car Group</div>
-                      <select
-                        className={`${theme.input} h-10 w-full`}
-                        value={bulkAddGroupKey}
-                        onChange={(e) => {
-                          setBulkAddGroupKey(e.target.value);
-                          setBulkAddPartCodes([]);
-                          setBulkPartSearch("");
-                        }}
-                      >
-                        <option value="">Select Car Group</option>
-                        {vinCatalogGroups.map((group) => (
-                          <option key={group.key} value={group.key}>
-                            {group.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <button
-                      type="button"
-                      className="h-10 rounded-md bg-teal-600 px-3 text-xs font-semibold text-white disabled:opacity-50"
-                      disabled={!bulkAddGroupKey || bulkAddPartCodes.length === 0}
-                      onClick={() => void bulkAddPartsFromGroup()}
-                    >
-                      Add Selected Parts
-                    </button>
-                  </div>
-                  {bulkAddGroupKey && (
-                    <div className="mt-2">
-                      <div className="grid gap-2 lg:grid-cols-[1fr_auto_auto]">
-                        <input
-                          type="text"
-                          className={`${theme.input} h-10 w-full`}
-                          value={bulkPartSearch}
-                          onChange={(e) => setBulkPartSearch(e.target.value)}
-                          placeholder="Search parts in selected group"
+                      <div>
+                        <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-amber-100/80">What did you observe?</div>
+                        <textarea
+                          className={`${theme.input} w-full resize-none`}
+                          rows={2}
+                          placeholder="e.g. Worn brake pads, metal-on-metal grinding sound"
+                          value={manualDraft.observation}
+                          onChange={(e) => setManualDraft((d) => ({ ...d, observation: e.target.value }))}
                         />
+                      </div>
+                      <div className="grid gap-2 lg:grid-cols-2">
+                        <div>
+                          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-amber-100/80">Part Name *</div>
+                          <input
+                            type="text"
+                            className={`${theme.input} h-10 w-full`}
+                            placeholder="e.g. Brake Pad Set"
+                            value={manualDraft.part}
+                            onChange={(e) => setManualDraft((d) => ({ ...d, part: e.target.value }))}
+                          />
+                        </div>
+                        <div>
+                          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-amber-100/80">
+                            Part Number <span className="font-normal normal-case text-amber-100/50">(leave blank if unknown)</span>
+                          </div>
+                          <input
+                            type="text"
+                            className={`${theme.input} h-10 w-full`}
+                            placeholder="Vendor will confirm"
+                            value={manualDraft.partNumber}
+                            onChange={(e) => setManualDraft((d) => ({ ...d, partNumber: e.target.value }))}
+                          />
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="text-[10px] font-semibold uppercase tracking-wide text-amber-100/80">Qty</div>
+                          <input
+                            type="number"
+                            min={1}
+                            className={`${theme.input} h-9 w-20`}
+                            value={manualDraft.qty}
+                            onChange={(e) => setManualDraft((d) => ({ ...d, qty: e.target.value }))}
+                          />
+                        </div>
                         <button
                           type="button"
-                          className="h-10 rounded-md border border-cyan-500/40 px-3 text-xs font-semibold text-cyan-100"
-                          onClick={() => {
-                            const allVisibleCodes = vinCatalogParts
-                              .filter((part) =>
-                                (part.groups ?? []).some((group) => {
-                                  const groupId = String(group?.id ?? "").trim();
-                                  const groupName = String(group?.name ?? "").trim();
-                                  const groupLevel = Number(group?.level ?? 0) || 0;
-                                  const key = `${groupId || groupName}::${groupLevel}`;
-                                  return key === bulkAddGroupKey;
-                                })
-                              )
-                              .filter((part) => {
-                                const needle = bulkPartSearch.trim().toLowerCase();
-                                if (!needle) return true;
-                                const label = `${part.name || ""} ${part.code || ""}`.toLowerCase();
-                                return label.includes(needle);
-                              })
-                              .map((part) => part.code);
-                            setBulkAddPartCodes(allVisibleCodes);
-                          }}
+                          className="rounded-md bg-amber-600 px-4 py-2 text-xs font-semibold text-white disabled:opacity-50"
+                          disabled={!manualDraft.part.trim()}
+                          onClick={addManualLineItem}
                         >
-                          Select All Visible
+                          Add to Findings ▶
                         </button>
-                        <button
-                          type="button"
-                          className="h-10 rounded-md border border-white/20 px-3 text-xs font-semibold text-white/80"
-                          onClick={() => setBulkAddPartCodes([])}
-                        >
-                          Clear
-                        </button>
-                      </div>
-                      <div className="mt-2 max-h-56 space-y-1 overflow-auto rounded-md border border-white/10 p-2">
-                        {vinCatalogParts
-                          .filter((part) =>
-                            (part.groups ?? []).some((group) => {
-                              const groupId = String(group?.id ?? "").trim();
-                              const groupName = String(group?.name ?? "").trim();
-                              const groupLevel = Number(group?.level ?? 0) || 0;
-                              const key = `${groupId || groupName}::${groupLevel}`;
-                              return key === bulkAddGroupKey;
-                            })
-                          )
-                          .filter((part) => {
-                            const needle = bulkPartSearch.trim().toLowerCase();
-                            if (!needle) return true;
-                            const label = `${part.name || ""} ${part.code || ""}`.toLowerCase();
-                            return label.includes(needle);
-                          })
-                          .map((part) => {
-                            const selected = bulkAddPartCodes.includes(part.code);
-                            return (
-                              <label
-                                key={`bulk-pick-${part.code}-${part.name}`}
-                                className="flex cursor-pointer items-center gap-2 rounded-md border border-white/10 px-2 py-1.5 text-xs hover:bg-white/5"
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={selected}
-                                  onChange={(e) => {
-                                    setBulkAddPartCodes((prev) => {
-                                      if (e.target.checked) {
-                                        if (prev.includes(part.code)) return prev;
-                                        return [...prev, part.code];
-                                      }
-                                      return prev.filter((code) => code !== part.code);
-                                    });
-                                  }}
-                                />
-                                <span className="text-white/85">{part.name || "Unnamed part"}</span>
-                                <span className="text-white/55">{part.code ? `(${part.code})` : ""}</span>
-                              </label>
-                            );
-                          })}
-                      </div>
-                      <div className="mt-2 text-[11px] text-cyan-100/80">
-                        {bulkAddPartCodes.length} part(s) selected.
                       </div>
                     </div>
                   )}
                 </div>
               )}
+
               <div className={`mt-2 rounded-md ${theme.cardBorder} ${theme.surfaceSubtle} p-3`}>
                 {parts.length === 0 ? (
                   <div className="rounded-md border border-dashed border-white/20 bg-black/20 p-4 text-center">
@@ -4725,7 +4804,7 @@ export function InspectionDetailPageClient({
                     const mediaDone = rowMediaRequirement.required ? Boolean(row.mediaFileId) : true;
                     const hasSelectedPart = Boolean(String(row.part ?? "").trim());
                     const isRowExpanded = hasSelectedPart ? (expandedLineItemsByRow[rowKey] ?? !row.isSaved) : true;
-                    const filteredCatalogParts = vinCatalogParts.filter((part) =>
+                    const filteredCatalogPartsRaw = vinCatalogParts.filter((part) =>
                       (part.groups ?? []).some((group) => {
                         const groupId = String(group?.id ?? "").trim();
                         const groupName = String(group?.name ?? "").trim();
@@ -4734,6 +4813,14 @@ export function InspectionDetailPageClient({
                         return key === selectedGroupKey;
                       })
                     );
+                    // When parts have no group metadata (17VIN action=part response),
+                    // fall back to all loaded parts if the selected key is a synthetic group.
+                    const isSyntheticGroup =
+                      filteredCatalogPartsRaw.length === 0 &&
+                      vinCatalogGroups.some((g) => g.key === selectedGroupKey);
+                    const filteredCatalogParts = isSyntheticGroup
+                      ? vinCatalogParts
+                      : filteredCatalogPartsRaw;
                     return (
                       <React.Fragment key={`grouped-row-${rowKey}-${index}`}>
                       {isNewGroup && (
@@ -5114,34 +5201,56 @@ export function InspectionDetailPageClient({
                           <div className="text-[11px] font-semibold uppercase tracking-wide text-cyan-200">
                             AI Part Inspection ({row.part || "Select part first"})
                           </div>
-                          <button
-                            type="button"
-                            className="rounded-md border border-cyan-500/40 px-2 py-1 text-[10px] font-semibold text-cyan-100 disabled:opacity-50"
-                            disabled={isLocked || (!String(row.catalogPartCode ?? "").trim() && !String(row.part ?? "").trim())}
-                            onClick={() => {
-                              const searchToken =
-                                String(row.catalogPartCode ?? "").trim() || String(row.part ?? "").trim();
-                              const query = [
-                                searchToken,
-                                inspectionMake,
-                                inspectionModel,
-                                inspectionYear,
-                                inspectionVin,
-                                "car part",
-                                "diagram",
-                              ]
+                          {(() => {
+                            const diagramUrl = vinCatalogParts.find((p) => p.code === selectedPartCode)?.diagram ?? "";
+                            const partNumber = String(row.catalogPartCode ?? "").trim() || String(row.part ?? "").trim();
+                            if (diagramUrl) {
+                              return (
+                                <a
+                                  href={diagramUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="rounded-md border border-cyan-500/40 px-2 py-1 text-[10px] font-semibold text-cyan-100 hover:bg-cyan-500/10"
+                                >
+                                  View Diagram
+                                </a>
+                              );
+                            }
+                            if (partNumber) {
+                              const searchQuery = [partNumber, inspectionMake, inspectionModel, inspectionYear, "car part diagram"]
                                 .map((v) => String(v ?? "").trim())
                                 .filter(Boolean)
                                 .join(" ");
-                              if (!query) return;
-                              window.location.assign(
-                                `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(query)}`
+                              return (
+                                <a
+                                  href={`https://www.google.com/search?tbm=isch&q=${encodeURIComponent(searchQuery)}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="rounded-md border border-white/20 px-2 py-1 text-[10px] font-semibold text-white/60 hover:text-white/90"
+                                >
+                                  Search Diagram
+                                </a>
                               );
-                            }}
-                          >
-                            View Diagram
-                          </button>
+                            }
+                            return null;
+                          })()}
                         </div>
+                        {(() => {
+                          const diagramUrl = vinCatalogParts.find((p) => p.code === selectedPartCode)?.diagram ?? "";
+                          if (!diagramUrl) return null;
+                          return (
+                            <div className="mt-2">
+                              <a href={diagramUrl} target="_blank" rel="noopener noreferrer">
+                                <img
+                                  src={diagramUrl}
+                                  alt={`Diagram for ${row.part || selectedPartCode}`}
+                                  className="max-h-48 rounded border border-cyan-500/20 object-contain"
+                                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                                />
+                              </a>
+                            </div>
+                          );
+                        })()}
                         {hasSelectedPart && (
                           <div className="mt-2 rounded border border-amber-500/30 bg-amber-500/10 p-2">
                             <div className="text-[11px] font-semibold uppercase tracking-wide text-amber-200">
@@ -5291,14 +5400,14 @@ export function InspectionDetailPageClient({
                   })}
                     </div>
                     {!isReadOnly && !isCollectCarPending && (
-                      <div className="mt-3 flex items-center gap-2">
+                      <div className="mt-3 border-t border-white/10 pt-3 flex justify-center">
                         <button
                           type="button"
-                          className="rounded-md bg-teal-600 px-3 py-2 text-xs font-semibold text-white"
-                          onClick={addLineItemRow}
-                          disabled={vinCatalogLoading || parts.some((p) => !p.isSaved)}
+                          className="rounded-md border border-emerald-500/40 px-4 py-2 text-xs font-semibold text-emerald-200 hover:bg-emerald-500/10 disabled:opacity-50"
+                          disabled={vin17CatalogLoading || vinCatalogLoading}
+                          onClick={() => { resetCatalogSection(); setCatalogModalOpen(true); }}
                         >
-                          {vinCatalogLoading ? "Loading..." : "+ Add Another Line Item"}
+                          + Add Line Item
                         </button>
                       </div>
                     )}
@@ -5983,6 +6092,211 @@ export function InspectionDetailPageClient({
           </div>
         </div>
       </div>
+      {/* ── Parts Catalog Modal ─────────────────────────────────────── */}
+      {catalogModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 backdrop-blur-sm"
+          onClick={(e) => { if (e.target === e.currentTarget) setCatalogModalOpen(false); }}
+        >
+          <div className="relative mx-4 w-full max-w-lg rounded-xl border border-emerald-500/30 bg-slate-900 p-5 shadow-2xl">
+            {/* Header */}
+            <div className="mb-4 flex items-center justify-between">
+              <div className="text-sm font-semibold text-emerald-200 uppercase tracking-wide">Parts Catalog</div>
+              <button
+                type="button"
+                className="rounded-md px-2 py-1 text-xs text-white/60 hover:bg-white/10 hover:text-white"
+                onClick={() => setCatalogModalOpen(false)}
+              >
+                ✕ Close
+              </button>
+            </div>
+
+            {/* EPC + Reload */}
+            <div className="grid gap-2 lg:grid-cols-[1fr_auto] lg:items-end">
+              <div>
+                <div className="text-[10px] font-semibold uppercase tracking-wide text-emerald-100/80">EPC</div>
+                <input
+                  type="text"
+                  className={`${theme.input} h-10 w-full`}
+                  value={vinPartsEpcState}
+                  onChange={(e) => setVinPartsEpcState(e.target.value)}
+                  placeholder="Auto from VIN (e.g. audi_vw)"
+                />
+              </div>
+              <button
+                type="button"
+                className="h-10 rounded-md bg-emerald-600 px-3 text-xs font-semibold text-white disabled:opacity-50"
+                disabled={vin17CatalogLoading || !vinPartsEpcState}
+                onClick={() => void fetchVin17CatalogLevel("cata1")}
+              >
+                {vin17CatalogLoading ? "Loading..." : "Reload"}
+              </button>
+            </div>
+
+            {/* Dynamic catalog level dropdowns */}
+            <div className="mt-3 space-y-2">
+              {vin17Cata1Options.length > 0 && (
+                <div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-emerald-100/80">Level 1 — Main Category</div>
+                  <select
+                    className={`${theme.input} h-10 w-full`}
+                    value={vin17Cata1Code}
+                    onChange={(e) => void onSelectCata1(e.target.value)}
+                    disabled={vin17CatalogLoading}
+                  >
+                    <option value="">Select main category</option>
+                    {vin17Cata1Options.map((row, idx) => (
+                      <option key={`c1m-${row.code}`} value={row.code}>{toCatalogDisplayLabel(row.name, idx)}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {vin17Cata1Code && vin17Cata2Options.length > 0 && (
+                <div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-emerald-100/80">Level 2 — Sub Category</div>
+                  <select
+                    className={`${theme.input} h-10 w-full`}
+                    value={vin17Cata2Code}
+                    onChange={(e) => void onSelectCata2(e.target.value)}
+                    disabled={vin17CatalogLoading}
+                  >
+                    <option value="">Select sub category</option>
+                    {vin17Cata2Options.map((row, idx) => (
+                      <option key={`c2m-${row.code}`} value={row.code}>{toCatalogDisplayLabel(row.name, idx)}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {vin17Cata2Code && vin17Cata3Options.length > 0 && (
+                <div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-emerald-100/80">Level 3 — Section</div>
+                  <select
+                    className={`${theme.input} h-10 w-full`}
+                    value={vin17Cata3Code}
+                    onChange={(e) => void onSelectCata3(e.target.value)}
+                    disabled={vin17CatalogLoading}
+                  >
+                    <option value="">Select section</option>
+                    {vin17Cata3Options.map((row, idx) => (
+                      <option key={`c3m-${row.code}`} value={row.code}>{toCatalogDisplayLabel(row.name, idx)}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {vin17Cata3Code && vin17Cata4Options.length > 0 && (
+                <div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-emerald-100/80">Level 4 — Detail</div>
+                  <select
+                    className={`${theme.input} h-10 w-full`}
+                    value={vin17Cata4Code}
+                    onChange={(e) => onSelectCata4(e.target.value)}
+                    disabled={vin17CatalogLoading}
+                  >
+                    <option value="">Select detail</option>
+                    {vin17Cata4Options.map((row, idx) => (
+                      <option key={`c4m-${row.code}`} value={row.code}>{toCatalogDisplayLabel(row.name, idx)}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {vin17CatalogLoading && (
+              <div className="mt-3 text-center text-xs text-emerald-100/70">Loading catalog...</div>
+            )}
+
+            {vinCatalogLoading && (
+              <div className="mt-3 text-center text-xs text-emerald-100/70">Loading parts...</div>
+            )}
+
+            {!vinCatalogLoading && vinCatalogParts.length > 0 && (
+              <div className="mt-3 rounded-md border border-emerald-500/30 bg-black/20 p-2">
+                <div className="mb-2 grid gap-2 grid-cols-[1fr_auto_auto]">
+                  <input
+                    type="text"
+                    className={`${theme.input} h-9 w-full`}
+                    value={bulkPartSearch}
+                    onChange={(e) => setBulkPartSearch(e.target.value)}
+                    placeholder="Search parts..."
+                  />
+                  <button
+                    type="button"
+                    className="h-9 rounded-md border border-emerald-500/40 px-3 text-xs font-semibold text-emerald-100"
+                    onClick={() => {
+                      const visibleCodes = vinCatalogParts
+                        .filter((p) => {
+                          const needle = bulkPartSearch.trim().toLowerCase();
+                          return !needle || `${p.name || ""} ${p.code || ""}`.toLowerCase().includes(needle);
+                        })
+                        .map((p) => p.code);
+                      setBulkAddPartCodes(visibleCodes);
+                    }}
+                  >
+                    All
+                  </button>
+                  <button
+                    type="button"
+                    className="h-9 rounded-md border border-white/20 px-3 text-xs font-semibold text-white/80"
+                    onClick={() => setBulkAddPartCodes([])}
+                  >
+                    Clear
+                  </button>
+                </div>
+                <div className="max-h-52 space-y-1 overflow-auto">
+                  {vinCatalogParts
+                    .filter((p) => {
+                      const needle = bulkPartSearch.trim().toLowerCase();
+                      return !needle || `${p.name || ""} ${p.code || ""}`.toLowerCase().includes(needle);
+                    })
+                    .map((part) => {
+                      const selected = bulkAddPartCodes.includes(part.code);
+                      return (
+                        <label
+                          key={`cat-pick-m-${part.code}-${part.name}`}
+                          className="flex cursor-pointer items-center gap-2 rounded-md border border-white/10 px-2 py-1.5 text-xs hover:bg-white/5"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selected}
+                            onChange={(e) => {
+                              setBulkAddPartCodes((prev) =>
+                                e.target.checked
+                                  ? prev.includes(part.code) ? prev : [...prev, part.code]
+                                  : prev.filter((c) => c !== part.code)
+                              );
+                            }}
+                          />
+                          <span className="text-white/85">{part.name || "Unnamed part"}</span>
+                          {part.code ? <span className="text-white/50">({part.code})</span> : null}
+                        </label>
+                      );
+                    })}
+                </div>
+                <div className="mt-2 flex items-center justify-between">
+                  <span className="text-[11px] text-emerald-100/70">
+                    {bulkAddPartCodes.length} of {vinCatalogParts.length} selected
+                  </span>
+                  <button
+                    type="button"
+                    className="rounded-md bg-teal-600 px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                    disabled={bulkAddPartCodes.length === 0}
+                    onClick={addSelectedCatalogParts}
+                  >
+                    Add Selected Parts
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {!vin17CatalogLoading && !vinCatalogLoading && vin17Cata1Options.length === 0 && vinPartsEpcState && (
+              <div className="mt-3 rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
+                No catalog found for this EPC. Use Manual Entry below to add parts.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <style>{`
         .report-page-footer {
           display: none;
