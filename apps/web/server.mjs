@@ -275,6 +275,20 @@ app.prepare().then(() => {
     }
   }, 10_000);
 
+  // Background sweep: auto-analyze inquiries that have recordings but haven't been analyzed yet.
+  // Runs every 5 minutes as a catch-up for any inquiries missed by the immediate webhook trigger.
+  setInterval(async () => {
+    const internalSecret = process.env.INTERNAL_SECRET ?? "";
+    if (!internalSecret) return;
+    try {
+      await fetch("http://localhost:3000/api/internal/ai/auto-analyze-inquiries?limit=10", {
+        headers: { "x-internal-secret": internalSecret },
+      });
+    } catch {
+      // server may not be ready yet — ignore
+    }
+  }, 5 * 60 * 1000);
+
   server.listen(port, hostname, () => {
     const proto = "http";
     console.log(`[web] ${mode} server ready on ${proto}://${hostname}:${port}`);

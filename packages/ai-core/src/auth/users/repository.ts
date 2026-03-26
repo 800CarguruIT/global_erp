@@ -17,6 +17,7 @@ export type UserListRow = {
   vendor_id?: string | null;
   branch_name?: string | null;
   mobile?: string | null;
+  dialer_location?: "inhouse" | "remote" | null;
 };
 
 function rowsFrom<T>(result: T[] | { rows: T[] }): T[] {
@@ -78,7 +79,7 @@ export async function listUsers(params: {
     SELECT u.id, u.email, u.full_name, u.is_active, u.employee_id, u.created_at, u.updated_at, u.company_id,
            u.branch_id, u.vendor_id, b.name as branch_name,
            (SELECT MAX(last_seen_at) FROM user_sessions us WHERE us.user_id = u.id) as last_login_at,
-           u.mobile
+           u.mobile, u.dialer_location
     FROM users u
     LEFT JOIN employees e ON e.id = u.employee_id
     LEFT JOIN branches b ON b.id = u.branch_id
@@ -120,7 +121,7 @@ export async function listUsers(params: {
 export async function getUserById(id: string): Promise<UserListRow | null> {
   const sql = getSql();
   const res = await sql<UserListRow[]>`
-    SELECT u.id, u.email, u.full_name, u.is_active, u.employee_id, u.created_at, u.updated_at, u.company_id, u.mobile
+    SELECT u.id, u.email, u.full_name, u.is_active, u.employee_id, u.created_at, u.updated_at, u.company_id, u.mobile, u.dialer_location
     FROM users u
     WHERE u.id = ${id}
     LIMIT 1
@@ -181,6 +182,7 @@ export async function updateUser(
     isActive?: boolean;
     roleIds?: string[];
     mobile?: string | null;
+    dialerLocation?: "inhouse" | "remote" | null;
   }
 ): Promise<UserListRow> {
   const sql = getSql();
@@ -192,11 +194,12 @@ export async function updateUser(
   if (patch.isActive !== undefined) updated.is_active = patch.isActive;
   if (patch.password !== undefined) updated.password_hash = passwordHash ?? null;
   if (patch.mobile !== undefined) updated.mobile = patch.mobile ?? null;
+  if (patch.dialerLocation !== undefined) updated.dialer_location = patch.dialerLocation ?? null;
   const res = await sql<UserListRow[]>`
     UPDATE users
     SET ${sql(updated)}
     WHERE id = ${id}
-    RETURNING id, email, full_name, is_active, employee_id, created_at, updated_at, company_id, mobile
+    RETURNING id, email, full_name, is_active, employee_id, created_at, updated_at, company_id, mobile, dialer_location
   `;
   const user = rowsFrom(res)[0];
   if (!user) throw new Error("User not found");
@@ -216,6 +219,7 @@ export async function updateUser(
   return {
     ...user,
     mobile: patch.mobile !== undefined ? patch.mobile ?? null : user.mobile ?? null,
+    dialer_location: patch.dialerLocation !== undefined ? patch.dialerLocation ?? null : user.dialer_location ?? null,
     roles: patch.roleIds?.map((rid) => ({ id: rid, name: "" })) ?? user.roles ?? [],
   };
 }

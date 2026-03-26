@@ -31,7 +31,9 @@
       "Bash(grep -r \"useSocket\\\\|useNotif\\\\|notify\\\\|alert\\\\|toast\" '/c/Users/ABC/Documents/Global ERP/apps/web' --include=*.tsx --include=*.ts)",
       "Bash(grep -r \"cata1\\\\|cata2\\\\|cata3\\\\|is_last\\\\|cata_level\" 'c:/Users/ABC/Documents/Global ERP' --include=*.ts --include=*.tsx)",
       "Bash(grep -r export.*InspectionMain 'c:/Users/ABC/Documents/Global ERP/packages/ui/src/')",
-      "Bash(FILTER_BRANCH_SQUELCH_WARNING=1 git filter-branch --force --index-filter 'git rm --cached --ignore-unmatch tmp/webhook-dialer.log apps/web/tmp/webhook-dialer.log' --prune-empty origin/main..HEAD)"
+      "Bash(FILTER_BRANCH_SQUELCH_WARNING=1 git filter-branch --force --index-filter 'git rm --cached --ignore-unmatch tmp/webhook-dialer.log apps/web/tmp/webhook-dialer.log' --prune-empty origin/main..HEAD)",
+      "Bash(cd /c/Users/ABC/Documents/\"Global ERP\")",
+      "Bash(grep -n \"const POST\" apps/web/app/api/webhooks/dialer/[providerKey]/route.ts)"
     ]
   }
 }

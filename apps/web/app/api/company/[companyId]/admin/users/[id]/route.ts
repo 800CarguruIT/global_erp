@@ -46,6 +46,12 @@ export async function PUT(req: NextRequest, { params }: Params) {
     isActive: body.isActive !== undefined ? Boolean(body.isActive) : undefined,
     roleIds: Array.isArray(body.roleIds) ? body.roleIds : undefined,
     mobile: body.mobile !== undefined ? body.mobile ?? null : undefined,
+    dialerLocation:
+      body.dialerLocation !== undefined
+        ? (body.dialerLocation === "inhouse" || body.dialerLocation === "remote"
+            ? body.dialerLocation
+            : null)
+        : undefined,
   });
   return NextResponse.json({ data: user });
 }

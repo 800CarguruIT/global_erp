@@ -39,14 +39,19 @@ export async function listCustomers(
   opts?: { search?: string; activeOnly?: boolean }
 ): Promise<CustomerRow[]> {
   const sql = getSql();
-  const search = opts?.search ? `%${opts.search}%` : null;
+  const rawSearch = opts?.search ?? "";
+  const search = rawSearch ? `%${rawSearch}%` : null;
+  // For phone-like searches, also compare last 9 digits to handle +971/971 prefix variations
+  const phoneDigits = rawSearch.replace(/\D+/g, "");
+  const phoneSuffix = phoneDigits.length >= 7 ? phoneDigits.slice(-9) : null;
   const filterSql = search
     ? sql`
       AND (
         code ILIKE ${search} OR
         name ILIKE ${search} OR
         email ILIKE ${search} OR
-        phone ILIKE ${search}
+        phone ILIKE ${search} OR
+        (${phoneSuffix !== null}::boolean AND right(regexp_replace(COALESCE(phone, ''), '\D', '', 'g'), 9) = ${phoneSuffix ?? ""})
       )`
     : sql``;
 
