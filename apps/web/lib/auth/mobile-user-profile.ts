@@ -3,12 +3,17 @@ import { getUserRoles } from "@repo/ai-core/auth/rbac/repository";
 import type { ScopeContext } from "@repo/ai-core";
 import { getUserContext } from "./user-context";
 
-type MobileDashboardKey = "dashboard" | "wsDashboard" | "carInDashboard";
+type MobileDashboardKey =
+  | "dashboard"
+  | "wsDashboard"
+  | "carInDashboard"
+  | "vendorDashboard";
 
 const MOBILE_DASHBOARD_PATHS: Record<MobileDashboardKey, string> = {
   dashboard: "/(main)/(home)/dashboard",
   wsDashboard: "/(main)/(home)/ws_dashboard",
   carInDashboard: "/(main)/(home)/car_in_dashoard",
+  vendorDashboard: "/(main)/(home)/vendor_dashboard",
 };
 
 function toScopeContext(params: {
@@ -39,7 +44,15 @@ function getDashboardKey(args: {
   scope: "global" | "company" | "branch" | "vendor";
   roleKeys: string[];
 }): MobileDashboardKey {
-  if (args.scope !== "branch") {
+  if (args.scope === "global") {
+    return "dashboard";
+  }
+
+  if (args.scope === "vendor") {
+    return "vendorDashboard";
+  }
+
+  if (args.scope === "company") {
     return "dashboard";
   }
 
