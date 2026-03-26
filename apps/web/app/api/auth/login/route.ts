@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { getSql } from "@repo/ai-core";
 import { createSessionToken, setSessionCookie } from "../../../../lib/auth/session";
 import { getUserContext } from "../../../../lib/auth/user-context";
+import { resolveLoginRedirect } from "../../../../lib/auth/login-redirect";
 import type { Branch } from "@repo/ai-core";
 
 type UserRow = {
@@ -86,22 +87,38 @@ export async function POST(req: NextRequest) {
         : null;
     const branchRedirectPath = thirdPartyWorkshopPath ?? (branchId ? `/branches/${branchId}` : "/company");
 
-    // Compute redirect based on scope
-    // TODO: add explicit "workshop" scope + workshopId routing when implemented.
-    let redirect = "/global";
+    // Compute redirect based on scope, with permission-based routing as fallback
+    let redirect: string;
     if (ctx?.isGlobal || scope === "global") {
       redirect = "/global";
     } else if (scope === "vendor") {
       redirect =
         companyId && vendorId
           ? `/company/${companyId}/vendors/${vendorId}`
-          : vendorId
-          ? `/company/${companyId ?? "unknown"}/vendors/${vendorId}`
           : "/global";
-    } else if (scope === "branch") {
-      redirect = branchRedirectPath;
+    } else if (scope === "branch" && branchId && companyId) {
+      // third_party branches always go to their workshop page
+      if (thirdPartyWorkshopPath) {
+        redirect = thirdPartyWorkshopPath;
+      } else {
+        redirect = await resolveLoginRedirect({
+          userId: user.id,
+          scope: "branch",
+          companyId,
+          branchId,
+          vendorId: null,
+          fallback: `/company/${companyId}/branches/${branchId}`,
+        });
+      }
     } else if (scope === "company" && companyId) {
-      redirect = `/company/${companyId}`;
+      redirect = await resolveLoginRedirect({
+        userId: user.id,
+        scope: "company",
+        companyId,
+        branchId: null,
+        vendorId: null,
+        fallback: `/company/${companyId}`,
+      });
     } else if (vendorId && companyId) {
       redirect = `/company/${companyId}/vendors/${vendorId}`;
     } else if (branchId && companyId) {
@@ -110,6 +127,8 @@ export async function POST(req: NextRequest) {
       redirect = `/company/${companies[0].companyId}`;
     } else if (!ctx?.isGlobal && companies.length > 1) {
       redirect = "/auth/select-company";
+    } else {
+      redirect = "/global";
     }
 
     const assignedExtension = String(user.mobile ?? "").trim() || null;

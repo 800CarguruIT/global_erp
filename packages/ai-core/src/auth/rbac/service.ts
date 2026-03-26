@@ -59,6 +59,7 @@ export async function createRole(
     branch_id: input.branchId ?? null,
     vendor_id: input.vendorId ?? null,
     description: input.description ?? null,
+    home_page: input.home_page ?? null,
   });
   await replaceRolePermissions(row.id, perms.map((p) => p.id));
   return { ...row, permissions: perms };
@@ -73,6 +74,7 @@ export async function updateRole(
   const updated = await updateRoleRow(id, {
     name: input.name ?? existing.name,
     description: input.description ?? existing.description,
+    home_page: "home_page" in input ? input.home_page : existing.home_page,
   });
   if (input.permissionKeys) {
     const filteredKeys = filterPermissionKeysForScope(existing.scope, input.permissionKeys);
@@ -173,6 +175,10 @@ export async function userHasAnyPermission(
 ): Promise<boolean> {
   const perms = await getUserPermissions(userId, scopeContext);
   return permissionKeys.some((k) => perms.includes(k));
+}
+
+export async function getUserRolesList(userId: string): Promise<RoleRow[]> {
+  return getUserRoles(userId);
 }
 
 export async function getUserRolesWithPermissions(userId: string): Promise<

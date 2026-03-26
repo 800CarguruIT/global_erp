@@ -228,3 +228,126 @@ export async function softDeleteUser(id: string): Promise<void> {
   const sql = getSql();
   await sql`UPDATE users SET is_active = false WHERE id = ${id}`;
 }
+
+export type EmployeeUserRow = {
+  employee_id: string;
+  auto_code: string;
+  employee_name: string;
+  department: string | null;
+  employee_email: string | null;
+  user_id: string | null;
+  email: string | null;
+  full_name: string | null;
+  is_active: boolean | null;
+  last_login_at: string | null;
+  mobile: string | null;
+  company_id: string | null;
+  branch_id: string | null;
+  branch_name: string | null;
+  roles: { id: string; name: string }[];
+};
+
+export async function listEmployeesWithUserStatus(params: {
+  companyId: string;
+  q?: string;
+  limit?: number;
+  offset?: number;
+  status?: "active" | "inactive" | "no_account";
+}): Promise<{ rows: EmployeeUserRow[]; total: number }> {
+  const sql = getSql();
+  const { companyId, q, limit = 50, offset = 0, status } = params;
+
+  const search = q?.trim().length
+    ? sql`AND (
+        LOWER(e.full_name) LIKE ${"%" + q.toLowerCase() + "%"}
+        OR LOWER(COALESCE(e.email_company, e.email_personal, '')) LIKE ${"%" + q.toLowerCase() + "%"}
+        OR LOWER(COALESCE(u.email, '')) LIKE ${"%" + q.toLowerCase() + "%"}
+      )`
+    : sql``;
+
+  const statusFilter =
+    status === "active"     ? sql`AND u.id IS NOT NULL AND u.is_active = true`  :
+    status === "inactive"   ? sql`AND u.id IS NOT NULL AND u.is_active = false` :
+    status === "no_account" ? sql`AND u.id IS NULL`                             :
+    sql``;
+
+  // Total count (same WHERE, no LIMIT)
+  const countResult = await sql<{ total: number }[]>`
+    SELECT COUNT(*)::int AS total
+    FROM employees e
+    LEFT JOIN users u ON u.employee_id = e.id
+    WHERE e.scope = 'company'
+      AND e.company_id = ${companyId}
+      ${search}
+      ${statusFilter}
+  `;
+  const total = (rowsFrom<any>(countResult)[0]?.total ?? 0) as number;
+
+  // Paged rows
+  const rows = await sql<any[]>`
+    SELECT
+      e.id            AS employee_id,
+      e.auto_code,
+      e.full_name     AS employee_name,
+      e.department,
+      COALESCE(e.email_company, e.email_personal) AS employee_email,
+      u.id            AS user_id,
+      u.email,
+      u.full_name,
+      u.is_active,
+      u.mobile,
+      u.company_id,
+      u.branch_id,
+      b.name          AS branch_name,
+      (SELECT MAX(last_seen_at) FROM user_sessions us WHERE us.user_id = u.id) AS last_login_at
+    FROM employees e
+    LEFT JOIN users u ON u.employee_id = e.id
+    LEFT JOIN branches b ON b.id = u.branch_id
+    WHERE e.scope = 'company'
+      AND e.company_id = ${companyId}
+      ${search}
+      ${statusFilter}
+    ORDER BY e.full_name ASC
+    LIMIT ${limit} OFFSET ${offset}
+  `;
+
+  const employees = rowsFrom<any>(rows).map((r: any): EmployeeUserRow => ({
+    employee_id: r.employee_id,
+    auto_code: r.auto_code,
+    employee_name: r.employee_name,
+    department: r.department ?? null,
+    employee_email: r.employee_email ?? null,
+    user_id: r.user_id ?? null,
+    email: r.email ?? null,
+    full_name: r.full_name ?? null,
+    is_active: r.is_active ?? null,
+    last_login_at: r.last_login_at ?? null,
+    mobile: r.mobile ?? null,
+    company_id: r.company_id ?? null,
+    branch_id: r.branch_id ?? null,
+    branch_name: r.branch_name ?? null,
+    roles: [],
+  }));
+
+  // Load roles for users on this page only
+  const userIds = employees.map((e) => e.user_id).filter(Boolean) as string[];
+  if (userIds.length) {
+    const roleRows = await sql<any[]>`
+      SELECT ur.user_id, r.id, r.name
+      FROM user_roles ur
+      INNER JOIN roles r ON r.id = ur.role_id
+      WHERE ur.user_id = ANY(${userIds}::uuid[])
+    `;
+    const grouped = new Map<string, { id: string; name: string }[]>();
+    for (const rr of rowsFrom<any>(roleRows)) {
+      const arr = grouped.get(rr.user_id) ?? [];
+      arr.push({ id: rr.id, name: rr.name });
+      grouped.set(rr.user_id, arr);
+    }
+    employees.forEach((e) => {
+      if (e.user_id) e.roles = grouped.get(e.user_id) ?? [];
+    });
+  }
+
+  return { rows: employees, total };
+}

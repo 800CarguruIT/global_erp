@@ -9,6 +9,7 @@ export interface RoleRow {
   branch_id: string | null;
   vendor_id: string | null;
   description: string | null;
+  home_page: string | null;
   is_system: boolean;
   created_at: Date;
   updated_at: Date;
@@ -40,11 +41,13 @@ export type CreateRoleInput = {
   branchId?: string | null;
   vendorId?: string | null;
   description?: string | null;
+  home_page?: string | null;
   permissionKeys: string[];
 };
 
 export type UpdateRoleInput = {
   name?: string;
   description?: string | null;
+  home_page?: string | null;
   permissionKeys?: string[];
 };

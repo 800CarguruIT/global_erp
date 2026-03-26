@@ -175,7 +175,7 @@ export function SidebarNav({
       }
       if (item.permissionKeys?.length) {
         if (!permissionsLoaded) return false;
-        const strict = scope === "branch";
+        const strict = scope === "branch" || scope === "company";
         return strict ? hasAnyExactPermission(item.permissionKeys) : hasAnyPermission(item.permissionKeys);
       }
       return true;
@@ -353,11 +353,11 @@ export function SidebarNav({
   const treeItems = SIDEBAR_TREE[scope];
   const filteredTreeItems = useMemo(() => {
     if (!treeItems?.length) return treeItems;
-    if (!permissionsLoaded) return treeItems;
+    if (!permissionsLoaded) return [];
     const filterTree = (items: SidebarItem[]): SidebarItem[] =>
       items.flatMap((item) => {
         const childItems = item.children ? filterTree(item.children) : undefined;
-        const strict = scope === "branch";
+        const strict = scope === "branch" || scope === "company";
         const allowed = !item.permissionKeys?.length
           ? true
           : permissionsLoaded
@@ -365,7 +365,7 @@ export function SidebarNav({
             ? hasAnyExactPermission(item.permissionKeys)
             : hasAnyPermission(item.permissionKeys)
           : false;
-        if (!allowed && (!childItems || childItems.length === 0)) return [];
+        if (!allowed) return [];
         return [{ ...item, children: childItems }];
       });
     return filterTree(treeItems);

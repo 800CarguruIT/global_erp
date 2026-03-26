@@ -33,7 +33,9 @@
       "Bash(grep -r export.*InspectionMain 'c:/Users/ABC/Documents/Global ERP/packages/ui/src/')",
       "Bash(FILTER_BRANCH_SQUELCH_WARNING=1 git filter-branch --force --index-filter 'git rm --cached --ignore-unmatch tmp/webhook-dialer.log apps/web/tmp/webhook-dialer.log' --prune-empty origin/main..HEAD)",
       "Bash(cd /c/Users/ABC/Documents/\"Global ERP\")",
-      "Bash(grep -n \"const POST\" apps/web/app/api/webhooks/dialer/[providerKey]/route.ts)"
+      "Bash(grep -n \"const POST\" apps/web/app/api/webhooks/dialer/[providerKey]/route.ts)",
+      "Bash(grep \"sql$\")",
+      "Bash(find 'c:/Users/ABC/Documents/Global ERP' -type f -path *packages/ui* -name *UserForm*)"
     ]
   }
 }

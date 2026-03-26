@@ -12,6 +12,7 @@ const normalizeId = (value: string | null | undefined) => {
 const updateSchema = z.object({
   name: z.string().optional(),
   description: z.string().optional().nullable(),
+  home_page: z.string().optional().nullable(),
   permissionKeys: z.array(z.string()).optional(),
 });
 

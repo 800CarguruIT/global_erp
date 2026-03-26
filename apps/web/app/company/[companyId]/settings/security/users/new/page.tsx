@@ -20,6 +20,18 @@ export default function CompanyUserCreatePage({
 }) {
   const { card, cardBorder } = useTheme();
   const [companyId, setCompanyId] = useState<string | null>(null);
+  const [prefill, setPrefill] = useState<{ employeeId?: string; name?: string; email?: string }>({});
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const sp = new URLSearchParams(window.location.search);
+      setPrefill({
+        employeeId: sp.get("employeeId") ?? undefined,
+        name: sp.get("name") ?? undefined,
+        email: sp.get("email") ?? undefined,
+      });
+    }
+  }, []);
   const [roles, setRoles] = useState<Role[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [scopeOptions, setScopeOptions] = useState<ScopeOption[]>([]);
@@ -179,6 +191,16 @@ export default function CompanyUserCreatePage({
               scopeValue={selectedScope}
               onScopeChange={(value) => setSelectedScope(value)}
               scopeLabel="Assign to (company / branch / vendor)"
+              initialValues={
+                prefill.employeeId || prefill.name || prefill.email
+                  ? {
+                      email: prefill.email ?? "",
+                      name: prefill.name ?? "",
+                      roleIds: [],
+                      employeeId: prefill.employeeId ?? null,
+                    }
+                  : undefined
+              }
               onSubmit={handleSubmit}
               onCancel={() =>
                 (window.location.href =

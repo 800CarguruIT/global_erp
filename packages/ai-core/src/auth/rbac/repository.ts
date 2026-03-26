@@ -103,7 +103,7 @@ export async function insertRole(
   const sql: any = getSql();
   const result = await sql<RoleRow[]>`
     INSERT INTO roles (
-      name, key, scope, company_id, branch_id, vendor_id, description, is_system
+      name, key, scope, company_id, branch_id, vendor_id, description, home_page, is_system
     ) VALUES (
       ${data.name},
       ${data.key},
@@ -112,6 +112,7 @@ export async function insertRole(
       ${data.branch_id ?? null},
       ${data.vendor_id ?? null},
       ${data.description ?? null},
+      ${data.home_page ?? null},
       ${data.is_system ?? false}
     )
     RETURNING *
@@ -129,6 +130,7 @@ export async function updateRoleRow(
     SET
       name = COALESCE(${patch.name}, name),
       description = ${patch.description ?? null},
+      home_page = ${patch.home_page ?? null},
       updated_at = NOW()
     WHERE id = ${id}
     RETURNING *

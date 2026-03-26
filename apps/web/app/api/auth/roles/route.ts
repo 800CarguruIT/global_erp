@@ -11,6 +11,7 @@ const createSchema = z.object({
   branchId: z.string().optional().nullable(),
   vendorId: z.string().optional().nullable(),
   description: z.string().optional().nullable(),
+  home_page: z.string().optional().nullable(),
   permissionKeys: z.array(z.string()).default([]),
 });
 
