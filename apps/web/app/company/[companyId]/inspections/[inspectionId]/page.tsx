@@ -406,6 +406,42 @@ export function InspectionDetailPageClient({
   const catalogAutoLoadAttemptedRef = useRef(false);
   const vin17AutoCatalogKeyRef = useRef("");
   const partsCatalogRef = useRef<HTMLDivElement>(null);
+
+  // AI-powered category picker state
+  const [quickCatOpen, setQuickCatOpen] = useState(false);
+  const [quickCatData, setQuickCatData] = useState<any[]>([]);
+  const [quickCatLoaded, setQuickCatLoaded] = useState(false);
+  const [quickCatLevel, setQuickCatLevel] = useState<"cat" | "sub" | "part">("cat");
+  const [quickCatSelectedCat, setQuickCatSelectedCat] = useState<any>(null);
+  const [quickCatSelectedSub, setQuickCatSelectedSub] = useState<any>(null);
+  const [aiVinDecoding, setAiVinDecoding] = useState(false);
+  const [aiVinDecodeResult, setAiVinDecodeResult] = useState<any>(null);
+  const [vinBodyType, setVinBodyType] = useState<string | null>(null);
+  const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
+  const [aiSummaryResult, setAiSummaryResult] = useState<{ technical: string | null; customer: string | null } | null>(null);
+  const [aiSuggestions, setAiSuggestions] = useState<{ name: string; reason: string; category: string; likelihood: string }[]>([]);
+  const [aiSuggestionsLoading, setAiSuggestionsLoading] = useState(false);
+  const [aiSuggestionsLastKey, setAiSuggestionsLastKey] = useState("");
+
+  // Load part categories — re-fetches when car make/body type changes (after VIN decode)
+  useEffect(() => {
+    if (!companyId) return;
+    const params = new URLSearchParams();
+    if (inspectionMake) params.set("make", inspectionMake);
+    if (inspectionModel) params.set("model", inspectionModel);
+    if (vinBodyType) params.set("bodyType", vinBodyType);
+    const qs = params.toString();
+    setQuickCatLoaded(false);
+    setQuickCatLevel("cat");
+    setQuickCatSelectedCat(null);
+    setQuickCatSelectedSub(null);
+    setQuickCatData([]);
+    fetch(`/api/company/${companyId}/workshop/inspections/part-categories${qs ? `?${qs}` : ""}`)
+      .then((r) => r.json())
+      .then((json) => { setQuickCatData(json.data ?? []); setQuickCatLoaded(true); })
+      .catch(() => setQuickCatLoaded(true));
+  }, [companyId, inspectionMake, inspectionModel, vinBodyType]);
+
   const [checks, setChecks] = useState<Record<string, CheckValue>>({});
   const [lineItemErrors, setLineItemErrors] = useState<Record<number, { part?: string; qty?: string; media?: string }>>(
     {}
@@ -449,6 +485,72 @@ export function InspectionDetailPageClient({
   useEffect(() => {
     partsRef.current = parts;
   }, [parts]);
+
+  // Auto-generate AI description when action + priority are set on a part
+  useEffect(() => {
+    const needsDescription = parts.findIndex(
+      (p: any) => p.actionType && p.priority && !p.aiDescription && !p._aiDescLoading
+    );
+    if (needsDescription === -1 || !companyId || !inspectionId) return;
+    const part = parts[needsDescription] as any;
+
+    // Mark as loading to prevent duplicate calls
+    setParts((prev) => prev.map((p, i) => i === needsDescription ? { ...p, _aiDescLoading: true } : p));
+
+    const partName = part.productName ?? part.part ?? "Unknown part";
+    const actionLabel = part.actionType === "replace" ? "Replace" : part.actionType === "service" ? "Service" : "Repair";
+    const priorityLabel = part.priority === "safety_risk" ? "Safety Risk" : part.priority === "mandatory" ? "Mandatory" : "Recommended";
+    const carContext = [inspectionMake, inspectionModel, inspectionYear].filter(Boolean).join(" ");
+
+    fetch(`/api/company/${companyId}/workshop/inspections/${inspectionId}/ai-describe-part`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        partName,
+        actionType: part.actionType,
+        priority: part.priority,
+        category: part.description ?? "",
+        carMake: inspectionMake,
+        carModel: inspectionModel,
+        carYear: inspectionYear,
+      }),
+    })
+      .then((r) => r.json())
+      .then((json) => {
+        const desc = json?.data?.description ?? `${partName} — ${actionLabel} (${priorityLabel})`;
+        setParts((prev) => prev.map((p, i) => i === needsDescription ? { ...p, aiDescription: desc, _aiDescLoading: false } : p));
+      })
+      .catch(() => {
+        setParts((prev) => prev.map((p, i) => i === needsDescription ? { ...p, _aiDescLoading: false } : p));
+      });
+  }, [parts, companyId, inspectionId, inspectionMake, inspectionModel, inspectionYear]);
+
+  // Auto-fetch AI suggestions when parts change
+  useEffect(() => {
+    const partNames = parts.map((p: any) => p.productName ?? p.part).filter(Boolean);
+    if (partNames.length === 0) { setAiSuggestions([]); setAiSuggestionsLastKey(""); return; }
+    const key = partNames.sort().join(",");
+    if (key === aiSuggestionsLastKey) return;
+    const timer = setTimeout(() => {
+      if (!companyId || !inspectionId) return;
+      setAiSuggestionsLoading(true);
+      fetch(`/api/company/${companyId}/workshop/inspections/${inspectionId}/ai-suggest-parts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ selectedParts: partNames, carMake: inspectionMake, carModel: inspectionModel, carYear: inspectionYear }),
+      })
+        .then((r) => r.json())
+        .then((json) => {
+          const suggestions = json?.data?.suggestions ?? [];
+          const currentNames = parts.map((p: any) => p.productName ?? p.part);
+          setAiSuggestions(suggestions.filter((s: any) => !currentNames.includes(s.name)));
+          setAiSuggestionsLastKey(key);
+        })
+        .catch(() => setAiSuggestions([]))
+        .finally(() => setAiSuggestionsLoading(false));
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [parts, companyId, inspectionId, inspectionMake, inspectionModel, inspectionYear, aiSuggestionsLastKey]);
 
   useEffect(() => {
     Promise.resolve(params).then((p) => {
@@ -906,9 +1008,9 @@ export function InspectionDetailPageClient({
     }
   }, [inspectionPlate, leadPlate]);
 
-  // Auto-load catalog parts silently on page startup so diagrams and category
-  // labels are available for saved line items without opening the modal first.
+  // Auto-load catalog parts silently on page startup — DISABLED (replaced by AI category picker)
   useEffect(() => {
+    return; // 17VIN catalog replaced by AI-powered category selection
     if (loading) return;
     if (catalogAutoLoadAttemptedRef.current) return;
     if (vinCatalogParts.length > 0) { catalogAutoLoadAttemptedRef.current = true; return; }
@@ -1714,29 +1816,10 @@ export function InspectionDetailPageClient({
     void fetchPartsForLeaf(code, 4, label4);
   };
 
+  // Auto-load 17VIN catalog on Step 5 — DISABLED (replaced by AI category picker)
   useEffect(() => {
-    if (inspectionStep !== 5) return;
-    if (!companyId || !leadId) return;
-    const vin = inspectionVin.trim().toUpperCase();
-    const epc = vinPartsEpcState.trim();
-    if (!vin || !epc) return;
-    if (vin17CatalogLoading) return;
-    if (vin17Cata1Options.length > 0) return;
-    const autoKey = `${companyId}:${leadId}:${vin}:${epc}:${vinLookupSelectedCarId || "-"}`;
-    if (vin17AutoCatalogKeyRef.current === autoKey) return;
-    vin17AutoCatalogKeyRef.current = autoKey;
-    void fetchVin17CatalogLevel("cata1", { epcOverride: epc, quiet: true });
-  }, [
-    companyId,
-    inspectionStep,
-    inspectionVin,
-    leadId,
-    vin17CatalogLoading,
-    vin17Cata1Options.length,
-    vinLookupSelectedCarId,
-    vinPartsEpcState,
-    fetchVin17CatalogLevel,
-  ]);
+    return; // 17VIN catalog replaced by AI-powered category selection
+  }, [inspectionStep]);
 
   useEffect(() => {
     vin17AutoCatalogKeyRef.current = "";
@@ -4415,11 +4498,34 @@ export function InspectionDetailPageClient({
                       />
                       <button
                         type="button"
-                        className="h-10 rounded-md bg-cyan-600 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white sm:whitespace-nowrap"
-                        disabled={isReadOnly || isCollectCarPending || vinLookupLoading}
-                        onClick={autoFillVehicleFromVin}
+                        className="h-10 rounded-md bg-violet-600 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white sm:whitespace-nowrap"
+                        disabled={isReadOnly || isCollectCarPending || aiVinDecoding || vinLookupLoading || !inspectionVin || inspectionVin.length !== 17}
+                        onClick={async () => {
+                          const vin = inspectionVin.trim().toUpperCase();
+                          if (!vin || vin.length !== 17) return;
+                          setAiVinDecoding(true);
+                          setVinLookupNote(null);
+                          setAiVinDecodeResult(null);
+                          try {
+                            const res = await fetch(`/api/company/${companyId}/workshop/inspections/${inspectionId}/ai-vin-decode`, {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ vin }),
+                            });
+                            const json = await res.json();
+                            if (!res.ok) throw new Error(json.error ?? "Decode failed");
+                            const d = json.data;
+                            // Show results but DO NOT auto-fill — user must click Confirm
+                            setAiVinDecodeResult(d);
+                            setVinLookupNote(`Decoded: ${[d.make, d.model, d.year, d.bodyType, d.fuelType].filter(Boolean).join(" · ")} (${d.source}). Click "Apply" to use these details.`);
+                          } catch (err: any) {
+                            setVinLookupNote(err?.message ?? "VIN decode failed");
+                          } finally {
+                            setAiVinDecoding(false);
+                          }
+                        }}
                       >
-                        {vinLookupLoading ? "Checking VIN..." : "Check VIN"}
+                        {aiVinDecoding || vinLookupLoading ? "Decoding VIN..." : "Decode VIN"}
                       </button>
                     </div>
                     {vinLookupCars.length > 1 && (
@@ -4548,13 +4654,87 @@ export function InspectionDetailPageClient({
                     />
                   </div>
                 </div>
-                {vinLookupNote && <div className="mt-2 text-xs text-cyan-200">{vinLookupNote}</div>}
+                {vinLookupNote && !aiVinDecodeResult && <div className="mt-2 text-xs text-cyan-200">{vinLookupNote}</div>}
+
+                {/* VIN Decode Confirmation Panel */}
+                {aiVinDecodeResult && (
+                  <div className="mt-3 rounded-md border border-violet-500/30 bg-violet-500/[0.05] p-3">
+                    <div className="text-[11px] font-semibold text-violet-200">VIN Decode Result — Review before applying</div>
+                    <div className="mt-2 grid gap-2 text-xs sm:grid-cols-2 md:grid-cols-3">
+                      {[
+                        ["Make", aiVinDecodeResult.make],
+                        ["Model", aiVinDecodeResult.model],
+                        ["Year", aiVinDecodeResult.year],
+                        ["Body", aiVinDecodeResult.bodyType],
+                        ["Engine", aiVinDecodeResult.engineType],
+                        ["Fuel", aiVinDecodeResult.fuelType],
+                        ["Drive", aiVinDecodeResult.driveType],
+                        ["Transmission", aiVinDecodeResult.transmissionType],
+                      ]
+                        .filter(([, v]) => v)
+                        .map(([label, value]) => (
+                          <div key={label}>
+                            <span className="text-white/40">{label}: </span>
+                            <span className="text-white/90">{value}</span>
+                          </div>
+                        ))}
+                    </div>
+                    <div className="mt-1 text-[10px] text-white/30">Source: {aiVinDecodeResult.source}</div>
+                    <div className="mt-3 flex gap-2">
+                      <button
+                        type="button"
+                        className="rounded-md bg-emerald-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500"
+                        onClick={async () => {
+                          const d = aiVinDecodeResult;
+                          // Apply to form fields
+                          if (d.make) setInspectionMake(d.make);
+                          if (d.model) setInspectionModel(d.model);
+                          if (d.year) setInspectionYear(String(d.year));
+                          if (d.bodyType) setVinBodyType(d.bodyType);
+                          // Save to DB via PUT
+                          try {
+                            await fetch(`/api/company/${companyId}/workshop/inspections/${inspectionId}/ai-vin-decode`, {
+                              method: "PUT",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                vin: inspectionVin.trim().toUpperCase(),
+                                make: d.make,
+                                model: d.model,
+                                year: d.year,
+                                bodyType: d.bodyType,
+                                decodeResult: d,
+                              }),
+                            });
+                          } catch { /* non-blocking */ }
+                          setVinLookupNote(`Applied: ${[d.make, d.model, d.year].filter(Boolean).join(" ")}`);
+                          setAiVinDecodeResult(null);
+                        }}
+                      >
+                        ✓ Apply These Details
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded-md border border-white/20 px-4 py-1.5 text-xs font-medium text-white/70 hover:bg-white/5"
+                        onClick={() => {
+                          setAiVinDecodeResult(null);
+                          setVinLookupNote("Decode dismissed. Car details unchanged.");
+                        }}
+                      >
+                        ✕ Dismiss
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
+
+            {/* ===== STEP 5: AI-POWERED INSPECTION ===== */}
             <div className={`mt-6 ${inspectionStep === 5 ? "" : "hidden"}`}>
+
+              {/* Inspection Checks (Oil/Battery/Tyre/OBD) */}
               <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
-                <div className="text-sm font-semibold">Inspection Checks</div>
+                <div className="text-sm font-semibold">Quick Checks</div>
                 <div className="mt-3 grid gap-3 lg:grid-cols-2">
                   {processCheckItems.map((item) => (
                     <div key={item.key} className="rounded-md border border-white/10 bg-black/20 p-3">
@@ -4564,107 +4744,155 @@ export function InspectionDetailPageClient({
                           <label key={value} className="flex items-center gap-1 text-white/80">
                             <input
                               type="radio"
-                              name={`process-${item.key}`}
-                              checked={processChecks[item.key] === value}
+                              name={`check-${item.key}`}
+                              checked={checks[item.key] === value}
                               disabled={isReadOnly || isCollectCarPending}
-                              onChange={() => updateProcessCheck(item.key, value)}
-                              className="h-3.5 w-3.5"
+                              onChange={() => setChecks((prev) => ({ ...prev, [item.key]: value }))}
                             />
-                            <span className="uppercase">{value}</span>
+                            {value.toUpperCase()}
                           </label>
                         ))}
                       </div>
                       <div className="mt-2">
-                        <label className="text-xs font-semibold text-white/70">{item.label} images</label>
+                        <div className="text-[10px] text-white/50">{item.label} images</div>
                         <input
                           type="file"
-                          accept="image/*"
                           multiple
-                          disabled={isReadOnly || isCollectCarPending || processCheckUploading[item.key]}
-                          className={`${theme.input} mt-1`}
+                          accept="image/*"
+                          disabled={isReadOnly || isCollectCarPending}
                           onChange={(e) => {
-                            void uploadProcessCheckFiles(item.key, e.target.files);
-                            e.currentTarget.value = "";
+                            const files = e.target.files;
+                            if (!files) return;
+                            void handleCheckMediaUpload(item.key, Array.from(files));
                           }}
+                          className="mt-1 text-xs text-white/70"
                         />
-                        {processCheckUploading[item.key] && (
-                          <div className="mt-1 text-[11px] text-cyan-300">Uploading images...</div>
-                        )}
                       </div>
-                      {processChecks[item.key] === "issue" && (
-                        <div className="mt-2">
-                          <label className="text-[11px] text-white/70">Issue Description</label>
-                          <textarea
-                            className={theme.input}
-                            rows={2}
-                            value={processCheckIssueNotes[item.key] ?? ""}
-                            readOnly={isReadOnly || isCollectCarPending}
-                            onChange={(e) =>
-                              setProcessCheckIssueNotes((prev) => ({
-                                ...prev,
-                                [item.key]: e.target.value,
-                              }))
-                            }
-                            placeholder={`Describe ${item.label.toLowerCase()} issue...`}
-                          />
-                        </div>
-                      )}
-                      {(processCheckMediaMulti[item.key]?.length ?? 0) > 0 && (
-                        <div className="mt-2 rounded border border-white/10 bg-black/30 p-2">
-                          <div className="grid gap-2 sm:grid-cols-2">
-                            {(processCheckMediaMulti[item.key] ?? []).map((fileId, mediaIndex) => (
-                              <div key={`${fileId}-${mediaIndex}`} className="rounded border border-white/10 bg-black/20 p-2">
-                                <img
-                                  className="h-24 w-full rounded border border-white/10 object-cover"
-                                  src={`/api/files/${fileId}`}
-                                  alt={`${item.label} upload ${mediaIndex + 1}`}
-                                />
-                                <div className="mt-1 flex items-center justify-between gap-2 text-[11px]">
-                                  <a
-                                    href={`/api/files/${fileId}`}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="text-primary hover:underline"
-                                  >
-                                    Open
-                                  </a>
-                                  {!isReadOnly && !isCollectCarPending && (
-                                    <button
-                                      type="button"
-                                      className="rounded bg-rose-600 px-2 py-0.5 font-semibold text-white"
-                                      onClick={() => {
-                                        setProcessCheckMediaMulti((prev) => {
-                                          const next = (prev[item.key] ?? []).filter((_, i) => i !== mediaIndex);
-                                          setProcessCheckMedia((singlePrev) => ({
-                                            ...singlePrev,
-                                            [item.key]: next[0] ?? "",
-                                          }));
-                                          return { ...prev, [item.key]: next };
-                                        });
-                                        setProcessMediaVerified((prev) => ({ ...prev, [item.key]: false }));
-                                      }}
-                                    >
-                                      Remove
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                          <div className="mt-2 text-[11px] text-emerald-300">
-                            Media uploaded
-                          </div>
-                        </div>
-                      )}
                     </div>
                   ))}
                 </div>
               </div>
 
-              <div className="flex items-center justify-between gap-2">
-                <div className="text-sm font-semibold">Findings / Parts Needed</div>
-                <div className="flex flex-wrap items-center gap-2 text-[10px]">
-                  <div className="flex flex-wrap items-center gap-1.5">
+              {/* ===== CATEGORY-BASED PART PICKER ===== */}
+              <div className="mt-4 rounded-md border border-violet-500/30 bg-violet-500/[0.05] p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-semibold text-violet-100">Select Parts by Category</div>
+                    <div className="text-[11px] text-white/50">Tap a category, then sub-category, then the specific part to add it.</div>
+                  </div>
+                </div>
+
+                <div className="mt-3">
+                  {!quickCatLoaded && (
+                    <div className="text-xs text-white/50">Loading categories...</div>
+                  )}
+
+                  {/* Level 1: Category Grid */}
+                  {quickCatLoaded && quickCatLevel === "cat" && (
+                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
+                      {quickCatData.map((cat: any) => (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          disabled={isReadOnly}
+                          onClick={() => { setQuickCatSelectedCat(cat); setQuickCatLevel("sub"); }}
+                          className="flex flex-col items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.03] p-3 text-center transition hover:border-violet-400 hover:bg-violet-500/10 disabled:opacity-50"
+                        >
+                          <span className="text-xl">{({"engine":"🔧","transmission":"⚙️","brakes":"🛑","suspension":"🔩","steering":"🎯","electrical":"⚡","ac":"❄️","body":"🚗","interior":"💺","exhaust":"💨","fuel":"⛽","tyres":"🛞"} as any)[cat.icon] ?? "🔧"}</span>
+                          <span className="text-[11px] font-semibold leading-tight text-white/90">{cat.name}</span>
+                          <span className="text-[10px] text-white/40">{cat.subcategories?.length ?? 0} groups</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Level 2: Sub-categories */}
+                  {quickCatLoaded && quickCatLevel === "sub" && quickCatSelectedCat && (
+                    <div className="space-y-3">
+                      <button type="button" onClick={() => { setQuickCatLevel("cat"); setQuickCatSelectedCat(null); }} className="text-xs text-violet-300 hover:underline">
+                        ← Back to all categories
+                      </button>
+                      <div className="text-xs font-semibold text-white/90">{quickCatSelectedCat.name}</div>
+                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+                        {(quickCatSelectedCat.subcategories ?? []).map((sub: any) => (
+                          <button
+                            key={sub.id}
+                            type="button"
+                            disabled={isReadOnly}
+                            onClick={() => { setQuickCatSelectedSub(sub); setQuickCatLevel("part"); }}
+                            className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5 text-left transition hover:border-violet-400 hover:bg-violet-500/10 disabled:opacity-50"
+                          >
+                            <div className="text-xs font-medium text-white/90">{sub.name}</div>
+                            <div className="text-[10px] text-white/40">{sub.parts?.length ?? 0} parts</div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Level 3: Parts */}
+                  {quickCatLoaded && quickCatLevel === "part" && quickCatSelectedSub && (
+                    <div className="space-y-3">
+                      <button type="button" onClick={() => { setQuickCatLevel("sub"); setQuickCatSelectedSub(null); }} className="text-xs text-violet-300 hover:underline">
+                        ← Back to {quickCatSelectedCat?.name}
+                      </button>
+                      <div className="text-xs font-semibold text-white/90">{quickCatSelectedSub.name}</div>
+                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                        {(quickCatSelectedSub.parts ?? []).map((part: any) => {
+                          const alreadyAdded = parts.some((p) => p.productName === part.name);
+                          return (
+                            <button
+                              key={part.id}
+                              type="button"
+                              disabled={alreadyAdded || isReadOnly}
+                              onClick={() => {
+                                setParts((prev) => [
+                                  ...prev,
+                                  {
+                                    id: `draft-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                                    productName: part.name,
+                                    partNumber: "",
+                                    description: `${quickCatSelectedCat?.name} > ${quickCatSelectedSub?.name}`,
+                                    quantity: 1,
+                                    reason: "Needs attention / replacement",
+                                    status: "Pending",
+                                    isSaved: false,
+                                    catalogGroupKey: "",
+                                    clientRowKey: "",
+                                    aiQuestions: [],
+                                    aiAnswers: {},
+                                    aiRecommendation: "",
+                                    mediaFileId: "",
+                                    approvedType: null,
+                                    orderStatus: null,
+                                  } as any,
+                                ]);
+                                // Go back to categories for next selection
+                                setQuickCatLevel("cat");
+                                setQuickCatSelectedCat(null);
+                                setQuickCatSelectedSub(null);
+                              }}
+                              className={`rounded-lg border px-3 py-2.5 text-left transition ${
+                                alreadyAdded
+                                  ? "border-emerald-500/30 bg-emerald-500/10 opacity-60"
+                                  : "border-white/10 bg-white/[0.03] hover:border-violet-400 hover:bg-violet-500/10"
+                              }`}
+                            >
+                              <span className="text-xs text-white/90">{alreadyAdded ? "✓ " : "＋ "}{part.name}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* ===== FINDINGS LIST ===== */}
+              <div className="mt-4">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-sm font-semibold">Findings / Parts Needed</div>
+                  <div className="flex flex-wrap items-center gap-2 text-[10px]">
                     <span className="rounded-full border border-white/15 px-2 py-0.5 text-white/70">Total: {parts.length}</span>
                     <span className="rounded-full border border-emerald-500/40 px-2 py-0.5 text-emerald-300">
                       Received: {parts.filter((p) => (p.orderStatus ?? "").toLowerCase() === "received").length}
@@ -4672,875 +4900,322 @@ export function InspectionDetailPageClient({
                     <span className="rounded-full border border-amber-500/40 px-2 py-0.5 text-amber-300">
                       Ordered: {parts.filter((p) => (p.orderStatus ?? "").toLowerCase() === "ordered").length}
                     </span>
-                    <span className="rounded-full border border-cyan-500/40 px-2 py-0.5 text-cyan-300">
-                      Draft: {parts.filter((p) => !p.isSaved).length}
-                    </span>
-                  </div>
-                  {!isReadOnly && !isCollectCarPending && (
-                    <>
+                    {!isReadOnly && !isCollectCarPending && (
                       <button
                         type="button"
                         className="rounded-md bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white disabled:opacity-50"
                         onClick={() => void saveAllDraftLineItems()}
                         disabled={parts.filter((p) => !p.isSaved).length === 0}
                       >
-                        Save All Draft
+                        Save All
                       </button>
-                      <button
-                        type="button"
-                        className="rounded-md bg-teal-600 px-2.5 py-1 text-[11px] font-semibold text-white disabled:opacity-50"
-                        disabled={vin17CatalogLoading || vinCatalogLoading}
-                        onClick={() => { resetCatalogPathsOnly(); setCatalogModalOpen(true); }}
-                      >
-                        + Add Line Item
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-              <div className="mt-2 rounded-md border border-cyan-500/20 bg-cyan-500/5 p-3">
-                <div className="text-[11px] font-semibold uppercase tracking-wide text-cyan-200">AI Line Item Assistant</div>
-                <div className="mt-2 grid gap-3 lg:grid-cols-2">
-                  <div>
-                    <div className="text-[11px] font-semibold text-cyan-100/90">Questions</div>
-                    <div className="mt-1 space-y-1 text-xs text-cyan-100/85">
-                      {lineItemAiInsights.questions.map((q, idx) => (
-                        <div key={`li-q-${idx}`}>- {q}</div>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-[11px] font-semibold text-cyan-100/90">Suggestions</div>
-                    <div className="mt-1 space-y-1 text-xs text-cyan-100/85">
-                      {lineItemAiInsights.suggestions.map((s, idx) => (
-                        <div key={`li-s-${idx}`}>- {s}</div>
-                      ))}
-                    </div>
+                    )}
                   </div>
                 </div>
-              </div>
-              {/* Manual Inspection Entry — only visible when catalog check is done and no catalog found */}
-              {!isReadOnly && !isCollectCarPending && vin17CatalogFetchDone && vin17Cata1Options.length === 0 && (
-                <div className="mt-2 rounded-md border border-amber-500/20 bg-amber-500/5 p-3">
-                  <div className="flex items-center justify-between">
-                    <div className="text-[11px] font-semibold uppercase tracking-wide text-amber-200">
-                      Manual Inspection Entry
-                    </div>
-                    <button
-                      type="button"
-                      className="rounded-md border border-amber-500/30 px-2 py-1 text-[10px] font-semibold text-amber-200 hover:bg-amber-500/10"
-                      onClick={() => setManualPanelOpen((v) => !v)}
-                    >
-                      {manualPanelOpen ? "Hide" : "+ Add Manual Entry"}
-                    </button>
+
+                {parts.length === 0 ? (
+                  <div className="mt-3 rounded-md border border-white/10 bg-white/[0.02] p-6 text-center">
+                    <div className="text-xs text-white/50">No parts added yet. Select from the categories above.</div>
                   </div>
-                  {manualPanelOpen && (
-                    <div className="mt-3 space-y-2">
-                      <div className="rounded-md border border-amber-400/10 bg-black/20 px-3 py-2 text-[11px] text-amber-100/80">
-                        Describe what you observed — AI will assist with part suggestions based on the category.
-                      </div>
-                      <div className="grid gap-2 lg:grid-cols-2">
-                        <div>
-                          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-amber-100/80">System / Category</div>
-                          <select
-                            className={`${theme.input} h-10 w-full`}
-                            value={manualDraft.category}
-                            onChange={(e) => setManualDraft((d) => ({ ...d, category: e.target.value }))}
-                          >
-                            <option value="">Select category</option>
-                            <option value="Engine">Engine</option>
-                            <option value="Gearbox">Gearbox</option>
-                            <option value="Brakes">Brakes</option>
-                            <option value="Suspension">Suspension</option>
-                            <option value="Electrical">Electrical</option>
-                            <option value="Body">Body</option>
-                            <option value="Other">Other</option>
-                          </select>
-                        </div>
-                        <div>
-                          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-amber-100/80">Severity</div>
-                          <select
-                            className={`${theme.input} h-10 w-full`}
-                            value={manualDraft.reason}
-                            onChange={(e) => setManualDraft((d) => ({ ...d, reason: e.target.value }))}
-                          >
-                            <option value="Safety Risk">Safety Risk</option>
-                            <option value="Mandatory">Mandatory</option>
-                            <option value="Recommended">Recommended</option>
-                            <option value="Optional">Optional</option>
-                          </select>
-                        </div>
-                      </div>
-                      <div>
-                        <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-amber-100/80">What did you observe?</div>
-                        <textarea
-                          className={`${theme.input} w-full resize-none`}
-                          rows={2}
-                          placeholder="e.g. Worn brake pads, metal-on-metal grinding sound"
-                          value={manualDraft.observation}
-                          onChange={(e) => setManualDraft((d) => ({ ...d, observation: e.target.value }))}
-                        />
-                      </div>
-                      <div className="grid gap-2 lg:grid-cols-2">
-                        <div>
-                          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-amber-100/80">Part Name *</div>
-                          <input
-                            type="text"
-                            className={`${theme.input} h-10 w-full`}
-                            placeholder="e.g. Brake Pad Set"
-                            value={manualDraft.part}
-                            onChange={(e) => setManualDraft((d) => ({ ...d, part: e.target.value }))}
-                          />
-                        </div>
-                        <div>
-                          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-amber-100/80">
-                            Part Number <span className="font-normal normal-case text-amber-100/50">(leave blank if unknown)</span>
+                ) : (
+                  <div className="mt-3 space-y-3">
+                    {parts.map((part, idx) => (
+                      <div key={part.id ?? idx} className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
+                        {/* Row 1: Part name + remove */}
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm font-semibold text-white/90">{(part as any).productName || part.part || "Unnamed part"}</div>
+                            {part.description && <div className="text-[10px] text-white/40">{part.description}</div>}
+                            {!part.isSaved && <span className="text-[10px] text-amber-400">● Draft</span>}
                           </div>
-                          <input
-                            type="text"
-                            className={`${theme.input} h-10 w-full`}
-                            placeholder="Vendor will confirm"
-                            value={manualDraft.partNumber}
-                            onChange={(e) => setManualDraft((d) => ({ ...d, partNumber: e.target.value }))}
-                          />
+                          {!isReadOnly && (
+                            <button type="button" onClick={() => setParts((prev) => prev.filter((_, i) => i !== idx))} className="rounded p-1 text-white/30 hover:text-rose-400">✕</button>
+                          )}
+                        </div>
+
+                        {/* Row 2: Action Type + Priority */}
+                        <div className="mt-2 flex flex-wrap gap-4">
+                          {/* Action Type: Replace / Service / Repair */}
+                          <div className="space-y-1">
+                            <div className="text-[10px] font-semibold uppercase tracking-wide text-white/40">Action</div>
+                            <div className="flex gap-1">
+                              {([
+                                { key: "replace", label: "Replace", icon: "🔄" },
+                                { key: "service", label: "Service", icon: "🔧" },
+                                { key: "repair", label: "Repair", icon: "🛠️" },
+                              ] as const).map(({ key, label, icon }) => (
+                                <button
+                                  key={key}
+                                  type="button"
+                                  disabled={isReadOnly}
+                                  onClick={() => setParts((prev) => prev.map((p, i) => i === idx ? { ...p, actionType: key } : p))}
+                                  className={`rounded-lg px-2.5 py-1 text-[11px] font-medium transition ${
+                                    (part as any).actionType === key
+                                      ? "bg-violet-500/25 text-violet-200 ring-1 ring-violet-500/50"
+                                      : "bg-white/5 text-white/50 hover:bg-white/10"
+                                  }`}
+                                >
+                                  {icon} {label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Priority: Safety Risk / Mandatory / Recommended */}
+                          <div className="space-y-1">
+                            <div className="text-[10px] font-semibold uppercase tracking-wide text-white/40">Priority</div>
+                            <div className="flex gap-1">
+                              {([
+                                { key: "safety_risk", label: "Safety Risk", color: "rose" },
+                                { key: "mandatory", label: "Mandatory", color: "amber" },
+                                { key: "recommended", label: "Recommended", color: "cyan" },
+                              ] as const).map(({ key, label, color }) => (
+                                <button
+                                  key={key}
+                                  type="button"
+                                  disabled={isReadOnly}
+                                  onClick={() => setParts((prev) => prev.map((p, i) => i === idx ? { ...p, priority: key } : p))}
+                                  className={`rounded-lg px-2.5 py-1 text-[11px] font-medium transition ${
+                                    (part as any).priority === key
+                                      ? color === "rose" ? "bg-rose-500/25 text-rose-200 ring-1 ring-rose-500/50"
+                                        : color === "amber" ? "bg-amber-500/25 text-amber-200 ring-1 ring-amber-500/50"
+                                        : "bg-cyan-500/25 text-cyan-200 ring-1 ring-cyan-500/50"
+                                      : "bg-white/5 text-white/50 hover:bg-white/10"
+                                  }`}
+                                >
+                                  {label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Row 3: AI Description (auto-generated) */}
+                        {(part as any).aiDescription ? (
+                          <div className="mt-2 rounded-md border border-cyan-500/20 bg-cyan-500/[0.03] px-3 py-2">
+                            <div className="text-[10px] font-semibold text-cyan-300">AI Assessment</div>
+                            <div className="mt-0.5 text-[11px] leading-relaxed text-white/70">{(part as any).aiDescription}</div>
+                          </div>
+                        ) : (part as any).actionType && (part as any).priority ? (
+                          <div className="mt-2 text-[10px] text-cyan-300 animate-pulse">Generating AI description...</div>
+                        ) : (
+                          <div className="mt-2 text-[10px] text-white/30">Select action &amp; priority to generate AI description.</div>
+                        )}
+
+                        {/* Row 4: Photo / Video Evidence */}
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          {/* Show attached files */}
+                          {((part as any).mediaFiles ?? (part.mediaFileId ? [{ id: part.mediaFileId, type: "file" }] : [])).map((mf: any, mfIdx: number) => (
+                            <div key={mf.id ?? mfIdx} className="flex items-center gap-1.5 rounded-md border border-emerald-500/20 bg-emerald-500/[0.05] px-2 py-1">
+                              <span className="text-[11px] text-emerald-300">{mf.type === "video" ? "🎥" : "📷"} {mf.type === "video" ? "Video" : "Photo"}</span>
+                              {!isReadOnly && (
+                                <button type="button" onClick={() => {
+                                  setParts((prev) => prev.map((p, i) => {
+                                    if (i !== idx) return p;
+                                    const files = ((p as any).mediaFiles ?? []).filter((_: any, fi: number) => fi !== mfIdx);
+                                    return { ...p, mediaFiles: files, mediaFileId: files[0]?.id ?? null, isSaved: false };
+                                  }));
+                                }} className="text-[10px] text-white/40 hover:text-rose-400">✕</button>
+                              )}
+                            </div>
+                          ))}
+                          {/* Always show upload buttons unless read-only */}
+                          {!isReadOnly && (
+                            <>
+                              <label className="flex cursor-pointer items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-1.5 text-[11px] text-white/60 transition hover:border-violet-400 hover:bg-violet-500/10 hover:text-white/90">
+                                📷 Photo
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  capture="environment"
+                                  className="hidden"
+                                  onChange={async (e) => {
+                                    const file = e.target.files?.[0];
+                                    if (!file) return;
+                                    const formData = new FormData();
+                                    formData.append("file", file);
+                                    formData.append("companyId", companyId ?? "");
+                                    formData.append("label", `inspection-photo-${idx}`);
+                                    try {
+                                      const res = await fetch("/api/files/upload", { method: "POST", body: formData });
+                                      const json = await res.json();
+                                      const fileId = json?.fileId ?? json?.data?.id ?? json?.id ?? null;
+                                      if (fileId) {
+                                        setParts((prev) => prev.map((p, i) => {
+                                          if (i !== idx) return p;
+                                          const files = [...((p as any).mediaFiles ?? []), { id: fileId, type: "photo" }];
+                                          return { ...p, mediaFiles: files, mediaFileId: files[0]?.id ?? null, isSaved: false };
+                                        }));
+                                      }
+                                    } catch { /* silent */ }
+                                    e.target.value = "";
+                                  }}
+                                />
+                              </label>
+                              <label className="flex cursor-pointer items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-1.5 text-[11px] text-white/60 transition hover:border-violet-400 hover:bg-violet-500/10 hover:text-white/90">
+                                🎥 Video
+                                <input
+                                  type="file"
+                                  accept="video/*"
+                                  capture="environment"
+                                  className="hidden"
+                                  onChange={async (e) => {
+                                    const file = e.target.files?.[0];
+                                    if (!file) return;
+                                    const formData = new FormData();
+                                    formData.append("file", file);
+                                    formData.append("companyId", companyId ?? "");
+                                    formData.append("label", `inspection-video-${idx}`);
+                                    try {
+                                      const res = await fetch("/api/files/upload", { method: "POST", body: formData });
+                                      const json = await res.json();
+                                      const fileId = json?.fileId ?? json?.data?.id ?? json?.id ?? null;
+                                      if (fileId) {
+                                        setParts((prev) => prev.map((p, i) => {
+                                          if (i !== idx) return p;
+                                          const files = [...((p as any).mediaFiles ?? []), { id: fileId, type: "video" }];
+                                          return { ...p, mediaFiles: files, mediaFileId: files[0]?.id ?? null, isSaved: false };
+                                        }));
+                                      }
+                                    } catch { /* silent */ }
+                                    e.target.value = "";
+                                  }}
+                                />
+                              </label>
+                            </>
+                          )}
                         </div>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className="text-[10px] font-semibold uppercase tracking-wide text-amber-100/80">Qty</div>
-                          <input
-                            type="number"
-                            min={1}
-                            className={`${theme.input} h-9 w-20`}
-                            value={manualDraft.qty}
-                            onChange={(e) => setManualDraft((d) => ({ ...d, qty: e.target.value }))}
-                          />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* ===== AI PART SUGGESTIONS ===== */}
+              {parts.length > 0 && (
+                <div className="mt-4 rounded-md border border-cyan-500/30 bg-cyan-500/[0.05] p-4">
+                  <div className="flex items-center gap-2">
+                    <div className="text-sm font-semibold text-cyan-100">AI Suggestions</div>
+                    {aiSuggestionsLoading && <span className="text-[11px] text-cyan-300 animate-pulse">analyzing...</span>}
+                  </div>
+                  <div className="text-[11px] text-white/50">Related parts that may also need inspection — add or dismiss.</div>
+
+                  {aiSuggestions.length > 0 && (
+                    <div className="mt-3 space-y-2">
+                      {aiSuggestions.map((suggestion, idx) => (
+                        <div key={idx} className="flex items-center gap-3 rounded-lg border border-cyan-500/20 bg-white/[0.02] p-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-semibold text-white/90">{suggestion.name}</span>
+                              <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold ${
+                                suggestion.likelihood === "high"
+                                  ? "bg-rose-500/20 text-rose-300"
+                                  : "bg-amber-500/20 text-amber-300"
+                              }`}>
+                                {suggestion.likelihood === "high" ? "LIKELY" : "POSSIBLE"}
+                              </span>
+                            </div>
+                            <div className="text-[11px] text-white/50">{suggestion.reason}</div>
+                            <div className="text-[10px] text-white/30">{suggestion.category}</div>
+                          </div>
+                          <button
+                            type="button"
+                            disabled={isReadOnly}
+                            onClick={() => {
+                              // Add the suggested part
+                              setParts((prev) => [
+                                ...prev,
+                                {
+                                  id: `draft-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                                  productName: suggestion.name,
+                                  partNumber: "",
+                                  description: `AI Suggested (${suggestion.category})`,
+                                  quantity: 1,
+                                  reason: suggestion.reason,
+                                  status: "Pending",
+                                  isSaved: false,
+                                  catalogGroupKey: "",
+                                  clientRowKey: "",
+                                  aiQuestions: [],
+                                  aiAnswers: {},
+                                  aiRecommendation: suggestion.reason,
+                                  mediaFileId: "",
+                                  approvedType: null,
+                                  orderStatus: null,
+                                } as any,
+                              ]);
+                              // Remove from suggestions
+                              setAiSuggestions((prev) => prev.filter((_, i) => i !== idx));
+                            }}
+                            className="rounded-md bg-cyan-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-cyan-500 disabled:opacity-50"
+                          >
+                            + Add
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setAiSuggestions((prev) => prev.filter((_, i) => i !== idx))}
+                            className="rounded p-1 text-white/30 hover:text-white/60"
+                          >
+                            ✕
+                          </button>
                         </div>
-                        <button
-                          type="button"
-                          className="rounded-md bg-amber-600 px-4 py-2 text-xs font-semibold text-white disabled:opacity-50"
-                          disabled={!manualDraft.part.trim()}
-                          onClick={addManualLineItem}
-                        >
-                          Add to Findings ▶
-                        </button>
-                      </div>
+                      ))}
                     </div>
+                  )}
+
+                  {!aiSuggestionsLoading && aiSuggestions.length === 0 && aiSuggestionsLastKey && (
+                    <div className="mt-2 text-[11px] text-white/40">No additional suggestions. All related parts covered.</div>
                   )}
                 </div>
               )}
-
-              <div className={`mt-2 rounded-md ${theme.cardBorder} ${theme.surfaceSubtle} p-3`}>
-                {parts.length === 0 ? (
-                  <div className="rounded-md border border-dashed border-white/20 bg-black/20 p-4 text-center">
-                    <div className="text-xs text-white/70">No line items added yet.</div>
-                    {!isReadOnly && !isCollectCarPending && (
-                      <button
-                        type="button"
-                        className="mt-3 rounded-md bg-teal-600 px-3 py-2 text-xs font-semibold text-white"
-                        onClick={addLineItemRow}
-                        disabled={vinCatalogLoading}
-                      >
-                        {vinCatalogLoading ? "Loading..." : "Add Line Item"}
-                      </button>
-                    )}
-                  </div>
-                ) : (
-                  <>
-                    <div className="hidden w-full gap-3 text-xs font-semibold text-white/70 lg:grid lg:grid-cols-[2fr_1.2fr_2fr_1fr_1.2fr_1fr_1.5fr]">
-                      <div>Parts Needed</div>
-                      <div>Part Number</div>
-                      <div>Description</div>
-                      <div>Quantity</div>
-                      <div>Status</div>
-                      <div>Picture / Video</div>
-                      <div>Actions</div>
-                    </div>
-                    <div className="mt-2 space-y-2">
-                      {groupedLineItemOrder.map(({ row, index, groupKey, groupLabel }, orderIdx) => {
-                    const isNewGroup = orderIdx === 0 || groupedLineItemOrder[orderIdx - 1]?.groupKey !== groupKey;
-                    const summary =
-                      groupKey === "__ungrouped__"
-                        ? {
-                            label: "Ungrouped",
-                            parts: [] as string[],
-                            healthPercent: 100,
-                            severityCounts: { "Safety Risk": 0, Mandatory: 0, Recommended: 0, Optional: 0 },
-                          }
-                        : groupSummaryByKey.get(groupKey) ??
-                          {
-                            label: groupLabel,
-                            parts: [] as string[],
-                            healthPercent: 100,
-                            severityCounts: { "Safety Risk": 0, Mandatory: 0, Recommended: 0, Optional: 0 },
-                          };
-                    const isLocked =
-                      isReadOnly || isCollectCarPending || row.partOrdered === 1 || row.orderStatus === "Ordered" || row.orderStatus === "Received";
-                    const rowKey = row.clientRowKey || row.id || `row-${index}`;
-                    const selectedGroupKey = String(row.catalogGroupKey ?? "");
-                    const selectedPartCode = String(row.catalogPartCode ?? "");
-                    const selectedGroupLabel =
-                      vinCatalogGroups.find((group) => group.key === selectedGroupKey)?.label ?? "";
-                    const rowAiQuestions = lineItemAiQuestionsByRow[rowKey] ?? [];
-                    const rowAiAnswers = lineItemAiAnswers[rowKey] ?? {};
-                    const smartSuggestionsBase =
-                      lineItemSmartSuggestionsByRow[rowKey] && lineItemSmartSuggestionsByRow[rowKey]!.length > 0
-                        ? lineItemSmartSuggestionsByRow[rowKey]!
-                        : generateSmartFaultSuggestions(
-                            String(row.part ?? ""),
-                            selectedGroupLabel,
-                            String(row.description ?? "")
-                          );
-                    const dismissedSuggestionIds = dismissedSmartSuggestionsByRow[rowKey] ?? [];
-                    const existingPartNames = new Set(
-                      parts
-                        .map((p) => String(p.part ?? "").trim().toLowerCase())
-                        .filter(Boolean)
-                    );
-                    const existingPartCodes = new Set(
-                      parts
-                        .map((p) => String(p.catalogPartCode ?? "").trim().toLowerCase())
-                        .filter(Boolean)
-                    );
-                    const smartSuggestions = smartSuggestionsBase.filter((s) => {
-                      if (dismissedSuggestionIds.includes(s.id)) return false;
-                      const label = String(s.label ?? "").trim();
-                      const lower = label.toLowerCase();
-                      const codeMatch = label.match(/\(([^)]+)\)\s*$/);
-                      const code = String(codeMatch?.[1] ?? "").trim().toLowerCase();
-                      if (existingPartNames.has(lower)) return false;
-                      if (code && existingPartCodes.has(code)) return false;
-                      return true;
-                    });
-                    const smartSuggestionsLoading = Boolean(lineItemSmartSuggestionsLoadingByRow[rowKey]);
-                    const rowMediaRequirement = getMediaRequirement(row);
-                    const answeredQuestionsCount = rowAiQuestions.filter((q) => Boolean(rowAiAnswers[q.id])).length;
-                    const statusDone = Boolean(String(row.reason ?? "").trim());
-                    const mediaDone = rowMediaRequirement.required ? Boolean(row.mediaFileId) : true;
-                    const hasSelectedPart = Boolean(String(row.part ?? "").trim());
-                    const isRowExpanded = hasSelectedPart ? (expandedLineItemsByRow[rowKey] ?? !row.isSaved) : true;
-                    const filteredCatalogPartsRaw = vinCatalogParts.filter((part) =>
-                      (part.groups ?? []).some((group) => {
-                        const groupId = String(group?.id ?? "").trim();
-                        const groupName = String(group?.name ?? "").trim();
-                        const groupLevel = Number(group?.level ?? 0) || 0;
-                        const key = `${groupId || groupName}::${groupLevel}`;
-                        return key === selectedGroupKey;
-                      })
-                    );
-                    // When parts have no group metadata (17VIN action=part response),
-                    // fall back to all loaded parts if the selected key is a synthetic group.
-                    const isSyntheticGroup =
-                      filteredCatalogPartsRaw.length === 0 &&
-                      vinCatalogGroups.some((g) => g.key === selectedGroupKey);
-                    const filteredCatalogParts = isSyntheticGroup
-                      ? vinCatalogParts
-                      : filteredCatalogPartsRaw;
-                    return (
-                      <React.Fragment key={`grouped-row-${rowKey}-${index}`}>
-                      {isNewGroup && (
-                        <div className="rounded-md border border-cyan-500/30 bg-cyan-500/10 p-2">
-                          <div className="flex flex-wrap items-start justify-between gap-2">
-                            <div>
-                              <div className="text-xs font-semibold text-cyan-100">{summary.label}</div>
-                              <div className="mt-1 text-[11px] text-white/80">
-                                Health Indicator:{" "}
-                                <span className="font-semibold text-white">{summary.healthPercent}%</span>
-                              </div>
-                            </div>
-                            <div className="flex flex-wrap items-center gap-1 text-[10px]">
-                              <span className="rounded-full border border-rose-500/40 px-2 py-0.5 text-rose-300">
-                                Safety {summary.severityCounts["Safety Risk"]}
-                              </span>
-                              <span className="rounded-full border border-amber-500/40 px-2 py-0.5 text-amber-300">
-                                Mandatory {summary.severityCounts.Mandatory}
-                              </span>
-                              <span className="rounded-full border border-cyan-500/40 px-2 py-0.5 text-cyan-200">
-                                Recommended {summary.severityCounts.Recommended}
-                              </span>
-                              <span className="rounded-full border border-white/20 px-2 py-0.5 text-white/80">
-                                Optional {summary.severityCounts.Optional}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="mt-1 h-1.5 w-full rounded bg-white/10">
-                            <div
-                              className={`h-1.5 rounded ${
-                                summary.healthPercent < 50
-                                  ? "bg-rose-400"
-                                  : summary.healthPercent < 70
-                                  ? "bg-amber-400"
-                                  : summary.healthPercent < 90
-                                  ? "bg-cyan-400"
-                                  : "bg-emerald-400"
-                              }`}
-                              style={{ width: `${Math.max(0, Math.min(100, summary.healthPercent))}%` }}
-                            />
-                          </div>
-                          <div className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-white/60">
-                            Selected Parts
-                          </div>
-                          <div className="mt-1 text-[11px] text-white/80">
-                            {summary.parts.length ? summary.parts.join(", ") : "No selected parts"}
-                          </div>
-                        </div>
-                      )}
-                      <div
-                        key={index}
-                        className="rounded-md border border-white/10 bg-black/10 p-2"
-                      >
-                        {hasSelectedPart && (
-                        <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-md border border-white/10 px-2 py-1.5">
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <div className="text-xs font-semibold text-white/90">
-                              {row.part || "New line item"} {row.catalogPartCode ? `(${row.catalogPartCode})` : ""}
-                            </div>
-                            {selectedGroupLabel && (
-                              <span className="rounded-full border border-cyan-500/40 px-2 py-0.5 text-[10px] text-cyan-200">
-                                {selectedGroupLabel}
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
-                            <span className={`rounded-full border px-2 py-0.5 ${row.isSaved ? "border-emerald-500/40 text-emerald-300" : "border-amber-500/40 text-amber-300"}`}>
-                              {row.isSaved ? "Saved" : "Draft"}
-                            </span>
-                            <span className={`rounded-full border px-2 py-0.5 ${statusDone ? "border-emerald-500/40 text-emerald-300" : "border-amber-500/40 text-amber-300"}`}>
-                              Status {statusDone ? "OK" : "Missing"}
-                            </span>
-                            <span className={`rounded-full border px-2 py-0.5 ${mediaDone ? "border-emerald-500/40 text-emerald-300" : "border-amber-500/40 text-amber-300"}`}>
-                              Media {mediaDone ? "OK" : "Missing"}
-                            </span>
-                            <span className={`rounded-full border px-2 py-0.5 ${answeredQuestionsCount === rowAiQuestions.length && rowAiQuestions.length > 0 ? "border-emerald-500/40 text-emerald-300" : "border-cyan-500/40 text-cyan-200"}`}>
-                              Questions {answeredQuestionsCount}/{rowAiQuestions.length}
-                            </span>
-                            <button
-                              type="button"
-                              className="rounded-md border border-white/20 px-2 py-0.5 text-white/80"
-                              onClick={() =>
-                                setExpandedLineItemsByRow((prev) => ({
-                                  ...prev,
-                                  [rowKey]: !(prev[rowKey] ?? !row.isSaved),
-                                }))
-                              }
-                            >
-                              {isRowExpanded ? "Collapse" : "Expand"}
-                            </button>
-                          </div>
-                        </div>
-                        )}
-                        {isRowExpanded && (
-                        <div className={`grid w-full items-start gap-3 ${hasSelectedPart ? "lg:grid-cols-[2fr_1.2fr_2fr_1fr_1.2fr_1fr_1.5fr]" : "lg:grid-cols-[2fr_1.2fr]"}`}>
-                        <div className="space-y-1">
-                          <div className="text-[10px] font-semibold uppercase tracking-wide text-white/60 lg:hidden">Part</div>
-                          {vinCatalogGroups.length > 0 ? (
-                            <div className="space-y-2">
-                              <select
-                                className={`${theme.input} h-10 w-full`}
-                                value={selectedGroupKey}
-                                disabled={isLocked}
-                                onChange={(e) => {
-                                  const groupKey = e.target.value;
-                                  setParts((prev) =>
-                                    prev.map((p, i) =>
-                                      i === index
-                                        ? {
-                                            ...p,
-                                            catalogGroupKey: groupKey,
-                                            catalogPartCode: "",
-                                            part: "",
-                                            productId: null,
-                                            productType: null,
-                                            isSaved: false,
-                                          }
-                                        : p
-                                    )
-                                  );
-                                  setLineItemErrors((prev) => ({
-                                    ...prev,
-                                    [index]: { ...prev[index], part: undefined },
-                                  }));
-                                  setLineItemSmartSuggestionsByRow((prev) => ({ ...prev, [rowKey]: [] }));
-                                  setLineItemSmartSuggestionsLoadingByRow((prev) => ({ ...prev, [rowKey]: false }));
-                                  setLineItemSmartSuggestionsFetchedByRow((prev) => ({ ...prev, [rowKey]: false }));
-                                  setDismissedSmartSuggestionsByRow((prev) => ({ ...prev, [rowKey]: [] }));
-                                }}
-                              >
-                                <option value="">Select Car Group</option>
-                                {vinCatalogGroups.map((group) => (
-                                  <option key={group.key} value={group.key}>
-                                    {group.label}
-                                  </option>
-                                ))}
-                              </select>
-                              {selectedGroupKey && (
-                                <select
-                                  className={`${theme.input} h-10 w-full`}
-                                  value={selectedPartCode}
-                                  disabled={isLocked}
-                                  onChange={(e) => {
-                                    const code = e.target.value;
-                                    const selected = filteredCatalogParts.find((part) => part.code === code) ?? null;
-                                    const nextPartName = selected?.name || selected?.code || "";
-                                    const nextPartCode = selected?.code || code;
-                                    setParts((prev) =>
-                                      prev.map((p, i) =>
-                                        i === index
-                                          ? {
-                                              ...p,
-                                              catalogPartCode: code,
-                                              part: nextPartName,
-                                              description: p.description || "",
-                                              productId: null,
-                                              productType: null,
-                                              isSaved: false,
-                                            }
-                                          : p
-                                      )
-                                    );
-                                    setLineItemErrors((prev) => ({
-                                      ...prev,
-                                      [index]: { ...prev[index], part: undefined },
-                                    }));
-                                    setLineItemAiAnswers((prev) => ({ ...prev, [rowKey]: {} }));
-                                    setLineItemAiRecommendationByRow((prev) => ({ ...prev, [rowKey]: "" }));
-                                    setLineItemSmartSuggestionsByRow((prev) => ({ ...prev, [rowKey]: [] }));
-                                    setLineItemSmartSuggestionsLoadingByRow((prev) => ({ ...prev, [rowKey]: false }));
-                                    setLineItemSmartSuggestionsFetchedByRow((prev) => ({ ...prev, [rowKey]: false }));
-                                    setDismissedSmartSuggestionsByRow((prev) => ({ ...prev, [rowKey]: [] }));
-                                    if (nextPartName) {
-                                      void requestLineItemAi(
-                                        rowKey,
-                                        {
-                                          partName: nextPartName,
-                                          partNumber: nextPartCode,
-                                          groupName: selectedGroupLabel,
-                                          description: row.description ?? "",
-                                          status: row.reason ?? "",
-                                        },
-                                        undefined,
-                                        undefined
-                                      );
-                                      void requestSmartFaultSuggestions(rowKey, {
-                                        partName: nextPartName,
-                                        partNumber: nextPartCode,
-                                        vin: inspectionVin.trim().toUpperCase(),
-                                        category: selectedGroupLabel,
-                                        groupName: selectedGroupLabel,
-                                        description: row.description ?? "",
-                                        status: row.reason ?? "",
-                                      });
-                                    }
-                                  }}
-                                >
-                                  <option value="">Select Part</option>
-                                  {filteredCatalogParts.map((part) => (
-                                    <option key={`${part.code}-${part.name}`} value={part.code}>
-                                      {part.name || "Unnamed part"}{part.code ? ` (${part.code})` : ""}
-                                    </option>
-                                  ))}
-                                </select>
-                              )}
-                            </div>
-                          ) : (
-                            <div className="relative">
-                              <input
-                                type="text"
-                                className={`${theme.input} h-10 w-full`}
-                                value={row.part}
-                                disabled={isLocked}
-                                onChange={(e) => updatePart(index, "part", e.target.value)}
-                                placeholder="Search products"
-                                onFocus={() => setProductOpenIndex(index)}
-                                onBlur={() => {
-                                  setTimeout(
-                                    () => setProductOpenIndex((current) => (current === index ? null : current)),
-                                    150
-                                  );
-                                }}
-                              />
-                              {productOpenIndex === index && (
-                                <div className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded-md border border-white/10 bg-slate-950 text-xs shadow-lg">
-                                  {(productResults.length ? productResults : products).map((product) => (
-                                    <button
-                                      key={product.id}
-                                      type="button"
-                                      className="flex w-full items-start gap-2 px-3 py-2 text-left text-white/80 hover:bg-white/10"
-                                      onMouseDown={(e) => e.preventDefault()}
-                                      onClick={() => {
-                                        updatePart(index, "part", product.name, {
-                                          productId: product.id,
-                                          productType: product.type ?? null,
-                                        });
-                                        setProductOpenIndex(null);
-                                        setLineItemAiAnswers((prev) => ({ ...prev, [rowKey]: {} }));
-                                        setLineItemAiRecommendationByRow((prev) => ({ ...prev, [rowKey]: "" }));
-                                        setLineItemSmartSuggestionsByRow((prev) => ({ ...prev, [rowKey]: [] }));
-                                        setLineItemSmartSuggestionsLoadingByRow((prev) => ({ ...prev, [rowKey]: false }));
-                                        setLineItemSmartSuggestionsFetchedByRow((prev) => ({ ...prev, [rowKey]: false }));
-                                        setDismissedSmartSuggestionsByRow((prev) => ({ ...prev, [rowKey]: [] }));
-                                        void requestLineItemAi(
-                                          rowKey,
-                                          {
-                                            partName: product.name,
-                                            partNumber: String(row.catalogPartCode ?? ""),
-                                            groupName: selectedGroupLabel,
-                                            description: row.description ?? "",
-                                            status: row.reason ?? "",
-                                          },
-                                          undefined,
-                                          undefined
-                                        );
-                                        void requestSmartFaultSuggestions(rowKey, {
-                                          partName: product.name,
-                                          partNumber: String(row.catalogPartCode ?? ""),
-                                          vin: inspectionVin.trim().toUpperCase(),
-                                          category: selectedGroupLabel,
-                                          groupName: selectedGroupLabel,
-                                          description: row.description ?? "",
-                                          status: row.reason ?? "",
-                                        });
-                                      }}
-                                    >
-                                      <span className="font-semibold">{product.name}</span>
-                                      <span className="text-[10px] text-white/50">{product.type}</span>
-                                    </button>
-                                  ))}
-                                  {productResults.length === 0 && products.length === 0 && (
-                                    <div className="px-3 py-2 text-white/50">No products found.</div>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        {lineItemErrors[index]?.part && (
-                          <div className="text-xs text-destructive">{lineItemErrors[index]?.part}</div>
-                        )}
-                      </div>
-                      {hasSelectedPart && (
-                      <div className="space-y-1">
-                        <div className="text-[10px] font-semibold uppercase tracking-wide text-white/60 lg:hidden">Part Number</div>
-                        <input
-                          type="text"
-                          className={`${theme.input} h-10 w-full`}
-                          value={row.catalogPartCode ?? ""}
-                          disabled={isLocked}
-                          onChange={(e) =>
-                            setParts((prev) =>
-                              prev.map((p, i) =>
-                                i === index ? { ...p, catalogPartCode: e.target.value, isSaved: false } : p
-                              )
-                            )
-                          }
-                          placeholder="Part number"
-                        />
-                      </div>
-                      )}
-                      {hasSelectedPart && (
-                      <div className="space-y-1">
-                        <div className="text-[10px] font-semibold uppercase tracking-wide text-white/60 lg:hidden">Description</div>
-                        <input
-                          type="text"
-                          className={`${theme.input} h-10 w-full`}
-                          value={row.description}
-                          disabled={isLocked}
-                          onChange={(e) => updatePart(index, "description", e.target.value)}
-                          placeholder="do it"
-                        />
-                      </div>
-                      )}
-                      {hasSelectedPart && (
-                      <div className="space-y-1">
-                        <div className="text-[10px] font-semibold uppercase tracking-wide text-white/60 lg:hidden">Quantity</div>
-                        <input
-                          type="number"
-                          min={1}
-                          step={1}
-                          className={`${theme.input} h-10 w-full`}
-                          value={row.qty}
-                          disabled={isLocked}
-                          onChange={(e) => updatePart(index, "qty", e.target.value)}
-                        />
-                        {lineItemErrors[index]?.qty && (
-                          <div className="text-xs text-destructive">{lineItemErrors[index]?.qty}</div>
-                        )}
-                      </div>
-                      )}
-                      {hasSelectedPart && (
-                      <div className="space-y-1">
-                        <div className="text-[10px] font-semibold uppercase tracking-wide text-white/60 lg:hidden">Status</div>
-                        <select
-                          className={`${theme.input} h-10 w-full`}
-                          value={row.reason || "Mandatory"}
-                          disabled={isLocked}
-                          onChange={(e) => updatePart(index, "reason", e.target.value)}
-                        >
-                          {lineItemStatusOptions.map((status) => (
-                            <option key={status} value={status}>
-                              {status}
-                            </option>
-                          ))}
-                          {row.reason && !lineItemStatusOptions.includes(row.reason as (typeof lineItemStatusOptions)[number]) ? (
-                            <option value={row.reason}>{row.reason}</option>
-                          ) : null}
-                        </select>
-                      </div>
-                      )}
-                      {hasSelectedPart && (
-                      <div className="space-y-1">
-                        <div className="text-[10px] font-semibold uppercase tracking-wide text-white/60 lg:hidden">Picture / Video</div>
-                        {(() => {
-                          const mediaRequirement = getMediaRequirement(row);
-                          return (
-                            <FileUploader
-                              label=""
-                              kind={mediaRequirement.kind}
-                              value={row.mediaFileId ?? ""}
-                              onChange={(id) => updatePartMedia(index, id ?? "")}
-                              disabled={isLocked}
-                              buttonOnly
-                              showPreview
-                              buttonClassName="h-10 w-full justify-center "
-                              containerClassName="w-full"
-                            />
-                          );
-                        })()}
-                        {lineItemErrors[index]?.media && (
-                          <div className="text-xs text-destructive">{lineItemErrors[index]?.media}</div>
-                        )}
-                      </div>
-                      )}
-                      {hasSelectedPart && (
-                      <div className="lg:col-span-7 rounded-md border border-cyan-500/20 bg-cyan-500/5 p-2">
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="text-[11px] font-semibold uppercase tracking-wide text-cyan-200">
-                            AI Part Inspection ({row.part || "Select part first"})
-                          </div>
-                          {(() => {
-                            const diagramUrl = vinCatalogParts.find((p) => p.code === selectedPartCode)?.diagram ?? "";
-                            const partNumber = String(row.catalogPartCode ?? "").trim() || String(row.part ?? "").trim();
-                            if (diagramUrl) {
-                              return (
-                                <a
-                                  href={diagramUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="rounded-md border border-cyan-500/40 px-2 py-1 text-[10px] font-semibold text-cyan-100 hover:bg-cyan-500/10"
-                                >
-                                  View Diagram
-                                </a>
-                              );
-                            }
-                            if (partNumber) {
-                              const searchQuery = [partNumber, inspectionMake, inspectionModel, inspectionYear, "car part diagram"]
-                                .map((v) => String(v ?? "").trim())
-                                .filter(Boolean)
-                                .join(" ");
-                              return (
-                                <a
-                                  href={`https://www.google.com/search?tbm=isch&q=${encodeURIComponent(searchQuery)}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="rounded-md border border-white/20 px-2 py-1 text-[10px] font-semibold text-white/60 hover:text-white/90"
-                                >
-                                  Search Diagram
-                                </a>
-                              );
-                            }
-                            return null;
-                          })()}
-                        </div>
-                        {(() => {
-                          const diagramUrl = vinCatalogParts.find((p) => p.code === selectedPartCode)?.diagram ?? "";
-                          if (!diagramUrl) return null;
-                          return (
-                            <div className="mt-2">
-                              <a href={diagramUrl} target="_blank" rel="noopener noreferrer">
-                                <img
-                                  src={diagramUrl}
-                                  alt={`Diagram for ${row.part || selectedPartCode}`}
-                                  className="max-h-48 rounded border border-cyan-500/20 object-contain"
-                                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-                                />
-                              </a>
-                            </div>
-                          );
-                        })()}
-                        {hasSelectedPart && (
-                          <div className="mt-2 rounded border border-amber-500/30 bg-amber-500/10 p-2">
-                            <div className="text-[11px] font-semibold uppercase tracking-wide text-amber-200">
-                              Smart Fault Suggestions
-                            </div>
-                            {smartSuggestionsLoading ? (
-                              <div className="mt-1 text-[11px] text-amber-100/80">
-                                Loading AI related suggestions...
-                              </div>
-                            ) : smartSuggestions.length === 0 ? (
-                              <div className="mt-1 text-[11px] text-amber-100/80">
-                                No related suggestions for this issue.
-                              </div>
-                            ) : (
-                              <div className="mt-1 space-y-1">
-                                {smartSuggestions.map((suggestion) => (
-                                  (() => {
-                                    const suggestionPartNumber =
-                                      String(suggestion.label.match(/\(([^)]+)\)/)?.[1] ?? "").trim() ||
-                                      String(row.catalogPartCode ?? "").trim();
-                                    const suggestionSearchQuery = [
-                                      suggestionPartNumber,
-                                      inspectionMake,
-                                      inspectionModel,
-                                      inspectionYear,
-                                      inspectionVin,
-                                      "car part",
-                                      "diagram",
-                                    ]
-                                      .map((v) => String(v ?? "").trim())
-                                      .filter(Boolean)
-                                      .join(" ");
-                                    const suggestionSearchUrl = `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(
-                                      suggestionSearchQuery
-                                    )}`;
-                                    return (
-                                  <div
-                                    key={`${rowKey}-smart-${suggestion.id}`}
-                                    className="flex flex-wrap items-center justify-between gap-2 rounded border border-white/10 bg-black/20 px-2 py-1.5 text-[11px]"
-                                  >
-                                    <div className="text-amber-100">
-                                      ⚠ {suggestion.label}
-                                      <div className="text-[10px] text-amber-100/70">{suggestion.reason}</div>
-                                    </div>
-                                    <div className="flex items-center gap-1.5">
-                                      <button
-                                        type="button"
-                                        className="rounded-md border border-emerald-500/40 px-2 py-0.5 text-[10px] font-semibold text-emerald-200"
-                                        onClick={() =>
-                                          void addSmartSuggestionAsLineItem(
-                                            index,
-                                            rowKey,
-                                            {
-                                              catalogGroupKey: row.catalogGroupKey,
-                                              reason: row.reason,
-                                              description: suggestion.reason,
-                                            },
-                                            suggestion
-                                          )
-                                        }
-                                      >
-                                        Add
-                                      </button>
-                                      <a
-                                        href={suggestionSearchUrl}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="rounded-md border border-cyan-500/40 px-2 py-0.5 text-[10px] font-semibold text-cyan-200"
-                                      >
-                                        Open AI Search Result
-                                      </a>
-                                      <button
-                                        type="button"
-                                        className="rounded-md border border-white/20 px-2 py-0.5 text-[10px] font-semibold text-white/80"
-                                        onClick={() =>
-                                          setDismissedSmartSuggestionsByRow((prev) => ({
-                                            ...prev,
-                                            [rowKey]: Array.from(new Set([...(prev[rowKey] ?? []), suggestion.id])),
-                                          }))
-                                        }
-                                      >
-                                        Dismiss
-                                      </button>
-                                    </div>
-                                  </div>
-                                    );
-                                  })()
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                        <div className="mt-2 text-[11px] text-cyan-100/70">
-                          AI Questions are hidden for now. Smart Fault Suggestions remain active.
-                        </div>
-                      </div>
-                      )}
-                      <div className="flex flex-wrap items-center gap-2 text-[11px]">
-                        <div className="w-full text-[10px] uppercase tracking-wide text-white/60 lg:hidden">Actions</div>
-                        {row.isSaved ? (
-                          <button
-                            type="button"
-                            className="rounded-md bg-blue-600 px-3 py-2 text-[11px] font-semibold text-white"
-                            disabled={isLocked}
-                            onClick={() => {
-                              setParts((prev) =>
-                                prev.map((p, i) => (i === index ? { ...p, isSaved: false } : p))
-                              );
-                              toast.success("Line item is now in edit mode.");
-                            }}
-                          >
-                            Edit
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            className="rounded-md bg-emerald-600 px-3 py-2 text-[11px] font-semibold text-white"
-                            onClick={() => saveLineItem(index)}
-                            disabled={row.isSaving || isLocked}
-                          >
-                            {row.isSaving ? "Saving..." : "Save"}
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          className="rounded-md bg-rose-600 px-3 py-2 text-[11px] font-semibold text-white"
-                          onClick={() => deleteLineItem(index)}
-                          disabled={isLocked}
-                        >
-                          Delete
-                        </button>
-                        {!isReadOnly && !isCollectCarPending && !row.isSaved && (
-                          <span className="text-[11px] text-amber-400">Please save this item</span>
-                        )}
-                        {!hasSelectedPart && (
-                          <span className="text-[11px] text-cyan-200">Select group and part first.</span>
-                        )}
-                        {isLocked && (
-                          <span className="text-[11px] text-amber-400">Ordered/received item</span>
-                        )}
-                      </div>
-                    </div>
-                    )}
-                    </div>
-                    </React.Fragment>
-                  );
-                  })}
-                    </div>
-                    {!isReadOnly && !isCollectCarPending && (
-                      <div className="mt-3 border-t border-white/10 pt-3 flex justify-center">
-                        <button
-                          type="button"
-                          className="rounded-md border border-emerald-500/40 px-4 py-2 text-xs font-semibold text-emerald-200 hover:bg-emerald-500/10 disabled:opacity-50"
-                          disabled={vin17CatalogLoading || vinCatalogLoading}
-                          onClick={() => { resetCatalogPathsOnly(); setCatalogModalOpen(true); }}
-                        >
-                          + Add Line Item
-                        </button>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
             </div>
 
+
             <div className={`mt-6 ${inspectionStep === 6 ? "" : "hidden"}`}>
-              <label className="text-xs font-semibold text-white/70">Inspector Remarks</label>
+              <div className="flex items-center justify-between gap-2">
+                <label className="text-xs font-semibold text-white/70">Inspector Remarks</label>
+                <button
+                  type="button"
+                  className="rounded-md bg-violet-600 px-3 py-1.5 text-[11px] font-semibold text-white disabled:opacity-50"
+                  disabled={aiSummaryLoading || parts.length === 0}
+                  onClick={async () => {
+                    setAiSummaryLoading(true);
+                    try {
+                      const res = await fetch(`/api/company/${companyId}/workshop/inspections/${inspectionId}/ai-summary`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                      });
+                      const json = await res.json();
+                      if (!res.ok) throw new Error(json.error ?? "AI summary failed");
+                      const d = json.data;
+                      setAiSummaryResult({ technical: d.technicalSummary, customer: d.customerSummary });
+                      if (d.technicalSummary) {
+                        setForm((prev) => ({ ...prev, inspectorRemarks: d.technicalSummary }));
+                      }
+                    } catch {
+                      // silent
+                    } finally {
+                      setAiSummaryLoading(false);
+                    }
+                  }}
+                >
+                  {aiSummaryLoading ? "Generating..." : "Generate AI Summary"}
+                </button>
+              </div>
               <textarea
-                className={theme.input}
+                className={`${theme.input} mt-1`}
                 rows={4}
                 value={form.inspectorRemarks}
                 readOnly={isReadOnly || isCollectCarPending}
                 onChange={(e) => setForm((prev) => ({ ...prev, inspectorRemarks: e.target.value }))}
                 placeholder="Final inspection remarks before completion."
               />
+              {aiSummaryResult?.customer && (
+                <div className="mt-2 rounded-md border border-violet-500/20 bg-violet-500/5 p-3">
+                  <div className="text-[11px] font-semibold text-violet-200">Customer-Friendly Summary (AI)</div>
+                  <div className="mt-1 whitespace-pre-wrap text-xs text-white/80">{aiSummaryResult.customer}</div>
+                </div>
+              )}
             </div>
             <div className={`mt-4 ${inspectionStep === 6 ? "" : "hidden"}`}>
               <div className="report-print-hide mb-3 flex flex-wrap items-center justify-end gap-2">

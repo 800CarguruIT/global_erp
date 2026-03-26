@@ -636,6 +636,11 @@ export function ProcurementDetailMain({ companyId, poId }: { companyId: string; 
                         <div className="mt-1 text-[10px] text-slate-400">
                           Received {Number(item.receivedQty ?? 0)} / {Number(item.quantity ?? 0)}
                         </div>
+                        {(item as any).vendorPartNumber ? (
+                          <div className="mt-1 text-[10px] text-emerald-300">✓ Evidence: {(item as any).vendorPartNumber}</div>
+                        ) : canReceiveLine ? (
+                          <div className="mt-1 text-[10px] text-amber-300">⚠ Vendor evidence required</div>
+                        ) : null}
                       </td>
                         <td className="px-2 py-1 align-top">
                           {item.inventoryRequestItemId &&

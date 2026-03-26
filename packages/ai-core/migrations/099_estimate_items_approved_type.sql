@@ -1,2 +1,2 @@
 ALTER TABLE estimate_items
-  ADD COLUMN approved_type text NULL;
+  ADD COLUMN IF NOT EXISTS approved_type text NULL;

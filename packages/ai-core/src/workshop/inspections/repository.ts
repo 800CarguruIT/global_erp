@@ -1,5 +1,5 @@
 import { getSql } from "../../db";
-import type { Inspection, InspectionItem, InspectionLineItem, InspectionStatus, LineItemStatus } from "./types";
+import type { Inspection, InspectionItem, InspectionLineItem, InspectionStatus, LineItemStatus, PartCategory, PartSubcategory, PartDefinition } from "./types";
 
 function mapInspectionRow(row: any): Inspection {
   return {
@@ -617,4 +617,133 @@ export async function markLineItemsOrderedByIds(
     RETURNING id
   `;
   return rows.length;
+}
+
+// ==================== Part Category Functions ====================
+
+export async function listPartCategories(companyId: string): Promise<PartCategory[]> {
+  const sql = getSql();
+  const rows = await sql`
+    SELECT id, company_id, name, icon, display_order, is_active
+    FROM inspection_part_categories
+    WHERE is_active = true
+      AND (company_id IS NULL OR company_id = ${companyId})
+    ORDER BY display_order, name
+  `;
+  return rows.map((r: any) => ({
+    id: r.id,
+    companyId: r.company_id,
+    name: r.name,
+    icon: r.icon,
+    displayOrder: r.display_order,
+    isActive: r.is_active,
+  }));
+}
+
+export async function listPartCategoryTree(
+  companyId: string,
+  make?: string | null,
+  bodyType?: string | null
+): Promise<PartCategory[]> {
+  const sql = getSql();
+
+  const catRows = await sql`
+    SELECT id, company_id, name, icon, display_order, is_active
+    FROM inspection_part_categories
+    WHERE is_active = true
+      AND (company_id IS NULL OR company_id = ${companyId})
+    ORDER BY display_order, name
+  `;
+
+  const catIds = catRows.map((r: any) => r.id);
+  if (!catIds.length) return [];
+
+  const subRows = await sql`
+    SELECT id, category_id, name, display_order, is_active
+    FROM inspection_part_subcategories
+    WHERE is_active = true
+      AND category_id::text = ANY(${sql.array(catIds)})
+    ORDER BY display_order, name
+  `;
+
+  const subIds = subRows.map((r: any) => r.id);
+  let partRows: any[] = [];
+  if (subIds.length) {
+    partRows = await sql`
+      SELECT id, subcategory_id, name, applicable_makes, applicable_body_types, display_order, is_active
+      FROM inspection_part_definitions
+      WHERE is_active = true
+        AND subcategory_id::text = ANY(${sql.array(subIds)})
+      ORDER BY display_order, name
+    `;
+  }
+
+  const filteredParts = partRows.filter((p: any) => {
+    if (make && p.applicable_makes && p.applicable_makes.length > 0) {
+      const normalizedMake = make.toLowerCase();
+      if (!p.applicable_makes.some((m: string) => m.toLowerCase() === normalizedMake)) return false;
+    }
+    if (bodyType && p.applicable_body_types && p.applicable_body_types.length > 0) {
+      const normalizedBody = bodyType.toLowerCase();
+      if (!p.applicable_body_types.some((b: string) => b.toLowerCase() === normalizedBody)) return false;
+    }
+    return true;
+  });
+
+  const partsBySubId = new Map<string, PartDefinition[]>();
+  for (const p of filteredParts) {
+    const list = partsBySubId.get(p.subcategory_id) ?? [];
+    list.push({
+      id: p.id,
+      subcategoryId: p.subcategory_id,
+      name: p.name,
+      applicableMakes: p.applicable_makes,
+      applicableBodyTypes: p.applicable_body_types,
+      displayOrder: p.display_order,
+      isActive: p.is_active,
+    });
+    partsBySubId.set(p.subcategory_id, list);
+  }
+
+  const subsByCatId = new Map<string, PartSubcategory[]>();
+  for (const s of subRows) {
+    const parts = partsBySubId.get(s.id) ?? [];
+    if (parts.length === 0 && (make || bodyType)) continue;
+    const list = subsByCatId.get(s.category_id) ?? [];
+    list.push({
+      id: s.id,
+      categoryId: s.category_id,
+      name: s.name,
+      displayOrder: s.display_order,
+      isActive: s.is_active,
+      parts,
+    });
+    subsByCatId.set(s.category_id, list);
+  }
+
+  return catRows
+    .map((c: any) => ({
+      id: c.id,
+      companyId: c.company_id,
+      name: c.name,
+      icon: c.icon,
+      displayOrder: c.display_order,
+      isActive: c.is_active,
+      subcategories: subsByCatId.get(c.id) ?? [],
+    }))
+    .filter((c: PartCategory) => (c.subcategories?.length ?? 0) > 0 || (!make && !bodyType));
+}
+
+export async function updateInspectionVinDecode(
+  companyId: string,
+  inspectionId: string,
+  vinDecodeResult: any
+): Promise<void> {
+  const sql = getSql();
+  await sql`
+    UPDATE inspections
+    SET vin_decode_result = ${sql.json(vinDecodeResult)},
+        updated_at = now()
+    WHERE id = ${inspectionId} AND company_id = ${companyId}
+  `;
 }

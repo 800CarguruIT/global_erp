@@ -288,6 +288,36 @@ function LoginContent() {
             </button>
           </form>
 
+          {/* Quick-login dev buttons */}
+          <div className={`mt-5 rounded-xl ${chipBorder} ${chipBg} p-4`}>
+            <p className={`mb-3 text-xs font-semibold uppercase tracking-wide ${textMuted}`}>Quick Login (Dev)</p>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {([
+                { label: "Global Admin", email: "admin@demo.test" },
+                { label: "Company Admin", email: "company@demo.test" },
+                { label: "Branch Admin", email: "branch@demo.test" },
+                { label: "Vendor Admin", email: "vendor@demo.test" },
+              ] as const).map((acc) => (
+                <button
+                  key={acc.email}
+                  type="button"
+                  disabled={loading}
+                  onClick={() => {
+                    setEmail(acc.email);
+                    setPassword("Admin@123");
+                    setTimeout(() => {
+                      const form = document.querySelector("form");
+                      form?.requestSubmit();
+                    }, 0);
+                  }}
+                  className={`rounded-lg ${selectBorder} ${selectBg} px-3 py-2 text-xs font-medium ${textPrimary} ${selectHover} transition disabled:opacity-60`}
+                >
+                  {acc.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className={`mt-4 text-xs ${textMuted}`}>
             <span>{t("login.needAccess")}</span>{" "}
             <Link href="#" className="text-sky-300 hover:underline">

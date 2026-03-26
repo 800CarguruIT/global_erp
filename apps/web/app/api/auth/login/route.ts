@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
       branchRecord?.ownership_type === "third_party" && baseBranchPath
         ? `${baseBranchPath}/workshop`
         : null;
-    const branchRedirectPath = thirdPartyWorkshopPath ?? (branchId ? `/branches/${branchId}` : "/company");
+    const branchRedirectPath = thirdPartyWorkshopPath ?? baseBranchPath ?? (branchId ? `/branches/${branchId}` : "/company");
 
     // Compute redirect based on scope, with permission-based routing as fallback
     let redirect: string;
