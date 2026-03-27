@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Card } from "./Card";
 import { useI18n } from "../i18n";
+import { HOME_PAGE_OPTIONS } from "../layout/sidebarConfig";
 
 type RoleScope = "global" | "company" | "branch" | "vendor";
 
@@ -12,6 +13,7 @@ type Role = {
   name: string;
   key: string;
   description?: string | null;
+  home_page?: string | null;
   scope: RoleScope;
   company_id?: string | null;
   branch_id?: string | null;
@@ -28,11 +30,71 @@ type Props = {
   onSaved?: (role: any) => void;
 };
 
+function HomePageSelect({
+  scope,
+  value,
+  onChange,
+}: {
+  scope: RoleScope;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const options = HOME_PAGE_OPTIONS[scope] ?? [];
+  const selected = options.find((o) => o.href === value);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  return (
+    <div ref={ref} className="relative w-full">
+      <button
+        type="button"
+        className="w-full flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-left"
+        onClick={() => setOpen((o) => !o)}
+      >
+        <span className={selected ? "" : "opacity-50"}>
+          {selected ? selected.label : "— Use permission-based default —"}
+        </span>
+        <svg className="w-4 h-4 opacity-50 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+        </svg>
+      </button>
+      {open && (
+        <ul className="absolute z-50 mt-1 w-full rounded-lg border border-white/10 bg-neutral-900 shadow-xl overflow-auto max-h-60 text-sm">
+          <li
+            className="px-3 py-2 cursor-pointer opacity-60 hover:opacity-100 hover:bg-white/10"
+            onClick={() => { onChange(""); setOpen(false); }}
+          >
+            — Use permission-based default —
+          </li>
+          {options.map((opt) => (
+            <li
+              key={opt.href}
+              className={`px-3 py-2 cursor-pointer hover:bg-white/10 ${value === opt.href ? "bg-white/15 font-medium" : ""}`}
+              onClick={() => { onChange(opt.href); setOpen(false); }}
+            >
+              {opt.label}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 export function RoleForm({ mode = "create", initial, availablePermissions, scope, onSaved }: Props) {
   const { t } = useI18n();
   const [name, setName] = useState(initial?.name ?? "");
   const [key, setKey] = useState(initial?.key ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
+  const [homePage, setHomePage] = useState(initial?.home_page ?? "");
   const [selectedPerms, setSelectedPerms] = useState<string[]>(
     (initial?.permissions ?? []).map((p) => p.key)
   );
@@ -54,6 +116,7 @@ export function RoleForm({ mode = "create", initial, availablePermissions, scope
       setName(initial.name);
       setKey(initial.key);
       setDescription(initial.description ?? "");
+      setHomePage(initial.home_page ?? "");
       setSelectedPerms((initial.permissions ?? []).map((p) => p.key));
     }
   }, [initial]);
@@ -81,6 +144,7 @@ export function RoleForm({ mode = "create", initial, availablePermissions, scope
         name,
         key,
         description,
+        home_page: homePage || null,
         scope: scope.scope,
         companyId: resolvedCompanyId ?? null,
         branchId: scope.branchId ?? null,
@@ -192,6 +256,14 @@ export function RoleForm({ mode = "create", initial, availablePermissions, scope
                 className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 min-h-[80px]"
                 value={description ?? ""}
                 onChange={(e) => setDescription(e.target.value)}
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="text-xs uppercase opacity-70">Default Landing Page</label>
+              <HomePageSelect
+                scope={scope.scope}
+                value={homePage}
+                onChange={setHomePage}
               />
             </div>
           </div>

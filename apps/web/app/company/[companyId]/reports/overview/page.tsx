@@ -1,5 +1,6 @@
 import { Reports } from "@repo/ai-core/server";
 import { AppLayout, KpiGrid, ModulePlaceholder } from "@repo/ui";
+import { AIPanel } from "../../../../(components)/intelligence/AIPanel";
 
 type PageProps = { params: { companyId: string } };
 
@@ -45,6 +46,7 @@ export default async function CompanyReportsOverviewPage({ params }: PageProps) 
   return (
     <AppLayout>
       <div className="space-y-6 py-4">
+        <AIPanel companyId={companyId} engines={["e1", "e3", "e5"]} />
         <div className="space-y-1">
           <h1 className="text-xl sm:text-2xl font-semibold">Reports Overview</h1>
           <p className="text-sm text-muted-foreground">

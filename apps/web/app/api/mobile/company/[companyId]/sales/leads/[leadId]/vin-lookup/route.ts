@@ -1,11 +1,5 @@
 import { NextRequest } from "next/server";
 import { getLeadById } from "@repo/ai-core/crm/leads/repository";
-import {
-  getVinCatalogCarsByVin,
-  getVinCatalogSnapshotByVinAndCarId,
-  upsertVinCatalogCars,
-  upsertVinCatalogSnapshot,
-} from "@repo/ai-core/crm/vin-catalog/repository";
 import { requireMobileUserId } from "@/lib/auth/mobile-auth";
 import { ensureCompanyAccess } from "@/lib/auth/mobile-company";
 import {
@@ -13,215 +7,200 @@ import {
   createMobileSuccessResponse,
   handleMobileError,
 } from "@/app/api/mobile/utils";
+import {
+  decodeVinWith17VinUsingConfig,
+  fetchVin17PartsUsingConfig,
+  prepareVin17PartsRequest,
+  prepareVin17Request,
+} from "@/lib/vin17";
+import { getVin17ConfigForCompany } from "@/lib/vin17-config";
+import {
+  getVinCatalogCarsByVin,
+  getVinCatalogSnapshotByVinAndCarId,
+  upsertVinCatalogCars,
+  upsertVinCatalogSnapshot,
+} from "@repo/ai-core/crm/vin-catalog/repository";
 
 type Params = { params: Promise<{ companyId: string; leadId: string }> };
-
-type CarguruCar = {
-  id?: string;
-  model?: string;
-  year?: string;
-  brand?: { id?: string; name?: string };
-  info?: { title?: string; description?: string };
-};
-
-type CarguruPart = {
-  code?: string;
-  name?: string;
-  groups?: Array<{ id?: string; level?: number; name?: string }>;
-};
-
-type NormalizedCar = {
-  id: string;
-  make: string;
-  model: string;
-  year: string;
-  title: string;
-  description: string;
-};
-
-async function fetchJsonWithProtocolFallback(urlPath: string) {
-  const urls = [
-    `https://800carguru.me${urlPath}`,
-    `http://800carguru.me${urlPath}`,
-  ];
-  let lastError: unknown = null;
-
-  for (const url of urls) {
-    try {
-      const res = await fetch(url, { cache: "no-store" });
-      if (!res.ok) {
-        lastError = new Error(
-          `Upstream request failed (${res.status}) for ${url}`,
-        );
-        continue;
-      }
-      return await res.json();
-    } catch (error) {
-      lastError = error;
-    }
-  }
-
-  throw lastError ?? new Error("VIN lookup upstream failed");
-}
-
-function normalizeCar(
-  car: CarguruCar | null | undefined,
-): NormalizedCar | null {
-  if (!car?.id) return null;
-  return {
-    id: String(car.id),
-    make: String(car.brand?.name ?? "").trim(),
-    model: String(car.model ?? car.info?.title ?? "").trim(),
-    year: String(car.year ?? "").trim(),
-    title: String(car.info?.title ?? "").trim(),
-    description: String(car.info?.description ?? "").trim(),
-  };
-}
 
 export async function GET(req: NextRequest, { params }: Params) {
   try {
     const userId = requireMobileUserId(req);
     const { companyId, leadId } = await params;
     const search = new URL(req.url).searchParams;
-    const vin = String(search.get("vin") ?? "")
-      .trim()
-      .toUpperCase();
+    const vin = String(search.get("vin") ?? "").trim().toUpperCase();
     const requestedCarId = String(search.get("carId") ?? "").trim();
+    const forceRefresh = String(search.get("refresh") ?? "").trim() === "1";
+    const epc = String(search.get("epc") ?? "").trim();
+    const lastCataCode = String(search.get("last_cata_code") ?? "").trim();
+    const lastCataCodeLevel = String(search.get("last_cata_code_level") ?? "").trim();
+    const isVinFilterOpen = String(search.get("is_vin_filter_open") ?? "").trim() || "1";
+    const epcId = String(search.get("epc_id") ?? "").trim();
+    const jsId = String(search.get("js_id") ?? "").trim();
+    const wantsParts = Boolean(lastCataCode && lastCataCodeLevel);
+    const wantsCatalog = ["cata1", "cata2", "cata3", "cata4"].includes(String(search.get("catalog_action") ?? "").trim().toLowerCase());
 
     if (!vin) {
       return createMobileErrorResponse("VIN is required.", 400);
     }
 
     await ensureCompanyAccess(userId, companyId);
-
     const lead = await getLeadById(companyId, leadId);
     if (!lead) {
       return createMobileErrorResponse("Lead not found.", 404);
     }
 
-    const cachedCars = await getVinCatalogCarsByVin(vin);
-    if (cachedCars.length > 0) {
-      if (requestedCarId) {
-        const cachedSelected = await getVinCatalogSnapshotByVinAndCarId(
-          vin,
-          requestedCarId,
-        );
-        if (cachedSelected && cachedSelected.partsCount > 0) {
-          return createMobileSuccessResponse({
-            ...cachedSelected,
-            cars: cachedCars,
-            requiresCarSelection: false,
-            source: "cache",
-          });
-        }
-      } else if (cachedCars.length > 1) {
+    // Current parts catalog flow can fetch 17vin parts when cata parameters are provided.
+    if (!forceRefresh && !wantsCatalog) {
+      const cachedCars = await getVinCatalogCarsByVin(vin);
+      if (cachedCars.length > 0) {
+        const selectedCar =
+          (requestedCarId ? cachedCars.find((c) => String(c.id) === requestedCarId) ?? null : null) ??
+          (cachedCars.length === 1 ? cachedCars[0] : null);
+        const requiresCarSelection = cachedCars.length > 1 && !selectedCar;
+        const cachedPartsSnapshot =
+          wantsParts && selectedCar
+            ? await getVinCatalogSnapshotByVinAndCarId(vin, String(selectedCar.id)).catch(() => null)
+            : null;
         return createMobileSuccessResponse({
           vin,
           cars: cachedCars,
-          car: null,
-          partsBrand: null,
-          parts: [],
-          partsCount: 0,
-          requiresCarSelection: true,
-          source: "cache",
+          car: selectedCar,
+          partsBrand: cachedPartsSnapshot?.partsBrand ?? null,
+          parts: cachedPartsSnapshot?.parts ?? [],
+          partsCount: cachedPartsSnapshot?.partsCount ?? 0,
+          requiresCarSelection,
+          partsCatalogPaused: !wantsParts,
+          source: "global_erp",
+          requestUrls: {
+            vinDecodeUrl: null,
+            partsUrl: null,
+          },
         });
-      } else {
-        const cachedSingle = await getVinCatalogSnapshotByVinAndCarId(
-          vin,
-          cachedCars[0]!.id,
-        );
-        if (cachedSingle && cachedSingle.partsCount > 0) {
-          return createMobileSuccessResponse({
-            ...cachedSingle,
-            cars: cachedCars,
-            requiresCarSelection: false,
-            source: "cache",
-          });
-        }
       }
     }
 
-    const carsPayload = await fetchJsonWithProtocolFallback(
-      `/api/parts_catalog/get_cars_by_vin.php?vin=${encodeURIComponent(vin)}`,
-    );
-    const carsList: CarguruCar[] = Array.isArray(carsPayload?.list)
-      ? carsPayload.list
-      : [];
-    const normalizedCars = carsList
-      .map((car) => normalizeCar(car))
-      .filter(Boolean) as NormalizedCar[];
-
-    if (carsList.length > 0) {
-      await upsertVinCatalogCars({ vin, cars: carsList as any });
+    const vin17Config = await getVin17ConfigForCompany(companyId);
+    const decoded = await decodeVinWith17VinUsingConfig(vin, vin17Config ?? undefined);
+    const cars = decoded.cars;
+    if (cars.length > 0) {
+      await upsertVinCatalogCars({
+        vin,
+        cars: cars.map((car) => ({
+          id: car.id,
+          make: car.make,
+          model: car.model,
+          year: car.year,
+          title: car.title,
+          description: car.description,
+        })),
+      });
     }
-
     const selectedCar =
-      (requestedCarId
-        ? normalizedCars.find((car) => car.id === requestedCarId)
-        : null) ?? (normalizedCars.length === 1 ? normalizedCars[0] : null);
-
-    if (!normalizedCars.length) {
-      return createMobileSuccessResponse({
+      (requestedCarId ? cars.find((c) => String(c.id) === requestedCarId) ?? null : null) ??
+      (cars.length === 1 ? cars[0] : null);
+    const requiresCarSelection = cars.length > 1 && !selectedCar;
+    const resolvedEpc = epc || String((decoded.raw as any)?.data?.epc ?? (decoded.raw as any)?.epc ?? "").trim();
+    let partsBrand: unknown = null;
+    let parts: Array<{ code: string; name: string; groups: Array<{ id: string; level: number; name: string }> }> = [];
+    let partsCount = 0;
+    let partsUrl: string | null = null;
+    if (wantsParts && selectedCar) {
+      if (!resolvedEpc) {
+        return createMobileErrorResponse("epc is required to fetch parts for this VIN.", 400, { provider: "17vin" });
+      }
+      const partsResult = await fetchVin17PartsUsingConfig(
+        {
+          vin,
+          epc: resolvedEpc,
+          lastCataCode,
+          lastCataCodeLevel,
+          isVinFilterOpen,
+          epcId,
+          jsId,
+        },
+        vin17Config ?? undefined
+      );
+      partsBrand = partsResult.partsBrand ?? null;
+      parts = partsResult.parts;
+      partsCount = partsResult.partsCount;
+      partsUrl = partsResult.requestUrl;
+      await upsertVinCatalogSnapshot({
         vin,
-        cars: [],
-        car: null,
-        partsBrand: null,
-        parts: [],
-        partsCount: 0,
-        requiresCarSelection: false,
+        car: {
+          id: selectedCar.id,
+          make: selectedCar.make,
+          model: selectedCar.model,
+          year: selectedCar.year,
+          title: selectedCar.title,
+          description: selectedCar.description,
+        },
+        parts,
+        partsBrand,
       });
     }
-
-    if (!selectedCar) {
-      return createMobileSuccessResponse({
-        vin,
-        cars: normalizedCars,
-        car: null,
-        partsBrand: null,
-        parts: [],
-        partsCount: 0,
-        requiresCarSelection: true,
-        source: "api",
-      });
-    }
-
-    const partsPayload = await fetchJsonWithProtocolFallback(
-      `/api/parts_catalog/get_parts_by_carId.php?carId=${encodeURIComponent(selectedCar.id)}`,
-    );
-    const partsList: CarguruPart[] = Array.isArray(partsPayload?.list)
-      ? partsPayload.list
-      : [];
-
-    await upsertVinCatalogSnapshot({
-      vin,
-      car: selectedCar as any,
-      parts: partsList as any,
-      partsBrand: partsPayload?.partsBrand ?? null,
-    });
-
-    const normalizedParts = partsList.map((part) => ({
-      code: String(part?.code ?? "").trim(),
-      name: String(part?.name ?? "").trim(),
-      groups: Array.isArray(part?.groups)
-        ? part.groups.map((group) => ({
-            id: String(group?.id ?? "").trim(),
-            level: Number(group?.level ?? 0) || 0,
-            name: String(group?.name ?? "").trim(),
-          }))
-        : [],
-    }));
 
     return createMobileSuccessResponse({
-      vin,
-      cars: normalizedCars,
+      vin: decoded.vin,
+      cars,
       car: selectedCar,
-      partsBrand: partsPayload?.partsBrand ?? null,
-      parts: normalizedParts,
-      partsCount: normalizedParts.length,
-      requiresCarSelection: false,
-      source: "api",
+      partsBrand,
+      parts,
+      partsCount,
+      requiresCarSelection,
+      partsCatalogPaused: !wantsParts,
+      source: "17vin",
+      requestUrls: {
+        vinDecodeUrl: decoded.requestUrl,
+        partsUrl,
+      },
     });
-  } catch (error) {
+  } catch (error: any) {
+    try {
+      const search = new URL(req.url).searchParams;
+      const vin = String(search.get("vin") ?? "").trim().toUpperCase();
+      const epc = String(search.get("epc") ?? "").trim();
+      const lastCataCode = String(search.get("last_cata_code") ?? "").trim();
+      const lastCataCodeLevel = String(search.get("last_cata_code_level") ?? "").trim();
+      const isVinFilterOpen = String(search.get("is_vin_filter_open") ?? "").trim() || "1";
+      const epcId = String(search.get("epc_id") ?? "").trim();
+      const jsId = String(search.get("js_id") ?? "").trim();
+      const wantsParts = Boolean(lastCataCode && lastCataCodeLevel);
+      if (vin) {
+        const { companyId } = await params;
+        const vin17Config = await getVin17ConfigForCompany(companyId);
+        const prepared =
+          wantsParts && epc
+            ? prepareVin17PartsRequest(
+                {
+                  vin,
+                  epc,
+                  lastCataCode,
+                  lastCataCodeLevel,
+                  isVinFilterOpen,
+                  epcId,
+                  jsId,
+                },
+                vin17Config ?? undefined
+              )
+            : prepareVin17Request(vin, vin17Config ?? undefined);
+        return createMobileErrorResponse(wantsParts ? "Failed to fetch parts with 17vin." : "Failed to decode VIN with 17vin.", 502, {
+          provider: "17vin",
+          details: String(error?.message ?? "upstream_error"),
+          signaturePreview: {
+            urlParameter: prepared.urlParameter,
+            username: prepared.username,
+            usernameHash: prepared.usernameHash,
+            passwordHash: prepared.passwordHash,
+            signature: prepared.signature,
+            requestUrl: prepared.requestUrl,
+          },
+        });
+      }
+    } catch {
+      // no-op
+    }
+
     console.error(
       "GET /api/mobile/company/[companyId]/sales/leads/[leadId]/vin-lookup error:",
       error,

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { AppLayout } from "@repo/ui";
 import { LeadsMain } from "@repo/ui/main-pages/LeadsMain";
+import { AIPanel } from "../../../(components)/intelligence/AIPanel";
 
 export default function CompanyLeadsPage({
   params,
@@ -18,7 +19,10 @@ export default function CompanyLeadsPage({
   return (
     <AppLayout>
       {companyId ? (
-        <LeadsMain companyId={companyId} />
+        <>
+          <AIPanel companyId={companyId} engines={["e1", "e4"]} />
+          <LeadsMain companyId={companyId} />
+        </>
       ) : (
         <div className="py-4 text-sm text-muted-foreground">Loading...</div>
       )}

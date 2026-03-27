@@ -72,6 +72,7 @@ export async function startOutboundCall(input: StartOutboundCallInput): Promise<
   const status: CallStatus = providerResult.success === false ? "failed" : "initiated";
   const session = await insertCallSession({
     ...input,
+    direction: "outbound",
     providerCallId: providerResult.callId ?? null,
     status,
     metadata: contextMetadata,
@@ -113,6 +114,7 @@ export async function handleDialerWebhookUpdate(update: DialerWebhookUpdate): Pr
   const mappedStatus = mapProviderStatus(update.status);
   let callSessionId = await updateCallSessionStatusByProviderCallId(update.providerCallId, {
     status: mappedStatus,
+    direction: update.direction,
     startedAt: update.startedAt,
     endedAt: update.endedAt,
     durationSeconds: update.durationSeconds ?? null,

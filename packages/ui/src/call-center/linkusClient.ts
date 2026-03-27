@@ -208,6 +208,65 @@ class LinkusClient {
     }
   }
 
+  /**
+   * Attach a remote MediaStream to a persistent <audio> element so the user
+   * can hear the other party. The element is created once and reused across calls.
+   * We never remove it from the DOM so the AudioContext used by WebRTC is not disrupted.
+   */
+  private attachRemoteStream(stream: MediaStream) {
+    if (typeof document === "undefined") return;
+    const AUDIO_ID = "__linkus_remote_audio__";
+    let audio = document.getElementById(AUDIO_ID) as HTMLAudioElement | null;
+    if (!audio) {
+      audio = document.createElement("audio");
+      audio.id = AUDIO_ID;
+      audio.autoplay = true;
+      audio.style.display = "none";
+      document.body.appendChild(audio);
+    }
+    if (audio.srcObject !== stream) {
+      audio.srcObject = stream;
+      audio.play().catch(() => {/* autoplay policy — browser will play when allowed */});
+    }
+  }
+
+  /**
+   * Patch RTCPeerConnection once at the global level so that every peer connection
+   * the SDK creates — regardless of internal event names — automatically routes
+   * incoming audio tracks to the speaker.
+   *
+   * This is more reliable than subscribing to SDK-specific events because it works
+   * with any SDK version or wrapper layer.
+   */
+  patchRTCPeerConnection() {
+    if (typeof window === "undefined" || !window.RTCPeerConnection) return;
+    if ((window as any).__linkusRTCPatched) return;
+    (window as any).__linkusRTCPatched = true;
+
+    const OrigPC = window.RTCPeerConnection;
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    const client = this;
+
+    function PatchedPC(this: RTCPeerConnection, ...args: ConstructorParameters<typeof RTCPeerConnection>) {
+      const pc: RTCPeerConnection = new OrigPC(...args);
+      pc.addEventListener("track", (e: RTCTrackEvent) => {
+        if (e.track.kind === "audio") {
+          const stream = e.streams?.[0] ?? new MediaStream([e.track]);
+          client.attachRemoteStream(stream);
+        }
+      });
+      return pc;
+    }
+    PatchedPC.prototype = OrigPC.prototype;
+    (PatchedPC as any).generateCertificate = OrigPC.generateCertificate?.bind(OrigPC);
+    window.RTCPeerConnection = PatchedPC as unknown as typeof RTCPeerConnection;
+  }
+
+  private hookRemoteAudio(target: any) {
+    // No-op — patchRTCPeerConnection handles all cases at the constructor level.
+    void target;
+  }
+
   private normalizeMaybePhone(value: unknown): string | null {
     const raw = String(value ?? "").trim();
     if (!raw) return null;
@@ -388,6 +447,10 @@ class LinkusClient {
       return this.status;
     }
 
+    // Patch RTCPeerConnection before the SDK initializes so every peer connection
+    // it creates automatically routes incoming audio to the browser speaker.
+    this.patchRTCPeerConnection();
+
     this.sdk = sdk;
     this.operator = null;
     this.phone = null;
@@ -449,18 +512,23 @@ class LinkusClient {
         if (this.phone && typeof this.phone.start === "function") {
           this.phone.start();
         }
+        // Hook remote audio on both operator and phone so incoming audio plays.
+        this.hookRemoteAudio(this.operator);
+        this.hookRemoteAudio(this.phone);
       } else if (typeof sdk.login === "function") {
         await sdk.login({
           ...(serverUrl ? { server: serverUrl } : {}),
           extension,
           ...(token ? { token } : password ? { password } : {}),
         });
+        this.hookRemoteAudio(sdk);
       } else if (typeof sdk.connect === "function") {
         await sdk.connect({
           ...(serverUrl ? { server: serverUrl } : {}),
           extension,
           ...(token ? { token } : password ? { password } : {}),
         });
+        this.hookRemoteAudio(sdk);
       }
 
       this.emit({ state: "connected", message: null, extension });
@@ -514,6 +582,7 @@ class LinkusClient {
     try {
       const sessions = this.collectRingingSessions();
       for (const session of sessions) {
+        this.hookRemoteAudio(session);
         this.writeDebugSnapshot({ lastSession: session, sessions });
         setCurrentSession(session);
         const okSessionAnswer = await tryInvoke(session, "answer", true);
@@ -583,6 +652,36 @@ class LinkusClient {
     this.emit({
       state: "error",
       message: "SDK hang failed",
+      extension: this.status.extension ?? null,
+    });
+    return false;
+  }
+
+  async dial(toNumber: string): Promise<boolean> {
+    if (!this.phone && !this.operator && !this.sdk) return false;
+    const normalized = toNumber.trim();
+    if (!normalized) return false;
+    const methods = ["call", "makeCall", "dial", "startCall", "invite"];
+    const targets = [this.phone, this.operator, this.sdk];
+    for (const target of targets) {
+      for (const method of methods) {
+        if (target && typeof target[method] === "function") {
+          try {
+            const result = await target[method](normalized);
+            // Hook remote audio on the returned session (if any) so the user
+            // can hear the remote party once they answer.
+            this.hookRemoteAudio(result);
+            this.hookRemoteAudio(target);
+            return true;
+          } catch {
+            // try next
+          }
+        }
+      }
+    }
+    this.emit({
+      state: "error",
+      message: `SDK dial failed for ${normalized} (no compatible dial method found)`,
       extension: this.status.extension ?? null,
     });
     return false;

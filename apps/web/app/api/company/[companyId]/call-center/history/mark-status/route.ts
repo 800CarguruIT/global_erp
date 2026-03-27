@@ -57,7 +57,7 @@ export async function POST(req: NextRequest, { params }: Params) {
             ELSE duration_seconds
           END,
           metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object(
-            'manualStatusPatch', ${status},
+            'manualStatusPatch', ${status}::text,
             'manualStatusPatchAt', NOW()::text,
             'manualStatusPatchSource', 'popup_hang'
           ),

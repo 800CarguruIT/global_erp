@@ -86,6 +86,7 @@ type LayoutProps = {
 
 type IncomingPopupState = {
   callId: string;
+  direction?: "inbound" | "outbound";
   fromNumber: string;
   toNumber: string;
   ringingExtensions?: string[];
@@ -109,6 +110,7 @@ type IncomingPopupState = {
     car?: string | null;
     phone?: string | null;
     type?: string | null;
+    notFound?: boolean;
   } | null;
 };
 
@@ -319,6 +321,10 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
   const [aiSimulationLoading, setAiSimulationLoading] = useState(false);
   const [incomingPopups, setIncomingPopups] = useState<IncomingPopupState[]>([]);
   const [expandedPopups, setExpandedPopups] = useState<Record<string, boolean>>({});
+  const [dialPadOpen, setDialPadOpen] = useState(false);
+  const [dialToNumber, setDialToNumber] = useState("");
+  const [isDialing, setIsDialing] = useState(false);
+  const [dialError, setDialError] = useState<string | null>(null);
   const [popupClock, setPopupClock] = useState(0);
   const [linkusStatus, setLinkusStatus] = useState<LinkusStatus>({
     state: "idle",
@@ -337,9 +343,13 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
     settings: false,
     sign: false,
   });
+  // Backoff delay for SDK reconnect attempts. Doubles on each failure, resets on success.
+  const sdkRetryDelayMsRef = useRef<number>(15_000);
   const answeredPopupHideTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const terminalCallsRef = useRef<Map<string, number>>(new Map());
   const recentlyClosedTargetsRef = useRef<Map<string, number>>(new Map());
+  const outboundRingtoneRef = useRef<{ stop: () => void } | null>(null);
+  const inboundRingtoneRef = useRef<{ stop: () => void } | null>(null);
   const sdkNoticeKeyRef = useRef<string>("");
   const showSdkNotice = useCallback((notice: SdkNoticeState) => {
     if (sdkNoticeKeyRef.current === notice.key) return;
@@ -521,6 +531,81 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
 
   useEffect(() => {
     incomingPopupsRef.current = incomingPopups;
+  }, [incomingPopups]);
+
+  // Play outbound ringback tone while any outbound call is in "ringing" stage.
+  // Uses HTMLAudioElement (WAV blob) — NOT AudioContext — so it never touches
+  // the WebRTC audio pipeline and cannot interfere with call audio.
+  useEffect(() => {
+    function buildRingtone(
+      freq1: number,
+      freq2: number,
+      toneSec: number,
+      cycleSec: number,
+      ref: React.MutableRefObject<{ stop: () => void } | null>
+    ) {
+      if (ref.current) return; // already playing
+      try {
+        const sampleRate = 8000;
+        const numSamples = sampleRate * toneSec;
+        const buf = new ArrayBuffer(44 + numSamples * 2);
+        const view = new DataView(buf);
+        const ws = (o: number, s: string) => { for (let i = 0; i < s.length; i++) view.setUint8(o + i, s.charCodeAt(i)); };
+        ws(0, "RIFF"); view.setUint32(4, 36 + numSamples * 2, true);
+        ws(8, "WAVE"); ws(12, "fmt ");
+        view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true);
+        view.setUint32(24, sampleRate, true); view.setUint32(28, sampleRate * 2, true);
+        view.setUint16(32, 2, true); view.setUint16(34, 16, true);
+        ws(36, "data"); view.setUint32(40, numSamples * 2, true);
+        for (let i = 0; i < numSamples; i++) {
+          const t = i / sampleRate;
+          const s = (Math.sin(2 * Math.PI * freq1 * t) + Math.sin(2 * Math.PI * freq2 * t)) * 0.15;
+          view.setInt16(44 + i * 2, Math.max(-32768, Math.min(32767, s * 32767)), true);
+        }
+        const url = URL.createObjectURL(new Blob([buf], { type: "audio/wav" }));
+        const audio = new Audio(url);
+        let active = true;
+        let timer: ReturnType<typeof setTimeout> | null = null;
+        const playOnce = () => {
+          if (!active) return;
+          audio.currentTime = 0;
+          audio.play().catch(() => {});
+          timer = window.setTimeout(() => { if (active) playOnce(); }, cycleSec * 1000);
+        };
+        playOnce();
+        ref.current = {
+          stop: () => {
+            active = false;
+            if (timer !== null) clearTimeout(timer);
+            audio.pause();
+            URL.revokeObjectURL(url);
+            ref.current = null;
+          },
+        };
+      } catch {
+        // Blob/Audio unavailable (SSR context)
+      }
+    }
+
+    // Outbound ringback: 440+480 Hz, 2s tone / 4s cycle
+    const isOutboundRinging = incomingPopups.some(
+      (p) => p.direction === "outbound" && p.stage === "ringing"
+    );
+    if (isOutboundRinging) {
+      buildRingtone(440, 480, 2, 4, outboundRingtoneRef);
+    } else if (outboundRingtoneRef.current) {
+      outboundRingtoneRef.current.stop();
+    }
+
+    // Inbound ring: 480+620 Hz, 2s tone / 4s cycle — plays while popup is new or ringing
+    const isInboundRinging = incomingPopups.some(
+      (p) => p.direction !== "outbound" && (p.stage === "new" || p.stage === "ringing") && !p.answeredByOther
+    );
+    if (isInboundRinging) {
+      buildRingtone(480, 620, 2, 4, inboundRingtoneRef);
+    } else if (inboundRingtoneRef.current) {
+      inboundRingtoneRef.current.stop();
+    }
   }, [incomingPopups]);
 
   useEffect(() => {
@@ -784,6 +869,8 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
     const connectFromStorage = async () => {
       const current = client.getStatus().state;
       if (current === "connected" || current === "connecting") return;
+      // Don't retry if both API fetches are permanently paused (misconfiguration or IP block).
+      if (autoSdkApiPausedRef.current.settings && autoSdkApiPausedRef.current.sign) return;
       const cfg = await ensureSdkSign(await ensureSdkSettings(readLinkusConfig()));
       const extension = String(cfg.extension ?? "").trim();
       const serverUrl = String(cfg.serverUrl ?? "").trim();
@@ -797,7 +884,9 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
             "Re-login after extension assignment if needed.",
           ],
         });
-      } else if (!serverUrl) {
+        return;
+      }
+      if (!serverUrl) {
         showSdkNotice({
           key: `missing-server:${sdkCompanyId}`,
           title: "Linkus server URL is missing",
@@ -807,18 +896,36 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
             "Ensure the integration is active for this company.",
           ],
         });
+        return;
       }
       await client.connect(cfg);
     };
+    // On successful connection reset the delay; on error/disconnect increase it.
+    // The useEffect re-runs when linkusStatus.state changes, so each state transition
+    // triggers a fresh attempt with the current (possibly backed-off) delay.
+    if (linkusStatus.state === "connected") {
+      sdkRetryDelayMsRef.current = 15_000;
+      return () => { stopped = true; unsubscribe(); };
+    }
+
+    // Both API endpoints permanently paused — stop all auto-retry, require manual action.
+    if (autoSdkApiPausedRef.current.settings && autoSdkApiPausedRef.current.sign) {
+      return () => { stopped = true; unsubscribe(); };
+    }
+
+    // Attempt connection immediately, then schedule next retry with current backoff delay.
     void connectFromStorage();
 
-    const timer = window.setInterval(() => {
-      void connectFromStorage();
-    }, 4000);
+    const retryDelay = sdkRetryDelayMsRef.current;
+    sdkRetryDelayMsRef.current = Math.min(retryDelay * 2, 120_000);
+
+    const timer = window.setTimeout(() => {
+      if (!stopped) void connectFromStorage();
+    }, retryDelay);
 
     return () => {
       stopped = true;
-      window.clearInterval(timer);
+      window.clearTimeout(timer);
       unsubscribe();
     };
   }, [clearSdkNotice, dialerEnabled, linkusStatus.state, readLinkusConfig, sdkCompanyId, showSdkNotice]);
@@ -857,6 +964,18 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
       });
       return;
     }
+    if (lower.includes("dialer_linkus_token") && lower.includes("missing")) {
+      showSdkNotice({
+        key: `status-token-missing:${sdkCompanyId}`,
+        title: "Linkus token or password is missing",
+        message: msg,
+        suggestions: [
+          "Open Dialer Integration and save your Yeastar credentials.",
+          "A token will be fetched automatically once credentials are set.",
+        ],
+      });
+      return;
+    }
     showSdkNotice({
       key: `status-error:${sdkCompanyId}:${msg}`,
       title: "SDK connection error",
@@ -867,23 +986,71 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
 
   useEffect(() => {
     if (!dialerEnabled) return;
+    // Tracks the last time each outbound popup was matched by an SDK session.
+    // Used to detect when a session disappears (remote party hung up).
+    const lastSdkMatchMs = new Map<string, number>();
     const timer = window.setInterval(() => {
       const now = Date.now();
       for (const [key, at] of terminalCallsRef.current.entries()) {
         if (now - at > 3 * 60 * 1000) terminalCallsRef.current.delete(key);
       }
       const snapshots = linkusClientRef.current.getSessionsSnapshot();
-      if (!snapshots.length) return;
       setIncomingPopups((prev) => {
         let changed = false;
         const next = prev.map((popup) => {
           if (popup.answeredByOther) return popup;
+          if (popup.stage === "ended") return popup;
+
           const byCallId = snapshots.find((s) => String(s.sessionId || "") === popup.callId);
           const byToNumber = snapshots.find(
             (s) => String(s.toNumber ?? "").trim() && String(s.toNumber ?? "").trim() === popup.toNumber
           );
-          const snap = byCallId ?? byToNumber;
-          if (!snap) return popup;
+          // For SDK-dialed outbound calls the SDK session's toNumber is the local extension,
+          // not the destination. Match by remoteNumber (the external party) instead.
+          const byRemoteNumber =
+            !byCallId && !byToNumber && popup.direction === "outbound"
+              ? snapshots.find(
+                  (s) =>
+                    String(s.remoteNumber ?? "").trim() &&
+                    String(s.remoteNumber ?? "").trim() === popup.toNumber
+                )
+              : undefined;
+          // For inbound calls, fall back to matching the caller's number against the SDK session's remoteNumber.
+          const byFromNumber =
+            !byCallId && !byToNumber && !byRemoteNumber && popup.direction === "inbound" &&
+            popup.fromNumber && popup.fromNumber.toLowerCase() !== "unknown"
+              ? snapshots.find(
+                  (s) =>
+                    String(s.remoteNumber ?? "").trim() &&
+                    String(s.remoteNumber ?? "").trim() === popup.fromNumber
+                )
+              : undefined;
+          const snap = byCallId ?? byToNumber ?? byFromNumber ?? byRemoteNumber;
+
+          // Session disappeared: remote party hung up before the BYE webhook arrived.
+          // If the popup was actively tracked by the SDK and is now gone for >3s, end it.
+          if (!snap) {
+            const lastSeen = lastSdkMatchMs.get(popup.callId);
+            const isActiveStage =
+              popup.stage === "talking" || popup.stage === "connection" || popup.stage === "ringing";
+            if (lastSeen !== undefined && isActiveStage && now - lastSeen > 3_000) {
+              lastSdkMatchMs.delete(popup.callId);
+              changed = true;
+              return {
+                ...popup,
+                stage: "ended" as const,
+                endReason: popup.endReason ?? "ended",
+                connectionSinceMs: null,
+                syncDelay: false,
+                endedAtMs: popup.endedAtMs ?? now,
+                lastEventAtMs: now,
+              };
+            }
+            return popup;
+          }
+
+          // Session found — record this tick as a live match.
+          lastSdkMatchMs.set(popup.callId, now);
 
           let stage = popup.stage ?? "new";
           if (snap.isHold || snap.callStatus.includes("hold")) {
@@ -897,10 +1064,10 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
           } else {
             stage = mergeStage(popup.stage, stage);
           }
+          // Use current time when first detected as answered — not callStartTime which
+          // reflects ring start and would make the timer begin too early.
           const nextAnsweredAt =
-            stage === "talking" || stage === "held"
-              ? popup.answeredAtMs ?? (snap.callStartTime > 0 ? snap.callStartTime : now)
-              : popup.answeredAtMs ?? null;
+            stage === "talking" || stage === "held" ? popup.answeredAtMs ?? now : popup.answeredAtMs ?? null;
           const nextConnectionSinceMs =
             stage === "connection"
               ? popup.stage === "connection"
@@ -952,35 +1119,11 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
 
     let stopped = false;
 
-    async function loadCustomerHintByPhone(phone: string) {
-      if (!phone.trim()) return null;
-      try {
-        const res = await fetch(
-          `/api/company/${companyId}/call-center/dashboard?search=${encodeURIComponent(phone.trim())}`,
-          { cache: "no-store" }
-        );
-        if (!res.ok) return null;
-        const payload = await res.json().catch(() => ({}));
-        const list = (Array.isArray(payload) ? payload : payload.data ?? payload.result ?? []) as any[];
-        const first =
-          list.find((row) => row?.isActive !== false && String(row?.type ?? "").toLowerCase() === "customer") ??
-          list.find((row) => row?.isActive !== false);
-        if (!first) return null;
-        return {
-          id: first.type === "customer" ? first.id ?? null : null,
-          name: first.name ?? null,
-          carId: first.carId ?? null,
-          car: first.car ?? null,
-          phone: first.phone ?? null,
-          type: first.type ?? null,
-        };
-      } catch {
-        return null;
-      }
-    }
+    // Use the component-level loadCustomerHintByPhone callback (defined outside useEffect)
 
     async function handleIncomingCall(input: {
       callId: string;
+      direction?: "inbound" | "outbound";
       fromNumber?: string | null;
       toNumber?: string | null;
       ringingExtensions?: string[] | null;
@@ -1030,14 +1173,45 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
           : sdkFallbackFrom;
       const ringingExtensions = normalizeStringList(input.ringingExtensions ?? []);
       const hasAgentTokens = agentTokensRef.current.size > 0;
-      const candidateTargets =
-        ringingExtensions.length > 0 ? ringingExtensions : toNumber ? [toNumber] : [];
+      // Always include toNumber alongside ringingExtensions: Yeastar sends toNumber = current
+      // extension being tried and ringingExtensions = remaining ones (toNumber excluded from the list).
+      const candidateTargets = [
+        ...ringingExtensions,
+        ...(toNumber ? [toNumber] : []),
+      ];
       if (
+        input.direction !== "outbound" &&
         hasAgentTokens &&
         candidateTargets.length > 0 &&
         !candidateTargets.some((target) => tokenMatchesAgent(agentTokensRef.current, target))
       ) {
         return;
+      }
+      // Suppress the agent-leg ring from Yeastar call/dial: Yeastar first calls the agent
+      // extension before bridging to the customer, which appears as an inbound ring with no
+      // external caller. Skip creating a second popup if there's already an active outbound call.
+      const isAgentLegRing =
+        input.direction !== "outbound" &&
+        !fromNumber &&
+        toNumber.length > 0 &&
+        toNumber.length <= 6 &&
+        /^\d+$/.test(toNumber) &&
+        hasAgentTokens &&
+        candidateTargets.every((t) => tokenMatchesAgent(agentTokensRef.current, t));
+      if (isAgentLegRing) {
+        const activeOutbound = incomingPopupsRef.current.find(
+          (p) => p.direction === "outbound" && p.stage !== "ended"
+        );
+        if (activeOutbound) {
+          // Link the real Yeastar providerCallId to the sdk-dial-* popup so that
+          // subsequent webhook events (ringing, in_progress, completed) can find it.
+          if (callId && activeOutbound.callId !== callId && activeOutbound.callId.startsWith("sdk-dial-")) {
+            setIncomingPopups((prev) =>
+              prev.map((p) => (p.callId === activeOutbound.callId ? { ...p, callId } : p))
+            );
+          }
+          return;
+        }
       }
       const aiText = String(input.aiText ?? "").trim();
       const pickupHint = String(input.pickupHint ?? "").trim();
@@ -1062,6 +1236,7 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
       setIncomingPopups((prev) => {
         const nextItem: IncomingPopupState = {
           callId,
+          direction: input.direction ?? "inbound",
           fromNumber: safeFromNumber || "Unknown",
           toNumber: toNumber || "Unknown",
           ringingExtensions,
@@ -1107,17 +1282,27 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
         return [...prev, nextItem].slice(-4);
       });
 
-      if (safeFromNumber) {
-        void loadCustomerHintByPhone(safeFromNumber)
-          .then((customer) => {
-            if (stopped || !customer) return;
-            setIncomingPopups((prev) =>
-              prev.map((p) => (p.callId === callId ? { ...p, customer } : p))
-            );
-          })
-          .catch(() => {
-            // ignore best-effort customer enrichment failures
-          });
+      {
+        // For outbound calls the customer is the destination (toNumber), not the agent extension (fromNumber)
+        const phoneForLookup = input.direction === "outbound"
+          ? (toNumber && toNumber.toLowerCase() !== "unknown" ? toNumber : "")
+          : safeFromNumber;
+        if (phoneForLookup) {
+          void loadCustomerHintByPhone(phoneForLookup)
+            .then((customer) => {
+              if (stopped) return;
+              setIncomingPopups((prev) =>
+                prev.map((p) =>
+                  p.callId === callId
+                    ? { ...p, customer: customer ?? { notFound: true } }
+                    : p
+                )
+              );
+            })
+            .catch(() => {
+              // ignore best-effort customer enrichment failures
+            });
+        }
       }
     }
 
@@ -1169,6 +1354,22 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
                 p.callId === incomingCallId ? { ...p, fromNumber: incomingFromNumber } : p
               )
             );
+            // fromNumber just resolved — trigger customer lookup immediately.
+            // handleIncomingCall may skip this due to recentlyClosedTargetsRef on back-to-back calls.
+            if (!open.customer || open.customer.notFound) {
+              void loadCustomerHintByPhone(incomingFromNumber)
+                .then((customer) => {
+                  if (stopped) return;
+                  setIncomingPopups((prev) =>
+                    prev.map((p) =>
+                      p.callId === incomingCallId && (!p.customer || p.customer.notFound)
+                        ? { ...p, customer: customer ?? { notFound: true } }
+                        : p
+                    )
+                  );
+                })
+                .catch(() => {});
+            }
           } else if (
             incomingFromNumber &&
             incomingFromNumber.toLowerCase() !== "unknown" &&
@@ -1200,6 +1401,21 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
               const existing = copy[idx];
               if (!existing) return prev;
               copy[idx] = { ...existing, fromNumber: incomingFromNumber };
+              // Trigger customer lookup for this enriched popup too
+              if (!existing.customer || existing.customer.notFound) {
+                void loadCustomerHintByPhone(incomingFromNumber)
+                  .then((customer) => {
+                    if (stopped) return;
+                    setIncomingPopups((prev2) =>
+                      prev2.map((p) =>
+                        p.callId === existing.callId && (!p.customer || p.customer.notFound)
+                          ? { ...p, customer: customer ?? { notFound: true } }
+                          : p
+                      )
+                    );
+                  })
+                  .catch(() => {});
+              }
               return copy;
             });
           } else if (incomingFromNumber && incomingFromNumber.toLowerCase() !== "unknown") {
@@ -1215,6 +1431,20 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
                 .sort((a, b) => (b.createdAtMs || 0) - (a.createdAtMs || 0));
               const target = unknowns[0];
               if (!target?.callId) return prev;
+              if (!target.customer || target.customer.notFound) {
+                void loadCustomerHintByPhone(incomingFromNumber)
+                  .then((customer) => {
+                    if (stopped) return;
+                    setIncomingPopups((prev2) =>
+                      prev2.map((p) =>
+                        p.callId === target.callId && (!p.customer || p.customer.notFound)
+                          ? { ...p, customer: customer ?? { notFound: true } }
+                          : p
+                      )
+                    );
+                  })
+                  .catch(() => {});
+              }
               return prev.map((p) => (p.callId === target.callId ? { ...p, fromNumber: incomingFromNumber } : p));
             });
           }
@@ -1273,16 +1503,28 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
                 ? answeredTargets.some((target) => tokenMatchesAgent(agentTokensRef.current, target))
                 : false;
 
-            if (hasAgentTokens && answeredTargets.length > 0 && !belongsToCurrentUser) {
+            if (hasAgentTokens && answeredTargets.length > 0 && !belongsToCurrentUser && direction !== "outbound") {
               if (answeredToNumber) {
                 recentlyClosedTargetsRef.current.set(answeredToNumber, Date.now());
               } else if (fallbackToNumber) {
                 recentlyClosedTargetsRef.current.set(fallbackToNumber, Date.now());
               }
+              // Show "Answered by ext X" briefly, then auto-hide after 5 seconds
+              const answeredExt = answeredToNumber || fallbackToNumber || null;
+              setIncomingPopups((prev) =>
+                prev.map((p) =>
+                  p.callId === targetCallId
+                    ? { ...p, answeredByOther: true, answeredByExtension: answeredExt, stage: "ended" as const, endReason: "answered_other" }
+                    : p
+                )
+              );
               const existingTimer = answeredPopupHideTimersRef.current.get(targetCallId);
               if (existingTimer) clearTimeout(existingTimer);
-              answeredPopupHideTimersRef.current.delete(targetCallId);
-              setIncomingPopups((prev) => prev.filter((p) => p.callId !== targetCallId));
+              const hideTimer = window.setTimeout(() => {
+                setIncomingPopups((prev) => prev.filter((p) => p.callId !== targetCallId));
+                answeredPopupHideTimersRef.current.delete(targetCallId);
+              }, 5_000);
+              answeredPopupHideTimersRef.current.set(targetCallId, hideTimer);
               return;
             }
 
@@ -1395,8 +1637,8 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
             return;
           }
 
-          if (direction !== "inbound") return;
-          if (!(status.includes("ring") || status.includes("incoming"))) return;
+          if (direction !== "inbound" && direction !== "outbound") return;
+          if (!(status.includes("ring") || status.includes("incoming") || status.includes("initiat"))) return;
           if (incomingCallId && terminalCallsRef.current.has(incomingCallId)) return;
           if (incomingCallId) {
             setIncomingPopups((prev) =>
@@ -1409,6 +1651,7 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
           }
           void handleIncomingCall({
             callId: incomingCallId,
+            direction: (direction === "outbound" ? "outbound" : "inbound") as "inbound" | "outbound",
             fromNumber: payload.fromNumber ?? null,
             toNumber: payload.toNumber ?? null,
             ringingExtensions: payload.ringingExtensions ?? null,
@@ -1473,6 +1716,7 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
       }
       answeredPopupHideTimersRef.current.clear();
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dialerEnabled, scopeInfo.scope, scopeInfo.companyId, disableIncomingCallRealtime]);
 
   async function handleLookup() {
@@ -1506,20 +1750,122 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
     router.push("/auth/login");
   }
 
+  const dialCompanyId =
+    scopeInfo.scope === "company" || scopeInfo.scope === "branch" || scopeInfo.scope === "vendor"
+      ? String(scopeInfo.companyId ?? "").trim()
+      : "";
+  const canDial = dialerEnabled && !!dialCompanyId;
+
+  async function loadCustomerHintByPhone(phone: string): Promise<IncomingPopupState["customer"]> {
+    if (!phone.trim() || !dialCompanyId) return null;
+    try {
+      const res = await fetch(
+        `/api/company/${dialCompanyId}/call-center/dashboard?search=${encodeURIComponent(phone.trim())}`,
+        { cache: "no-store" }
+      );
+      if (!res.ok) return null;
+      const payload = await res.json().catch(() => ({}));
+      const list = (Array.isArray(payload) ? payload : payload.data ?? payload.result ?? []) as any[];
+      const first =
+        list.find((row) => row?.isActive !== false && String(row?.type ?? "").toLowerCase() === "customer") ??
+        list.find((row) => row?.isActive !== false);
+      if (!first) return null;
+      return {
+        id: first.type === "customer" ? first.id ?? null : null,
+        name: first.name ?? null,
+        carId: first.carId ?? null,
+        car: first.car ?? null,
+        phone: first.phone ?? null,
+        type: first.type ?? null,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  async function handleDialOut() {
+    const toNumber = dialToNumber.trim();
+    if (!toNumber || !dialCompanyId) return;
+    setIsDialing(true);
+    setDialError(null);
+    try {
+      const sdkConnected = linkusStatus.state === "connected";
+      let callId = "";
+
+      if (sdkConnected) {
+        // Place call directly via WebRTC SDK — no agent-leg ring, no Linkus app needed.
+        const ok = await linkusClientRef.current.dial(toNumber);
+        if (!ok) throw new Error("SDK dial failed — check browser microphone permission");
+      } else {
+        // Fallback: Yeastar REST call/dial (rings agent extension first).
+        const res = await fetch(`/api/company/${dialCompanyId}/call-center/call`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            toNumber,
+            fromNumber: linkusStatus.extension || undefined,
+          }),
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(body?.error ?? `HTTP ${res.status}`);
+        callId = String(body?.providerCallId ?? body?.callId ?? body?.id ?? "").trim();
+      }
+
+      // Show outbound popup immediately — webhook delivers ringing/answered updates.
+      const popupCallId = callId || `sdk-dial-${Date.now()}`;
+      setIncomingPopups((prev) => [
+        ...prev,
+        {
+          callId: popupCallId,
+          direction: "outbound",
+          fromNumber: linkusStatus.extension || "—",
+          toNumber,
+          createdAtMs: Date.now(),
+          stage: "new",
+          endReason: null,
+          connectionSinceMs: null,
+          syncDelay: false,
+          answeredAtMs: null,
+          endedAtMs: null,
+          lastEventAtMs: Date.now(),
+          customer: null,
+        },
+      ]);
+      // Enrich outbound popup with customer info by looking up toNumber
+      if (toNumber && dialCompanyId) {
+        void loadCustomerHintByPhone(toNumber)
+          .then((customer) => {
+            setIncomingPopups((prev) =>
+              prev.map((p) =>
+                p.callId === popupCallId
+                  ? { ...p, customer: customer ?? { notFound: true } }
+                  : p
+              )
+            );
+          })
+          .catch(() => {});
+      }
+      setDialPadOpen(false);
+      setDialToNumber("");
+    } catch (err: any) {
+      setDialError(err?.message ?? "Call failed");
+    } finally {
+      setIsDialing(false);
+    }
+  }
+
   function canSdkAnswerToNumber(
     toNumber: string | null | undefined,
-    ringingExtensions?: string[] | null
+    _ringingExtensions?: string[] | null
   ): boolean {
     const sdkExtTokens = buildAgentTokenSet([linkusStatus.extension ?? ""]);
     if (!sdkExtTokens.size) return true;
-    const candidates = [
-      String(toNumber ?? "").trim(),
-      ...normalizeStringList(ringingExtensions ?? []),
-    ].filter(Boolean);
-    if (!candidates.length) return true;
-    return candidates.some((candidate) =>
-      agentTokenVariants(candidate).some((token) => sdkExtTokens.has(token))
-    );
+    // Only check toNumber (the extension currently ringing). ringingExtensions are
+    // queued extensions that haven't started ringing yet — answering those would fail
+    // because the PBX hasn't sent them a SIP INVITE.
+    const candidate = String(toNumber ?? "").trim();
+    if (!candidate) return true;
+    return agentTokenVariants(candidate).some((token) => sdkExtTokens.has(token));
   }
 
   async function handleAnswerWithSdk(
@@ -1738,6 +2084,17 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
               />
             </label>
           )}
+          {canDial && (
+            <button
+              type="button"
+              onClick={() => { setDialPadOpen((prev) => !prev); setDialError(null); }}
+              className="rounded-full border border-white/30 px-3 py-1 text-xs sm:text-sm hover:border-white"
+              aria-expanded={dialPadOpen}
+              aria-controls="navbar-dial-pad"
+            >
+              📞 Dial
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setLookupOpen((prev) => !prev)}
@@ -1761,6 +2118,35 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
           >
             Logout
           </button>
+
+          {dialPadOpen && canDial && (
+            <div
+              id="navbar-dial-pad"
+              className="absolute right-0 top-full z-50 mt-2 w-72 max-w-[90vw] rounded-2xl border border-white/10 bg-black p-3 shadow-xl"
+            >
+              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-white/60">New Outbound Call</div>
+              <div className="flex items-center gap-2">
+                <input
+                  autoFocus
+                  type="tel"
+                  value={dialToNumber}
+                  onChange={(e) => setDialToNumber(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") void handleDialOut(); }}
+                  placeholder="Enter phone number"
+                  className="h-9 w-full rounded-lg border border-white/15 bg-black/40 px-3 text-sm outline-none focus:ring-2 focus:ring-white/20"
+                />
+                <button
+                  type="button"
+                  onClick={() => void handleDialOut()}
+                  disabled={isDialing || !dialToNumber.trim()}
+                  className="shrink-0 rounded-lg border border-emerald-400/50 bg-emerald-500/20 px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-emerald-300 transition hover:bg-emerald-500/30 disabled:opacity-50"
+                >
+                  {isDialing ? "…" : "Call"}
+                </button>
+              </div>
+              {dialError && <div className="mt-2 text-xs text-red-400">{dialError}</div>}
+            </div>
+          )}
 
           {lookupOpen && (
             <div
@@ -1942,7 +2328,9 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <div className="text-xs uppercase tracking-[0.18em] text-emerald-300">Incoming Call</div>
+                  <div className={`text-xs uppercase tracking-[0.18em] ${popup.direction === "outbound" ? "text-cyan-300" : "text-emerald-300"}`}>
+                    {popup.direction === "outbound" ? "Outbound Call" : "Incoming Call"}
+                  </div>
                   {autoCompact ? (
                     <button
                       type="button"
@@ -1966,7 +2354,17 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
                   <div className="mt-1 text-[10px] text-amber-200/90">{linkusStatus.message}</div>
                 ) : null}
                 <div className="mt-1 text-[10px] text-slate-400">Call ID: {popup.callId}</div>
-                <div className="mt-1 text-lg font-semibold">{popup.customer?.name ?? "Unknown Caller"}</div>
+                <div className="mt-1 text-lg font-semibold">
+                  {popup.customer?.notFound ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/50 bg-amber-500/15 px-2.5 py-0.5 text-sm font-semibold text-amber-300">
+                      New Customer
+                    </span>
+                  ) : popup.customer?.name ? (
+                    popup.customer.name
+                  ) : (
+                    <span className="text-slate-400">{popup.direction === "outbound" ? popup.toNumber : popup.fromNumber}</span>
+                  )}
+                </div>
                 <div className="mt-1 text-xs text-slate-300">To: {popup.toNumber}</div>
                 <div className="mt-1 flex items-center gap-2 text-xs">
                   <span
@@ -1975,7 +2373,7 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
                     {labelForStage(popup.stage)}
                   </span>
                   {elapsedMs !== null ? (
-                    <span className="font-mono text-emerald-200">{formatDuration(elapsedMs)}</span>
+                    <span className={`font-mono ${popup.direction === "outbound" ? "text-cyan-200" : "text-emerald-200"}`}>{formatDuration(elapsedMs)}</span>
                   ) : null}
                 </div>
                 {popup.syncDelay ? (
@@ -2021,13 +2419,13 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
                   </div>
                 ) : null}
                 {popup.answeredByOther ? (
-                  <div className="mt-1 text-xs text-amber-200">
-                    Answered by ext {popup.answeredByExtension ?? popup.toNumber}
+                  <div className="mt-2 rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-center text-xs font-medium text-amber-300">
+                    ✓ Answered by ext {popup.answeredByExtension ?? popup.toNumber}
                   </div>
                 ) : null}
                 {!isCompact ? (
                   <div className="mt-2 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-sm">
-                    <div className="text-xs text-slate-300">Mobile No: {popup.customer?.phone ?? popup.fromNumber}</div>
+                    <div className="text-xs text-slate-300">Mobile No: {popup.customer?.phone ?? (popup.direction === "outbound" ? popup.toNumber : popup.fromNumber)}</div>
                     {popup.customer?.car ? (
                       <div className="text-xs text-slate-300">Car: {popup.customer.car}</div>
                     ) : null}
@@ -2040,6 +2438,7 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
                   </div>
                 ) : null}
                 <div className="mt-3 flex flex-col gap-2 text-[11px]">
+                  {popup.direction !== "outbound" ? (
                   <button
                     type="button"
                     className="w-full rounded-xl border border-emerald-300/50 bg-emerald-500/15 px-3 py-2 text-sm font-semibold text-emerald-100 hover:border-emerald-200/90 disabled:opacity-50"
@@ -2061,6 +2460,7 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
                   >
                     Answer (SDK)
                   </button>
+                  ) : null}
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"

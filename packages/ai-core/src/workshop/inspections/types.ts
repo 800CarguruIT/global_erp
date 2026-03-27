@@ -31,6 +31,7 @@ export type Inspection = {
   aiSummaryPlain?: string | null;
   draftPayload?: any | null;
   mediaSummary?: any | null;
+  vinDecodeResult?: any | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -77,6 +78,13 @@ export type InspectionLineItem = {
   aiQuestions?: any[] | null;
   aiAnswers?: Record<string, any> | null;
   aiRecommendation?: string | null;
+  categoryId?: string | null;
+  subcategoryId?: string | null;
+  partDefinitionId?: string | null;
+  severityLevel?: "good" | "attention" | "replace" | null;
+  aiPartNumber?: string | null;
+  aiPartAlternatives?: any | null;
+  aiPriceEstimate?: any | null;
   partOrdered?: number | null;
   orderStatus?: OrderStatus | null;
   quoteCosts?: {
@@ -87,4 +95,34 @@ export type InspectionLineItem = {
   };
   createdAt: string;
   updatedAt: string;
+};
+
+// Part category hierarchy types for guided inspection
+export type PartCategory = {
+  id: string;
+  companyId: string | null;
+  name: string;
+  icon: string | null;
+  displayOrder: number;
+  isActive: boolean;
+  subcategories?: PartSubcategory[];
+};
+
+export type PartSubcategory = {
+  id: string;
+  categoryId: string;
+  name: string;
+  displayOrder: number;
+  isActive: boolean;
+  parts?: PartDefinition[];
+};
+
+export type PartDefinition = {
+  id: string;
+  subcategoryId: string;
+  name: string;
+  applicableMakes: string[] | null;
+  applicableBodyTypes: string[] | null;
+  displayOrder: number;
+  isActive: boolean;
 };

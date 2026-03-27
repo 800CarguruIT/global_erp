@@ -32,6 +32,8 @@ export * as CallCenter from "./call-center/service";
 export * as CallCenterTypes from "./call-center/types";
 export * as CallAiPolicy from "./call-center/aiPolicy";
 export * as CallAiWorkflow from "./call-center/aiWorkflow";
+export * as CustomerDataCenter from "./customer-data-center/service";
+export * as CustomerDataCenterTypes from "./customer-data-center/types";
 export * as Vendors from "./vendors/service";
 export * as VendorTypes from "./vendors/types";
 export * as Branches from "./branches/repository";
@@ -110,6 +112,9 @@ export * as PushTypes from "./push/types";
 export * as EventAutomation from "./event-automation/service";
 
 export { getOpenAIClient, getOpenAIClientForCompany } from "./ai/client";
+export { getAnthropicClient, getAnthropicClientForCompany } from "./ai/anthropicClient";
+export * as Intelligence from "./intelligence";
+export type { EngineKey, EngineResult, Signal, EngineConfig } from "./intelligence";
 export { canUseAi } from "./ai/policy";
 export {
   clearCompanyAiProviderConfig,
@@ -119,3 +124,5 @@ export {
 } from "./ai/providerConfig";
 export * as Files from "./files/repository";
 export type { FileKind, FileRecord } from "./files/types";
+export * as MasterDashboard from "./master-dashboard/service";
+export type { MasterDashboardData, MasterDashboardFilter } from "./master-dashboard/types";

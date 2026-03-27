@@ -53,6 +53,8 @@ export async function POST(req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: `Select brand for ${check.label}.` }, { status: 400 });
     }
   }
+  // Vendor-confirmed part number takes precedence over the system-resolved one.
+  const finalPartNumber = vendorPartNumber;
   const resolvedBrand = oemBrand ?? oeBrand ?? aftmBrand ?? usedBrand ?? null;
   if (!resolvedBrand) {
     return NextResponse.json({ error: "Select at least one quote type with brand." }, { status: 400 });
@@ -92,6 +94,16 @@ export async function POST(req: NextRequest, { params }: Params) {
     if (existing.length) {
       return NextResponse.json({ error: "Quote already submitted for this part." }, { status: 409 });
     }
+  }
+
+  const vendorPartNumber = toStringOrNull(body.partNumber);
+  const diagramFileId = toStringOrNull(body.diagramFileId);
+
+  if (!vendorPartNumber) {
+    return NextResponse.json({ error: "Part number is required." }, { status: 400 });
+  }
+  if (!diagramFileId) {
+    return NextResponse.json({ error: "Part diagram is required." }, { status: 400 });
   }
 
   let resolvedPartNumber: string | null = null;
@@ -173,7 +185,7 @@ export async function POST(req: NextRequest, { params }: Params) {
           ${lineItemId ?? null},
           ${inventoryRequestId ?? null},
           ${inventoryRequestItemId ?? null},
-          ${resolvedPartNumber},
+          ${finalPartNumber},
           ${resolvedBrand},
           ${toStringOrNull(body.remarks)},
           ${oemAmount},
@@ -230,7 +242,7 @@ export async function POST(req: NextRequest, { params }: Params) {
           ${lineItemId ?? null},
           ${inventoryRequestId ?? null},
           ${inventoryRequestItemId ?? null},
-          ${resolvedPartNumber},
+          ${finalPartNumber},
           ${toStringOrNull(body.remarks)},
           ${oemAmount},
           ${oeAmount},
@@ -251,6 +263,21 @@ export async function POST(req: NextRequest, { params }: Params) {
         )
         RETURNING id
       `;
+
+  // Save diagram file reference when the column exists (migration 078+).
+  try {
+    const hasDiagramColRows = await sql<{ has_col: boolean }[]>`
+      SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'part_quotes' AND column_name = 'diagram_url'
+      ) AS has_col
+    `;
+    if (hasDiagramColRows[0]?.has_col) {
+      await sql`UPDATE part_quotes SET diagram_url = ${diagramFileId} WHERE id = ${row[0]?.id}`;
+    }
+  } catch {
+    // Column may not exist — keep submission non-blocking.
+  }
 
   try {
     const hasOptionBrandColsRows = await sql<{

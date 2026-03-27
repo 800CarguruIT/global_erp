@@ -71,6 +71,21 @@ type LoadedData = {
   };
 };
 
+const CATEGORY_ICONS: Record<string, string> = {
+  engine: "🔧",
+  transmission: "⚙️",
+  brakes: "🛑",
+  suspension: "🔩",
+  steering: "🎯",
+  electrical: "⚡",
+  ac: "❄️",
+  body: "🚗",
+  interior: "💺",
+  exhaust: "💨",
+  fuel: "⛽",
+  tyres: "🛞",
+};
+
 export function InspectionDetailMain({ companyId, inspectionId }: InspectionDetailMainProps) {
   const [loadState, setLoadState] = useState<LoadState<LoadedData>>({
     status: "loading",
@@ -95,6 +110,23 @@ export function InspectionDetailMain({ companyId, inspectionId }: InspectionDeta
   });
   const [isSavingCollectStage, setIsSavingCollectStage] = useState(false);
   const [collectStageError, setCollectStageError] = useState<string | null>(null);
+
+  // AI VIN decode state
+  const [vinDecoding, setVinDecoding] = useState(false);
+  const [vinDecodeResult, setVinDecodeResult] = useState<any>(null);
+  const [vinDecodeError, setVinDecodeError] = useState<string | null>(null);
+  const [vinBodyType, setVinBodyType] = useState<string | null>(null);
+
+  // Part category picker state
+  type PartCategoryTree = { id: string; name: string; icon: string | null; subcategories: { id: string; name: string; parts: { id: string; name: string }[] }[] };
+  const [partCategories, setPartCategories] = useState<PartCategoryTree[]>([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [selectedSubcategoryId, setSelectedSubcategoryId] = useState<string | null>(null);
+  const [partCatsLoaded, setPartCatsLoaded] = useState(false);
+
+  // AI summary state
+  const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
+  const [aiSummary, setAiSummary] = useState<{ technical: string | null; customer: string | null } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -211,6 +243,19 @@ export function InspectionDetailMain({ companyId, inspectionId }: InspectionDeta
       cancelled = true;
     };
   }, [companyId, inspectionId]);
+
+  // Load part categories
+  useEffect(() => {
+    if (partCatsLoaded) return;
+    const make = draft?.car?.make || undefined;
+    fetch(`/api/company/${companyId}/workshop/inspections/part-categories${make ? `?make=${encodeURIComponent(make)}` : ""}`)
+      .then((r) => r.json())
+      .then((json) => {
+        setPartCategories(json.data ?? []);
+        setPartCatsLoaded(true);
+      })
+      .catch(() => setPartCatsLoaded(true));
+  }, [companyId, partCatsLoaded, draft?.car?.make]);
 
   useEffect(() => {
     const collectComplete = collectDifferenceDecision === "no" || collectDifferenceDecision === "yes";
@@ -560,7 +605,54 @@ export function InspectionDetailMain({ companyId, inspectionId }: InspectionDeta
             <TextField label="Make" value={draft.car.make ?? ""} onChange={(v) => updateCar("make", v)} />
             <TextField label="Model" value={draft.car.model ?? ""} onChange={(v) => updateCar("model", v)} />
             <TextField label="Year" value={draft.car.year ?? ""} onChange={(v) => updateCar("year", v)} />
-            <TextField label="VIN" value={draft.car.vin ?? ""} onChange={(v) => updateCar("vin", v)} />
+            <div className="space-y-1">
+              <label className="text-xs font-medium">VIN</label>
+              <div className="flex gap-2">
+                <input
+                  className="w-full rounded border bg-background px-2 py-1 text-sm"
+                  value={draft.car.vin ?? ""}
+                  onChange={(e) => updateCar("vin", e.target.value)}
+                  placeholder="Enter 17-character VIN"
+                />
+                <button
+                  type="button"
+                  disabled={!draft.car.vin || draft.car.vin.length !== 17 || vinDecoding}
+                  onClick={async () => {
+                    setVinDecoding(true);
+                    setVinDecodeError(null);
+                    try {
+                      const res = await fetch(`/api/company/${companyId}/workshop/inspections/${inspection.id}/ai-vin-decode`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ vin: draft.car.vin }),
+                      });
+                      const json = await res.json();
+                      if (!res.ok) throw new Error(json.error ?? "Decode failed");
+                      const d = json.data;
+                      if (d.make) updateCar("make", d.make);
+                      if (d.model) updateCar("model", d.model);
+                      if (d.year) updateCar("year", String(d.year));
+                      if (d.bodyType) setVinBodyType(d.bodyType);
+                      setVinDecodeResult(d);
+                    } catch (err: any) {
+                      setVinDecodeError(err?.message ?? "VIN decode failed");
+                    } finally {
+                      setVinDecoding(false);
+                    }
+                  }}
+                  className="whitespace-nowrap rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground disabled:opacity-60"
+                >
+                  {vinDecoding ? "Decoding..." : "Decode VIN"}
+                </button>
+              </div>
+              {vinDecodeError && <div className="text-xs text-destructive">{vinDecodeError}</div>}
+              {vinDecodeResult && (
+                <div className="mt-1 rounded border bg-muted/30 px-2 py-1 text-[11px] text-muted-foreground">
+                  AI decoded: {[vinDecodeResult.make, vinDecodeResult.model, vinDecodeResult.year, vinDecodeResult.bodyType, vinDecodeResult.engineType, vinDecodeResult.fuelType].filter(Boolean).join(" · ")}
+                  <span className="ml-1 text-[10px]">({vinDecodeResult.source})</span>
+                </div>
+              )}
+            </div>
             <TextField label="Mileage" value={draft.car.mileage ?? ""} onChange={(v) => updateCar("mileage", v)} placeholder="e.g. 123,456 km" />
             <TextField label="Tyre size (front)" value={draft.car.tyreFront ?? ""} onChange={(v) => updateCar("tyreFront", v)} />
             <TextField label="Tyre size (rear)" value={draft.car.tyreRear ?? ""} onChange={(v) => updateCar("tyreRear", v)} />
@@ -579,113 +671,208 @@ export function InspectionDetailMain({ companyId, inspectionId }: InspectionDeta
           </div>
         </section>
 
+        {/* ===== GUIDED PART SELECTOR ===== */}
         <section className="space-y-3 rounded-xl border p-4">
-          <div className="flex items-center justify-between gap-2">
-            <div>
-              <h2 className="text-sm font-semibold">Inspection findings</h2>
-              <p className="text-xs text-muted-foreground">
-                Add one line per part or issue. Each line will later be converted into estimate items and a customer report.
-              </p>
-            </div>
-            <button type="button" onClick={addItem} className="rounded-md border px-2 py-1 text-xs font-medium">
-              Add line
-            </button>
+          <div>
+            <h2 className="text-sm font-semibold">Inspection Findings</h2>
+            <p className="text-xs text-muted-foreground">
+              Select parts by category. Tap a part to add it as a finding.
+            </p>
           </div>
 
-          <div className="overflow-x-auto rounded-md border">
-            <table className="min-w-full text-xs">
-              <thead>
-                <tr className="border-b bg-muted/40 text-[11px] text-muted-foreground">
-                  <th className="py-1 pl-2 pr-3 text-left">Part / area</th>
-                  <th className="px-2 py-1 text-left">Severity</th>
-                  <th className="px-2 py-1 text-left">Required action</th>
-                  <th className="px-2 py-1 text-left">Why (technical)</th>
-                  <th className="px-2 py-1 text-left">Why (for customer)</th>
-                  <th className="px-2 py-1 text-left">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {draft.items.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="py-2 px-3 text-xs text-muted-foreground">
-                      No findings added yet.
-                    </td>
-                  </tr>
-                ) : (
-                  draft.items.map((item, index) => (
-                    <tr key={index} className="border-b last:border-0">
-                      <td className="py-1 pl-2 pr-3 align-top">
-                        <input
-                          className="w-full rounded border bg-background px-2 py-1 text-xs"
-                          value={item.partName}
-                          onChange={(e) => updateItem(index, { partName: e.target.value })}
-                          placeholder="e.g. Front brake pads"
-                        />
-                      </td>
-                      <td className="px-2 py-1 align-top">
-                        <select
-                          className="w-full rounded border bg-background px-2 py-1 text-xs"
-                          value={item.severity ?? ""}
-                          onChange={(e) => updateItem(index, { severity: e.target.value })}
-                        >
-                          <option value="">—</option>
-                          <option value="minor">Minor</option>
-                          <option value="moderate">Moderate</option>
-                          <option value="critical">Critical</option>
-                        </select>
-                      </td>
-                      <td className="px-2 py-1 align-top">
-                        <input
-                          className="w-full rounded border bg-background px-2 py-1 text-xs"
-                          value={item.requiredAction ?? ""}
-                          onChange={(e) => updateItem(index, { requiredAction: e.target.value })}
-                          placeholder="e.g. Replace / adjust / monitor"
-                        />
-                      </td>
-                      <td className="px-2 py-1 align-top">
-                        <textarea
-                          className="h-16 w-full resize-none rounded border bg-background px-2 py-1 text-xs"
-                          value={item.techReason ?? ""}
-                          onChange={(e) => updateItem(index, { techReason: e.target.value })}
-                          placeholder="Technical reason for this item."
-                        />
-                      </td>
-                      <td className="px-2 py-1 align-top">
-                        <textarea
-                          className="h-16 w-full resize-none rounded border bg-background px-2 py-1 text-xs"
-                          value={item.laymanReason ?? ""}
-                          onChange={(e) => updateItem(index, { laymanReason: e.target.value })}
-                          placeholder="Customer-friendly explanation (AI helper later)."
-                        />
-                      </td>
-                      <td className="px-2 py-1 align-top">
-                        <button type="button" onClick={() => removeItem(index)} className="rounded-md border px-2 py-1 text-[11px]">
-                          Remove
-                        </button>
-                        <div className="mt-2 text-[10px] text-muted-foreground">Photo proof upload coming soon</div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+          {/* Category Grid (Level 1) */}
+          {!selectedCategoryId && (
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
+              {partCategories.map((cat) => (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => setSelectedCategoryId(cat.id)}
+                  className="flex flex-col items-center gap-1 rounded-xl border p-3 text-center transition hover:border-primary hover:bg-primary/5"
+                >
+                  <span className="text-lg">{CATEGORY_ICONS[cat.icon ?? ""] ?? "🔧"}</span>
+                  <span className="text-[11px] font-medium leading-tight">{cat.name}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Sub-category List (Level 2) */}
+          {selectedCategoryId && !selectedSubcategoryId && (() => {
+            const cat = partCategories.find((c) => c.id === selectedCategoryId);
+            return (
+              <div className="space-y-2">
+                <button type="button" onClick={() => setSelectedCategoryId(null)} className="text-xs text-primary hover:underline">
+                  ← Back to categories
+                </button>
+                <h3 className="text-xs font-semibold">{cat?.name}</h3>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+                  {(cat?.subcategories ?? []).map((sub) => (
+                    <button
+                      key={sub.id}
+                      type="button"
+                      onClick={() => setSelectedSubcategoryId(sub.id)}
+                      className="rounded-lg border px-3 py-2 text-left text-xs font-medium transition hover:border-primary hover:bg-primary/5"
+                    >
+                      {sub.name}
+                      <span className="ml-1 text-[10px] text-muted-foreground">({sub.parts?.length ?? 0})</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Part Picker (Level 3) */}
+          {selectedCategoryId && selectedSubcategoryId && (() => {
+            const cat = partCategories.find((c) => c.id === selectedCategoryId);
+            const sub = cat?.subcategories?.find((s) => s.id === selectedSubcategoryId);
+            return (
+              <div className="space-y-2">
+                <button type="button" onClick={() => setSelectedSubcategoryId(null)} className="text-xs text-primary hover:underline">
+                  ← Back to {cat?.name}
+                </button>
+                <h3 className="text-xs font-semibold">{sub?.name}</h3>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {(sub?.parts ?? []).map((part) => {
+                    const alreadyAdded = draft.items.some((it) => it.partName === part.name);
+                    return (
+                      <button
+                        key={part.id}
+                        type="button"
+                        disabled={alreadyAdded}
+                        onClick={() => {
+                          addItem();
+                          setDraft((prev) => {
+                            if (!prev) return prev;
+                            const items = [...prev.items];
+                            items[items.length - 1] = {
+                              ...items[items.length - 1],
+                              partName: part.name,
+                              category: cat?.name ?? "",
+                              severity: "moderate",
+                              requiredAction: "Inspect / Replace",
+                            };
+                            return { ...prev, items };
+                          });
+                          // Reset picker to category level
+                          setSelectedCategoryId(null);
+                          setSelectedSubcategoryId(null);
+                        }}
+                        className={`rounded-lg border px-3 py-2 text-left text-xs transition ${
+                          alreadyAdded ? "opacity-40" : "hover:border-primary hover:bg-primary/5"
+                        }`}
+                      >
+                        {alreadyAdded ? "✓ " : "＋ "}{part.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Manual add fallback */}
+          <div className="flex items-center gap-2 border-t pt-2">
+            <button type="button" onClick={addItem} className="rounded-md border px-2 py-1 text-[11px] font-medium">
+              + Add manually
+            </button>
+            <span className="text-[10px] text-muted-foreground">or select from categories above</span>
           </div>
         </section>
 
+        {/* ===== FINDINGS LIST ===== */}
         <section className="space-y-3 rounded-xl border p-4">
-          <h2 className="text-sm font-semibold">Inspector remarks</h2>
-          <p className="text-xs text-muted-foreground">
-            Technical summary of inspection. AI will later generate a customer-friendly explanation.
-          </p>
+          <h2 className="text-sm font-semibold">Findings ({draft.items.length})</h2>
+          {draft.items.length === 0 ? (
+            <p className="text-xs text-muted-foreground">No findings added yet. Select parts from the categories above.</p>
+          ) : (
+            <div className="space-y-2">
+              {draft.items.map((item, index) => (
+                <div key={index} className="flex items-center gap-2 rounded-lg border p-2">
+                  <div className="min-w-0 flex-1">
+                    <input
+                      className="w-full rounded border-0 bg-transparent px-1 py-0.5 text-sm font-medium focus:outline-none focus:ring-1 focus:ring-primary"
+                      value={item.partName}
+                      onChange={(e) => updateItem(index, { partName: e.target.value })}
+                      placeholder="Part name"
+                    />
+                    {item.category && <span className="ml-1 text-[10px] text-muted-foreground">{item.category}</span>}
+                  </div>
+                  {/* Severity toggle: 3 color-coded buttons */}
+                  <div className="flex gap-1">
+                    {(["minor", "moderate", "critical"] as const).map((sev) => (
+                      <button
+                        key={sev}
+                        type="button"
+                        onClick={() => updateItem(index, { severity: sev })}
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-semibold transition ${
+                          item.severity === sev
+                            ? sev === "minor" ? "bg-emerald-500/20 text-emerald-400 ring-1 ring-emerald-500/50"
+                            : sev === "moderate" ? "bg-amber-500/20 text-amber-400 ring-1 ring-amber-500/50"
+                            : "bg-rose-500/20 text-rose-400 ring-1 ring-rose-500/50"
+                            : "bg-muted/30 text-muted-foreground hover:bg-muted/60"
+                        }`}
+                      >
+                        {sev === "minor" ? "Good" : sev === "moderate" ? "Attention" : "Replace"}
+                      </button>
+                    ))}
+                  </div>
+                  <button type="button" onClick={() => removeItem(index)} className="rounded p-1 text-muted-foreground hover:text-destructive">
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="space-y-3 rounded-xl border p-4">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <h2 className="text-sm font-semibold">Inspector remarks</h2>
+              <p className="text-xs text-muted-foreground">
+                Technical summary. AI can auto-generate from findings.
+              </p>
+            </div>
+            <button
+              type="button"
+              disabled={aiSummaryLoading || draft.items.length === 0}
+              onClick={async () => {
+                setAiSummaryLoading(true);
+                try {
+                  const res = await fetch(`/api/company/${companyId}/workshop/inspections/${inspection.id}/ai-summary`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                  });
+                  const json = await res.json();
+                  if (!res.ok) throw new Error(json.error ?? "AI summary failed");
+                  const d = json.data;
+                  setAiSummary({ technical: d.technicalSummary, customer: d.customerSummary });
+                  if (d.technicalSummary) updateRemark(d.technicalSummary);
+                } catch {
+                  // silent fail
+                } finally {
+                  setAiSummaryLoading(false);
+                }
+              }}
+              className="rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground disabled:opacity-60"
+            >
+              {aiSummaryLoading ? "Generating..." : "Generate AI Summary"}
+            </button>
+          </div>
           <textarea
             className="h-32 w-full resize-none rounded border bg-background px-3 py-2 text-sm"
             value={draft.inspectorRemark ?? ""}
             onChange={(e) => updateRemark(e.target.value)}
             placeholder="Describe overall condition and important notes."
           />
-          <p className="text-[11px] text-muted-foreground">
-            Customer report (AI layman translation) will appear here in a later iteration.
-          </p>
+          {aiSummary?.customer && (
+            <div className="rounded-lg border bg-muted/20 p-3">
+              <h3 className="text-xs font-semibold">Customer-Friendly Summary (AI)</h3>
+              <p className="mt-1 text-xs text-muted-foreground whitespace-pre-wrap">{aiSummary.customer}</p>
+            </div>
+          )}
         </section>
         </div>
       </div>

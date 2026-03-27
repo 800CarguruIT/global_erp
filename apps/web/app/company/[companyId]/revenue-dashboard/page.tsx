@@ -1,4 +1,5 @@
 import { AppLayout, ModulePlaceholder } from "@repo/ui";
+import { AIPanel } from "../../../(components)/intelligence/AIPanel";
 
 type Props =
   | { params: { companyId: string } }
@@ -18,6 +19,7 @@ export default async function RevenueDashboardPage({ params }: Props) {
 
   return (
     <AppLayout>
+      <AIPanel companyId={companyId} engines={["e3", "e6"]} />
       <ModulePlaceholder
         title="Revenue Dashboard"
         description="Revenue insights are coming soon for this company. Check back soon for invoice and growth metrics."

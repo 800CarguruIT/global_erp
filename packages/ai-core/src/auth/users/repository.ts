@@ -17,6 +17,7 @@ export type UserListRow = {
   vendor_id?: string | null;
   branch_name?: string | null;
   mobile?: string | null;
+  dialer_location?: "inhouse" | "remote" | null;
 };
 
 function rowsFrom<T>(result: T[] | { rows: T[] }): T[] {
@@ -33,9 +34,10 @@ export async function listUsers(params: {
   activeOnly?: boolean;
   globalOnly?: boolean;
   status?: "all" | "active" | "inactive";
+  department?: string;
 }): Promise<UserListRow[]> {
   const sql = getSql();
-  const { q, limit = 50, offset = 0, companyId, branchId, vendorId, activeOnly = true, globalOnly = false } = params;
+  const { q, limit = 50, offset = 0, companyId, branchId, vendorId, activeOnly = true, globalOnly = false, department } = params;
   const resolvedStatus = params.status ?? (params.activeOnly === false ? "all" : "active");
   const search =
     q && q.trim().length
@@ -71,12 +73,13 @@ export async function listUsers(params: {
       : resolvedStatus === "inactive"
       ? sql`AND u.is_active = FALSE`
       : sql``;
+  const departmentFilter = department ? sql`AND e.department = ${department}` : sql``;
 
   const rows = await sql<UserListRow[]>`
     SELECT u.id, u.email, u.full_name, u.is_active, u.employee_id, u.created_at, u.updated_at, u.company_id,
            u.branch_id, u.vendor_id, b.name as branch_name,
            (SELECT MAX(last_seen_at) FROM user_sessions us WHERE us.user_id = u.id) as last_login_at,
-           u.mobile
+           u.mobile, u.dialer_location
     FROM users u
     LEFT JOIN employees e ON e.id = u.employee_id
     LEFT JOIN branches b ON b.id = u.branch_id
@@ -87,6 +90,7 @@ export async function listUsers(params: {
       ${branchFilter}
       ${vendorFilter}
       ${statusFilter}
+      ${departmentFilter}
     ORDER BY u.created_at DESC
     LIMIT ${limit} OFFSET ${offset}
   `;
@@ -117,7 +121,7 @@ export async function listUsers(params: {
 export async function getUserById(id: string): Promise<UserListRow | null> {
   const sql = getSql();
   const res = await sql<UserListRow[]>`
-    SELECT u.id, u.email, u.full_name, u.is_active, u.employee_id, u.created_at, u.updated_at, u.company_id, u.mobile
+    SELECT u.id, u.email, u.full_name, u.is_active, u.employee_id, u.created_at, u.updated_at, u.company_id, u.mobile, u.dialer_location
     FROM users u
     WHERE u.id = ${id}
     LIMIT 1
@@ -178,6 +182,7 @@ export async function updateUser(
     isActive?: boolean;
     roleIds?: string[];
     mobile?: string | null;
+    dialerLocation?: "inhouse" | "remote" | null;
   }
 ): Promise<UserListRow> {
   const sql = getSql();
@@ -189,11 +194,12 @@ export async function updateUser(
   if (patch.isActive !== undefined) updated.is_active = patch.isActive;
   if (patch.password !== undefined) updated.password_hash = passwordHash ?? null;
   if (patch.mobile !== undefined) updated.mobile = patch.mobile ?? null;
+  if (patch.dialerLocation !== undefined) updated.dialer_location = patch.dialerLocation ?? null;
   const res = await sql<UserListRow[]>`
     UPDATE users
     SET ${sql(updated)}
     WHERE id = ${id}
-    RETURNING id, email, full_name, is_active, employee_id, created_at, updated_at, company_id, mobile
+    RETURNING id, email, full_name, is_active, employee_id, created_at, updated_at, company_id, mobile, dialer_location
   `;
   const user = rowsFrom(res)[0];
   if (!user) throw new Error("User not found");
@@ -213,6 +219,7 @@ export async function updateUser(
   return {
     ...user,
     mobile: patch.mobile !== undefined ? patch.mobile ?? null : user.mobile ?? null,
+    dialer_location: patch.dialerLocation !== undefined ? patch.dialerLocation ?? null : user.dialer_location ?? null,
     roles: patch.roleIds?.map((rid) => ({ id: rid, name: "" })) ?? user.roles ?? [],
   };
 }
@@ -220,4 +227,127 @@ export async function updateUser(
 export async function softDeleteUser(id: string): Promise<void> {
   const sql = getSql();
   await sql`UPDATE users SET is_active = false WHERE id = ${id}`;
+}
+
+export type EmployeeUserRow = {
+  employee_id: string;
+  auto_code: string;
+  employee_name: string;
+  department: string | null;
+  employee_email: string | null;
+  user_id: string | null;
+  email: string | null;
+  full_name: string | null;
+  is_active: boolean | null;
+  last_login_at: string | null;
+  mobile: string | null;
+  company_id: string | null;
+  branch_id: string | null;
+  branch_name: string | null;
+  roles: { id: string; name: string }[];
+};
+
+export async function listEmployeesWithUserStatus(params: {
+  companyId: string;
+  q?: string;
+  limit?: number;
+  offset?: number;
+  status?: "active" | "inactive" | "no_account";
+}): Promise<{ rows: EmployeeUserRow[]; total: number }> {
+  const sql = getSql();
+  const { companyId, q, limit = 50, offset = 0, status } = params;
+
+  const search = q?.trim().length
+    ? sql`AND (
+        LOWER(e.full_name) LIKE ${"%" + q.toLowerCase() + "%"}
+        OR LOWER(COALESCE(e.email_company, e.email_personal, '')) LIKE ${"%" + q.toLowerCase() + "%"}
+        OR LOWER(COALESCE(u.email, '')) LIKE ${"%" + q.toLowerCase() + "%"}
+      )`
+    : sql``;
+
+  const statusFilter =
+    status === "active"     ? sql`AND u.id IS NOT NULL AND u.is_active = true`  :
+    status === "inactive"   ? sql`AND u.id IS NOT NULL AND u.is_active = false` :
+    status === "no_account" ? sql`AND u.id IS NULL`                             :
+    sql``;
+
+  // Total count (same WHERE, no LIMIT)
+  const countResult = await sql<{ total: number }[]>`
+    SELECT COUNT(*)::int AS total
+    FROM employees e
+    LEFT JOIN users u ON u.employee_id = e.id
+    WHERE e.scope = 'company'
+      AND e.company_id = ${companyId}
+      ${search}
+      ${statusFilter}
+  `;
+  const total = (rowsFrom<any>(countResult)[0]?.total ?? 0) as number;
+
+  // Paged rows
+  const rows = await sql<any[]>`
+    SELECT
+      e.id            AS employee_id,
+      e.auto_code,
+      e.full_name     AS employee_name,
+      e.department,
+      COALESCE(e.email_company, e.email_personal) AS employee_email,
+      u.id            AS user_id,
+      u.email,
+      u.full_name,
+      u.is_active,
+      u.mobile,
+      u.company_id,
+      u.branch_id,
+      b.name          AS branch_name,
+      (SELECT MAX(last_seen_at) FROM user_sessions us WHERE us.user_id = u.id) AS last_login_at
+    FROM employees e
+    LEFT JOIN users u ON u.employee_id = e.id
+    LEFT JOIN branches b ON b.id = u.branch_id
+    WHERE e.scope = 'company'
+      AND e.company_id = ${companyId}
+      ${search}
+      ${statusFilter}
+    ORDER BY e.full_name ASC
+    LIMIT ${limit} OFFSET ${offset}
+  `;
+
+  const employees = rowsFrom<any>(rows).map((r: any): EmployeeUserRow => ({
+    employee_id: r.employee_id,
+    auto_code: r.auto_code,
+    employee_name: r.employee_name,
+    department: r.department ?? null,
+    employee_email: r.employee_email ?? null,
+    user_id: r.user_id ?? null,
+    email: r.email ?? null,
+    full_name: r.full_name ?? null,
+    is_active: r.is_active ?? null,
+    last_login_at: r.last_login_at ?? null,
+    mobile: r.mobile ?? null,
+    company_id: r.company_id ?? null,
+    branch_id: r.branch_id ?? null,
+    branch_name: r.branch_name ?? null,
+    roles: [],
+  }));
+
+  // Load roles for users on this page only
+  const userIds = employees.map((e) => e.user_id).filter(Boolean) as string[];
+  if (userIds.length) {
+    const roleRows = await sql<any[]>`
+      SELECT ur.user_id, r.id, r.name
+      FROM user_roles ur
+      INNER JOIN roles r ON r.id = ur.role_id
+      WHERE ur.user_id = ANY(${userIds}::uuid[])
+    `;
+    const grouped = new Map<string, { id: string; name: string }[]>();
+    for (const rr of rowsFrom<any>(roleRows)) {
+      const arr = grouped.get(rr.user_id) ?? [];
+      arr.push({ id: rr.id, name: rr.name });
+      grouped.set(rr.user_id, arr);
+    }
+    employees.forEach((e) => {
+      if (e.user_id) e.roles = grouped.get(e.user_id) ?? [];
+    });
+  }
+
+  return { rows: employees, total };
 }

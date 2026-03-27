@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSql } from "@repo/ai-core/db";
+import { requirePermission, buildScopeContextFromRoute } from "@/lib/auth/permissions";
 
 type Params = { params: Promise<{ companyId: string }> };
 
 export async function GET(_req: NextRequest, { params }: Params) {
   const { companyId } = await params;
+  const authError = await requirePermission(_req, "workshop.earnings.view", buildScopeContextFromRoute({ companyId }));
+  if (authError) return authError;
   const { searchParams } = new URL(_req.url);
   const branchId = searchParams.get("branchId")?.trim() || null;
   const from = searchParams.get("from")?.trim() || null;

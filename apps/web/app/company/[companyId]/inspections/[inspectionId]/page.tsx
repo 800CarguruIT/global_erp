@@ -55,12 +55,28 @@ type VinCatalogPartGroup = {
 type VinCatalogPart = {
   code: string;
   name: string;
+  nameZh: string;
+  diagram: string;
   groups: VinCatalogPartGroup[];
 };
 type VinCatalogGroupOption = {
   key: string;
   label: string;
   level: number;
+};
+type VinLookupCar = {
+  id: string;
+  make: string;
+  model: string;
+  year: string;
+  title: string;
+  description: string;
+};
+type Vin17CatalogNodeOption = {
+  code: string;
+  name: string;
+  level: number;
+  isLast: boolean;
 };
 type LineItemAiAnswerValue = "" | "yes" | "no" | "na";
 type LineItemAiQuestion = {
@@ -209,6 +225,16 @@ const formatDetailKey = (key: string) =>
     )
     .join(" / ");
 
+const toCatalogDisplayLabel = (rawName: string, fallbackIndex: number) => {
+  const text = String(rawName ?? "").trim();
+  if (!text) return `Category ${fallbackIndex + 1}`;
+  const cleaned = text
+    .replace(/^[A-Z0-9]+(?:[_-][A-Z0-9]+)*\s+/i, "")
+    .replace(/^\d+(?:\.\d+)?\s+/, "")
+    .trim();
+  return cleaned || `Category ${fallbackIndex + 1}`;
+};
+
 export function InspectionDetailPageClient({
   params,
   forceWorkshopView = false,
@@ -304,6 +330,26 @@ export function InspectionDetailPageClient({
   const [inspectionYear, setInspectionYear] = useState("");
   const [vinLookupLoading, setVinLookupLoading] = useState(false);
   const [vinLookupNote, setVinLookupNote] = useState<string | null>(null);
+  const [vinLookupCars, setVinLookupCars] = useState<VinLookupCar[]>([]);
+  const [vinLookupSelectedCarId, setVinLookupSelectedCarId] = useState("");
+  const [vinPartsEpcState, setVinPartsEpcState] = useState("");
+  const [vinPartsLastCataCodeState, setVinPartsLastCataCodeState] = useState("");
+  const [vinPartsLastCataCodeLevelState, setVinPartsLastCataCodeLevelState] = useState("");
+  const [vinPartsIsVinFilterOpenState, setVinPartsIsVinFilterOpenState] = useState("1");
+  const [vinPartsEpcIdState, setVinPartsEpcIdState] = useState("");
+  const [vinPartsJsIdState, setVinPartsJsIdState] = useState("");
+  const [vin17CatalogLoading, setVin17CatalogLoading] = useState(false);
+  const [vin17CatalogFetchDone, setVin17CatalogFetchDone] = useState(false);
+  const [vin17CatalogAction, setVin17CatalogAction] = useState<"cata1" | "cata2" | "cata3" | "cata4">("cata1");
+  const [vin17CatalogNodes, setVin17CatalogNodes] = useState<Vin17CatalogNodeOption[]>([]);
+  const [vin17Cata1Options, setVin17Cata1Options] = useState<Vin17CatalogNodeOption[]>([]);
+  const [vin17Cata2Options, setVin17Cata2Options] = useState<Vin17CatalogNodeOption[]>([]);
+  const [vin17Cata3Options, setVin17Cata3Options] = useState<Vin17CatalogNodeOption[]>([]);
+  const [vin17Cata4Options, setVin17Cata4Options] = useState<Vin17CatalogNodeOption[]>([]);
+  const [vin17Cata1Code, setVin17Cata1Code] = useState("");
+  const [vin17Cata2Code, setVin17Cata2Code] = useState("");
+  const [vin17Cata3Code, setVin17Cata3Code] = useState("");
+  const [vin17Cata4Code, setVin17Cata4Code] = useState("");
   const [customer, setCustomer] = useState<any | null>(null);
   const [car, setCar] = useState<any | null>(null);
   const [leadPlate, setLeadPlate] = useState("");
@@ -346,7 +392,56 @@ export function InspectionDetailPageClient({
   const [vinCatalogParts, setVinCatalogParts] = useState<VinCatalogPart[]>([]);
   const [vinCatalogGroups, setVinCatalogGroups] = useState<VinCatalogGroupOption[]>([]);
   const [vinCatalogLoading, setVinCatalogLoading] = useState(false);
+  const [manualPanelOpen, setManualPanelOpen] = useState(false);
+  const [catalogModalOpen, setCatalogModalOpen] = useState(false);
+  const [manualDraft, setManualDraft] = useState({
+    category: "",
+    observation: "",
+    part: "",
+    partNumber: "",
+    qty: "1",
+    reason: "Mandatory" as string,
+  });
   const vinCatalogLoadedVinRef = useRef("");
+  const catalogAutoLoadAttemptedRef = useRef(false);
+  const vin17AutoCatalogKeyRef = useRef("");
+  const partsCatalogRef = useRef<HTMLDivElement>(null);
+
+  // AI-powered category picker state
+  const [quickCatOpen, setQuickCatOpen] = useState(false);
+  const [quickCatData, setQuickCatData] = useState<any[]>([]);
+  const [quickCatLoaded, setQuickCatLoaded] = useState(false);
+  const [quickCatLevel, setQuickCatLevel] = useState<"cat" | "sub" | "part">("cat");
+  const [quickCatSelectedCat, setQuickCatSelectedCat] = useState<any>(null);
+  const [quickCatSelectedSub, setQuickCatSelectedSub] = useState<any>(null);
+  const [aiVinDecoding, setAiVinDecoding] = useState(false);
+  const [aiVinDecodeResult, setAiVinDecodeResult] = useState<any>(null);
+  const [vinBodyType, setVinBodyType] = useState<string | null>(null);
+  const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
+  const [aiSummaryResult, setAiSummaryResult] = useState<{ technical: string | null; customer: string | null } | null>(null);
+  const [aiSuggestions, setAiSuggestions] = useState<{ name: string; reason: string; category: string; likelihood: string }[]>([]);
+  const [aiSuggestionsLoading, setAiSuggestionsLoading] = useState(false);
+  const [aiSuggestionsLastKey, setAiSuggestionsLastKey] = useState("");
+
+  // Load part categories — re-fetches when car make/body type changes (after VIN decode)
+  useEffect(() => {
+    if (!companyId) return;
+    const params = new URLSearchParams();
+    if (inspectionMake) params.set("make", inspectionMake);
+    if (inspectionModel) params.set("model", inspectionModel);
+    if (vinBodyType) params.set("bodyType", vinBodyType);
+    const qs = params.toString();
+    setQuickCatLoaded(false);
+    setQuickCatLevel("cat");
+    setQuickCatSelectedCat(null);
+    setQuickCatSelectedSub(null);
+    setQuickCatData([]);
+    fetch(`/api/company/${companyId}/workshop/inspections/part-categories${qs ? `?${qs}` : ""}`)
+      .then((r) => r.json())
+      .then((json) => { setQuickCatData(json.data ?? []); setQuickCatLoaded(true); })
+      .catch(() => setQuickCatLoaded(true));
+  }, [companyId, inspectionMake, inspectionModel, vinBodyType]);
+
   const [checks, setChecks] = useState<Record<string, CheckValue>>({});
   const [lineItemErrors, setLineItemErrors] = useState<Record<number, { part?: string; qty?: string; media?: string }>>(
     {}
@@ -390,6 +485,72 @@ export function InspectionDetailPageClient({
   useEffect(() => {
     partsRef.current = parts;
   }, [parts]);
+
+  // Auto-generate AI description when action + priority are set on a part
+  useEffect(() => {
+    const needsDescription = parts.findIndex(
+      (p: any) => p.actionType && p.priority && !p.aiDescription && !p._aiDescLoading
+    );
+    if (needsDescription === -1 || !companyId || !inspectionId) return;
+    const part = parts[needsDescription] as any;
+
+    // Mark as loading to prevent duplicate calls
+    setParts((prev) => prev.map((p, i) => i === needsDescription ? { ...p, _aiDescLoading: true } : p));
+
+    const partName = part.productName ?? part.part ?? "Unknown part";
+    const actionLabel = part.actionType === "replace" ? "Replace" : part.actionType === "service" ? "Service" : "Repair";
+    const priorityLabel = part.priority === "safety_risk" ? "Safety Risk" : part.priority === "mandatory" ? "Mandatory" : "Recommended";
+    const carContext = [inspectionMake, inspectionModel, inspectionYear].filter(Boolean).join(" ");
+
+    fetch(`/api/company/${companyId}/workshop/inspections/${inspectionId}/ai-describe-part`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        partName,
+        actionType: part.actionType,
+        priority: part.priority,
+        category: part.description ?? "",
+        carMake: inspectionMake,
+        carModel: inspectionModel,
+        carYear: inspectionYear,
+      }),
+    })
+      .then((r) => r.json())
+      .then((json) => {
+        const desc = json?.data?.description ?? `${partName} — ${actionLabel} (${priorityLabel})`;
+        setParts((prev) => prev.map((p, i) => i === needsDescription ? { ...p, aiDescription: desc, _aiDescLoading: false } : p));
+      })
+      .catch(() => {
+        setParts((prev) => prev.map((p, i) => i === needsDescription ? { ...p, _aiDescLoading: false } : p));
+      });
+  }, [parts, companyId, inspectionId, inspectionMake, inspectionModel, inspectionYear]);
+
+  // Auto-fetch AI suggestions when parts change
+  useEffect(() => {
+    const partNames = parts.map((p: any) => p.productName ?? p.part).filter(Boolean);
+    if (partNames.length === 0) { setAiSuggestions([]); setAiSuggestionsLastKey(""); return; }
+    const key = partNames.sort().join(",");
+    if (key === aiSuggestionsLastKey) return;
+    const timer = setTimeout(() => {
+      if (!companyId || !inspectionId) return;
+      setAiSuggestionsLoading(true);
+      fetch(`/api/company/${companyId}/workshop/inspections/${inspectionId}/ai-suggest-parts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ selectedParts: partNames, carMake: inspectionMake, carModel: inspectionModel, carYear: inspectionYear }),
+      })
+        .then((r) => r.json())
+        .then((json) => {
+          const suggestions = json?.data?.suggestions ?? [];
+          const currentNames = parts.map((p: any) => p.productName ?? p.part);
+          setAiSuggestions(suggestions.filter((s: any) => !currentNames.includes(s.name)));
+          setAiSuggestionsLastKey(key);
+        })
+        .catch(() => setAiSuggestions([]))
+        .finally(() => setAiSuggestionsLoading(false));
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [parts, companyId, inspectionId, inspectionMake, inspectionModel, inspectionYear, aiSuggestionsLastKey]);
 
   useEffect(() => {
     Promise.resolve(params).then((p) => {
@@ -567,6 +728,31 @@ export function InspectionDetailPageClient({
         setInspectionMake(String(draft.inspectionMake ?? ""));
         setInspectionModel(String(draft.inspectionModel ?? ""));
         setInspectionYear(String(draft.inspectionYear ?? ""));
+        setVinLookupSelectedCarId(String(draft.vinLookupSelectedCarId ?? ""));
+        setVinPartsEpcState(String(draft.vinPartsEpc ?? ""));
+        setVinPartsLastCataCodeState(String(draft.vinPartsLastCataCode ?? ""));
+        setVinPartsLastCataCodeLevelState(String(draft.vinPartsLastCataCodeLevel ?? ""));
+        setVinPartsIsVinFilterOpenState(String(draft.vinPartsIsVinFilterOpen ?? "1"));
+        setVinPartsEpcIdState(String(draft.vinPartsEpcId ?? ""));
+        setVinPartsJsIdState(String(draft.vinPartsJsId ?? ""));
+        if (Array.isArray(draft.vinCatalogGroupsSnapshot) && draft.vinCatalogGroupsSnapshot.length > 0) {
+          setVinCatalogGroups(draft.vinCatalogGroupsSnapshot as VinCatalogGroupOption[]);
+        }
+        if (Array.isArray(draft.vinCatalogPartsSnapshot) && draft.vinCatalogPartsSnapshot.length > 0) {
+          setVinCatalogParts(
+            (draft.vinCatalogPartsSnapshot as any[]).map((p) => ({
+              code: String(p?.code ?? ""),
+              name: String(p?.name ?? ""),
+              nameZh: String(p?.nameZh ?? ""),
+              diagram: String(p?.diagram ?? ""),
+              groups: Array.isArray(p?.groups) ? p.groups : [],
+            }))
+          );
+          // Mark this VIN as already loaded so the inspectionVin-change effect doesn't
+          // clear the restored snapshot when inspectionVin transitions from "" to its value.
+          const restoredVin = String(draft.inspectionVin ?? "").trim().toUpperCase();
+          if (restoredVin) vinCatalogLoadedVinRef.current = restoredVin;
+        }
         initialRemarksRef.current = draft.inspectorRemarks ?? "";
         initialStatusRef.current = String(payload?.status ?? "pending").toLowerCase();
         setChecks(draft.checks ?? {});
@@ -813,15 +999,96 @@ export function InspectionDetailPageClient({
     if (!vin || vin === vinCatalogLoadedVinRef.current) return;
     setVinCatalogParts([]);
     setVinCatalogGroups([]);
+    // Reset auto-load guard so it can retry for the new VIN
+    catalogAutoLoadAttemptedRef.current = false;
   }, [inspectionVin]);
   useEffect(() => {
     if (!inspectionPlate.trim() && leadPlate.trim()) {
       setInspectionPlate(leadPlate.trim());
     }
   }, [inspectionPlate, leadPlate]);
+
+  // Auto-load catalog parts silently on page startup — DISABLED (replaced by AI category picker)
+  useEffect(() => {
+    return; // 17VIN catalog replaced by AI-powered category selection
+    if (loading) return;
+    if (catalogAutoLoadAttemptedRef.current) return;
+    if (vinCatalogParts.length > 0) { catalogAutoLoadAttemptedRef.current = true; return; }
+    if (!vinPartsLastCataCodeState || !vinPartsLastCataCodeLevelState) return;
+    if (!parts.some((p) => p.isSaved && p.catalogGroupKey)) return;
+    if (!companyId || !leadId || !inspectionVin.trim()) return;
+    catalogAutoLoadAttemptedRef.current = true;
+    const vin = inspectionVin.trim().toUpperCase();
+    const epc = vinPartsEpcState.trim();
+    const url = new URL(`/api/company/${companyId}/sales/leads/${leadId}/vin-lookup`, window.location.origin);
+    url.searchParams.set("vin", vin);
+    if (epc) url.searchParams.set("epc", epc);
+    url.searchParams.set("last_cata_code", vinPartsLastCataCodeState);
+    url.searchParams.set("last_cata_code_level", vinPartsLastCataCodeLevelState);
+    url.searchParams.set("is_vin_filter_open", vinPartsIsVinFilterOpenState || "1");
+    if (vinPartsEpcIdState) url.searchParams.set("epc_id", vinPartsEpcIdState);
+    if (vinPartsJsIdState) url.searchParams.set("js_id", vinPartsJsIdState);
+    if (vinLookupSelectedCarId) url.searchParams.set("carId", vinLookupSelectedCarId);
+    fetch(url.toString(), { cache: "no-store" })
+      .then((res) => res.json())
+      .then((body) => {
+        const rawParts = Array.isArray(body?.data?.parts) ? body.data.parts : [];
+        if (!rawParts.length) return;
+        const normalizedParts: VinCatalogPart[] = rawParts.map((part: any) => ({
+          code: String(part?.code ?? "").trim(),
+          name: String(part?.name ?? "").trim(),
+          nameZh: String(part?.nameZh ?? "").trim(),
+          diagram: String(part?.diagram ?? "").trim(),
+          groups: Array.isArray(part?.groups)
+            ? part.groups.map((g: any) => ({
+                id: String(g?.id ?? "").trim(),
+                level: Number(g?.level ?? 0) || 0,
+                name: String(g?.name ?? "").trim(),
+              }))
+            : [],
+        }));
+        setVinCatalogParts(normalizedParts);
+        const syntheticGroup: VinCatalogGroupOption = {
+          key: vinPartsLastCataCodeState,
+          label: vinPartsLastCataCodeState,
+          level: Number(vinPartsLastCataCodeLevelState) || 0,
+        };
+        setVinCatalogGroups((prev) => {
+          const mergedMap = new Map(prev.map((g) => [g.key, g]));
+          for (const g of [...buildVinCatalogGroupOptions(normalizedParts), syntheticGroup]) mergedMap.set(g.key, g);
+          return Array.from(mergedMap.values());
+        });
+        vinCatalogLoadedVinRef.current = vin;
+      })
+      .catch(() => { /* silent — not critical for page load */ });
+  }, [loading, companyId, leadId, inspectionVin, vinPartsEpcState, vinPartsLastCataCodeState, vinPartsLastCataCodeLevelState, vinPartsIsVinFilterOpenState, vinPartsEpcIdState, vinPartsJsIdState, vinLookupSelectedCarId, parts, vinCatalogParts.length]);
   const currentStatus = String(inspection?.status ?? "pending").toLowerCase();
   const isWorkshopView = forceWorkshopView || searchParams.get("view") === "workshop" || Boolean(workshopBranchIdProp);
   const workshopBranchId = workshopBranchIdProp ?? searchParams.get("branchId");
+  const hasVinPartsParams = Boolean(vinPartsLastCataCodeState && vinPartsLastCataCodeLevelState);
+
+  useEffect(() => {
+    const epcFromUrl = String(searchParams.get("epc") ?? "").trim();
+    const lastCodeFromUrl = String(searchParams.get("last_cata_code") ?? "").trim();
+    const lastLevelFromUrl = String(searchParams.get("last_cata_code_level") ?? "").trim();
+    const filterOpenFromUrl = String(searchParams.get("is_vin_filter_open") ?? "").trim() || "1";
+    const epcIdFromUrl = String(searchParams.get("epc_id") ?? "").trim();
+    const jsIdFromUrl = String(searchParams.get("js_id") ?? "").trim();
+    if (!vinPartsEpcState && epcFromUrl) setVinPartsEpcState(epcFromUrl);
+    if (!vinPartsLastCataCodeState && lastCodeFromUrl) setVinPartsLastCataCodeState(lastCodeFromUrl);
+    if (!vinPartsLastCataCodeLevelState && lastLevelFromUrl) setVinPartsLastCataCodeLevelState(lastLevelFromUrl);
+    if (!vinPartsIsVinFilterOpenState && filterOpenFromUrl) setVinPartsIsVinFilterOpenState(filterOpenFromUrl);
+    if (!vinPartsEpcIdState && epcIdFromUrl) setVinPartsEpcIdState(epcIdFromUrl);
+    if (!vinPartsJsIdState && jsIdFromUrl) setVinPartsJsIdState(jsIdFromUrl);
+  }, [
+    searchParams,
+    vinPartsEpcIdState,
+    vinPartsEpcState,
+    vinPartsIsVinFilterOpenState,
+    vinPartsJsIdState,
+    vinPartsLastCataCodeLevelState,
+    vinPartsLastCataCodeState,
+  ]);
   const backHref =
     isWorkshopView && companyId && workshopBranchId
       ? `/company/${companyId}/branches/${workshopBranchId}/workshop`
@@ -926,6 +1193,13 @@ export function InspectionDetailPageClient({
       inspectionMake: inspectionMake.trim(),
       inspectionModel: inspectionModel.trim(),
       inspectionYear: inspectionYear.trim(),
+      vinLookupSelectedCarId: vinLookupSelectedCarId.trim(),
+      vinPartsEpc: vinPartsEpcState.trim(),
+      vinPartsLastCataCode: vinPartsLastCataCodeState.trim(),
+      vinPartsLastCataCodeLevel: vinPartsLastCataCodeLevelState.trim(),
+      vinPartsIsVinFilterOpen: vinPartsIsVinFilterOpenState.trim(),
+      vinPartsEpcId: vinPartsEpcIdState.trim(),
+      vinPartsJsId: vinPartsJsIdState.trim(),
       parts: rows.map((p) => ({
         id: p.id,
         productId: p.productId ?? null,
@@ -942,6 +1216,8 @@ export function InspectionDetailPageClient({
       lineItemAiAnswers,
       lineItemAiQuestionsByRow,
       lineItemAiRecommendationByRow,
+      vinCatalogGroupsSnapshot: vinCatalogGroups,
+      vinCatalogPartsSnapshot: vinCatalogParts.map((p) => ({ code: p.code, name: p.name, nameZh: p.nameZh, diagram: p.diagram, groups: p.groups })),
       advisorApproved: approvals?.advisorApproved ?? advisorApproved,
       advisorApprovedAt: approvals?.advisorApprovedAt ?? advisorApprovedAt,
       advisorApprovedBy: approvals?.advisorApprovedBy ?? advisorApprovedBy,
@@ -977,10 +1253,19 @@ export function InspectionDetailPageClient({
       inspectionPlate,
       inspectionVin,
       inspectionYear,
+      vinLookupSelectedCarId,
+      vinPartsEpcIdState,
+      vinPartsEpcState,
+      vinPartsIsVinFilterOpenState,
+      vinPartsJsIdState,
+      vinPartsLastCataCodeLevelState,
+      vinPartsLastCataCodeState,
       inspectionStep,
       lineItemAiAnswers,
       lineItemAiQuestionsByRow,
       lineItemAiRecommendationByRow,
+      vinCatalogGroups,
+      vinCatalogParts,
       parts,
       processChecks,
       processCheckMedia,
@@ -1237,6 +1522,12 @@ export function InspectionDetailPageClient({
     setVinLookupLoading(true);
     setVinLookupNote(null);
     try {
+      const clearVinAutofillFields = () => {
+        setInspectionMake("");
+        setInspectionModel("");
+        setInspectionYear("");
+      };
+
       const localRes = await fetch(`/api/cars?companyId=${companyId}&search=${encodeURIComponent(vin)}&pageSize=50`, {
         cache: "no-store",
       });
@@ -1263,6 +1554,8 @@ export function InspectionDetailPageClient({
           setForm((prev) => ({ ...prev, carInMileage: String(exact?.mileage ?? "") }));
         }
         if (hasLocalVehicleBasics) {
+          setVinLookupCars([]);
+          setVinLookupSelectedCarId("");
           setVinLookupNote(`VIN found in database${exact?.code ? ` (${exact.code})` : ""}. Car data loaded.`);
           return;
         }
@@ -1273,17 +1566,41 @@ export function InspectionDetailPageClient({
         return;
       }
 
-      const vinRes = await fetch(
-        `/api/company/${companyId}/sales/leads/${leadId}/vin-lookup?vin=${encodeURIComponent(vin)}&refresh=1`,
-        { cache: "no-store" }
-      );
+      const selectedCarId = vinLookupSelectedCarId.trim();
+      const vinUrl = new URL(`/api/company/${companyId}/sales/leads/${leadId}/vin-lookup`, window.location.origin);
+      vinUrl.searchParams.set("vin", vin);
+      vinUrl.searchParams.set("refresh", "1");
+      if (selectedCarId) vinUrl.searchParams.set("carId", selectedCarId);
+      if (hasVinPartsParams) {
+        if (vinPartsEpcState) vinUrl.searchParams.set("epc", vinPartsEpcState);
+        vinUrl.searchParams.set("last_cata_code", vinPartsLastCataCodeState);
+        vinUrl.searchParams.set("last_cata_code_level", vinPartsLastCataCodeLevelState);
+        vinUrl.searchParams.set("is_vin_filter_open", vinPartsIsVinFilterOpenState);
+        if (vinPartsEpcIdState) vinUrl.searchParams.set("epc_id", vinPartsEpcIdState);
+        if (vinPartsJsIdState) vinUrl.searchParams.set("js_id", vinPartsJsIdState);
+      }
+      const vinRes = await fetch(vinUrl.toString(), { cache: "no-store" });
       if (!vinRes.ok) {
         const err = await vinRes.json().catch(() => ({}));
         throw new Error(String(err?.error ?? "VIN lookup failed"));
       }
       const vinJson = await vinRes.json().catch(() => ({}));
+      const decodedEpc = String(vinJson?.data?.epc ?? "").trim();
+      if (decodedEpc) setVinPartsEpcState(decodedEpc);
+      const vinCarsRaw = Array.isArray(vinJson?.data?.cars) ? vinJson.data.cars : [];
+      const vinCars: VinLookupCar[] = vinCarsRaw.map((row: any) => ({
+        id: String(row?.id ?? "").trim(),
+        make: String(row?.make ?? row?.brand?.name ?? "").trim(),
+        model: String(row?.model ?? "").trim(),
+        year: String(row?.year ?? row?.modelYear ?? "").trim(),
+        title: String(row?.title ?? "").trim(),
+        description: String(row?.description ?? "").trim(),
+      }));
+      setVinLookupCars(vinCars);
       const vinCar = vinJson?.data?.car ?? null;
       if (vinCar) {
+        const selectedId = String(vinCar?.id ?? "").trim();
+        if (selectedId) setVinLookupSelectedCarId(selectedId);
         {
           const vinMake = String(vinCar?.make ?? vinCar?.brand?.name ?? "").trim();
           const vinModel = String(vinCar?.model ?? vinCar?.title ?? "").trim();
@@ -1293,7 +1610,13 @@ export function InspectionDetailPageClient({
           if (vinYear) setInspectionYear(vinYear);
         }
         setVinLookupNote("VIN decoded from catalog and vehicle fields auto-filled.");
+      } else if (vinCars.length > 1) {
+        clearVinAutofillFields();
+        setVinLookupSelectedCarId("");
+        setVinLookupNote(`Multiple cars found (${vinCars.length}). Select the correct car.`);
       } else {
+        clearVinAutofillFields();
+        setVinLookupSelectedCarId("");
         setVinLookupNote("VIN lookup finished with no matched vehicle details.");
       }
     } catch (err: any) {
@@ -1302,6 +1625,224 @@ export function InspectionDetailPageClient({
       setVinLookupLoading(false);
     }
   };
+
+  const applySelectedVinCar = async (carId: string) => {
+    const nextCarId = String(carId ?? "").trim();
+    setVinLookupSelectedCarId(nextCarId);
+    if (!nextCarId || !companyId || !leadId) return;
+    const vin = inspectionVin.trim().toUpperCase();
+    if (!vin) return;
+    setVinLookupLoading(true);
+    try {
+      const vinRes = await fetch(
+        `/api/company/${companyId}/sales/leads/${leadId}/vin-lookup?vin=${encodeURIComponent(vin)}&carId=${encodeURIComponent(nextCarId)}`,
+        { cache: "no-store" }
+      );
+      if (!vinRes.ok) {
+        const err = await vinRes.json().catch(() => ({}));
+        throw new Error(String(err?.error ?? "VIN lookup failed"));
+      }
+      const vinJson = await vinRes.json().catch(() => ({}));
+      const vinCar = vinJson?.data?.car ?? null;
+      if (!vinCar) {
+        setInspectionMake("");
+        setInspectionModel("");
+        setInspectionYear("");
+        setVinLookupNote("Selected car could not be resolved.");
+        return;
+      }
+      const vinMake = String(vinCar?.make ?? vinCar?.brand?.name ?? "").trim();
+      const vinModel = String(vinCar?.model ?? vinCar?.title ?? "").trim();
+      const vinYear = String(vinCar?.year ?? vinCar?.modelYear ?? "").trim();
+      if (vinMake) setInspectionMake(vinMake);
+      if (vinModel) setInspectionModel(vinModel);
+      if (vinYear) setInspectionYear(vinYear);
+      setVinLookupNote("Selected VIN car loaded.");
+    } catch (err: any) {
+      setVinLookupNote(err?.message ?? "Failed to apply selected VIN car.");
+    } finally {
+      setVinLookupLoading(false);
+    }
+  };
+
+  const fetchVin17CatalogLevel = async (
+    action: "cata1" | "cata2" | "cata3" | "cata4",
+    opts?: {
+      epcOverride?: string;
+      quiet?: boolean;
+      cata1CodeOverride?: string;
+      cata2CodeOverride?: string;
+      cata3CodeOverride?: string;
+    }
+  ): Promise<Vin17CatalogNodeOption[]> => {
+    if (!companyId || !leadId) {
+      toast.error("Lead context is missing.");
+      return [];
+    }
+    const vin = inspectionVin.trim().toUpperCase();
+    if (!vin) {
+      toast.error("Enter VIN first.");
+      return [];
+    }
+    const effectiveEpc = String(opts?.epcOverride ?? vinPartsEpcState ?? "").trim();
+    if (!effectiveEpc) {
+      toast.error("EPC is required. Decode VIN first or set EPC.");
+      return [];
+    }
+    setVin17CatalogLoading(true);
+    try {
+      const url = new URL(`/api/company/${companyId}/sales/leads/${leadId}/vin-lookup`, window.location.origin);
+      url.searchParams.set("vin", vin);
+      url.searchParams.set("catalog_action", action);
+      url.searchParams.set("epc", effectiveEpc);
+      if (vinLookupSelectedCarId) url.searchParams.set("carId", vinLookupSelectedCarId);
+      const cata1Code = String(opts?.cata1CodeOverride ?? vin17Cata1Code ?? "").trim();
+      const cata2Code = String(opts?.cata2CodeOverride ?? vin17Cata2Code ?? "").trim();
+      const cata3Code = String(opts?.cata3CodeOverride ?? vin17Cata3Code ?? "").trim();
+      if (cata1Code) url.searchParams.set("cata1_code", cata1Code);
+      if (cata2Code) url.searchParams.set("cata2_code", cata2Code);
+      if (cata3Code) url.searchParams.set("cata3_code", cata3Code);
+      const res = await fetch(url.toString(), { cache: "no-store" });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(String(body?.error ?? "Failed to load 17VIN catalog level."));
+      const rawRows = Array.isArray(body?.data?.catalogs) ? body.data.catalogs : [];
+      const nodes: Vin17CatalogNodeOption[] = rawRows.map((row: any) => ({
+        code: String(row?.code ?? "").trim(),
+        name: String(row?.name ?? "").trim(),
+        level: Number(row?.level ?? 0) || Number(String(action).replace("cata", "")) || 1,
+        isLast: Boolean(row?.isLast),
+      }));
+      setVin17CatalogNodes(nodes);
+      setVin17CatalogAction(action);
+      if (action === "cata1") { setVin17Cata1Options(nodes); setVin17CatalogFetchDone(true); }
+      if (action === "cata2") setVin17Cata2Options(nodes);
+      if (action === "cata3") setVin17Cata3Options(nodes);
+      if (action === "cata4") setVin17Cata4Options(nodes);
+      if (!opts?.quiet) toast.success(`Loaded ${nodes.length} item(s) for ${action.toUpperCase()}.`);
+      return nodes;
+    } catch (err: any) {
+      if (action === "cata1") setVin17CatalogFetchDone(true);
+      toast.error(err?.message ?? "Failed to load 17VIN catalog level.");
+      return [];
+    } finally {
+      setVin17CatalogLoading(false);
+    }
+  };
+
+  const selectCatalogLeaf = (code: string, level: number) => {
+    setVinPartsLastCataCodeState(code);
+    setVinPartsLastCataCodeLevelState(String(level));
+  };
+
+  const onSelectCata1 = async (code: string) => {
+    setVin17Cata1Code(code);
+    setVin17Cata2Code("");
+    setVin17Cata3Code("");
+    setVin17Cata4Code("");
+    setVin17Cata2Options([]);
+    setVin17Cata3Options([]);
+    setVin17Cata4Options([]);
+    setVinPartsLastCataCodeState("");
+    setVinPartsLastCataCodeLevelState("");
+    const node = vin17Cata1Options.find((n) => n.code === code);
+    if (!node || !code) return;
+    const label1 = node.name || code;
+    if (node.isLast) {
+      void fetchPartsForLeaf(code, 1, label1);
+      return;
+    }
+    const next = await fetchVin17CatalogLevel("cata2", { cata1CodeOverride: code, quiet: true });
+    if (!next.length) {
+      void fetchPartsForLeaf(code, 1, label1);
+    }
+  };
+
+  const onSelectCata2 = async (code: string) => {
+    setVin17Cata2Code(code);
+    setVin17Cata3Code("");
+    setVin17Cata4Code("");
+    setVin17Cata3Options([]);
+    setVin17Cata4Options([]);
+    setVinPartsLastCataCodeState("");
+    setVinPartsLastCataCodeLevelState("");
+    const node = vin17Cata2Options.find((n) => n.code === code);
+    if (!node || !code) return;
+    const cata1Name = vin17Cata1Options.find((n) => n.code === vin17Cata1Code)?.name ?? "";
+    const label2 = [cata1Name, node.name].filter(Boolean).join(" › ");
+    if (node.isLast) {
+      void fetchPartsForLeaf(code, 2, label2);
+      return;
+    }
+    const next = await fetchVin17CatalogLevel("cata3", {
+      cata1CodeOverride: vin17Cata1Code,
+      cata2CodeOverride: code,
+      quiet: true,
+    });
+    if (!next.length) void fetchPartsForLeaf(code, 2, label2);
+  };
+
+  const onSelectCata3 = async (code: string) => {
+    setVin17Cata3Code(code);
+    setVin17Cata4Code("");
+    setVin17Cata4Options([]);
+    setVinPartsLastCataCodeState("");
+    setVinPartsLastCataCodeLevelState("");
+    const node = vin17Cata3Options.find((n) => n.code === code);
+    if (!node || !code) return;
+    const cata1Name = vin17Cata1Options.find((n) => n.code === vin17Cata1Code)?.name ?? "";
+    const cata2Name = vin17Cata2Options.find((n) => n.code === vin17Cata2Code)?.name ?? "";
+    const label3 = [cata1Name, cata2Name, node.name].filter(Boolean).join(" › ");
+    if (node.isLast) {
+      void fetchPartsForLeaf(code, 3, label3);
+      return;
+    }
+    const next = await fetchVin17CatalogLevel("cata4", {
+      cata1CodeOverride: vin17Cata1Code,
+      cata2CodeOverride: vin17Cata2Code,
+      cata3CodeOverride: code,
+      quiet: true,
+    });
+    if (!next.length) void fetchPartsForLeaf(code, 3, label3);
+  };
+
+  const onSelectCata4 = (code: string) => {
+    setVin17Cata4Code(code);
+    const node = vin17Cata4Options.find((n) => n.code === code);
+    if (!node || !code) return;
+    const cata1Name = vin17Cata1Options.find((n) => n.code === vin17Cata1Code)?.name ?? "";
+    const cata2Name = vin17Cata2Options.find((n) => n.code === vin17Cata2Code)?.name ?? "";
+    const cata3Name = vin17Cata3Options.find((n) => n.code === vin17Cata3Code)?.name ?? "";
+    const label4 = [cata1Name, cata2Name, cata3Name, node.name].filter(Boolean).join(" › ");
+    void fetchPartsForLeaf(code, 4, label4);
+  };
+
+  // Auto-load 17VIN catalog on Step 5 — DISABLED (replaced by AI category picker)
+  useEffect(() => {
+    return; // 17VIN catalog replaced by AI-powered category selection
+  }, [inspectionStep]);
+
+  useEffect(() => {
+    vin17AutoCatalogKeyRef.current = "";
+    setVin17CatalogNodes([]);
+    setVin17Cata1Options([]);
+    setVin17Cata2Options([]);
+    setVin17Cata3Options([]);
+    setVin17Cata4Options([]);
+    setVin17Cata1Code("");
+    setVin17Cata2Code("");
+    setVin17Cata3Code("");
+    setVin17Cata4Code("");
+    setVin17CatalogFetchDone(false);
+    setManualPanelOpen(false);
+  }, [inspectionVin, vinLookupSelectedCarId]);
+
+  // Auto-open manual panel when catalog is confirmed unavailable.
+  useEffect(() => {
+    if (vin17CatalogFetchDone && vin17Cata1Options.length === 0) {
+      setManualPanelOpen(true);
+    }
+  }, [vin17CatalogFetchDone, vin17Cata1Options.length]);
+
 
   const buildVinCatalogGroupOptions = (partsList: VinCatalogPart[]): VinCatalogGroupOption[] => {
     const map = new Map<string, VinCatalogGroupOption>();
@@ -1320,6 +1861,110 @@ export function InspectionDetailPageClient({
     return Array.from(map.values()).sort((a, b) => a.level - b.level || a.label.localeCompare(b.label));
   };
 
+  const fetchPartsForLeaf = useCallback(
+    async (lastCataCode: string, lastCataCodeLevel: number, groupLabel?: string) => {
+      const vin = inspectionVin.trim().toUpperCase();
+      const epc = vinPartsEpcState.trim();
+      setVinPartsLastCataCodeState(lastCataCode);
+      setVinPartsLastCataCodeLevelState(String(lastCataCodeLevel));
+      setBulkAddPartCodes([]);
+      setBulkPartSearch("");
+      setVinCatalogParts([]);
+      // Keep existing vinCatalogGroups so already-added line items continue showing their labels
+      vinCatalogLoadedVinRef.current = "";
+      if (!companyId || !leadId || !vin || !epc) return;
+      setVinCatalogLoading(true);
+      try {
+        const buildUrl = (refresh: boolean) => {
+          const url = new URL(
+            `/api/company/${companyId}/sales/leads/${leadId}/vin-lookup`,
+            window.location.origin
+          );
+          url.searchParams.set("vin", vin);
+          url.searchParams.set("epc", epc);
+          url.searchParams.set("last_cata_code", lastCataCode);
+          url.searchParams.set("last_cata_code_level", String(lastCataCodeLevel));
+          if (refresh) url.searchParams.set("refresh", "1");
+          if (vinLookupSelectedCarId) url.searchParams.set("carId", vinLookupSelectedCarId);
+          return url.toString();
+        };
+        // Always refresh — DB cache stores the last category's parts, not the current one.
+        const res = await fetch(buildUrl(true), { cache: "no-store" });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(String(body?.error ?? "Failed to load parts"));
+        const rawParts = Array.isArray(body?.data?.parts) ? body.data.parts : [];
+        const normalizedParts: VinCatalogPart[] = rawParts.map((part: any) => ({
+          code: String(part?.code ?? "").trim(),
+          name: String(part?.name ?? "").trim(),
+          nameZh: String(part?.nameZh ?? "").trim(),
+          diagram: String(part?.diagram ?? "").trim(),
+          groups: Array.isArray(part?.groups)
+            ? part.groups.map((group: any) => ({
+                id: String(group?.id ?? "").trim(),
+                level: Number(group?.level ?? 0) || 0,
+                name: String(group?.name ?? "").trim(),
+              }))
+            : [],
+        }));
+        setVinCatalogParts(normalizedParts);
+        // Inject a synthetic group entry keyed by lastCataCode so line items can resolve
+        // a human-readable label even when 17VIN parts don't carry group metadata.
+        const baseGroups = buildVinCatalogGroupOptions(normalizedParts);
+        const syntheticLabel = groupLabel?.trim() || lastCataCode;
+        const syntheticGroup: VinCatalogGroupOption = {
+          key: lastCataCode,
+          label: syntheticLabel,
+          level: lastCataCodeLevel,
+        };
+        setVinCatalogGroups((prev) => {
+          const mergedMap = new Map(prev.map((g) => [g.key, g]));
+          for (const g of [...baseGroups, syntheticGroup]) mergedMap.set(g.key, g);
+          return Array.from(mergedMap.values());
+        });
+        vinCatalogLoadedVinRef.current = vin;
+        if (!normalizedParts.length) toast.error("No parts found for this category.");
+        else toast.success(`${normalizedParts.length} part(s) loaded.`);
+      } catch (err: any) {
+        toast.error(err?.message ?? "Failed to load parts.");
+      } finally {
+        setVinCatalogLoading(false);
+      }
+    },
+    [companyId, inspectionVin, leadId, vinLookupSelectedCarId, vinPartsEpcState]
+  );
+
+  const resetCatalogSection = useCallback(() => {
+    setVin17Cata1Code("");
+    setVin17Cata2Code("");
+    setVin17Cata3Code("");
+    setVin17Cata4Code("");
+    setVin17Cata2Options([]);
+    setVin17Cata3Options([]);
+    setVin17Cata4Options([]);
+    setVinPartsLastCataCodeState("");
+    setVinPartsLastCataCodeLevelState("");
+    setVinCatalogParts([]);
+    setVinCatalogGroups([]);
+    setBulkAddPartCodes([]);
+    setBulkPartSearch("");
+    vinCatalogLoadedVinRef.current = "";
+  }, []);
+
+  // Lighter reset for opening the modal — only clears navigation path state,
+  // preserving vinCatalogGroups/vinCatalogParts so existing line items
+  // continue to display their category labels and diagrams.
+  const resetCatalogPathsOnly = useCallback(() => {
+    setVin17Cata1Code("");
+    setVin17Cata2Code("");
+    setVin17Cata3Code("");
+    setVin17Cata4Code("");
+    setVin17Cata2Options([]);
+    setVin17Cata3Options([]);
+    setVin17Cata4Options([]);
+    setBulkAddPartCodes([]);
+    setBulkPartSearch("");
+  }, []);
+
   const ensureVinCatalogForLineItems = useCallback(async () => {
     const vin = inspectionVin.trim().toUpperCase();
     if (!companyId || !leadId) {
@@ -1333,16 +1978,76 @@ export function InspectionDetailPageClient({
     if (vinCatalogLoadedVinRef.current === vin && vinCatalogParts.length > 0) return true;
     setVinCatalogLoading(true);
     try {
-      const res = await fetch(
-        `/api/company/${companyId}/sales/leads/${leadId}/vin-lookup?vin=${encodeURIComponent(vin)}`,
-        { cache: "no-store" }
-      );
-      const body = await res.json().catch(() => ({}));
+      // If catalog leaf params are not selected yet, auto-load first level (cata1).
+      if (!hasVinPartsParams) {
+        const seedUrl = new URL(`/api/company/${companyId}/sales/leads/${leadId}/vin-lookup`, window.location.origin);
+        seedUrl.searchParams.set("vin", vin);
+        seedUrl.searchParams.set("refresh", "1");
+        if (vinLookupSelectedCarId) seedUrl.searchParams.set("carId", vinLookupSelectedCarId);
+        const seedRes = await fetch(seedUrl.toString(), { cache: "no-store" });
+        const seedBody = await seedRes.json().catch(() => ({}));
+        if (!seedRes.ok) throw new Error(String(seedBody?.error ?? "Failed to decode VIN"));
+        const epcFromDecode = String(seedBody?.data?.epc ?? "").trim();
+        const carsRaw = Array.isArray(seedBody?.data?.cars) ? seedBody.data.cars : [];
+        const selectedCar = seedBody?.data?.car ?? null;
+        if (epcFromDecode) setVinPartsEpcState(epcFromDecode);
+        if (!selectedCar && carsRaw.length > 1) {
+          setVinLookupCars(
+            carsRaw.map((row: any) => ({
+              id: String(row?.id ?? "").trim(),
+              make: String(row?.make ?? row?.brand?.name ?? "").trim(),
+              model: String(row?.model ?? "").trim(),
+              year: String(row?.year ?? row?.modelYear ?? "").trim(),
+              title: String(row?.title ?? "").trim(),
+              description: String(row?.description ?? "").trim(),
+            }))
+          );
+          setVinLookupNote(`Multiple cars found (${carsRaw.length}). Select the correct car first.`);
+          toast.error("Select car variant first, then click Add Line Item.");
+          return false;
+        }
+        if (selectedCar?.id) setVinLookupSelectedCarId(String(selectedCar.id));
+        const level1Nodes = await fetchVin17CatalogLevel("cata1", { epcOverride: epcFromDecode, quiet: true });
+        if (level1Nodes.length === 0) {
+          toast.error("No level-1 catalog returned from 17VIN.");
+        } else {
+          toast.message("Level-1 catalog loaded. Select catalog path and leaf, then add line items.");
+        }
+        return false;
+      }
+
+      const buildLookupUrl = (refresh: boolean) => {
+        const url = new URL(`/api/company/${companyId}/sales/leads/${leadId}/vin-lookup`, window.location.origin);
+        url.searchParams.set("vin", vin);
+        if (refresh) url.searchParams.set("refresh", "1");
+        if (vinLookupSelectedCarId) url.searchParams.set("carId", vinLookupSelectedCarId);
+        if (hasVinPartsParams) {
+          if (vinPartsEpcState) url.searchParams.set("epc", vinPartsEpcState);
+          url.searchParams.set("last_cata_code", vinPartsLastCataCodeState);
+          url.searchParams.set("last_cata_code_level", vinPartsLastCataCodeLevelState);
+          url.searchParams.set("is_vin_filter_open", vinPartsIsVinFilterOpenState);
+          if (vinPartsEpcIdState) url.searchParams.set("epc_id", vinPartsEpcIdState);
+          if (vinPartsJsIdState) url.searchParams.set("js_id", vinPartsJsIdState);
+        }
+        return url.toString();
+      };
+
+      let res = await fetch(buildLookupUrl(false), { cache: "no-store" });
+      let body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(String(body?.error ?? "Failed to load VIN part groups"));
-      const rawParts = Array.isArray(body?.data?.parts) ? body.data.parts : [];
+
+      let rawParts = Array.isArray(body?.data?.parts) ? body.data.parts : [];
+      if (!rawParts.length && hasVinPartsParams) {
+        res = await fetch(buildLookupUrl(true), { cache: "no-store" });
+        body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(String(body?.error ?? "Failed to load VIN part groups"));
+        rawParts = Array.isArray(body?.data?.parts) ? body.data.parts : [];
+      }
       const normalizedParts: VinCatalogPart[] = rawParts.map((part: any) => ({
         code: String(part?.code ?? "").trim(),
         name: String(part?.name ?? "").trim(),
+        nameZh: String(part?.nameZh ?? "").trim(),
+        diagram: String(part?.diagram ?? "").trim(),
         groups: Array.isArray(part?.groups)
           ? part.groups.map((group: any) => ({
               id: String(group?.id ?? "").trim(),
@@ -1352,10 +2057,18 @@ export function InspectionDetailPageClient({
           : [],
       }));
       setVinCatalogParts(normalizedParts);
-      setVinCatalogGroups(buildVinCatalogGroupOptions(normalizedParts));
+      setVinCatalogGroups((prev) => {
+        const mergedMap = new Map(prev.map((g) => [g.key, g]));
+        for (const g of buildVinCatalogGroupOptions(normalizedParts)) mergedMap.set(g.key, g);
+        return Array.from(mergedMap.values());
+      });
       vinCatalogLoadedVinRef.current = vin;
       if (!normalizedParts.length) {
-        toast.error("No VIN catalog parts found for this car.");
+        toast.error(
+          hasVinPartsParams
+            ? "No VIN catalog parts found for this car."
+            : "No VIN catalog parts in database. Provide 17VIN catalog params (epc, last_cata_code, last_cata_code_level)."
+        );
         return false;
       }
       return true;
@@ -1365,7 +2078,21 @@ export function InspectionDetailPageClient({
     } finally {
       setVinCatalogLoading(false);
     }
-  }, [companyId, inspectionVin, leadId, vinCatalogParts.length]);
+  }, [
+    companyId,
+    fetchVin17CatalogLevel,
+    hasVinPartsParams,
+    inspectionVin,
+    leadId,
+    vinCatalogParts.length,
+    vinLookupSelectedCarId,
+    vinPartsEpcIdState,
+    vinPartsEpcState,
+    vinPartsIsVinFilterOpenState,
+    vinPartsJsIdState,
+    vinPartsLastCataCodeLevelState,
+    vinPartsLastCataCodeState,
+  ]);
 
 
   const updatePart = (
@@ -2399,6 +3126,90 @@ export function InspectionDetailPageClient({
     }),
     [makeLineItemClientRowKey]
   );
+
+  const addSelectedCatalogParts = useCallback(() => {
+    if (!bulkAddPartCodes.length) {
+      toast.error("Select at least one part.");
+      return;
+    }
+    const selectedParts = bulkAddPartCodes
+      .map((code) => vinCatalogParts.find((p) => p.code === code))
+      .filter(Boolean) as VinCatalogPart[];
+    if (!selectedParts.length) {
+      toast.error("No valid parts selected.");
+      return;
+    }
+    // Use the leaf catalog code as the group key — fetchPartsForLeaf registers a synthetic
+    // VinCatalogGroupOption with this key so the label resolves correctly in line items.
+    const groupKey = vinPartsLastCataCodeState || "manual";
+    const groupLabel = vinCatalogGroups.find((g) => g.key === groupKey)?.label ?? groupKey;
+    const newRows = selectedParts.map((part) =>
+      buildLineItemDraftFromCatalog(part.name || part.code || "", part.code || "", groupKey)
+    );
+    setParts((prev) => [...prev, ...newRows]);
+    setExpandedLineItemsByRow((prev) => {
+      const next = { ...prev };
+      for (const row of newRows) {
+        const key = String(row.clientRowKey ?? "");
+        if (key) next[key] = false;
+      }
+      return next;
+    });
+    setBulkAddPartCodes([]);
+    for (const row of newRows) {
+      if (!row.clientRowKey || !row.part) continue;
+      void requestLineItemAi(
+        row.clientRowKey,
+        {
+          partName: row.part,
+          partNumber: row.catalogPartCode ?? "",
+          groupName: groupLabel,
+          description: row.description ?? "",
+          status: row.reason ?? "",
+        },
+        undefined,
+        undefined
+      );
+    }
+    toast.success(`${newRows.length} line item(s) added.`);
+    setCatalogModalOpen(false);
+  }, [bulkAddPartCodes, buildLineItemDraftFromCatalog, requestLineItemAi, vinCatalogGroups, vinCatalogParts, vinPartsLastCataCodeState]);
+
+  const addManualLineItem = useCallback(() => {
+    const part = manualDraft.part.trim();
+    if (!part) {
+      toast.error("Part name is required.");
+      return;
+    }
+    const groupKey = manualDraft.category || "manual";
+    const newRow = buildLineItemDraftFromCatalog(part, manualDraft.partNumber.trim(), groupKey, {
+      qty: manualDraft.qty || "1",
+      reason: manualDraft.reason || "Mandatory",
+      description: manualDraft.observation.trim(),
+    });
+    setParts((prev) => [...prev, newRow]);
+    setExpandedLineItemsByRow((prev) => {
+      const key = String(newRow.clientRowKey ?? "");
+      return key ? { ...prev, [key]: false } : prev;
+    });
+    if (newRow.clientRowKey && newRow.part) {
+      void requestLineItemAi(
+        newRow.clientRowKey,
+        {
+          partName: newRow.part,
+          partNumber: newRow.catalogPartCode ?? "",
+          groupName: manualDraft.category,
+          description: newRow.description ?? "",
+          status: newRow.reason ?? "",
+        },
+        undefined,
+        undefined
+      );
+    }
+    setManualDraft({ category: manualDraft.category, observation: "", part: "", partNumber: "", qty: "1", reason: "Mandatory" });
+    toast.success("Part added to findings.");
+  }, [buildLineItemDraftFromCatalog, manualDraft, requestLineItemAi]);
+
   const addSmartSuggestionAsLineItem = useCallback(
     async (
       index: number,
@@ -2684,6 +3495,17 @@ export function InspectionDetailPageClient({
                 {completedAt && <div>Completed: {new Date(completedAt).toLocaleString()}</div>}
                 {cancelledAt && <div className="text-rose-300">Cancelled: {new Date(cancelledAt).toLocaleString()}</div>}
               </div>
+            )}
+            {customer?.phone && (
+              <a
+                href={`tel:${String(customer.phone).replace(/\s+/g, "")}`}
+                className="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-200 transition hover:bg-emerald-500/20"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 1.27h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.91a16 16 0 0 0 6.09 6.09l.91-.91a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
+                </svg>
+                {String(customer.phone)}
+              </a>
             )}
             <Link
               href={backHref}
@@ -3667,18 +4489,79 @@ export function InspectionDetailPageClient({
                         className={theme.input}
                         value={inspectionVin}
                         readOnly={isReadOnly || isCollectCarPending}
-                        onChange={(e) => setInspectionVin(e.target.value.toUpperCase())}
+                        onChange={(e) => {
+                          setInspectionVin(e.target.value.toUpperCase());
+                          setVinLookupCars([]);
+                          setVinLookupSelectedCarId("");
+                        }}
                         placeholder="Enter VIN"
                       />
                       <button
                         type="button"
-                        className="h-10 rounded-md bg-cyan-600 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white sm:whitespace-nowrap"
-                        disabled={isReadOnly || isCollectCarPending || vinLookupLoading}
-                        onClick={autoFillVehicleFromVin}
+                        className="h-10 rounded-md bg-violet-600 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white sm:whitespace-nowrap"
+                        disabled={isReadOnly || isCollectCarPending || aiVinDecoding || vinLookupLoading || !inspectionVin || inspectionVin.length !== 17}
+                        onClick={async () => {
+                          const vin = inspectionVin.trim().toUpperCase();
+                          if (!vin || vin.length !== 17) return;
+                          setAiVinDecoding(true);
+                          setVinLookupNote(null);
+                          setAiVinDecodeResult(null);
+                          try {
+                            const res = await fetch(`/api/company/${companyId}/workshop/inspections/${inspectionId}/ai-vin-decode`, {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ vin }),
+                            });
+                            const json = await res.json();
+                            if (!res.ok) throw new Error(json.error ?? "Decode failed");
+                            const d = json.data;
+                            // Show results but DO NOT auto-fill — user must click Confirm
+                            setAiVinDecodeResult(d);
+                            setVinLookupNote(`Decoded: ${[d.make, d.model, d.year, d.bodyType, d.fuelType].filter(Boolean).join(" · ")} (${d.source}). Click "Apply" to use these details.`);
+                          } catch (err: any) {
+                            setVinLookupNote(err?.message ?? "VIN decode failed");
+                          } finally {
+                            setAiVinDecoding(false);
+                          }
+                        }}
                       >
-                        {vinLookupLoading ? "Checking VIN..." : "Check VIN"}
+                        {aiVinDecoding || vinLookupLoading ? "Decoding VIN..." : "Decode VIN"}
                       </button>
                     </div>
+                    {vinLookupCars.length > 1 && (
+                      <div className="mt-2">
+                        <label className="text-[11px] text-white/70">Select matched car</label>
+                        <select
+                          className={`${theme.input} mt-1`}
+                          value={vinLookupSelectedCarId}
+                          disabled={isReadOnly || isCollectCarPending || vinLookupLoading}
+                          onChange={(e) => {
+                            const selectedId = e.target.value;
+                            setVinLookupSelectedCarId(selectedId);
+                            if (selectedId) {
+                              void applySelectedVinCar(selectedId);
+                            }
+                          }}
+                        >
+                          <option value="">Select car...</option>
+                          {vinLookupCars.map((candidate, idx) => {
+                            const label = [
+                              candidate.make,
+                              candidate.model,
+                              candidate.year,
+                              candidate.title && candidate.title !== candidate.model ? candidate.title : "",
+                            ]
+                              .filter(Boolean)
+                              .join(" | ");
+                            return (
+                              <option key={`${candidate.id || "row"}-${idx}`} value={candidate.id}>
+                                {label || candidate.id || `Candidate ${idx + 1}`}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      </div>
+                    )}
                   </div>
                   <div>
                     <label className="text-xs font-semibold text-white/70">Car Plate</label>
@@ -3771,13 +4654,87 @@ export function InspectionDetailPageClient({
                     />
                   </div>
                 </div>
-                {vinLookupNote && <div className="mt-2 text-xs text-cyan-200">{vinLookupNote}</div>}
+                {vinLookupNote && !aiVinDecodeResult && <div className="mt-2 text-xs text-cyan-200">{vinLookupNote}</div>}
+
+                {/* VIN Decode Confirmation Panel */}
+                {aiVinDecodeResult && (
+                  <div className="mt-3 rounded-md border border-violet-500/30 bg-violet-500/[0.05] p-3">
+                    <div className="text-[11px] font-semibold text-violet-200">VIN Decode Result — Review before applying</div>
+                    <div className="mt-2 grid gap-2 text-xs sm:grid-cols-2 md:grid-cols-3">
+                      {[
+                        ["Make", aiVinDecodeResult.make],
+                        ["Model", aiVinDecodeResult.model],
+                        ["Year", aiVinDecodeResult.year],
+                        ["Body", aiVinDecodeResult.bodyType],
+                        ["Engine", aiVinDecodeResult.engineType],
+                        ["Fuel", aiVinDecodeResult.fuelType],
+                        ["Drive", aiVinDecodeResult.driveType],
+                        ["Transmission", aiVinDecodeResult.transmissionType],
+                      ]
+                        .filter(([, v]) => v)
+                        .map(([label, value]) => (
+                          <div key={label}>
+                            <span className="text-white/40">{label}: </span>
+                            <span className="text-white/90">{value}</span>
+                          </div>
+                        ))}
+                    </div>
+                    <div className="mt-1 text-[10px] text-white/30">Source: {aiVinDecodeResult.source}</div>
+                    <div className="mt-3 flex gap-2">
+                      <button
+                        type="button"
+                        className="rounded-md bg-emerald-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500"
+                        onClick={async () => {
+                          const d = aiVinDecodeResult;
+                          // Apply to form fields
+                          if (d.make) setInspectionMake(d.make);
+                          if (d.model) setInspectionModel(d.model);
+                          if (d.year) setInspectionYear(String(d.year));
+                          if (d.bodyType) setVinBodyType(d.bodyType);
+                          // Save to DB via PUT
+                          try {
+                            await fetch(`/api/company/${companyId}/workshop/inspections/${inspectionId}/ai-vin-decode`, {
+                              method: "PUT",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                vin: inspectionVin.trim().toUpperCase(),
+                                make: d.make,
+                                model: d.model,
+                                year: d.year,
+                                bodyType: d.bodyType,
+                                decodeResult: d,
+                              }),
+                            });
+                          } catch { /* non-blocking */ }
+                          setVinLookupNote(`Applied: ${[d.make, d.model, d.year].filter(Boolean).join(" ")}`);
+                          setAiVinDecodeResult(null);
+                        }}
+                      >
+                        ✓ Apply These Details
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded-md border border-white/20 px-4 py-1.5 text-xs font-medium text-white/70 hover:bg-white/5"
+                        onClick={() => {
+                          setAiVinDecodeResult(null);
+                          setVinLookupNote("Decode dismissed. Car details unchanged.");
+                        }}
+                      >
+                        ✕ Dismiss
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
+
+            {/* ===== STEP 5: AI-POWERED INSPECTION ===== */}
             <div className={`mt-6 ${inspectionStep === 5 ? "" : "hidden"}`}>
+
+              {/* Inspection Checks (Oil/Battery/Tyre/OBD) */}
               <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
-                <div className="text-sm font-semibold">Inspection Checks</div>
+                <div className="text-sm font-semibold">Quick Checks</div>
                 <div className="mt-3 grid gap-3 lg:grid-cols-2">
                   {processCheckItems.map((item) => (
                     <div key={item.key} className="rounded-md border border-white/10 bg-black/20 p-3">
@@ -3787,107 +4744,155 @@ export function InspectionDetailPageClient({
                           <label key={value} className="flex items-center gap-1 text-white/80">
                             <input
                               type="radio"
-                              name={`process-${item.key}`}
-                              checked={processChecks[item.key] === value}
+                              name={`check-${item.key}`}
+                              checked={checks[item.key] === value}
                               disabled={isReadOnly || isCollectCarPending}
-                              onChange={() => updateProcessCheck(item.key, value)}
-                              className="h-3.5 w-3.5"
+                              onChange={() => setChecks((prev) => ({ ...prev, [item.key]: value }))}
                             />
-                            <span className="uppercase">{value}</span>
+                            {value.toUpperCase()}
                           </label>
                         ))}
                       </div>
                       <div className="mt-2">
-                        <label className="text-xs font-semibold text-white/70">{item.label} images</label>
+                        <div className="text-[10px] text-white/50">{item.label} images</div>
                         <input
                           type="file"
-                          accept="image/*"
                           multiple
-                          disabled={isReadOnly || isCollectCarPending || processCheckUploading[item.key]}
-                          className={`${theme.input} mt-1`}
+                          accept="image/*"
+                          disabled={isReadOnly || isCollectCarPending}
                           onChange={(e) => {
-                            void uploadProcessCheckFiles(item.key, e.target.files);
-                            e.currentTarget.value = "";
+                            const files = e.target.files;
+                            if (!files) return;
+                            void handleCheckMediaUpload(item.key, Array.from(files));
                           }}
+                          className="mt-1 text-xs text-white/70"
                         />
-                        {processCheckUploading[item.key] && (
-                          <div className="mt-1 text-[11px] text-cyan-300">Uploading images...</div>
-                        )}
                       </div>
-                      {processChecks[item.key] === "issue" && (
-                        <div className="mt-2">
-                          <label className="text-[11px] text-white/70">Issue Description</label>
-                          <textarea
-                            className={theme.input}
-                            rows={2}
-                            value={processCheckIssueNotes[item.key] ?? ""}
-                            readOnly={isReadOnly || isCollectCarPending}
-                            onChange={(e) =>
-                              setProcessCheckIssueNotes((prev) => ({
-                                ...prev,
-                                [item.key]: e.target.value,
-                              }))
-                            }
-                            placeholder={`Describe ${item.label.toLowerCase()} issue...`}
-                          />
-                        </div>
-                      )}
-                      {(processCheckMediaMulti[item.key]?.length ?? 0) > 0 && (
-                        <div className="mt-2 rounded border border-white/10 bg-black/30 p-2">
-                          <div className="grid gap-2 sm:grid-cols-2">
-                            {(processCheckMediaMulti[item.key] ?? []).map((fileId, mediaIndex) => (
-                              <div key={`${fileId}-${mediaIndex}`} className="rounded border border-white/10 bg-black/20 p-2">
-                                <img
-                                  className="h-24 w-full rounded border border-white/10 object-cover"
-                                  src={`/api/files/${fileId}`}
-                                  alt={`${item.label} upload ${mediaIndex + 1}`}
-                                />
-                                <div className="mt-1 flex items-center justify-between gap-2 text-[11px]">
-                                  <a
-                                    href={`/api/files/${fileId}`}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="text-primary hover:underline"
-                                  >
-                                    Open
-                                  </a>
-                                  {!isReadOnly && !isCollectCarPending && (
-                                    <button
-                                      type="button"
-                                      className="rounded bg-rose-600 px-2 py-0.5 font-semibold text-white"
-                                      onClick={() => {
-                                        setProcessCheckMediaMulti((prev) => {
-                                          const next = (prev[item.key] ?? []).filter((_, i) => i !== mediaIndex);
-                                          setProcessCheckMedia((singlePrev) => ({
-                                            ...singlePrev,
-                                            [item.key]: next[0] ?? "",
-                                          }));
-                                          return { ...prev, [item.key]: next };
-                                        });
-                                        setProcessMediaVerified((prev) => ({ ...prev, [item.key]: false }));
-                                      }}
-                                    >
-                                      Remove
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                          <div className="mt-2 text-[11px] text-emerald-300">
-                            Media uploaded
-                          </div>
-                        </div>
-                      )}
                     </div>
                   ))}
                 </div>
               </div>
 
-              <div className="flex items-center justify-between gap-2">
-                <div className="text-sm font-semibold">Findings / Parts Needed</div>
-                <div className="flex flex-wrap items-center gap-2 text-[10px]">
-                  <div className="flex flex-wrap items-center gap-1.5">
+              {/* ===== CATEGORY-BASED PART PICKER ===== */}
+              <div className="mt-4 rounded-md border border-violet-500/30 bg-violet-500/[0.05] p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-semibold text-violet-100">Select Parts by Category</div>
+                    <div className="text-[11px] text-white/50">Tap a category, then sub-category, then the specific part to add it.</div>
+                  </div>
+                </div>
+
+                <div className="mt-3">
+                  {!quickCatLoaded && (
+                    <div className="text-xs text-white/50">Loading categories...</div>
+                  )}
+
+                  {/* Level 1: Category Grid */}
+                  {quickCatLoaded && quickCatLevel === "cat" && (
+                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
+                      {quickCatData.map((cat: any) => (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          disabled={isReadOnly}
+                          onClick={() => { setQuickCatSelectedCat(cat); setQuickCatLevel("sub"); }}
+                          className="flex flex-col items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.03] p-3 text-center transition hover:border-violet-400 hover:bg-violet-500/10 disabled:opacity-50"
+                        >
+                          <span className="text-xl">{({"engine":"🔧","transmission":"⚙️","brakes":"🛑","suspension":"🔩","steering":"🎯","electrical":"⚡","ac":"❄️","body":"🚗","interior":"💺","exhaust":"💨","fuel":"⛽","tyres":"🛞"} as any)[cat.icon] ?? "🔧"}</span>
+                          <span className="text-[11px] font-semibold leading-tight text-white/90">{cat.name}</span>
+                          <span className="text-[10px] text-white/40">{cat.subcategories?.length ?? 0} groups</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Level 2: Sub-categories */}
+                  {quickCatLoaded && quickCatLevel === "sub" && quickCatSelectedCat && (
+                    <div className="space-y-3">
+                      <button type="button" onClick={() => { setQuickCatLevel("cat"); setQuickCatSelectedCat(null); }} className="text-xs text-violet-300 hover:underline">
+                        ← Back to all categories
+                      </button>
+                      <div className="text-xs font-semibold text-white/90">{quickCatSelectedCat.name}</div>
+                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+                        {(quickCatSelectedCat.subcategories ?? []).map((sub: any) => (
+                          <button
+                            key={sub.id}
+                            type="button"
+                            disabled={isReadOnly}
+                            onClick={() => { setQuickCatSelectedSub(sub); setQuickCatLevel("part"); }}
+                            className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5 text-left transition hover:border-violet-400 hover:bg-violet-500/10 disabled:opacity-50"
+                          >
+                            <div className="text-xs font-medium text-white/90">{sub.name}</div>
+                            <div className="text-[10px] text-white/40">{sub.parts?.length ?? 0} parts</div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Level 3: Parts */}
+                  {quickCatLoaded && quickCatLevel === "part" && quickCatSelectedSub && (
+                    <div className="space-y-3">
+                      <button type="button" onClick={() => { setQuickCatLevel("sub"); setQuickCatSelectedSub(null); }} className="text-xs text-violet-300 hover:underline">
+                        ← Back to {quickCatSelectedCat?.name}
+                      </button>
+                      <div className="text-xs font-semibold text-white/90">{quickCatSelectedSub.name}</div>
+                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                        {(quickCatSelectedSub.parts ?? []).map((part: any) => {
+                          const alreadyAdded = parts.some((p) => p.productName === part.name);
+                          return (
+                            <button
+                              key={part.id}
+                              type="button"
+                              disabled={alreadyAdded || isReadOnly}
+                              onClick={() => {
+                                setParts((prev) => [
+                                  ...prev,
+                                  {
+                                    id: `draft-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                                    productName: part.name,
+                                    partNumber: "",
+                                    description: `${quickCatSelectedCat?.name} > ${quickCatSelectedSub?.name}`,
+                                    quantity: 1,
+                                    reason: "Needs attention / replacement",
+                                    status: "Pending",
+                                    isSaved: false,
+                                    catalogGroupKey: "",
+                                    clientRowKey: "",
+                                    aiQuestions: [],
+                                    aiAnswers: {},
+                                    aiRecommendation: "",
+                                    mediaFileId: "",
+                                    approvedType: null,
+                                    orderStatus: null,
+                                  } as any,
+                                ]);
+                                // Go back to categories for next selection
+                                setQuickCatLevel("cat");
+                                setQuickCatSelectedCat(null);
+                                setQuickCatSelectedSub(null);
+                              }}
+                              className={`rounded-lg border px-3 py-2.5 text-left transition ${
+                                alreadyAdded
+                                  ? "border-emerald-500/30 bg-emerald-500/10 opacity-60"
+                                  : "border-white/10 bg-white/[0.03] hover:border-violet-400 hover:bg-violet-500/10"
+                              }`}
+                            >
+                              <span className="text-xs text-white/90">{alreadyAdded ? "✓ " : "＋ "}{part.name}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* ===== FINDINGS LIST ===== */}
+              <div className="mt-4">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-sm font-semibold">Findings / Parts Needed</div>
+                  <div className="flex flex-wrap items-center gap-2 text-[10px]">
                     <span className="rounded-full border border-white/15 px-2 py-0.5 text-white/70">Total: {parts.length}</span>
                     <span className="rounded-full border border-emerald-500/40 px-2 py-0.5 text-emerald-300">
                       Received: {parts.filter((p) => (p.orderStatus ?? "").toLowerCase() === "received").length}
@@ -3895,862 +4900,322 @@ export function InspectionDetailPageClient({
                     <span className="rounded-full border border-amber-500/40 px-2 py-0.5 text-amber-300">
                       Ordered: {parts.filter((p) => (p.orderStatus ?? "").toLowerCase() === "ordered").length}
                     </span>
-                    <span className="rounded-full border border-cyan-500/40 px-2 py-0.5 text-cyan-300">
-                      Draft: {parts.filter((p) => !p.isSaved).length}
-                    </span>
-                  </div>
-                  {!isReadOnly && !isCollectCarPending && (
-                    <>
+                    {!isReadOnly && !isCollectCarPending && (
                       <button
                         type="button"
                         className="rounded-md bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white disabled:opacity-50"
                         onClick={() => void saveAllDraftLineItems()}
                         disabled={parts.filter((p) => !p.isSaved).length === 0}
                       >
-                        Save All Draft
+                        Save All
                       </button>
-                      <button
-                        type="button"
-                        className="rounded-md bg-teal-600 px-2.5 py-1 text-[11px] font-semibold text-white"
-                        onClick={addLineItemRow}
-                        disabled={vinCatalogLoading || (parts.length > 0 && parts.some((p) => !p.isSaved))}
-                      >
-                        {vinCatalogLoading ? "Loading..." : "+ Add Line Item"}
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-              <div className="mt-2 rounded-md border border-cyan-500/20 bg-cyan-500/5 p-3">
-                <div className="text-[11px] font-semibold uppercase tracking-wide text-cyan-200">AI Line Item Assistant</div>
-                <div className="mt-2 grid gap-3 lg:grid-cols-2">
-                  <div>
-                    <div className="text-[11px] font-semibold text-cyan-100/90">Questions</div>
-                    <div className="mt-1 space-y-1 text-xs text-cyan-100/85">
-                      {lineItemAiInsights.questions.map((q, idx) => (
-                        <div key={`li-q-${idx}`}>- {q}</div>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-[11px] font-semibold text-cyan-100/90">Suggestions</div>
-                    <div className="mt-1 space-y-1 text-xs text-cyan-100/85">
-                      {lineItemAiInsights.suggestions.map((s, idx) => (
-                        <div key={`li-s-${idx}`}>- {s}</div>
-                      ))}
-                    </div>
+                    )}
                   </div>
                 </div>
-              </div>
-              {vinCatalogGroups.length > 0 && !isReadOnly && !isCollectCarPending && (
-                <div className="mt-2 rounded-md border border-cyan-500/20 bg-cyan-500/5 p-3">
-                  <div className="text-[11px] font-semibold uppercase tracking-wide text-cyan-200">
-                    Add Multiple Line Items By Group
+
+                {parts.length === 0 ? (
+                  <div className="mt-3 rounded-md border border-white/10 bg-white/[0.02] p-6 text-center">
+                    <div className="text-xs text-white/50">No parts added yet. Select from the categories above.</div>
                   </div>
-                  <div className="mt-2 grid gap-2 lg:grid-cols-[1.2fr_auto] lg:items-end">
-                    <div className="space-y-1">
-                      <div className="text-[10px] font-semibold uppercase tracking-wide text-cyan-100/80">Car Group</div>
-                      <select
-                        className={`${theme.input} h-10 w-full`}
-                        value={bulkAddGroupKey}
-                        onChange={(e) => {
-                          setBulkAddGroupKey(e.target.value);
-                          setBulkAddPartCodes([]);
-                          setBulkPartSearch("");
-                        }}
-                      >
-                        <option value="">Select Car Group</option>
-                        {vinCatalogGroups.map((group) => (
-                          <option key={group.key} value={group.key}>
-                            {group.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <button
-                      type="button"
-                      className="h-10 rounded-md bg-teal-600 px-3 text-xs font-semibold text-white disabled:opacity-50"
-                      disabled={!bulkAddGroupKey || bulkAddPartCodes.length === 0}
-                      onClick={() => void bulkAddPartsFromGroup()}
-                    >
-                      Add Selected Parts
-                    </button>
-                  </div>
-                  {bulkAddGroupKey && (
-                    <div className="mt-2">
-                      <div className="grid gap-2 lg:grid-cols-[1fr_auto_auto]">
-                        <input
-                          type="text"
-                          className={`${theme.input} h-10 w-full`}
-                          value={bulkPartSearch}
-                          onChange={(e) => setBulkPartSearch(e.target.value)}
-                          placeholder="Search parts in selected group"
-                        />
-                        <button
-                          type="button"
-                          className="h-10 rounded-md border border-cyan-500/40 px-3 text-xs font-semibold text-cyan-100"
-                          onClick={() => {
-                            const allVisibleCodes = vinCatalogParts
-                              .filter((part) =>
-                                (part.groups ?? []).some((group) => {
-                                  const groupId = String(group?.id ?? "").trim();
-                                  const groupName = String(group?.name ?? "").trim();
-                                  const groupLevel = Number(group?.level ?? 0) || 0;
-                                  const key = `${groupId || groupName}::${groupLevel}`;
-                                  return key === bulkAddGroupKey;
-                                })
-                              )
-                              .filter((part) => {
-                                const needle = bulkPartSearch.trim().toLowerCase();
-                                if (!needle) return true;
-                                const label = `${part.name || ""} ${part.code || ""}`.toLowerCase();
-                                return label.includes(needle);
-                              })
-                              .map((part) => part.code);
-                            setBulkAddPartCodes(allVisibleCodes);
-                          }}
-                        >
-                          Select All Visible
-                        </button>
-                        <button
-                          type="button"
-                          className="h-10 rounded-md border border-white/20 px-3 text-xs font-semibold text-white/80"
-                          onClick={() => setBulkAddPartCodes([])}
-                        >
-                          Clear
-                        </button>
-                      </div>
-                      <div className="mt-2 max-h-56 space-y-1 overflow-auto rounded-md border border-white/10 p-2">
-                        {vinCatalogParts
-                          .filter((part) =>
-                            (part.groups ?? []).some((group) => {
-                              const groupId = String(group?.id ?? "").trim();
-                              const groupName = String(group?.name ?? "").trim();
-                              const groupLevel = Number(group?.level ?? 0) || 0;
-                              const key = `${groupId || groupName}::${groupLevel}`;
-                              return key === bulkAddGroupKey;
-                            })
-                          )
-                          .filter((part) => {
-                            const needle = bulkPartSearch.trim().toLowerCase();
-                            if (!needle) return true;
-                            const label = `${part.name || ""} ${part.code || ""}`.toLowerCase();
-                            return label.includes(needle);
-                          })
-                          .map((part) => {
-                            const selected = bulkAddPartCodes.includes(part.code);
-                            return (
-                              <label
-                                key={`bulk-pick-${part.code}-${part.name}`}
-                                className="flex cursor-pointer items-center gap-2 rounded-md border border-white/10 px-2 py-1.5 text-xs hover:bg-white/5"
-                              >
+                ) : (
+                  <div className="mt-3 space-y-3">
+                    {parts.map((part, idx) => (
+                      <div key={part.id ?? idx} className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
+                        {/* Row 1: Part name + remove */}
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm font-semibold text-white/90">{(part as any).productName || part.part || "Unnamed part"}</div>
+                            {part.description && <div className="text-[10px] text-white/40">{part.description}</div>}
+                            {!part.isSaved && <span className="text-[10px] text-amber-400">● Draft</span>}
+                          </div>
+                          {!isReadOnly && (
+                            <button type="button" onClick={() => setParts((prev) => prev.filter((_, i) => i !== idx))} className="rounded p-1 text-white/30 hover:text-rose-400">✕</button>
+                          )}
+                        </div>
+
+                        {/* Row 2: Action Type + Priority */}
+                        <div className="mt-2 flex flex-wrap gap-4">
+                          {/* Action Type: Replace / Service / Repair */}
+                          <div className="space-y-1">
+                            <div className="text-[10px] font-semibold uppercase tracking-wide text-white/40">Action</div>
+                            <div className="flex gap-1">
+                              {([
+                                { key: "replace", label: "Replace", icon: "🔄" },
+                                { key: "service", label: "Service", icon: "🔧" },
+                                { key: "repair", label: "Repair", icon: "🛠️" },
+                              ] as const).map(({ key, label, icon }) => (
+                                <button
+                                  key={key}
+                                  type="button"
+                                  disabled={isReadOnly}
+                                  onClick={() => setParts((prev) => prev.map((p, i) => i === idx ? { ...p, actionType: key } : p))}
+                                  className={`rounded-lg px-2.5 py-1 text-[11px] font-medium transition ${
+                                    (part as any).actionType === key
+                                      ? "bg-violet-500/25 text-violet-200 ring-1 ring-violet-500/50"
+                                      : "bg-white/5 text-white/50 hover:bg-white/10"
+                                  }`}
+                                >
+                                  {icon} {label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Priority: Safety Risk / Mandatory / Recommended */}
+                          <div className="space-y-1">
+                            <div className="text-[10px] font-semibold uppercase tracking-wide text-white/40">Priority</div>
+                            <div className="flex gap-1">
+                              {([
+                                { key: "safety_risk", label: "Safety Risk", color: "rose" },
+                                { key: "mandatory", label: "Mandatory", color: "amber" },
+                                { key: "recommended", label: "Recommended", color: "cyan" },
+                              ] as const).map(({ key, label, color }) => (
+                                <button
+                                  key={key}
+                                  type="button"
+                                  disabled={isReadOnly}
+                                  onClick={() => setParts((prev) => prev.map((p, i) => i === idx ? { ...p, priority: key } : p))}
+                                  className={`rounded-lg px-2.5 py-1 text-[11px] font-medium transition ${
+                                    (part as any).priority === key
+                                      ? color === "rose" ? "bg-rose-500/25 text-rose-200 ring-1 ring-rose-500/50"
+                                        : color === "amber" ? "bg-amber-500/25 text-amber-200 ring-1 ring-amber-500/50"
+                                        : "bg-cyan-500/25 text-cyan-200 ring-1 ring-cyan-500/50"
+                                      : "bg-white/5 text-white/50 hover:bg-white/10"
+                                  }`}
+                                >
+                                  {label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Row 3: AI Description (auto-generated) */}
+                        {(part as any).aiDescription ? (
+                          <div className="mt-2 rounded-md border border-cyan-500/20 bg-cyan-500/[0.03] px-3 py-2">
+                            <div className="text-[10px] font-semibold text-cyan-300">AI Assessment</div>
+                            <div className="mt-0.5 text-[11px] leading-relaxed text-white/70">{(part as any).aiDescription}</div>
+                          </div>
+                        ) : (part as any).actionType && (part as any).priority ? (
+                          <div className="mt-2 text-[10px] text-cyan-300 animate-pulse">Generating AI description...</div>
+                        ) : (
+                          <div className="mt-2 text-[10px] text-white/30">Select action &amp; priority to generate AI description.</div>
+                        )}
+
+                        {/* Row 4: Photo / Video Evidence */}
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          {/* Show attached files */}
+                          {((part as any).mediaFiles ?? (part.mediaFileId ? [{ id: part.mediaFileId, type: "file" }] : [])).map((mf: any, mfIdx: number) => (
+                            <div key={mf.id ?? mfIdx} className="flex items-center gap-1.5 rounded-md border border-emerald-500/20 bg-emerald-500/[0.05] px-2 py-1">
+                              <span className="text-[11px] text-emerald-300">{mf.type === "video" ? "🎥" : "📷"} {mf.type === "video" ? "Video" : "Photo"}</span>
+                              {!isReadOnly && (
+                                <button type="button" onClick={() => {
+                                  setParts((prev) => prev.map((p, i) => {
+                                    if (i !== idx) return p;
+                                    const files = ((p as any).mediaFiles ?? []).filter((_: any, fi: number) => fi !== mfIdx);
+                                    return { ...p, mediaFiles: files, mediaFileId: files[0]?.id ?? null, isSaved: false };
+                                  }));
+                                }} className="text-[10px] text-white/40 hover:text-rose-400">✕</button>
+                              )}
+                            </div>
+                          ))}
+                          {/* Always show upload buttons unless read-only */}
+                          {!isReadOnly && (
+                            <>
+                              <label className="flex cursor-pointer items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-1.5 text-[11px] text-white/60 transition hover:border-violet-400 hover:bg-violet-500/10 hover:text-white/90">
+                                📷 Photo
                                 <input
-                                  type="checkbox"
-                                  checked={selected}
-                                  onChange={(e) => {
-                                    setBulkAddPartCodes((prev) => {
-                                      if (e.target.checked) {
-                                        if (prev.includes(part.code)) return prev;
-                                        return [...prev, part.code];
+                                  type="file"
+                                  accept="image/*"
+                                  capture="environment"
+                                  className="hidden"
+                                  onChange={async (e) => {
+                                    const file = e.target.files?.[0];
+                                    if (!file) return;
+                                    const formData = new FormData();
+                                    formData.append("file", file);
+                                    formData.append("companyId", companyId ?? "");
+                                    formData.append("label", `inspection-photo-${idx}`);
+                                    try {
+                                      const res = await fetch("/api/files/upload", { method: "POST", body: formData });
+                                      const json = await res.json();
+                                      const fileId = json?.fileId ?? json?.data?.id ?? json?.id ?? null;
+                                      if (fileId) {
+                                        setParts((prev) => prev.map((p, i) => {
+                                          if (i !== idx) return p;
+                                          const files = [...((p as any).mediaFiles ?? []), { id: fileId, type: "photo" }];
+                                          return { ...p, mediaFiles: files, mediaFileId: files[0]?.id ?? null, isSaved: false };
+                                        }));
                                       }
-                                      return prev.filter((code) => code !== part.code);
-                                    });
+                                    } catch { /* silent */ }
+                                    e.target.value = "";
                                   }}
                                 />
-                                <span className="text-white/85">{part.name || "Unnamed part"}</span>
-                                <span className="text-white/55">{part.code ? `(${part.code})` : ""}</span>
                               </label>
-                            );
-                          })}
+                              <label className="flex cursor-pointer items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-1.5 text-[11px] text-white/60 transition hover:border-violet-400 hover:bg-violet-500/10 hover:text-white/90">
+                                🎥 Video
+                                <input
+                                  type="file"
+                                  accept="video/*"
+                                  capture="environment"
+                                  className="hidden"
+                                  onChange={async (e) => {
+                                    const file = e.target.files?.[0];
+                                    if (!file) return;
+                                    const formData = new FormData();
+                                    formData.append("file", file);
+                                    formData.append("companyId", companyId ?? "");
+                                    formData.append("label", `inspection-video-${idx}`);
+                                    try {
+                                      const res = await fetch("/api/files/upload", { method: "POST", body: formData });
+                                      const json = await res.json();
+                                      const fileId = json?.fileId ?? json?.data?.id ?? json?.id ?? null;
+                                      if (fileId) {
+                                        setParts((prev) => prev.map((p, i) => {
+                                          if (i !== idx) return p;
+                                          const files = [...((p as any).mediaFiles ?? []), { id: fileId, type: "video" }];
+                                          return { ...p, mediaFiles: files, mediaFileId: files[0]?.id ?? null, isSaved: false };
+                                        }));
+                                      }
+                                    } catch { /* silent */ }
+                                    e.target.value = "";
+                                  }}
+                                />
+                              </label>
+                            </>
+                          )}
+                        </div>
                       </div>
-                      <div className="mt-2 text-[11px] text-cyan-100/80">
-                        {bulkAddPartCodes.length} part(s) selected.
-                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* ===== AI PART SUGGESTIONS ===== */}
+              {parts.length > 0 && (
+                <div className="mt-4 rounded-md border border-cyan-500/30 bg-cyan-500/[0.05] p-4">
+                  <div className="flex items-center gap-2">
+                    <div className="text-sm font-semibold text-cyan-100">AI Suggestions</div>
+                    {aiSuggestionsLoading && <span className="text-[11px] text-cyan-300 animate-pulse">analyzing...</span>}
+                  </div>
+                  <div className="text-[11px] text-white/50">Related parts that may also need inspection — add or dismiss.</div>
+
+                  {aiSuggestions.length > 0 && (
+                    <div className="mt-3 space-y-2">
+                      {aiSuggestions.map((suggestion, idx) => (
+                        <div key={idx} className="flex items-center gap-3 rounded-lg border border-cyan-500/20 bg-white/[0.02] p-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-semibold text-white/90">{suggestion.name}</span>
+                              <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold ${
+                                suggestion.likelihood === "high"
+                                  ? "bg-rose-500/20 text-rose-300"
+                                  : "bg-amber-500/20 text-amber-300"
+                              }`}>
+                                {suggestion.likelihood === "high" ? "LIKELY" : "POSSIBLE"}
+                              </span>
+                            </div>
+                            <div className="text-[11px] text-white/50">{suggestion.reason}</div>
+                            <div className="text-[10px] text-white/30">{suggestion.category}</div>
+                          </div>
+                          <button
+                            type="button"
+                            disabled={isReadOnly}
+                            onClick={() => {
+                              // Add the suggested part
+                              setParts((prev) => [
+                                ...prev,
+                                {
+                                  id: `draft-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                                  productName: suggestion.name,
+                                  partNumber: "",
+                                  description: `AI Suggested (${suggestion.category})`,
+                                  quantity: 1,
+                                  reason: suggestion.reason,
+                                  status: "Pending",
+                                  isSaved: false,
+                                  catalogGroupKey: "",
+                                  clientRowKey: "",
+                                  aiQuestions: [],
+                                  aiAnswers: {},
+                                  aiRecommendation: suggestion.reason,
+                                  mediaFileId: "",
+                                  approvedType: null,
+                                  orderStatus: null,
+                                } as any,
+                              ]);
+                              // Remove from suggestions
+                              setAiSuggestions((prev) => prev.filter((_, i) => i !== idx));
+                            }}
+                            className="rounded-md bg-cyan-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-cyan-500 disabled:opacity-50"
+                          >
+                            + Add
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setAiSuggestions((prev) => prev.filter((_, i) => i !== idx))}
+                            className="rounded p-1 text-white/30 hover:text-white/60"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
                     </div>
+                  )}
+
+                  {!aiSuggestionsLoading && aiSuggestions.length === 0 && aiSuggestionsLastKey && (
+                    <div className="mt-2 text-[11px] text-white/40">No additional suggestions. All related parts covered.</div>
                   )}
                 </div>
               )}
-              <div className={`mt-2 rounded-md ${theme.cardBorder} ${theme.surfaceSubtle} p-3`}>
-                {parts.length === 0 ? (
-                  <div className="rounded-md border border-dashed border-white/20 bg-black/20 p-4 text-center">
-                    <div className="text-xs text-white/70">No line items added yet.</div>
-                    {!isReadOnly && !isCollectCarPending && (
-                      <button
-                        type="button"
-                        className="mt-3 rounded-md bg-teal-600 px-3 py-2 text-xs font-semibold text-white"
-                        onClick={addLineItemRow}
-                        disabled={vinCatalogLoading}
-                      >
-                        {vinCatalogLoading ? "Loading..." : "Add Line Item"}
-                      </button>
-                    )}
-                  </div>
-                ) : (
-                  <>
-                    <div className="hidden w-full gap-3 text-xs font-semibold text-white/70 lg:grid lg:grid-cols-[2fr_1.2fr_2fr_1fr_1.2fr_1fr_1.5fr]">
-                      <div>Parts Needed</div>
-                      <div>Part Number</div>
-                      <div>Description</div>
-                      <div>Quantity</div>
-                      <div>Status</div>
-                      <div>Picture / Video</div>
-                      <div>Actions</div>
-                    </div>
-                    <div className="mt-2 space-y-2">
-                      {groupedLineItemOrder.map(({ row, index, groupKey, groupLabel }, orderIdx) => {
-                    const isNewGroup = orderIdx === 0 || groupedLineItemOrder[orderIdx - 1]?.groupKey !== groupKey;
-                    const summary =
-                      groupKey === "__ungrouped__"
-                        ? {
-                            label: "Ungrouped",
-                            parts: [] as string[],
-                            healthPercent: 100,
-                            severityCounts: { "Safety Risk": 0, Mandatory: 0, Recommended: 0, Optional: 0 },
-                          }
-                        : groupSummaryByKey.get(groupKey) ??
-                          {
-                            label: groupLabel,
-                            parts: [] as string[],
-                            healthPercent: 100,
-                            severityCounts: { "Safety Risk": 0, Mandatory: 0, Recommended: 0, Optional: 0 },
-                          };
-                    const isLocked =
-                      isReadOnly || isCollectCarPending || row.partOrdered === 1 || row.orderStatus === "Ordered" || row.orderStatus === "Received";
-                    const rowKey = row.clientRowKey || row.id || `row-${index}`;
-                    const selectedGroupKey = String(row.catalogGroupKey ?? "");
-                    const selectedPartCode = String(row.catalogPartCode ?? "");
-                    const selectedGroupLabel =
-                      vinCatalogGroups.find((group) => group.key === selectedGroupKey)?.label ?? "";
-                    const rowAiQuestions = lineItemAiQuestionsByRow[rowKey] ?? [];
-                    const rowAiAnswers = lineItemAiAnswers[rowKey] ?? {};
-                    const smartSuggestionsBase =
-                      lineItemSmartSuggestionsByRow[rowKey] && lineItemSmartSuggestionsByRow[rowKey]!.length > 0
-                        ? lineItemSmartSuggestionsByRow[rowKey]!
-                        : generateSmartFaultSuggestions(
-                            String(row.part ?? ""),
-                            selectedGroupLabel,
-                            String(row.description ?? "")
-                          );
-                    const dismissedSuggestionIds = dismissedSmartSuggestionsByRow[rowKey] ?? [];
-                    const existingPartNames = new Set(
-                      parts
-                        .map((p) => String(p.part ?? "").trim().toLowerCase())
-                        .filter(Boolean)
-                    );
-                    const existingPartCodes = new Set(
-                      parts
-                        .map((p) => String(p.catalogPartCode ?? "").trim().toLowerCase())
-                        .filter(Boolean)
-                    );
-                    const smartSuggestions = smartSuggestionsBase.filter((s) => {
-                      if (dismissedSuggestionIds.includes(s.id)) return false;
-                      const label = String(s.label ?? "").trim();
-                      const lower = label.toLowerCase();
-                      const codeMatch = label.match(/\(([^)]+)\)\s*$/);
-                      const code = String(codeMatch?.[1] ?? "").trim().toLowerCase();
-                      if (existingPartNames.has(lower)) return false;
-                      if (code && existingPartCodes.has(code)) return false;
-                      return true;
-                    });
-                    const smartSuggestionsLoading = Boolean(lineItemSmartSuggestionsLoadingByRow[rowKey]);
-                    const rowMediaRequirement = getMediaRequirement(row);
-                    const answeredQuestionsCount = rowAiQuestions.filter((q) => Boolean(rowAiAnswers[q.id])).length;
-                    const statusDone = Boolean(String(row.reason ?? "").trim());
-                    const mediaDone = rowMediaRequirement.required ? Boolean(row.mediaFileId) : true;
-                    const hasSelectedPart = Boolean(String(row.part ?? "").trim());
-                    const isRowExpanded = hasSelectedPart ? (expandedLineItemsByRow[rowKey] ?? !row.isSaved) : true;
-                    const filteredCatalogParts = vinCatalogParts.filter((part) =>
-                      (part.groups ?? []).some((group) => {
-                        const groupId = String(group?.id ?? "").trim();
-                        const groupName = String(group?.name ?? "").trim();
-                        const groupLevel = Number(group?.level ?? 0) || 0;
-                        const key = `${groupId || groupName}::${groupLevel}`;
-                        return key === selectedGroupKey;
-                      })
-                    );
-                    return (
-                      <React.Fragment key={`grouped-row-${rowKey}-${index}`}>
-                      {isNewGroup && (
-                        <div className="rounded-md border border-cyan-500/30 bg-cyan-500/10 p-2">
-                          <div className="flex flex-wrap items-start justify-between gap-2">
-                            <div>
-                              <div className="text-xs font-semibold text-cyan-100">{summary.label}</div>
-                              <div className="mt-1 text-[11px] text-white/80">
-                                Health Indicator:{" "}
-                                <span className="font-semibold text-white">{summary.healthPercent}%</span>
-                              </div>
-                            </div>
-                            <div className="flex flex-wrap items-center gap-1 text-[10px]">
-                              <span className="rounded-full border border-rose-500/40 px-2 py-0.5 text-rose-300">
-                                Safety {summary.severityCounts["Safety Risk"]}
-                              </span>
-                              <span className="rounded-full border border-amber-500/40 px-2 py-0.5 text-amber-300">
-                                Mandatory {summary.severityCounts.Mandatory}
-                              </span>
-                              <span className="rounded-full border border-cyan-500/40 px-2 py-0.5 text-cyan-200">
-                                Recommended {summary.severityCounts.Recommended}
-                              </span>
-                              <span className="rounded-full border border-white/20 px-2 py-0.5 text-white/80">
-                                Optional {summary.severityCounts.Optional}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="mt-1 h-1.5 w-full rounded bg-white/10">
-                            <div
-                              className={`h-1.5 rounded ${
-                                summary.healthPercent < 50
-                                  ? "bg-rose-400"
-                                  : summary.healthPercent < 70
-                                  ? "bg-amber-400"
-                                  : summary.healthPercent < 90
-                                  ? "bg-cyan-400"
-                                  : "bg-emerald-400"
-                              }`}
-                              style={{ width: `${Math.max(0, Math.min(100, summary.healthPercent))}%` }}
-                            />
-                          </div>
-                          <div className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-white/60">
-                            Selected Parts
-                          </div>
-                          <div className="mt-1 text-[11px] text-white/80">
-                            {summary.parts.length ? summary.parts.join(", ") : "No selected parts"}
-                          </div>
-                        </div>
-                      )}
-                      <div
-                        key={index}
-                        className="rounded-md border border-white/10 bg-black/10 p-2"
-                      >
-                        {hasSelectedPart && (
-                        <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-md border border-white/10 px-2 py-1.5">
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <div className="text-xs font-semibold text-white/90">
-                              {row.part || "New line item"} {row.catalogPartCode ? `(${row.catalogPartCode})` : ""}
-                            </div>
-                            {selectedGroupLabel && (
-                              <span className="rounded-full border border-cyan-500/40 px-2 py-0.5 text-[10px] text-cyan-200">
-                                {selectedGroupLabel}
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
-                            <span className={`rounded-full border px-2 py-0.5 ${row.isSaved ? "border-emerald-500/40 text-emerald-300" : "border-amber-500/40 text-amber-300"}`}>
-                              {row.isSaved ? "Saved" : "Draft"}
-                            </span>
-                            <span className={`rounded-full border px-2 py-0.5 ${statusDone ? "border-emerald-500/40 text-emerald-300" : "border-amber-500/40 text-amber-300"}`}>
-                              Status {statusDone ? "OK" : "Missing"}
-                            </span>
-                            <span className={`rounded-full border px-2 py-0.5 ${mediaDone ? "border-emerald-500/40 text-emerald-300" : "border-amber-500/40 text-amber-300"}`}>
-                              Media {mediaDone ? "OK" : "Missing"}
-                            </span>
-                            <span className={`rounded-full border px-2 py-0.5 ${answeredQuestionsCount === rowAiQuestions.length && rowAiQuestions.length > 0 ? "border-emerald-500/40 text-emerald-300" : "border-cyan-500/40 text-cyan-200"}`}>
-                              Questions {answeredQuestionsCount}/{rowAiQuestions.length}
-                            </span>
-                            <button
-                              type="button"
-                              className="rounded-md border border-white/20 px-2 py-0.5 text-white/80"
-                              onClick={() =>
-                                setExpandedLineItemsByRow((prev) => ({
-                                  ...prev,
-                                  [rowKey]: !(prev[rowKey] ?? !row.isSaved),
-                                }))
-                              }
-                            >
-                              {isRowExpanded ? "Collapse" : "Expand"}
-                            </button>
-                          </div>
-                        </div>
-                        )}
-                        {isRowExpanded && (
-                        <div className={`grid w-full items-start gap-3 ${hasSelectedPart ? "lg:grid-cols-[2fr_1.2fr_2fr_1fr_1.2fr_1fr_1.5fr]" : "lg:grid-cols-[2fr_1.2fr]"}`}>
-                        <div className="space-y-1">
-                          <div className="text-[10px] font-semibold uppercase tracking-wide text-white/60 lg:hidden">Part</div>
-                          {vinCatalogGroups.length > 0 ? (
-                            <div className="space-y-2">
-                              <select
-                                className={`${theme.input} h-10 w-full`}
-                                value={selectedGroupKey}
-                                disabled={isLocked}
-                                onChange={(e) => {
-                                  const groupKey = e.target.value;
-                                  setParts((prev) =>
-                                    prev.map((p, i) =>
-                                      i === index
-                                        ? {
-                                            ...p,
-                                            catalogGroupKey: groupKey,
-                                            catalogPartCode: "",
-                                            part: "",
-                                            productId: null,
-                                            productType: null,
-                                            isSaved: false,
-                                          }
-                                        : p
-                                    )
-                                  );
-                                  setLineItemErrors((prev) => ({
-                                    ...prev,
-                                    [index]: { ...prev[index], part: undefined },
-                                  }));
-                                  setLineItemSmartSuggestionsByRow((prev) => ({ ...prev, [rowKey]: [] }));
-                                  setLineItemSmartSuggestionsLoadingByRow((prev) => ({ ...prev, [rowKey]: false }));
-                                  setLineItemSmartSuggestionsFetchedByRow((prev) => ({ ...prev, [rowKey]: false }));
-                                  setDismissedSmartSuggestionsByRow((prev) => ({ ...prev, [rowKey]: [] }));
-                                }}
-                              >
-                                <option value="">Select Car Group</option>
-                                {vinCatalogGroups.map((group) => (
-                                  <option key={group.key} value={group.key}>
-                                    {group.label}
-                                  </option>
-                                ))}
-                              </select>
-                              {selectedGroupKey && (
-                                <select
-                                  className={`${theme.input} h-10 w-full`}
-                                  value={selectedPartCode}
-                                  disabled={isLocked}
-                                  onChange={(e) => {
-                                    const code = e.target.value;
-                                    const selected = filteredCatalogParts.find((part) => part.code === code) ?? null;
-                                    const nextPartName = selected?.name || selected?.code || "";
-                                    const nextPartCode = selected?.code || code;
-                                    setParts((prev) =>
-                                      prev.map((p, i) =>
-                                        i === index
-                                          ? {
-                                              ...p,
-                                              catalogPartCode: code,
-                                              part: nextPartName,
-                                              description: p.description || "",
-                                              productId: null,
-                                              productType: null,
-                                              isSaved: false,
-                                            }
-                                          : p
-                                      )
-                                    );
-                                    setLineItemErrors((prev) => ({
-                                      ...prev,
-                                      [index]: { ...prev[index], part: undefined },
-                                    }));
-                                    setLineItemAiAnswers((prev) => ({ ...prev, [rowKey]: {} }));
-                                    setLineItemAiRecommendationByRow((prev) => ({ ...prev, [rowKey]: "" }));
-                                    setLineItemSmartSuggestionsByRow((prev) => ({ ...prev, [rowKey]: [] }));
-                                    setLineItemSmartSuggestionsLoadingByRow((prev) => ({ ...prev, [rowKey]: false }));
-                                    setLineItemSmartSuggestionsFetchedByRow((prev) => ({ ...prev, [rowKey]: false }));
-                                    setDismissedSmartSuggestionsByRow((prev) => ({ ...prev, [rowKey]: [] }));
-                                    if (nextPartName) {
-                                      void requestLineItemAi(
-                                        rowKey,
-                                        {
-                                          partName: nextPartName,
-                                          partNumber: nextPartCode,
-                                          groupName: selectedGroupLabel,
-                                          description: row.description ?? "",
-                                          status: row.reason ?? "",
-                                        },
-                                        undefined,
-                                        undefined
-                                      );
-                                      void requestSmartFaultSuggestions(rowKey, {
-                                        partName: nextPartName,
-                                        partNumber: nextPartCode,
-                                        vin: inspectionVin.trim().toUpperCase(),
-                                        category: selectedGroupLabel,
-                                        groupName: selectedGroupLabel,
-                                        description: row.description ?? "",
-                                        status: row.reason ?? "",
-                                      });
-                                    }
-                                  }}
-                                >
-                                  <option value="">Select Part</option>
-                                  {filteredCatalogParts.map((part) => (
-                                    <option key={`${part.code}-${part.name}`} value={part.code}>
-                                      {part.name || "Unnamed part"}{part.code ? ` (${part.code})` : ""}
-                                    </option>
-                                  ))}
-                                </select>
-                              )}
-                            </div>
-                          ) : (
-                            <div className="relative">
-                              <input
-                                type="text"
-                                className={`${theme.input} h-10 w-full`}
-                                value={row.part}
-                                disabled={isLocked}
-                                onChange={(e) => updatePart(index, "part", e.target.value)}
-                                placeholder="Search products"
-                                onFocus={() => setProductOpenIndex(index)}
-                                onBlur={() => {
-                                  setTimeout(
-                                    () => setProductOpenIndex((current) => (current === index ? null : current)),
-                                    150
-                                  );
-                                }}
-                              />
-                              {productOpenIndex === index && (
-                                <div className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded-md border border-white/10 bg-slate-950 text-xs shadow-lg">
-                                  {(productResults.length ? productResults : products).map((product) => (
-                                    <button
-                                      key={product.id}
-                                      type="button"
-                                      className="flex w-full items-start gap-2 px-3 py-2 text-left text-white/80 hover:bg-white/10"
-                                      onMouseDown={(e) => e.preventDefault()}
-                                      onClick={() => {
-                                        updatePart(index, "part", product.name, {
-                                          productId: product.id,
-                                          productType: product.type ?? null,
-                                        });
-                                        setProductOpenIndex(null);
-                                        setLineItemAiAnswers((prev) => ({ ...prev, [rowKey]: {} }));
-                                        setLineItemAiRecommendationByRow((prev) => ({ ...prev, [rowKey]: "" }));
-                                        setLineItemSmartSuggestionsByRow((prev) => ({ ...prev, [rowKey]: [] }));
-                                        setLineItemSmartSuggestionsLoadingByRow((prev) => ({ ...prev, [rowKey]: false }));
-                                        setLineItemSmartSuggestionsFetchedByRow((prev) => ({ ...prev, [rowKey]: false }));
-                                        setDismissedSmartSuggestionsByRow((prev) => ({ ...prev, [rowKey]: [] }));
-                                        void requestLineItemAi(
-                                          rowKey,
-                                          {
-                                            partName: product.name,
-                                            partNumber: String(row.catalogPartCode ?? ""),
-                                            groupName: selectedGroupLabel,
-                                            description: row.description ?? "",
-                                            status: row.reason ?? "",
-                                          },
-                                          undefined,
-                                          undefined
-                                        );
-                                        void requestSmartFaultSuggestions(rowKey, {
-                                          partName: product.name,
-                                          partNumber: String(row.catalogPartCode ?? ""),
-                                          vin: inspectionVin.trim().toUpperCase(),
-                                          category: selectedGroupLabel,
-                                          groupName: selectedGroupLabel,
-                                          description: row.description ?? "",
-                                          status: row.reason ?? "",
-                                        });
-                                      }}
-                                    >
-                                      <span className="font-semibold">{product.name}</span>
-                                      <span className="text-[10px] text-white/50">{product.type}</span>
-                                    </button>
-                                  ))}
-                                  {productResults.length === 0 && products.length === 0 && (
-                                    <div className="px-3 py-2 text-white/50">No products found.</div>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        {lineItemErrors[index]?.part && (
-                          <div className="text-xs text-destructive">{lineItemErrors[index]?.part}</div>
-                        )}
-                      </div>
-                      {hasSelectedPart && (
-                      <div className="space-y-1">
-                        <div className="text-[10px] font-semibold uppercase tracking-wide text-white/60 lg:hidden">Part Number</div>
-                        <input
-                          type="text"
-                          className={`${theme.input} h-10 w-full`}
-                          value={row.catalogPartCode ?? ""}
-                          disabled={isLocked}
-                          onChange={(e) =>
-                            setParts((prev) =>
-                              prev.map((p, i) =>
-                                i === index ? { ...p, catalogPartCode: e.target.value, isSaved: false } : p
-                              )
-                            )
-                          }
-                          placeholder="Part number"
-                        />
-                      </div>
-                      )}
-                      {hasSelectedPart && (
-                      <div className="space-y-1">
-                        <div className="text-[10px] font-semibold uppercase tracking-wide text-white/60 lg:hidden">Description</div>
-                        <input
-                          type="text"
-                          className={`${theme.input} h-10 w-full`}
-                          value={row.description}
-                          disabled={isLocked}
-                          onChange={(e) => updatePart(index, "description", e.target.value)}
-                          placeholder="do it"
-                        />
-                      </div>
-                      )}
-                      {hasSelectedPart && (
-                      <div className="space-y-1">
-                        <div className="text-[10px] font-semibold uppercase tracking-wide text-white/60 lg:hidden">Quantity</div>
-                        <input
-                          type="number"
-                          min={1}
-                          step={1}
-                          className={`${theme.input} h-10 w-full`}
-                          value={row.qty}
-                          disabled={isLocked}
-                          onChange={(e) => updatePart(index, "qty", e.target.value)}
-                        />
-                        {lineItemErrors[index]?.qty && (
-                          <div className="text-xs text-destructive">{lineItemErrors[index]?.qty}</div>
-                        )}
-                      </div>
-                      )}
-                      {hasSelectedPart && (
-                      <div className="space-y-1">
-                        <div className="text-[10px] font-semibold uppercase tracking-wide text-white/60 lg:hidden">Status</div>
-                        <select
-                          className={`${theme.input} h-10 w-full`}
-                          value={row.reason || "Mandatory"}
-                          disabled={isLocked}
-                          onChange={(e) => updatePart(index, "reason", e.target.value)}
-                        >
-                          {lineItemStatusOptions.map((status) => (
-                            <option key={status} value={status}>
-                              {status}
-                            </option>
-                          ))}
-                          {row.reason && !lineItemStatusOptions.includes(row.reason as (typeof lineItemStatusOptions)[number]) ? (
-                            <option value={row.reason}>{row.reason}</option>
-                          ) : null}
-                        </select>
-                      </div>
-                      )}
-                      {hasSelectedPart && (
-                      <div className="space-y-1">
-                        <div className="text-[10px] font-semibold uppercase tracking-wide text-white/60 lg:hidden">Picture / Video</div>
-                        {(() => {
-                          const mediaRequirement = getMediaRequirement(row);
-                          return (
-                            <FileUploader
-                              label=""
-                              kind={mediaRequirement.kind}
-                              value={row.mediaFileId ?? ""}
-                              onChange={(id) => updatePartMedia(index, id ?? "")}
-                              disabled={isLocked}
-                              buttonOnly
-                              showPreview
-                              buttonClassName="h-10 w-full justify-center "
-                              containerClassName="w-full"
-                            />
-                          );
-                        })()}
-                        {lineItemErrors[index]?.media && (
-                          <div className="text-xs text-destructive">{lineItemErrors[index]?.media}</div>
-                        )}
-                      </div>
-                      )}
-                      {hasSelectedPart && (
-                      <div className="lg:col-span-7 rounded-md border border-cyan-500/20 bg-cyan-500/5 p-2">
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="text-[11px] font-semibold uppercase tracking-wide text-cyan-200">
-                            AI Part Inspection ({row.part || "Select part first"})
-                          </div>
-                          <button
-                            type="button"
-                            className="rounded-md border border-cyan-500/40 px-2 py-1 text-[10px] font-semibold text-cyan-100 disabled:opacity-50"
-                            disabled={isLocked || (!String(row.catalogPartCode ?? "").trim() && !String(row.part ?? "").trim())}
-                            onClick={() => {
-                              const searchToken =
-                                String(row.catalogPartCode ?? "").trim() || String(row.part ?? "").trim();
-                              const query = [
-                                searchToken,
-                                inspectionMake,
-                                inspectionModel,
-                                inspectionYear,
-                                inspectionVin,
-                                "car part",
-                                "diagram",
-                              ]
-                                .map((v) => String(v ?? "").trim())
-                                .filter(Boolean)
-                                .join(" ");
-                              if (!query) return;
-                              window.location.assign(
-                                `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(query)}`
-                              );
-                            }}
-                          >
-                            View Diagram
-                          </button>
-                        </div>
-                        {hasSelectedPart && (
-                          <div className="mt-2 rounded border border-amber-500/30 bg-amber-500/10 p-2">
-                            <div className="text-[11px] font-semibold uppercase tracking-wide text-amber-200">
-                              Smart Fault Suggestions
-                            </div>
-                            {smartSuggestionsLoading ? (
-                              <div className="mt-1 text-[11px] text-amber-100/80">
-                                Loading AI related suggestions...
-                              </div>
-                            ) : smartSuggestions.length === 0 ? (
-                              <div className="mt-1 text-[11px] text-amber-100/80">
-                                No related suggestions for this issue.
-                              </div>
-                            ) : (
-                              <div className="mt-1 space-y-1">
-                                {smartSuggestions.map((suggestion) => (
-                                  (() => {
-                                    const suggestionPartNumber =
-                                      String(suggestion.label.match(/\(([^)]+)\)/)?.[1] ?? "").trim() ||
-                                      String(row.catalogPartCode ?? "").trim();
-                                    const suggestionSearchQuery = [
-                                      suggestionPartNumber,
-                                      inspectionMake,
-                                      inspectionModel,
-                                      inspectionYear,
-                                      inspectionVin,
-                                      "car part",
-                                      "diagram",
-                                    ]
-                                      .map((v) => String(v ?? "").trim())
-                                      .filter(Boolean)
-                                      .join(" ");
-                                    const suggestionSearchUrl = `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(
-                                      suggestionSearchQuery
-                                    )}`;
-                                    return (
-                                  <div
-                                    key={`${rowKey}-smart-${suggestion.id}`}
-                                    className="flex flex-wrap items-center justify-between gap-2 rounded border border-white/10 bg-black/20 px-2 py-1.5 text-[11px]"
-                                  >
-                                    <div className="text-amber-100">
-                                      ⚠ {suggestion.label}
-                                      <div className="text-[10px] text-amber-100/70">{suggestion.reason}</div>
-                                    </div>
-                                    <div className="flex items-center gap-1.5">
-                                      <button
-                                        type="button"
-                                        className="rounded-md border border-emerald-500/40 px-2 py-0.5 text-[10px] font-semibold text-emerald-200"
-                                        onClick={() =>
-                                          void addSmartSuggestionAsLineItem(
-                                            index,
-                                            rowKey,
-                                            {
-                                              catalogGroupKey: row.catalogGroupKey,
-                                              reason: row.reason,
-                                              description: suggestion.reason,
-                                            },
-                                            suggestion
-                                          )
-                                        }
-                                      >
-                                        Add
-                                      </button>
-                                      <a
-                                        href={suggestionSearchUrl}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="rounded-md border border-cyan-500/40 px-2 py-0.5 text-[10px] font-semibold text-cyan-200"
-                                      >
-                                        Open AI Search Result
-                                      </a>
-                                      <button
-                                        type="button"
-                                        className="rounded-md border border-white/20 px-2 py-0.5 text-[10px] font-semibold text-white/80"
-                                        onClick={() =>
-                                          setDismissedSmartSuggestionsByRow((prev) => ({
-                                            ...prev,
-                                            [rowKey]: Array.from(new Set([...(prev[rowKey] ?? []), suggestion.id])),
-                                          }))
-                                        }
-                                      >
-                                        Dismiss
-                                      </button>
-                                    </div>
-                                  </div>
-                                    );
-                                  })()
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                        <div className="mt-2 text-[11px] text-cyan-100/70">
-                          AI Questions are hidden for now. Smart Fault Suggestions remain active.
-                        </div>
-                      </div>
-                      )}
-                      <div className="flex flex-wrap items-center gap-2 text-[11px]">
-                        <div className="w-full text-[10px] uppercase tracking-wide text-white/60 lg:hidden">Actions</div>
-                        {row.isSaved ? (
-                          <button
-                            type="button"
-                            className="rounded-md bg-blue-600 px-3 py-2 text-[11px] font-semibold text-white"
-                            disabled={isLocked}
-                            onClick={() => {
-                              setParts((prev) =>
-                                prev.map((p, i) => (i === index ? { ...p, isSaved: false } : p))
-                              );
-                              toast.success("Line item is now in edit mode.");
-                            }}
-                          >
-                            Edit
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            className="rounded-md bg-emerald-600 px-3 py-2 text-[11px] font-semibold text-white"
-                            onClick={() => saveLineItem(index)}
-                            disabled={row.isSaving || isLocked}
-                          >
-                            {row.isSaving ? "Saving..." : "Save"}
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          className="rounded-md bg-rose-600 px-3 py-2 text-[11px] font-semibold text-white"
-                          onClick={() => deleteLineItem(index)}
-                          disabled={isLocked}
-                        >
-                          Delete
-                        </button>
-                        {!isReadOnly && !isCollectCarPending && !row.isSaved && (
-                          <span className="text-[11px] text-amber-400">Please save this item</span>
-                        )}
-                        {!hasSelectedPart && (
-                          <span className="text-[11px] text-cyan-200">Select group and part first.</span>
-                        )}
-                        {isLocked && (
-                          <span className="text-[11px] text-amber-400">Ordered/received item</span>
-                        )}
-                      </div>
-                    </div>
-                    )}
-                    </div>
-                    </React.Fragment>
-                  );
-                  })}
-                    </div>
-                    {!isReadOnly && !isCollectCarPending && (
-                      <div className="mt-3 flex items-center gap-2">
-                        <button
-                          type="button"
-                          className="rounded-md bg-teal-600 px-3 py-2 text-xs font-semibold text-white"
-                          onClick={addLineItemRow}
-                          disabled={vinCatalogLoading || parts.some((p) => !p.isSaved)}
-                        >
-                          {vinCatalogLoading ? "Loading..." : "+ Add Another Line Item"}
-                        </button>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
             </div>
 
+
             <div className={`mt-6 ${inspectionStep === 6 ? "" : "hidden"}`}>
-              <label className="text-xs font-semibold text-white/70">Inspector Remarks</label>
+              <div className="flex items-center justify-between gap-2">
+                <label className="text-xs font-semibold text-white/70">Inspector Remarks</label>
+                <button
+                  type="button"
+                  className="rounded-md bg-violet-600 px-3 py-1.5 text-[11px] font-semibold text-white disabled:opacity-50"
+                  disabled={aiSummaryLoading || parts.length === 0}
+                  onClick={async () => {
+                    setAiSummaryLoading(true);
+                    try {
+                      const res = await fetch(`/api/company/${companyId}/workshop/inspections/${inspectionId}/ai-summary`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                      });
+                      const json = await res.json();
+                      if (!res.ok) throw new Error(json.error ?? "AI summary failed");
+                      const d = json.data;
+                      setAiSummaryResult({ technical: d.technicalSummary, customer: d.customerSummary });
+                      if (d.technicalSummary) {
+                        setForm((prev) => ({ ...prev, inspectorRemarks: d.technicalSummary }));
+                      }
+                    } catch {
+                      // silent
+                    } finally {
+                      setAiSummaryLoading(false);
+                    }
+                  }}
+                >
+                  {aiSummaryLoading ? "Generating..." : "Generate AI Summary"}
+                </button>
+              </div>
               <textarea
-                className={theme.input}
+                className={`${theme.input} mt-1`}
                 rows={4}
                 value={form.inspectorRemarks}
                 readOnly={isReadOnly || isCollectCarPending}
                 onChange={(e) => setForm((prev) => ({ ...prev, inspectorRemarks: e.target.value }))}
                 placeholder="Final inspection remarks before completion."
               />
+              {aiSummaryResult?.customer && (
+                <div className="mt-2 rounded-md border border-violet-500/20 bg-violet-500/5 p-3">
+                  <div className="text-[11px] font-semibold text-violet-200">Customer-Friendly Summary (AI)</div>
+                  <div className="mt-1 whitespace-pre-wrap text-xs text-white/80">{aiSummaryResult.customer}</div>
+                </div>
+              )}
             </div>
             <div className={`mt-4 ${inspectionStep === 6 ? "" : "hidden"}`}>
               <div className="report-print-hide mb-3 flex flex-wrap items-center justify-end gap-2">
@@ -5417,6 +5882,211 @@ export function InspectionDetailPageClient({
           </div>
         </div>
       </div>
+      {/* ── Parts Catalog Modal ─────────────────────────────────────── */}
+      {catalogModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 backdrop-blur-sm"
+          onClick={(e) => { if (e.target === e.currentTarget) setCatalogModalOpen(false); }}
+        >
+          <div className="relative mx-4 w-full max-w-lg rounded-xl border border-emerald-500/30 bg-slate-900 p-5 shadow-2xl">
+            {/* Header */}
+            <div className="mb-4 flex items-center justify-between">
+              <div className="text-sm font-semibold text-emerald-200 uppercase tracking-wide">Parts Catalog</div>
+              <button
+                type="button"
+                className="rounded-md px-2 py-1 text-xs text-white/60 hover:bg-white/10 hover:text-white"
+                onClick={() => setCatalogModalOpen(false)}
+              >
+                ✕ Close
+              </button>
+            </div>
+
+            {/* EPC + Reload */}
+            <div className="grid gap-2 lg:grid-cols-[1fr_auto] lg:items-end">
+              <div>
+                <div className="text-[10px] font-semibold uppercase tracking-wide text-emerald-100/80">EPC</div>
+                <input
+                  type="text"
+                  className={`${theme.input} h-10 w-full`}
+                  value={vinPartsEpcState}
+                  onChange={(e) => setVinPartsEpcState(e.target.value)}
+                  placeholder="Auto from VIN (e.g. audi_vw)"
+                />
+              </div>
+              <button
+                type="button"
+                className="h-10 rounded-md bg-emerald-600 px-3 text-xs font-semibold text-white disabled:opacity-50"
+                disabled={vin17CatalogLoading || !vinPartsEpcState}
+                onClick={() => void fetchVin17CatalogLevel("cata1")}
+              >
+                {vin17CatalogLoading ? "Loading..." : "Reload"}
+              </button>
+            </div>
+
+            {/* Dynamic catalog level dropdowns */}
+            <div className="mt-3 space-y-2">
+              {vin17Cata1Options.length > 0 && (
+                <div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-emerald-100/80">Level 1 — Main Category</div>
+                  <select
+                    className={`${theme.input} h-10 w-full`}
+                    value={vin17Cata1Code}
+                    onChange={(e) => void onSelectCata1(e.target.value)}
+                    disabled={vin17CatalogLoading}
+                  >
+                    <option value="">Select main category</option>
+                    {vin17Cata1Options.map((row, idx) => (
+                      <option key={`c1m-${row.code}`} value={row.code}>{toCatalogDisplayLabel(row.name, idx)}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {vin17Cata1Code && vin17Cata2Options.length > 0 && (
+                <div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-emerald-100/80">Level 2 — Sub Category</div>
+                  <select
+                    className={`${theme.input} h-10 w-full`}
+                    value={vin17Cata2Code}
+                    onChange={(e) => void onSelectCata2(e.target.value)}
+                    disabled={vin17CatalogLoading}
+                  >
+                    <option value="">Select sub category</option>
+                    {vin17Cata2Options.map((row, idx) => (
+                      <option key={`c2m-${row.code}`} value={row.code}>{toCatalogDisplayLabel(row.name, idx)}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {vin17Cata2Code && vin17Cata3Options.length > 0 && (
+                <div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-emerald-100/80">Level 3 — Section</div>
+                  <select
+                    className={`${theme.input} h-10 w-full`}
+                    value={vin17Cata3Code}
+                    onChange={(e) => void onSelectCata3(e.target.value)}
+                    disabled={vin17CatalogLoading}
+                  >
+                    <option value="">Select section</option>
+                    {vin17Cata3Options.map((row, idx) => (
+                      <option key={`c3m-${row.code}`} value={row.code}>{toCatalogDisplayLabel(row.name, idx)}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {vin17Cata3Code && vin17Cata4Options.length > 0 && (
+                <div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-emerald-100/80">Level 4 — Detail</div>
+                  <select
+                    className={`${theme.input} h-10 w-full`}
+                    value={vin17Cata4Code}
+                    onChange={(e) => onSelectCata4(e.target.value)}
+                    disabled={vin17CatalogLoading}
+                  >
+                    <option value="">Select detail</option>
+                    {vin17Cata4Options.map((row, idx) => (
+                      <option key={`c4m-${row.code}`} value={row.code}>{toCatalogDisplayLabel(row.name, idx)}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {vin17CatalogLoading && (
+              <div className="mt-3 text-center text-xs text-emerald-100/70">Loading catalog...</div>
+            )}
+
+            {vinCatalogLoading && (
+              <div className="mt-3 text-center text-xs text-emerald-100/70">Loading parts...</div>
+            )}
+
+            {!vinCatalogLoading && vinCatalogParts.length > 0 && (
+              <div className="mt-3 rounded-md border border-emerald-500/30 bg-black/20 p-2">
+                <div className="mb-2 grid gap-2 grid-cols-[1fr_auto_auto]">
+                  <input
+                    type="text"
+                    className={`${theme.input} h-9 w-full`}
+                    value={bulkPartSearch}
+                    onChange={(e) => setBulkPartSearch(e.target.value)}
+                    placeholder="Search parts..."
+                  />
+                  <button
+                    type="button"
+                    className="h-9 rounded-md border border-emerald-500/40 px-3 text-xs font-semibold text-emerald-100"
+                    onClick={() => {
+                      const visibleCodes = vinCatalogParts
+                        .filter((p) => {
+                          const needle = bulkPartSearch.trim().toLowerCase();
+                          return !needle || `${p.name || ""} ${p.code || ""}`.toLowerCase().includes(needle);
+                        })
+                        .map((p) => p.code);
+                      setBulkAddPartCodes(visibleCodes);
+                    }}
+                  >
+                    All
+                  </button>
+                  <button
+                    type="button"
+                    className="h-9 rounded-md border border-white/20 px-3 text-xs font-semibold text-white/80"
+                    onClick={() => setBulkAddPartCodes([])}
+                  >
+                    Clear
+                  </button>
+                </div>
+                <div className="max-h-52 space-y-1 overflow-auto">
+                  {vinCatalogParts
+                    .filter((p) => {
+                      const needle = bulkPartSearch.trim().toLowerCase();
+                      return !needle || `${p.name || ""} ${p.code || ""}`.toLowerCase().includes(needle);
+                    })
+                    .map((part) => {
+                      const selected = bulkAddPartCodes.includes(part.code);
+                      return (
+                        <label
+                          key={`cat-pick-m-${part.code}-${part.name}`}
+                          className="flex cursor-pointer items-center gap-2 rounded-md border border-white/10 px-2 py-1.5 text-xs hover:bg-white/5"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selected}
+                            onChange={(e) => {
+                              setBulkAddPartCodes((prev) =>
+                                e.target.checked
+                                  ? prev.includes(part.code) ? prev : [...prev, part.code]
+                                  : prev.filter((c) => c !== part.code)
+                              );
+                            }}
+                          />
+                          <span className="text-white/85">{part.name || "Unnamed part"}</span>
+                          {part.code ? <span className="text-white/50">({part.code})</span> : null}
+                        </label>
+                      );
+                    })}
+                </div>
+                <div className="mt-2 flex items-center justify-between">
+                  <span className="text-[11px] text-emerald-100/70">
+                    {bulkAddPartCodes.length} of {vinCatalogParts.length} selected
+                  </span>
+                  <button
+                    type="button"
+                    className="rounded-md bg-teal-600 px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                    disabled={bulkAddPartCodes.length === 0}
+                    onClick={addSelectedCatalogParts}
+                  >
+                    Add Selected Parts
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {!vin17CatalogLoading && !vinCatalogLoading && vin17Cata1Options.length === 0 && vinPartsEpcState && (
+              <div className="mt-3 rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
+                No catalog found for this EPC. Use Manual Entry below to add parts.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <style>{`
         .report-page-footer {
           display: none;

@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AppLayout, useTheme } from "@repo/ui";
+import { AIPanel } from "../../../(components)/intelligence/AIPanel";
 
 type Params = { params: { companyId: string } | Promise<{ companyId: string }> };
 
@@ -285,6 +286,7 @@ export default function CompanyCustomersPage({ params }: Params) {
   return (
     <AppLayout>
       <div className="space-y-4 py-4">
+        <AIPanel companyId={companyId} engines={["e4", "e6"]} />
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="space-y-1">
             <h1 className="text-xl sm:text-2xl font-semibold">Customers</h1>

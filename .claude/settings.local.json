@@ -1,0 +1,41 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -l \"customer_data_center\" \"c:/Users/ABC/Documents/Global ERP/packages/ai-core/migrations/\"*.sql)",
+      "Bash(find '/c/Users/ABC/Documents/Global ERP/apps/web/app/api' -path *data-center* -type f)",
+      "Bash(find 'c:/Users/ABC/Documents/Global ERP' -name *.prisma -type f)",
+      "Bash(grep -n \"INSERT INTO \\\\`roles\\\\`\" \"c:/Users/ABC/Downloads/carguru2.sql\")",
+      "Bash(grep -n \"INSERT INTO \\\\`permissions\\\\`\" \"c:/Users/ABC/Downloads/carguru2.sql\")",
+      "Bash(grep -n \"INSERT INTO \\\\`roles_permissons\\\\`\\\\|INSERT INTO \\\\`employees\\\\`\" \"c:/Users/ABC/Downloads/carguru2.sql\")",
+      "Bash(find '/c/Users/ABC/Documents/Global ERP/db' -type f -name *.sql -o -name *.ts -o -name *.md)",
+      "Bash(find '/c/Users/ABC/Documents/Global ERP/packages/ai-core/migrations' -type f -name *.sql)",
+      "Bash(find '/c/Users/ABC/Documents/Global ERP/apps/web/lib' -type f \\\\\\(-name *.ts -o -name *.tsx \\\\\\))",
+      "Bash(find '/c/Users/ABC/Documents/Global ERP/apps/web/app/api' -type f -path *admin/users* -o -path *auth/users*)",
+      "Bash(grep -n \"employee_id\" \"/c/Users/ABC/Documents/Global ERP/packages/ai-core/migrations/\"*.sql)",
+      "Bash(ls /c/Users/ABC/Downloads/*.sql)",
+      "Bash(ls /c/Users/ABC/Desktop/*.sql)",
+      "Bash(grep -n \"^INSERT INTO \\\\`employees\\\\`\" /c/Users/ABC/Downloads/carguru2.sql)",
+      "Bash(node -e \"require\\(''puppeteer''\\)\")",
+      "Bash(node -e \"require\\(''playwright''\\)\")",
+      "Bash(find 'c:/Users/ABC/Documents/Global ERP/packages/ai-core/src' -type f \\\\\\(-name *.ts -o -name *.tsx \\\\\\))",
+      "Bash(node --input-type=module:*)",
+      "Bash(find 'c:/Users/ABC/Documents/Global ERP' -type f \\\\\\(-name *yeastar* -o -name *dialer* -o -name *channel* \\\\\\))",
+      "WebSearch",
+      "WebFetch(domain:developers.cloudflare.com)",
+      "Bash(Get-Content \"C:\\\\Users\\\\ABC\\\\Documents\\\\Global ERP\\\\apps\\\\web\\\\tmp\\\\webhook-dialer.log\")",
+      "Bash(xargs grep:*)",
+      "Bash(grep -r \"FROM files\\\\|FROM customers\\\\|FROM company_contacts\" '/c/Users/ABC/Documents/Global ERP/packages' --include=*.ts --include=*.sql)",
+      "Bash(grep -r \"incoming-popup\\\\|IncomingPopup\" '/c/Users/ABC/Documents/Global ERP/apps/web/app' --include=*.tsx --include=*.ts)",
+      "Bash(grep -n \"CREATE TABLE.*files\" \"/c/Users/ABC/Documents/Global ERP/packages/ai-core/migrations\"/*.sql)",
+      "Bash(find '/c/Users/ABC/Documents/Global ERP/packages/ui' -type f -name *.tsx -o -name *.ts)",
+      "Bash(grep -r \"useSocket\\\\|useNotif\\\\|notify\\\\|alert\\\\|toast\" '/c/Users/ABC/Documents/Global ERP/apps/web' --include=*.tsx --include=*.ts)",
+      "Bash(grep -r \"cata1\\\\|cata2\\\\|cata3\\\\|is_last\\\\|cata_level\" 'c:/Users/ABC/Documents/Global ERP' --include=*.ts --include=*.tsx)",
+      "Bash(grep -r export.*InspectionMain 'c:/Users/ABC/Documents/Global ERP/packages/ui/src/')",
+      "Bash(FILTER_BRANCH_SQUELCH_WARNING=1 git filter-branch --force --index-filter 'git rm --cached --ignore-unmatch tmp/webhook-dialer.log apps/web/tmp/webhook-dialer.log' --prune-empty origin/main..HEAD)",
+      "Bash(cd /c/Users/ABC/Documents/\"Global ERP\")",
+      "Bash(grep -n \"const POST\" apps/web/app/api/webhooks/dialer/[providerKey]/route.ts)",
+      "Bash(grep \"sql$\")",
+      "Bash(find 'c:/Users/ABC/Documents/Global ERP' -type f -path *packages/ui* -name *UserForm*)"
+    ]
+  }
+}

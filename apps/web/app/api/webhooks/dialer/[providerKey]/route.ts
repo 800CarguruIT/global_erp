@@ -1196,6 +1196,7 @@ async function resolveYeastarRecordingForCall(args: {
   recordingUrl?: string;
   recordingId?: string;
   recordingDurationSeconds?: number;
+  integrationCompanyId?: string | null;
 } | null> {
   const provider = "yeastar";
   const hints = await getRecordingResolveHints(args).catch(() => ({
@@ -1329,7 +1330,7 @@ async function resolveYeastarRecordingForCall(args: {
           stage: "recording_resolve_query",
           providerCallId: args.providerCallId,
           integrationId: integration.id,
-          tokenMode: tokenResult.mode ?? null,
+          tokenMode: tokenResult.mode ?? undefined,
           attempt: attempt + 1,
           found: true,
         });
@@ -1339,6 +1340,7 @@ async function resolveYeastarRecordingForCall(args: {
           recordingDurationSeconds: Number.isFinite(recordingDurationSeconds)
             ? recordingDurationSeconds
             : undefined,
+          integrationCompanyId: integration.company_id ?? null,
         };
       }
 
@@ -1363,7 +1365,7 @@ async function resolveYeastarRecordingForCall(args: {
           sslVerify,
           providerCallId: args.providerCallId,
           integrationId: integration.id,
-          tokenMode: tokenResult.mode ?? null,
+          tokenMode: tokenResult.mode ?? undefined,
           attempt: attempt + 1,
           hints,
         }).catch(() => null);
@@ -1373,12 +1375,12 @@ async function resolveYeastarRecordingForCall(args: {
             stage: "recording_resolve_fallback_hit",
             providerCallId: args.providerCallId,
             integrationId: integration.id,
-            tokenMode: tokenResult.mode ?? null,
+            tokenMode: tokenResult.mode ?? undefined,
             attempt: attempt + 1,
             recordingUrl: fallbackResolved.recordingUrl ?? null,
             recordingId: fallbackResolved.recordingId ?? null,
           });
-          return fallbackResolved;
+          return { ...fallbackResolved, integrationCompanyId: integration.company_id ?? null };
         }
       }
 
@@ -1401,6 +1403,9 @@ async function scheduleDeferredYeastarRecordingResolve(args: {
   providerKey: string;
   companyId?: string | null;
   status: string;
+  direction?: "inbound" | "outbound";
+  fromNumber?: string | null;
+  toNumber?: string | null;
 }) {
   const key = `${args.providerKey}|${args.companyId ?? ""}|${args.providerCallId}`;
   const now = Date.now();
@@ -1416,12 +1421,13 @@ async function scheduleDeferredYeastarRecordingResolve(args: {
           companyId: args.companyId ?? null,
         });
         if (resolved?.recordingUrl || resolved?.recordingId) {
+          const effectiveCompanyId = args.companyId ?? resolved.integrationCompanyId ?? null;
           await CallCenter.handleDialerWebhookUpdate({
             providerKey: args.providerKey,
             providerCallId: args.providerCallId,
             status: args.status,
-            scope: args.companyId ? "company" : "global",
-            companyId: args.companyId ?? undefined,
+            scope: effectiveCompanyId ? "company" : "global",
+            companyId: effectiveCompanyId ?? undefined,
             recordingUrl: resolved.recordingUrl,
             recordingId: resolved.recordingId,
             recordingDurationSeconds: resolved.recordingDurationSeconds,
@@ -1431,12 +1437,77 @@ async function scheduleDeferredYeastarRecordingResolve(args: {
             stage: "recording_resolved_deferred",
             providerKey: args.providerKey,
             providerCallId: args.providerCallId,
-            companyId: args.companyId ?? null,
+            companyId: effectiveCompanyId,
             delayMs,
             recordingUrl: resolved.recordingUrl ?? null,
             recordingId: resolved.recordingId ?? null,
             recordingDurationSeconds: resolved.recordingDurationSeconds ?? null,
           });
+          // For outbound calls, no inquiry was created at call-start time.
+          // Create one now so auto-analyze can find it.
+          // Yeastar sends two legs per outbound call (agent + trunk). The trunk leg fires as
+          // "inbound" and may already have created an inquiry — check before creating a duplicate.
+          if (args.direction === "outbound" && effectiveCompanyId && isLikelyExternalNumber(args.toNumber)) {
+            const sql = getSql();
+            const customerNumber = args.toNumber ?? null;
+            // Look up when this call session started so we can check for the trunk-leg
+            // inquiry that was created at call-start time (not at recording-resolve time).
+            const sessionRows = await sql<{ created_at: string }[]>`
+              SELECT created_at FROM call_sessions
+              WHERE provider_call_id = ${args.providerCallId}
+              ORDER BY created_at ASC LIMIT 1
+            `.catch(() => []);
+            const sessionCreatedAt = ((sessionRows as any).rows ?? sessionRows)[0]?.created_at ?? new Date().toISOString();
+            const existingInquiry = await sql<{ id: string }[]>`
+              SELECT id FROM call_ai_inquiries
+              WHERE company_id = ${effectiveCompanyId}
+                AND from_number = ${customerNumber}
+                AND created_at BETWEEN ${sessionCreatedAt}::timestamptz - interval '30 seconds'
+                                   AND ${sessionCreatedAt}::timestamptz + interval '5 minutes'
+              LIMIT 1
+            `.catch(() => []);
+            const existingRows = (existingInquiry as any).rows ?? existingInquiry;
+            if (existingRows.length > 0) {
+              // Trunk-leg inquiry found — point it at the agent-leg provider_call_id
+              // so the recording (stored under the agent-leg session) is visible.
+              await sql`
+                UPDATE call_ai_inquiries
+                SET provider_call_id = ${args.providerCallId},
+                    provider_key      = ${args.providerKey},
+                    updated_at        = now()
+                WHERE id = ${existingRows[0].id}
+                  AND provider_call_id != ${args.providerCallId}
+              `.catch(() => {});
+            } else {
+              await CallAiWorkflow.runCallAiWorkflow({
+                companyId: effectiveCompanyId,
+                providerKey: args.providerKey,
+                providerCallId: args.providerCallId,
+                fromNumber: args.toNumber ?? null,
+                toNumber: args.fromNumber ?? null,
+                simulationMode: false,
+                inquiryOnly: true,
+              }).catch((err: unknown) => {
+                void logWebhookLine({
+                  ts: new Date().toISOString(),
+                  stage: "outbound_inquiry_create_error",
+                  providerKey: args.providerKey,
+                  providerCallId: args.providerCallId,
+                  companyId: effectiveCompanyId,
+                  error: err instanceof Error ? err.message : String(err),
+                });
+              });
+            }
+          }
+          // Trigger auto-analysis now that recording is available — fire-and-forget
+          const internalSecret = process.env.INTERNAL_SECRET ?? "";
+          if (internalSecret) {
+            const autoAnalyzeBase = (process.env.NEXTAUTH_URL ?? "http://localhost:3000").replace(/\/+$/, "");
+            void fetch(
+              `${autoAnalyzeBase}/api/internal/ai/auto-analyze-inquiries?providerCallId=${encodeURIComponent(args.providerCallId)}`,
+              { headers: { "x-internal-secret": internalSecret } }
+            ).catch(() => {});
+          }
           return;
         }
         await logWebhookLine({
@@ -1843,6 +1914,11 @@ function mapYeastarWebhook(providerKey: string, payload: any): DialerWebhookUpda
   if (msgCallType.includes("outbound") || directionNormalized.includes("out")) {
     direction = "outbound";
   } else if (
+    // Yeastar P-Series PCIR (type 30020): "External" means extension→PSTN = outbound
+    msgCallType === "external"
+  ) {
+    direction = "outbound";
+  } else if (
     msgCallType.includes("inbound") ||
     directionNormalized.includes("in") ||
     [30011, 30016].includes(yeastarType)
@@ -1850,9 +1926,24 @@ function mapYeastarWebhook(providerKey: string, payload: any): DialerWebhookUpda
     direction = "inbound";
   }
 
+  // Fallback heuristic for Yeastar type 30020 events with no explicit direction field:
+  // if fromNumber is a short internal extension (≤5 digits) and toNumber is an external
+  // number (≥7 digits), the call was originated by the extension → outbound.
+  if (direction === "inbound" && yeastarType === 30020) {
+    const fromDigits = String(fromRaw ?? "").replace(/\D+/g, "");
+    const toDigits = String(toRaw ?? "").replace(/\D+/g, "");
+    if (fromDigits.length <= 5 && toDigits.length >= 7) {
+      direction = "outbound";
+    }
+  }
+
   let normalizedStatus = rawStatus;
-  // Yeastar commonly sends event code 30016 for incoming call request.
-  if (rawStatus === "30016" || yeastarType === 30016) {
+  // Yeastar type 30012 is a post-call CDR — fires after hangup with the final disposition.
+  // "ANSWERED" here means the call successfully completed, not that it's currently in progress.
+  // "NO ANSWER", "BUSY", "FAILED" are also final — map all type 30012 events to "completed".
+  if (yeastarType === 30012) {
+    normalizedStatus = "completed";
+  } else if (rawStatus === "30016" || yeastarType === 30016) {
     normalizedStatus = "incoming";
   } else if (yeastarType === 30011 && hasAnswerMember) {
     normalizedStatus = "ANSWERED";
@@ -1938,6 +2029,18 @@ function shouldIgnoreYeastarAuxEvent(update: DialerWebhookUpdate): {
 
   const hasKnownFrom = !isUnknownPartyNumber(update.fromNumber ?? null);
   const hasKnownTo = !isUnknownPartyNumber(update.toNumber ?? null);
+
+  // For call_over / call_answer: if the caller is unknown and toNumber is a short internal
+  // extension (1–6 digits), this is a ring group leg shadow event. Yeastar type 30020 uses
+  // a UUID call_id that is different from the type 30012 CDR call_id — so they can't update
+  // the same session. Ignoring these prevents duplicate "unknown" rows in call history.
+  if ((operation === "call_over" || operation === "call_answer") && !hasKnownFrom) {
+    const toVal = String(update.toNumber ?? "").trim();
+    if (/^\d{1,6}$/.test(toVal)) {
+      return { ignore: true, operation, type: eventType };
+    }
+  }
+
   if (hasKnownFrom || hasKnownTo) {
     return { ignore: false };
   }
@@ -1949,7 +2052,8 @@ async function handle(providerKey: string, req: NextRequest) {
   const headers = Object.fromEntries(req.headers.entries());
   const parsed = await parsePayload(req);
   const payload = parsed.payload;
-  await logWebhookLine({
+  // Fire-and-forget — disk I/O must not block the fast path (popup delivery)
+  void logWebhookLine({
     ts: new Date().toISOString(),
     stage: "received",
     providerKey,
@@ -1958,10 +2062,7 @@ async function handle(providerKey: string, req: NextRequest) {
     contentType: parsed.contentType,
     rawBody: parsed.rawText.slice(0, 4000),
     payload,
-  });
-
-  // Maintain legacy integration event behavior
-  await Dialer.handleDialerWebhook(providerKey, payload, headers);
+  }).catch(() => {});
 
   // Map payload to CallCenter update
   const update =
@@ -2016,6 +2117,11 @@ async function handle(providerKey: string, req: NextRequest) {
       toNumber: update.toNumber ?? null,
       ringingExtensions: update.ringingExtensions ?? null,
     });
+    // Run legacy integration handler in background — must not block the fast path
+    void Dialer.handleDialerWebhook(providerKey, payload, headers).catch(() => {});
+  } else {
+    // Non-fast-path events (outbound, answered, ended, etc.) — blocking is fine
+    await Dialer.handleDialerWebhook(providerKey, payload, headers);
   }
 
   const needsLiveFallback =
@@ -2030,8 +2136,17 @@ async function handle(providerKey: string, req: NextRequest) {
       companyId: update.companyId,
     }).catch(() => null);
     if (resolved?.fromNumber) update.fromNumber = resolved.fromNumber;
-    if ((!update.toNumber || update.toNumber.toLowerCase() === "unknown") && resolved?.toNumber) {
+    const currentToIsShortExtension = /^\d{1,6}$/.test(String(update.toNumber ?? "").trim());
+    if (
+      resolved?.toNumber &&
+      (!update.toNumber || update.toNumber.toLowerCase() === "unknown" || currentToIsShortExtension)
+    ) {
       update.toNumber = resolved.toNumber;
+      // If toNumber was a short extension and the live query resolved an external number,
+      // this is an agent-originated outbound call (SDK dial or call/dial via Linkus).
+      if (currentToIsShortExtension) {
+        update.direction = "outbound";
+      }
     }
     await logWebhookLine({
       ts: new Date().toISOString(),
@@ -2053,6 +2168,27 @@ async function handle(providerKey: string, req: NextRequest) {
     fromNumber: update.fromNumber ?? null,
     toNumber: update.toNumber ?? null,
   });
+
+  // For outbound calls (e.g. placed directly from Linkus), Yeastar payloads carry no companyId.
+  // Resolve it from the active integration so the session is stored under the correct company.
+  if (!update.companyId && update.direction === "outbound" && providerKey.toLowerCase() === "yeastar") {
+    const inferredCompanyId = await resolveCompanyForInbound({
+      providerKey: update.providerKey,
+      toNumber: update.toNumber ?? null,
+      rawPayload: update.rawPayload,
+    }).catch(() => null);
+    if (inferredCompanyId) {
+      update.companyId = inferredCompanyId;
+      update.scope = "company";
+      await logWebhookLine({
+        ts: new Date().toISOString(),
+        stage: "company_scope_resolved_outbound",
+        providerKey,
+        providerCallId: update.providerCallId,
+        companyId: inferredCompanyId,
+      });
+    }
+  }
 
   let popupAiText: string | null = null;
   let popupPickupHint: string | null = null;
@@ -2380,28 +2516,31 @@ async function handle(providerKey: string, req: NextRequest) {
       providerKey,
       companyId: update.companyId ?? null,
       status: String(update.status ?? "completed"),
+      direction: update.direction ?? "inbound",
+      fromNumber: update.fromNumber ?? null,
+      toNumber: update.toNumber ?? null,
     });
   }
 
   await CallCenter.handleDialerWebhookUpdate(update);
 
-  if (update.direction === "inbound") {
-    publishIncomingPopupEvent({
-      id: `${providerKey}-${update.providerCallId}-${Date.now()}`,
-      providerCallId: update.providerCallId,
-      providerKey,
-      direction: "inbound",
-      status: update.status,
-      fromNumber: update.fromNumber ?? null,
-      toNumber: update.toNumber ?? null,
-      ringingExtensions: update.ringingExtensions ?? null,
-      companyId: update.companyId ?? null,
-      branchId: update.branchId ?? null,
-      aiText: popupAiText,
-      pickupHint: popupPickupHint,
-      createdAt: new Date().toISOString(),
-    });
-  }
+  // Publish real-time event for ALL directions and statuses so the UI can track
+  // every transition (initiated → ringing → answered → ended) without polling.
+  publishIncomingPopupEvent({
+    id: `${providerKey}-${update.providerCallId}-${Date.now()}`,
+    providerCallId: update.providerCallId,
+    providerKey,
+    direction: (update.direction ?? "inbound") as "inbound" | "outbound",
+    status: update.status,
+    fromNumber: update.fromNumber ?? null,
+    toNumber: update.toNumber ?? null,
+    ringingExtensions: update.ringingExtensions ?? null,
+    companyId: update.companyId ?? null,
+    branchId: update.branchId ?? null,
+    aiText: popupAiText,
+    pickupHint: popupPickupHint,
+    createdAt: new Date().toISOString(),
+  });
 }
 
 export async function POST(req: NextRequest, ctx: ParamsCtx) {

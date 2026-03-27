@@ -11,6 +11,7 @@ import {
   useI18n,
   useTheme,
 } from "@repo/ui";
+import { AIPanel } from "../../../(components)/intelligence/AIPanel";
 
 type Summary = {
   stats: {
@@ -186,6 +187,7 @@ function CallCenterContent({ companyId }: { companyId: string }) {
 
   return (
     <div className="space-y-6 py-4">
+      <AIPanel companyId={companyId} engines={["e1", "e2"]} />
       <div className="space-y-1">
         <h1 className="text-xl sm:text-2xl font-semibold">{t("call.company.title")}</h1>
         <p className="text-sm text-muted-foreground">{t("call.company.subtitle")}</p>

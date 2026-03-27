@@ -21,7 +21,24 @@ export async function GET(req: NextRequest, ctx: ParamsCtx) {
       limit: Number.isFinite(limit) ? Math.min(Math.max(limit, 1), 500) : 200,
     });
 
-    const filtered = direction ? sessions.filter((s) => s.direction === direction) : sessions;
+    // Exclude Yeastar ring group "shadow" sessions: inbound legs where the caller is unknown,
+    // the destination is a short internal extension, and the call had no duration.
+    // These come from Yeastar type 30020 per-extension events (UUID call_id) which can't be
+    // merged with the real type 30012 CDR session. Kept only if they somehow have duration.
+    const withoutShadows = sessions.filter((s) => {
+      if (s.direction !== "inbound") return true;
+      const from = String(s.fromNumber ?? "").trim().toLowerCase();
+      const fromIsUnknown = !from || from === "unknown" || from === "null";
+      if (!fromIsUnknown) return true;
+      const to = String(s.toNumber ?? "").trim();
+      const toIsShortExtension = /^\d{1,6}$/.test(to);
+      if (!toIsShortExtension) return true;
+      // Keep if there's any meaningful duration (caller with hidden number who actually spoke)
+      const hasDuration = s.durationSeconds != null && s.durationSeconds > 0;
+      return hasDuration;
+    });
+
+    const filtered = direction ? withoutShadows.filter((s) => s.direction === direction) : withoutShadows;
     const sessionIds = filtered.map((s) => s.id);
     const recordings = await CallCenter.listRecordingsForSessions(sessionIds);
     const recordingMap = new Map<string, { url: string; durationSeconds: number | null }>();
@@ -62,6 +79,29 @@ export async function GET(req: NextRequest, ctx: ParamsCtx) {
       })
     );
 
+    // For sessions without a linked customer, resolve by phone (handles +971/971 prefix variants)
+    const uniqueExternalPhones = Array.from(
+      new Set(
+        filtered
+          .filter((s) => !(s.toEntityType === "customer" && s.toEntityId))
+          .map((s) => (s.direction === "outbound" ? s.toNumber : s.fromNumber))
+          .filter((p): p is string => Boolean(p) && p.toLowerCase() !== "unknown")
+      )
+    );
+    const phoneCustomerMap = new Map<string, { name: string | null; phone: string | null }>();
+    await Promise.all(
+      uniqueExternalPhones.map(async (phone) => {
+        try {
+          const matches = await Crm.listCustomers(companyId, { search: phone });
+          if (matches.length > 0) {
+            phoneCustomerMap.set(phone, { name: matches[0].name ?? null, phone: (matches[0] as any).phone ?? null });
+          }
+        } catch {
+          // ignore
+        }
+      })
+    );
+
     const payload = filtered.map((s) => {
       const computedDurationSeconds =
         s.durationSeconds ??
@@ -76,14 +116,23 @@ export async function GET(req: NextRequest, ctx: ParamsCtx) {
       direction: s.direction,
       from: s.fromNumber,
       to: s.toNumber,
-      status: s.status,
+      // If a session is stuck at "in_progress" but has actual duration, the call clearly
+      // ended — Yeastar type 30012 CDR used to map "ANSWERED" → "in_progress" (now fixed).
+      // Upgrade stale in_progress sessions so history shows them as Completed.
+      status: (s.status === "in_progress" || s.status === "ANSWERED") && computedDurationSeconds && computedDurationSeconds > 0
+        ? "completed"
+        : s.status,
       startedAt: s.startedAt ?? s.createdAt,
       durationSeconds: computedDurationSeconds,
       createdByUserId: s.createdByUserId,
       agent: userMap.get(s.createdByUserId ?? "") ?? null,
       toEntityType: s.toEntityType,
       toEntityId: s.toEntityId,
-      customer: s.toEntityType === "customer" && s.toEntityId ? customerMap.get(s.toEntityId) ?? null : null,
+      customer: (() => {
+        if (s.toEntityType === "customer" && s.toEntityId) return customerMap.get(s.toEntityId) ?? null;
+        const externalPhone = s.direction === "outbound" ? s.toNumber : s.fromNumber;
+        return externalPhone ? phoneCustomerMap.get(externalPhone) ?? null : null;
+      })(),
       recording: recordingMap.get(s.id) ?? null,
       metadata: s.metadata ?? {},
       };

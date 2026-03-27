@@ -41,6 +41,23 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     }
   }
 
+  // Handle delivery details update
+  const hasDeliveryFields = body.deliveryBranchId || body.deliveryAddress || body.deliveryContact || body.deliveryPhone || body.deliveryNotes;
+  if (hasDeliveryFields) {
+    const sql = (await import("@repo/ai-core/db")).getSql();
+    await sql`
+      UPDATE purchase_orders SET
+        delivery_branch_id = COALESCE(${body.deliveryBranchId ?? null}, delivery_branch_id),
+        delivery_address = COALESCE(${body.deliveryAddress ?? null}, delivery_address),
+        delivery_contact = COALESCE(${body.deliveryContact ?? null}, delivery_contact),
+        delivery_phone = COALESCE(${body.deliveryPhone ?? null}, delivery_phone),
+        delivery_notes = COALESCE(${body.deliveryNotes ?? null}, delivery_notes),
+        delivery_set_at = COALESCE(delivery_set_at, now()),
+        updated_at = now()
+      WHERE id = ${poId} AND company_id = ${companyId}
+    `;
+  }
+
   await updatePurchaseOrderHeader(companyId, poId, {
     status: requestedStatus,
     expectedDate: body.expectedDate ?? null,
