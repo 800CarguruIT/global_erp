@@ -35,7 +35,11 @@
       "Bash(cd /c/Users/ABC/Documents/\"Global ERP\")",
       "Bash(grep -n \"const POST\" apps/web/app/api/webhooks/dialer/[providerKey]/route.ts)",
       "Bash(grep \"sql$\")",
-      "Bash(find 'c:/Users/ABC/Documents/Global ERP' -type f -path *packages/ui* -name *UserForm*)"
+      "Bash(find 'c:/Users/ABC/Documents/Global ERP' -type f -path *packages/ui* -name *UserForm*)",
+      "Bash(gunzip -c \"c:/Users/DELL/Documents/global_erp-main/global_erp-main/db/carguru_v2_2026-03-26_16-23-48.sql.gz\")",
+      "Bash(gunzip -c db/carguru_v2_2026-03-26_16-23-48.sql.gz)",
+      "Bash(grep -A 50 \"CREATE TABLE \\\\`chsc_customers\\\\`\")",
+      "Bash(node -e \"const postgres = require\\(''./node_modules/postgres''\\); const sql = postgres\\(''postgres://autoguru:autoguru@localhost:5432/global_erp_dev'', { max: 1 }\\); sql\\\\`SELECT count\\(*\\) FROM leads WHERE company_id=''d32af79a-fdde-4052-a8f1-6bc69ba3544e'' AND customer_id IS NULL\\\\`.then\\(r => { console.log\\(''leads no customer:'', r[0].count\\); return sql.end\\(\\); }\\).catch\\(e => { console.error\\(e.message\\); process.exit\\(1\\); }\\);\")"
     ]
   }
 }

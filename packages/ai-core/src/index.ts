@@ -118,6 +118,7 @@ export type { EngineKey, EngineResult, Signal, EngineConfig } from "./intelligen
 export { canUseAi } from "./ai/policy";
 export {
   clearCompanyAiProviderConfig,
+  getAllCompanyAiProviderConfigs,
   getCompanyAiProviderConfig,
   maskApiKey,
   upsertCompanyAiProviderConfig,

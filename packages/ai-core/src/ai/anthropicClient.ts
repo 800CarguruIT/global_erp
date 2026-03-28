@@ -25,8 +25,8 @@ export async function getAnthropicClientForCompany(
   const normalizedCompanyId = String(companyId ?? "").trim();
 
   if (normalizedCompanyId) {
-    const config = await getCompanyAiProviderConfig(normalizedCompanyId).catch(() => null);
-    if (config?.isActive && config.provider === "anthropic") {
+    const config = await getCompanyAiProviderConfig(normalizedCompanyId, "anthropic").catch(() => null);
+    if (config?.isActive) {
       const companyKey = String(config.apiKey ?? "").trim();
       if (companyKey) {
         return { client: new Anthropic({ apiKey: companyKey }), source: "company" };

@@ -1,0 +1,523 @@
+id	name	username	email	designation	department	phone	status	current_status	terminated_at
+1	Syed Muhammad Furrukh Syed Muhammad Qasim	smfurrukh	it@800carguru.ae	Senior Developer	Admin Department	589776035	0		2025-12-09 20:00:00
+2	Muzamil Saiyad Saiyad Sikandar Kasam	Muzamil	it@800carguru.ae	Sales Manager	Admin	0586037635	0		NULL
+3	Sonika Sandesh Mandiyal Sandesh Mandiyal	Sonika	admin@800carguru.ae	Sales Agent	Service Center 1	0586001140	0		NULL
+4	Aziza Fatima Bin Khalifa Salam Bin	Aziza	admin@carguru.ae	Appointment Coordinator	Service Center Sales Department	0586008491	1		NULL
+5	Nirmala Martin 	Nirmala	admin@carguru.ae	FeedBack Agent	Service Center 1	0586001135	0		NULL
+6	Abdul Karim Abdul Aziz	Sohail	admin@carguru.ae	Supervisor	Service Center Sales Department	586001139	1		NULL
+7	Mohammad Asid Hussain	Asid	rsa@carguru.ae	Sales Agent	Call Center	0581027627	0		NULL
+8	Bilal Naeem Naeem Sadiq	Bilal	rsa@carguru.ae	Sales Agent	Call Center	0581027627	0		NULL
+9	Ahmed Sharif Kudus Sharief	Ahmad	rsa@carguru.ae	Sales Agent	RSA Sales Department	0589776034	0		2025-09-29 20:00:00
+10	Abdullah Shabbir Shabbir Ahmed	Abdullah	rsa@carguru.ae	Sales Agent	RSA Sales Department	0554601318	0		2025-10-24 20:00:00
+11	Kamran Mazher Mazher Iqbal  	Kamran	rsa@carguru.ae	Supervisor	RSA Sales Department	521679266	1		NULL
+12	Muhammad Hadeed Mehmood Qazi Rizwan Khan	Hadeed	rsa@cg.ae	Senior Sales Agent	Call Center	0589776038	0		NULL
+13	Muhammad Javed Fareed Ghulam Fareed	Javed	rsa@cg.ae	Senior Sales Agent	Call Center	0545942036	0		NULL
+14	Jeeva	Jeeva		Sales Agent	Call Center	0586037628	1		NULL
+15	Mohmmad  Auff	Auf	rsa@cg.ae	Agent	Call Center	0522448032	0		NULL
+16	Muhammad Umair Muhammad Waseem	Umair	rsa@cg.ae	Dispatcher Agent	RSA Sales Department	522448032	1		2026-02-25 20:00:00
+17	Hunain  Asif Muhammad Asif	Hunain	admin@800carguru.ae	Head – ERP Control	Third Party Garage Operations Department	521548064	1		NULL
+18	Hussnain Ali M Munir Iqbal	Husnain	rsa@cg.ae	Service Advisor	Service Center Sales Department	586001143	1		2026-02-25 20:00:00
+19	Ramees Mallisseri Hassainar Mallisseri	Ramees	rsa@cg.ae	Service Advisor	Service Center Sales Department	581027624	1		NULL
+20	Venkatesh Murugesan 	Essa	rsa@cg.ae	Service Advisor	Service Center Sales Department	586008498	1		NULL
+21	Muhammad Usman 	Usman	rsa@cg.ae	Sales Advisor- Tyre	Service Center 1	0586001143	0		NULL
+22	Mohammed Saqeeb Mandlik Mansoor Mandlik	Saqeeb	rsa@cg.ae	Tyre Sales Supervisor	SC-01 Operations Department	0557973462	0		2025-07-31 20:00:00
+23	Surbhi Sanjay Anand	Surbhi	rsa@cg.ae	Service Advisor	Service Center Sales Department	588142039	1		NULL
+24	Parash Tomar	Paras	rsa@cg.ae	Service Advisor	Service Center 1	0521679262	0		NULL
+25	Muhammed Ibrahim Muhammad Imran Ameen Ameen	Ibrahim	rsa@cg.ae	Service Advisor	Service Center 1	0557973458	0		NULL
+`id`	`name`	`username`	`email`	`designation`	`department`	`phone`	`status`	`current_status`	`terminated_at`
+26	Shafeeunnasar Areepatta Mannil	Shafi	rsa@cg.ae	Service Advisor	Service Center 1	0557973215	0		NULL
+27	Syed Yasir Hussain Shah Shah Nawaz	Yasir	rsa@cg.ae	Service Advisor	Service Center 1	0586008488	0		NULL
+28	Mohammed Ashik Mohamed Kutty Vadakethil 	Ashiq	admin@800carguru.ae	Service Advisor	Service Center 1	0588362730	0		NULL
+29	Junaid Wasi Uddin Wasi	Junaid	rsa@cg.ae	Service Advisor	Service Center 1	0586037631	0		NULL
+30	Muhammed Salih Valiyathody	Salih	hr@800carguru.ae	HR Manager	Admin Department	557973146	1		2026-03-10 20:00:00
+31	Arvind Charan Gopal Dan Charan	Arvind	accounts@800carguru.ae	Accounts Manager	Admin Department	521078509	1		2026-03-15 20:00:00
+32	Umer Hassan Khan Abid Hussain Khan	Umer	accounts@800carguru.ae	Purchaser	Admin	0586008490	0		NULL
+33	Noman Naseer Muhammad Naseer Ahmed	Noman	accounts@800carguru.ae	Accounts Receivable	Admin Department	581027626	0		2025-12-25 20:00:00
+34	John Thomas	John	rsa@cg.ae	Business Development Manager	Admin	Not Available	0		NULL
+35	Ankit Dhingra	Ankit	carcare@800carguru.ae	Operations Manager	Onsite	0557973142	0		NULL
+36	Habib Ali Naseeb Ali Naseeb	Habib	accounts@800carguru.ae	Accounts Payable	Admin	0586001134	0		NULL
+37	Syed Maaz Ahmed Syed Anwar Ahmed	Maaz	accounts@800carguru.ae	Purchaser	Spare Parts Department	557973268	1		NULL
+38	Sumaya Namale 	Sumaya	admin@800carguru.ae	Cleaner	Admin	0586008494	0		NULL
+39	Aneeq Ahmad Muhammad  Ahmad Butt 	Aneeq	info@800carguru.ae	Dispatcher Agent	RSA Sales Department	Not Available	1		NULL
+40	Hamza Farrukh Farrukh Nadeem	Hamza	rsa@cg.ae	Compliance Officer	RSA Sales Department	581027629	1		NULL
+41	Nimmy Bindhu Bindhu	Nimmy	Nimmybindu@gmail.com	Service Advisor	Service Center Sales Department	0504641774	0		2025-12-03 20:00:00
+42	Syeda Sarwathunissa	Syeda	rsa@cg.ae	CHSC Tele Sales Agent	Call Center	0586008493	0		NULL
+43	Dimple Anil Lalwani 	Dimple	info@800carguru.ae	Sales Agent	RSA Sales Department	0581027628	0		2025-09-19 20:00:00
+44	Fauziya Mohammed Hanif Khan	Fauziya	info@800carguru.ae	Sales Agent	RSA Sales Department	581027623	1		NULL
+45	Chaithanya Dara Janardhan	Chaithanya	rsa@cg.ae	Service Coordinator	Call Center	0586008495	0		NULL
+46	Asma Islam Muhammad Islam	Asma	rsa@cg.ae	Sales Agent	Service Center 1	0588142076	0		NULL
+47	Asir Jilani ghulam Jilani Khan Khan	Asir	rsa@cg.ae	CHSC Field Sales Agent	RSA	0557973260	0		NULL
+48	Sami Ullah Ghulam Murtaza	Sami	rsa@cg.ae	Service Advisor	Service Center Sales Department	522357443	1		NULL
+49	Salman Jehanzeb Khan 	Salman	rsa@cg.ae	Battery Technician	RSA Operations	586001136	1		NULL
+50	Asif Mahmood Jam Abdul Qadir 	Asif Mahmood	rsa@cg.ae	Battery Technician	RSA Operations	589776037	1		NULL
+51	Hazrat Ali Sabz Ali	Hazrat Ali	rsa@cg.ae	Minor Service Technician	RSA Technicians	0586001138	0		NULL
+52	Muhammad Ammad Muhammad Riaz Khan  	Muhammad Ammad	rsa@cg.ae	RSA - Technician (AUH)	RSA	0521548068	0		NULL
+53	Shahid  Ali Amir Ud Din	Shahid	rsa@cg.ae	Battery Technician	RSA Operations	521679264	0		2026-02-03 20:00:00
+54	Zafar Ali Muhammad Sabir  	Zafar	rsa@cg.ae	Battery Technician	RSA Operations	588362725	1		NULL
+`id`	`name`	`username`	`email`	`designation`	`department`	`phone`	`status`	`current_status`	`terminated_at`
+55	Salaman Khan 	Salaman	rsa@cg.ae	Technician	Onsite	0586001136	0		NULL
+56	Adnan  Khan Abdul Waheed Khan	Adnan	rsa@cg.ae	Battery Technician	RSA Operations	521679270	0		2025-10-17 20:00:00
+57	Sami Ullah	Sami Ullah	rsa@cg.ae	RSA - Technician (DXB)	Onsite	0521548070	0		NULL
+58	Mehran Khan Umar Ali	Mehran	rsa@cg.ae	Recovery Driver	Towing Service Department	0521679265	0		NULL
+59	Umaid Ali Muhammad Hanif	Umaid	rsa@cg.ae	Battery Technician	RSA Operations	521548073	0		2025-11-24 20:00:00
+60	Ehtisham Zafar Zafar  Iqbal	Ehtisham	rsa@cg.ae	Battery Technician	RSA Operations	521548076	0		2025-09-25 20:00:00
+61	Ismail Nadar Khan 	Ismail	rsa@cg.ae	Technician	Onsite	0588362729	0		NULL
+62	Jawad Muhammad Tahir Muhammad	Jawad	rsa@cg.ae	Battery Technician	RSA Operations	581027622	1		NULL
+63	Muhammad Shahzad  Muhammad Nawaz	Shahzad	rsa@cg.ae	Tyre Technician	Service Center Operations Department	0588362723	1		NULL
+64	Rafaqat Riasat Riasat Ali	Rafaqat	rsa@cg.ae	Battery Technician	RSA Operations	521548071	0		2025-11-24 20:00:00
+65	Sajid Ullah  Saeed Ullah	Sajid	rsa@cg.ae	Battery Technician	RSA Operations	588362729	0		2025-11-24 20:00:00
+66	Abbas Khan	Abbas	rsa@cg.ae	Technician	Onsite	0521679263	0		NULL
+68	Ahsan Ayaz Ajmal Khan	Ahsan	rsa@cg.ae	Battery Technician	RSA Operations	586001137	1		NULL
+69	Zeeshan Khan Izat Khan	Zeeshan	rsa@cg.ae	Battery Technician	RSA Operations	586008499	0		2025-10-15 20:00:00
+70	Wajahat Ullah Ayub  Khan 	Wajahat	rsa@cg.ae	Battery Technician	RSA Operations	504641774	0		2025-11-24 20:00:00
+71	Wajid Ali Jamshid 	Wajid	rsa@cg.ae	Battery Technician	RSA Operations	521679261	0		2025-11-03 20:00:00
+72	Syed Farhan Ahmed Syed Anwar Ahmed	Farhan	rsa@cg.ae	Floor Supervisor	Service Center Operations Department	521548069	1		NULL
+73	Mohammed Khalid Ali	Khalid	rsa@cg.ae	Quality Controller (QC)	Service Center 1	0557973140	0		NULL
+74	Adnan Abdul Iliyaz	Adnan1	rsa@cg.ae	Diagnoser	Service Center 1	Not Available	0		NULL
+75	Muhammad Ahmed Nazar Hussain	Ahmed Nazar	rsa@cg.ae	Service Advisor	Service Center 1	0586037627	0		NULL
+76	Saeed Ahmad Chaudhry Nazir Ahmad	Ahmad Chaudhry	rsa@cg.ae	Driver	Service Center 1	Not Available	0		NULL
+77	Abid Ali Ahmed Ali	Abid Ali	rsa@cg.ae	Head Inspector	Service Center Operations Department	0509382165	0		2025-11-18 20:00:00
+78	Muhammad Sarfraz Muhammad Ismail	Sarfraz	rsa@cg.ae	Electrician	Service Center Operations Department	Not Available	0		2025-10-06 20:00:00
+79	Husain Syeed Tassadaq Muhammed Ramzan 	Tassadaq	rsa@cg.ae	Technician	Service Center Operations Department	Not Available	1		NULL
+80	Ali Mohammad Mughal Baz	Mughal	rsa@cg.ae	Driver	Spare Parts Department	581027620	1		NULL
+81	Irfan Ullah Noor Khuda	Irfan Ullah	rsa@cg.ae	Recovery Driver	RSA Operations	589776048	1		NULL
+82	Hazrat Umar	Hazrat Umar	rsa@cg.ae	Technician	Onsite	0586001138	0		NULL
+83	Muhammad Yasin Said Malang	Yasin	rsa@cg.ae	Recovery- Driver	Service Center 1	0586008485	0		NULL
+`id`	`name`	`username`	`email`	`designation`	`department`	`phone`	`status`	`current_status`	`terminated_at`
+84	Noor Islam Muhammad Islam	Noor Islam	rsa@cg.ae	Recovery Driver	Towing Service Department	0586001138	0		2025-07-15 20:00:00
+85	Mamraiz Aziz Khan	Mamraiz	rsa@cg.ae	Recovery Driver	RSA Operations	553075660	1		NULL
+86	Sulman Anjum Shakoor Sulman	Sulman	rsa@cg.ae	Floor Driver	Service Center Operations Department	Not Available	0		2025-10-06 20:00:00
+87	Muhammad Usman Sardar Ahmed	Usman Sardar	rsa@cg.ae	Head Inspector	Service Center Operations Department	Not Available	1		NULL
+88	Muhammad Waqas Muhammad Shoaib	Waqas	rsa@cg.ae	Inspector	Service Center Operations Department	Not Available	0		2025-11-18 20:00:00
+89	Muhammad Imran  Muhammad  Iqbal	Imran	rsa@cg.ae	Floor Cleaner	Service Center Operations Department	Not Available	1		NULL
+90	Mohsin  Tanveer Tanveer Ahmad 	Mohsin	rsa@cg.ae	Head Electrician	Service Center Operations Department	Not Available	1		NULL
+91	Noah Sarkodie 	Sarkodie	rsa@cg.ae	Washer	Service Center 1	Not Available	0		NULL
+92	Muhammad Saad Sami Ullah	Saad_1	rsa@cg.ae	Tyre Technician	Service Center Operations Department	Not Available	1		NULL
+93	Mulazim Hussain Liyaqat Ali	Mulazim	rsa@cg.ae	Inspector	Service Center Operations Department	Not Available	0		2025-10-06 20:00:00
+94	Kehven  Akum Awunibeh	Kehven	rsa@cg.ae	Helper	Service Center 1	Not Available	0		NULL
+95	Irfan Ali Umrani Ali Khan Umrani	Irfan Ali	rsa@cg.ae	Dispatcher Agent	RSA Operations	521078437	1		NULL
+96	Abdul Rehman 	Abdul Rehman	rsa@cg.ae	Mechanics	Service Center 1	Not Available	0		NULL
+97	Simon Darko	Simon	rsa@cg.ae	Inspector	Service Center Operations Department	Not Available	0		2025-10-06 20:00:00
+98	Ameer Mukhtar	Ameer	rsa@cg.ae	Car  Washer	Service Center 1	Not Available	0		NULL
+99	Muhammad Abbas Ali 	Abbas	rsa@cg.ae	Car  Washer	Service Center 1	Not Available	0		NULL
+100	Waqar Muhamad Sajjad Ahmad	Waqqar	rsa@cg.ae	Battery Technician	RSA Operations	0586001142	1		NULL
+101	Umar Tariq Tariq Hussain	Umar Tariq	rsa@cg.ae	Mechanics	Service Center 1	Not Available	0		NULL
+102	Rehan Rasool Shakoor Anjum 	Rehan Rasool	admin@800carguru.ae	Stock Incharge	Spare Parts Department	521548078	1		NULL
+103	Shahid Khan	Shahid Khan	rsa@cg.ae	Mechanics	Service Center 1	Not Available	0		NULL
+104	Hamza Abid Abid Hussain	Hamza Abid	rsa@cg.ae	Mechanics	Service Center 1	0509340709	0		NULL
+105	Bilal Jamil Jamil Ahmad	Bilal Jamil	rsa@cg.ae	Dentor	Service Center Operations Department	Not Available	0		2025-10-06 20:00:00
+`id`	`name`	`username`	`email`	`designation`	`department`	`phone`	`status`	`current_status`	`terminated_at`
+106	Allan  Kato	Allan  Kato	rsa@cg.ae	Mechanics	Service Center 1	Not Available	0		NULL
+107	Samwiri Walusimbi 	Samwiri	rsa@cg.ae	Mechanics	Service Center 1	Not Available	0		NULL
+108	Sunny Mann Jaswinderjit Mann	Sunny	rsa@cg.ae	Floor Supervisor	Service Center 1	0524326915	0		NULL
+109	Haseeb  Azhar  Azhar Mehmood	Haseeb	rsa@cg.ae	Asst. Stock Incharge	Spare Parts Department	0525995663	1		NULL
+110	Liaqat Ali Muhammad Sharif	Liaqat Ali	rsa@cg.ae	Painter	Service Center Operations Department	Not Available	1		NULL
+111	Shahzaib Khan Nawab Khan	Shahzaib	rsa@cg.ae	Head Inspector	Service Center Operations Department	Not Available	0		2025-11-18 20:00:00
+112	Saif Ullah 	Saif Ullah	rsa@cg.ae	Electrician	Service Center 1	0561805736	0		NULL
+113	Sameer Khan Bashir Khan	Sameer Khan	rsa@cg.ae	Tyre Technician	Service Center Operations Department	Not Available	0		2025-10-06 20:00:00
+114	Fahid Shabbir Muhammad Shabbir Zahid	Fahid	rsa@cg.ae	Mechanics	Service Center 1	0561826568	0		NULL
+115	Ebrima Bittaye	Ebrima Bittaye	rsa@cg.ae	Technician	Service Center 2	Not Available	0		NULL
+116	Mahmodul Hossain Ali Noyab	Mahmodul Hossain	rsa@cg.ae	Floor Driver	Service Center Operations Department	Not Available	0		2025-10-06 20:00:00
+117	Collins Ahyiah	Collins	rsa@cg.ae	Tyre Technician	Service Center Operations Department	Not Available	0		2025-10-06 20:00:00
+118	Usman Gani	Usman Gani	rsa@cg.ae	Cleaner	Service Center 2	Not Available	0		NULL
+119	Wilfred Kofie	Wilfred	rsa@cg.ae	Car Wash Service Man	Service Center Operations Department	Not Available	0		2025-10-06 20:00:00
+120	Abdul Sammed Salifu	Sammed	rsa@cg.ae	Washer	Service Center Operations Department	0545018949	0		2025-11-24 20:00:00
+121	Joseph majwala 	Joseph	rsa@cg.ae	Car Wash Service Man	Service Center Operations Department	Not Available	1		NULL
+122	Jackson Masaaba	Jackson	rsa@cg.ae	Washer	Onsite	0545019081	0		NULL
+123	Ernest Agodoa	Ernest	rsa@cg.ae	Washer	Onsite Car Wash Department	0545019055	0		2025-06-29 20:00:00
+124	Uwais Ali Muhammad Boota	Uwais	rsa@cg.ae	Car Wash Service Man	Service Center Operations Department	Not Available	0		2025-09-25 20:00:00
+125	Gulzar Ahmed Nizam Din	Gulzar	rsa@cg.ae	Service Advisor	Service Center 1	0521548067	0		NULL
+126	Muhammad Furqan	Furqan	rsa@cg.ae	Battery Technician	RSA Operations	521548070	0		2025-09-25 20:00:00
+127	Syed Ovais Ahmed	Ovais	ovais@800carguru.ae	Chief Executive Officer	Higher Management	586008492	1		NULL
+128	Syed Hammad Ahmed 	Hammad	hammad@800carguru.ae	General Manager	Higher Management	521679268	1		NULL
+129	Arslan Ahmad Mazhar Iqbal	Arslan	legal@800carguru.ae	Operations Manager	Admin Department	521548077	1		2026-03-25 20:00:00
+130	Khaled Mohamed Fawzi	Khaled	info@800carguru.ae	Business Development Manager	Admin	0589776039	0		NULL
+131	Syed Mukhtar Ahmed	Mukhtar	mukhtar@800carguru.ae	Managing Director	Higher Management	0556199868	1		NULL
+`id`	`name`	`username`	`email`	`designation`	`department`	`phone`	`status`	`current_status`	`terminated_at`
+132	Muhammad Rizwan Safdar Muhammad	Muhammad Rizwan	rsa@cg.ae	Electrician	Service Center Operations Department	Not Available	0		2025-10-10 20:00:00
+133	Mir Alam Alam Khan	Mir Alam	rsa@cg.ae	Technician	Service Center Operations Department	Not Available	1		NULL
+134	Akashdeep Singh	Akashdeep	rsa@800carguru.ae	Car Wash Service Man	Service Center Operations Department	Not Available	0		2025-11-10 20:00:00
+135	Ashik CK	AshikCK	info@800carguru.ae	Service Advisor	Service Center 1	Not Available	0		NULL
+136	Fatima Qudrat Malik Qudratullah Malik	Fatima		Complaints Handling Rep.	Service Center 1	Not Available	0		NULL
+137	Jalal Khan	Jalal	rsa@cg.ae	Mechanics	Onsite	0553057076	0		NULL
+138	Muhammad Hassaan Sabir	Hassaan	info@800carguru.ae	Service Advisor	Service Center 1	0521791342	0		NULL
+139	Aks Imran Imran Butt	Aks	info@800carguru.ae	CHSC Tele Sales Agent	CHSC Sales	Not Available	0		NULL
+140	Huzan Rizwan Kazi Rizwan Ibrahim Kazi	Huzan	info@800carguru.ae	Sales Agent	RSA Sales Department	0586008497	1		NULL
+141	Moahmed Mahmoud Nassan 	Nassan	info@800carguru.ae	CHSC Tele Sales Agent	Call Center	Not Available	0		NULL
+142	Tatenda Jesina Mutema	Jesina	info@800carguru.ae	Service Co-ordinator	Service Center 1	0521078360	0		NULL
+143	Euvelan Achieng	Euvelan	info@800carguru.ae	CHSC Tele Sales Agent	Call Center	0521078519	0		NULL
+144	Edrine Nambooze	Edrine	info@800carguru.ae	CHSC Tele Sales Agent	Call Center	Not Available	0		NULL
+145	Syeda Serwish Jawad Syed Jawad Ullah	Syeda Serwish	info@800carguru.ae	Sales Agent	Call Center	0504640461	0		NULL
+146	Hashim Thajudeen Thajudeen	Hashim	info@800carguru.ae	Service Advisor	Service Center 1	Not Available	0		NULL
+147	Shyam Kumar Sarasan Sarasan Sarasamma	Shyam	info@800carguru.ae	Sales Advisor- Tyre	Service Center 1	Not Available	0		NULL
+148	Ibbad Uddin Khalid Uddin	Ibbad	info@800carguru.ae	Sales Advisor- Tyre	Service Center 1	Not Available	0		NULL
+149	Salman Ali Quaiser Quaiser Raza	Salman Ali	info@800carguru.ae	Sales Advisor- Tyre	Service Center 1	Not Available	0		NULL
+150	Farah Naz Muhammad Ashfaq	Farah	info@800carguru.ae	Customer Relation 	Service Center Sales Department	504638102	1		NULL
+151	Tintu Prasad Ganga Prasad	Tintu	info@800carguru.ae	CHSC Tele Sales Agent	CHSC Sales	Not Available	0		NULL
+152	Vishesh Kalpeshbhai Mehta	Vishesh	info@800carguru.ae	Sales Agent	RSA Field Sales Department	0504641774	0		2025-08-25 20:00:00
+153	Muhammad Furqan Noor Khan	MFNK	fnk198981@gmail.com	Purchaser	Spare Parts Department	504640315	1		NULL
+154	Arbab  Sikandar Nawaz  Nawaz Muhammad	Sikandar	rsa@800carguru.ae	Battery Technician	RSA Operations	589776047	1		NULL
+155	Daniel Amankwah Yeboah	Daniel	admin@800carguru.ae	Washer	Onsite	0501996711	0		NULL
+156	Abdoulie Jawara	Abdoulie	admin@800carguru.ae	Car  Washer	Car Wash	Not Available	0		NULL
+157	Jaspreet Kaur Harjinder Singh	Jaspreet	admin@800carguru.ae	Service Co-ordinator	SC-01 Operations Department	0586008492	0		2025-06-24 20:00:00
+158	Zainab Daniyal Naveed	Zainab	admin@800carguru.ae	Sales Agent	RSA Sales Department	0543077393	1		NULL
+159	Cecilia Wanza Kamia	Cecilia	admin@800carguru.ae	CHSC Tele Sales Agent	Call Center	Not Available	0		NULL
+160	Patrecia Carrillo Ramos	Patricia	admin@800carguru.ae	CHSC Tele Sales Agent	Call Center	Not Available	0		NULL
+161	Yakshada Hemant Chouhan	Yakshita	admin@800carguru.ae	CHSC Tele Sales Agent	Call Center	Not Available	0		NULL
+162	Kashaf Bilal Muhammad Bilal	Kashaf	admin@800carguru.ae	Sales Agent	Call Center	0543077365	0		NULL
+163	Zarmeen Qureshi Muhammad Ishaq	Zarmeen	admin@800carguru.ae	Sales Agent	RSA Sales Department	0543077484	0		2025-09-22 20:00:00
+164	Chester Kinphul	Chester	admin@800carguru.ae	Washer	Onsite	0504641025	0		NULL
+165	Sampson Effah	Samson	admin@800carguru.ae	Washer	Onsite	0504633741	0		NULL
+166	Frank Doudu Tabiri	Franck	admin@800carguru.ae	Washer	Onsite	0504631150	0		NULL
+`id`	`name`	`username`	`email`	`designation`	`department`	`phone`	`status`	`current_status`	`terminated_at`
+167	Isaac Formson	Isaac	admin@800carguru.ae	Washer	Onsite	0504636939	0		NULL
+168	Ali	Ali	admin@800carguru.ae	Car  Washer	Car Wash	Not Available	0		NULL
+169	Mubarik Yakubu	Mubarak	admin@800carguru.ae	Washer	Onsite	0501996581	0		NULL
+170	Christian Kwame Attefah	Christian	admin@800carguru.ae	Washer	Onsite	0504636085	0		NULL
+171	Malick	Malick	admin@800carguru.ae	Washer	Onsite	Not Available	0		NULL
+172	Felix	Felix	admin@800carguru.ae	Car  Washer	Car Wash	Not Available	0		NULL
+173	Gideon Annor Asiedu	Gideon	admin@800carguru.ae	Washer	Onsite	0501996885	0		NULL
+174	Wisdom	Wisdom	admin@800carguru.ae	Car  Washer	Car Wash	Not Available	0		NULL
+176	Muhammad Ibrar Mughal Ahmed Gulzar	Ibrar	admin@800carguru.ae	Service Advisor	Service Center 1	0521078452	0		NULL
+177	Kholod	Kholod	..@gmail.com	TeleSales	Call Center	Not Available	0		NULL
+178	Suhail Hussain Bakhsh Hussain Bakhsh	Suhail Hussain	rsa@cg.ae	Call Center RSA Agent	Call Center	0586008496	0		NULL
+179	Abdul Rahaman Rasak	Razzak	admin@800carguru.ae	Washer	Onsite	0501996832	0		NULL
+180	Rao Aman Rao Muhammad Zulfiqar	Rao	rsa@cg.ae	Technician	Service Center Operations Department	Not Available	1		NULL
+181	Seth Ampofo	Ampofo	rsa@cg.ae	Mechanics	Service Center 1	Not Available	0		NULL
+182	Salim Fazal	Salim	rsa@cg.ae	Service Advisor	Service Center 1	Not Available	0		NULL
+183	Mohammed Juwel	Juwel	rsa@cg.ae	Technician	Onsite	0588362729	0		NULL
+184	Anas Ahmad Nagori Sageer Ahmed Nagori	Anas	info@800carguru.ae	Service Advisor	Service Center 1	Not Available	0		NULL
+185	Trainee 01 	Trainee01	rsa@cg.ae	Sales Agent	Call Center	Not Available	0		NULL
+186	Md Samirul Islam Md Mojibur Rahaman	Samirul	rsa@cg.ae	Car Wash Service Man	Service Center Operations Department	Not Available	0		2025-10-06 20:00:00
+187	Shalinda Madhumal Dissanayaka	Shalinda	rsa@cg.ae	Washer	Onsite	0543077603	0		NULL
+188	Ambala Kandeyale Sanjeewa Niroshan Karunasekara	Ambala	rsa@cg.ae	Washer	Onsite	0543077522	0		NULL
+189	Ranjith Gemunu Panagoda  Thellaburea Hettige	Ranjith	rsa@cg.ae	Washer	Onsite	0543079957	0		NULL
+190	Oshada Dilshan Mandis  Wasalage	Oshada	rsa@cg.ae	Washer	Onsite	0543077566	0		NULL
+191	Silthu Chaudhary	Silthu	rsa@cg.ae	Car  Washer	Onsite	Not Available	0		NULL
+192	Surath Iranga Madapitige	Surath	rsa@cg.ae	Washer	Onsite	0543076609	0		NULL
+193	Dinusha Rukshan Madduma 	Dinusha	rsa@cg.ae	Washer	Onsite	0543080611	0		NULL
+194	Shahzaib Ahmad Ishtiaq	Shahzaib Ahmad	rsa@cg.ae	Car  Washer	Onsite	0543080545	0		NULL
+195	Bassem Mohamed Adel Mohamed Elrefaei Noureldin	Bassem	rsa@cg.ae	Service Advisor	Service Center 1	Not Available	0		NULL
+196	Mazher Ahmed Maqsood Ahmed Khan	Mazher	rsa@cg.ae	Supervisor	Admin	0501996704	0		NULL
+197	Muhammad Faizan  Muhammad Zafran	Faizan	info@800carguru.ae	Service Advisor	Service Center Sales Department	543077349	1		NULL
+198	Salma Abdulmajeed Ali Abdulla Alhajeri	Salma	admin@800carguru.ae	Sales Agent	Tele Sales Department	Not Available	0		2025-06-24 20:00:00
+199	Neha Vipan Kumar	Neha	admin@800carguru.ae	CHSC Tele Sales Agent	Call Center	Not Available	0		NULL
+200	Hassan Murtaza Hassan Athar Rizvi	Hassanmurtaza	rsa@cg.ae	Sales Agent	Call Center	Not Available	0		NULL
+201	Supun Priyankara Ponnamperuma Arachchighe	Supun	rsa@cg.ae	Car  Washer	Car Wash	Not Available	0		NULL
+202	Uditha Ranganath Jayaveera Rankoth Pedi Durayalage	Uditha	rsa@cg.ae	Washer	Onsite	0543080447	0		NULL
+203	Laksiri Kalistus Walahapitiya Acharige	Laksiri	rsa@cg.ae	Washer	Onsite	0543076918	0		NULL
+204	Nandasiri Vitharana Geegana Gamage	Nandasiri 	rsa@cg.ae	Car  Washer	Car Wash	Not Available	0		NULL
+205	Nipun Madihushan Nawarunnage	Nipun	rsa@cg.ae	Washer	Onsite	0543077338	0		NULL
+206	Aishah Ali Saif Saleh Alkindi	Aishah	info@800carguru.ae	Sales Agent	RSA Sales Department	0507730335	0		2025-12-17 20:00:00
+207	Fatima Ali Saif Saleh Alkindi	Fatima		TeleSales	Call Center	0507730193	0		NULL
+`id`	`name`	`username`	`email`	`designation`	`department`	`phone`	`status`	`current_status`	`terminated_at`
+208	Shaikha Ali Saif Saleh Alkindi	Shaikha	info@800carguru.ae	Sales Agent	RSA Sales Department	0507730146	0		2025-09-24 20:00:00
+209	Mohammed Faisal Bhava Bava Palayilimbichi	M.Faisal	admin@800carguru.ae	Floor Supervisor	Service Center 1	0586037627	0		NULL
+210	Nihad Vayaladakkam Kuniyil	Nihad	admin@800carguru.ae	Service Advisor	Service Center 1	Not Available	0		NULL
+211	Moin Saifi Kamruddin	SAIFI	admin@800carguru.ae	Service Advisor	Service Center 1	0504640153	0		NULL
+212	Rehmat Ali Muhabbat Ali Khan 	Rehmat	rsa@cg.ae	Advisor	Admin	0504640207	0		NULL
+213	Mohammad Talal Ahmad Abdullah	Talal	admin@800carguru.ae	Service Advisor	Service Center 1	0521679262	0		NULL
+214	Muhammad Ahmad Anwar Anwar Ul Haq 	Ahmad_Anwar	rsa@cg.ae	Service Advisor	Service Center Sales Department	557973215	1		NULL
+215	Junaid Rashid Rashid Rehman	Junaid Rashid	rsa@cg.ae	Inbound	Admin	0586008496	0		NULL
+216	Shehriyar Khan Riaz	Shehriyar	rsa@cg.ae	Outbound	Admin	0586037635	0		NULL
+217	Bilal Ahmed Aurangzeb	Bilal Ahmed	rsa@cg.ae	Service Advisor	Service Center Sales Department	557973260	1		NULL
+218	Naqash Arif	Naqash	rsa@800carguru.ae	Sales Agent	RSA Call Center Department	Not Available	0		2025-09-04 20:00:00
+219	Aman Sonika Mandiyal	Aman		Agent	Call Center	Not Available	0		NULL
+220	Fahid	Fahid		Cleaner	Service Center 1	Not Available	0		NULL
+221	Asif	Asif		Driver	Onsite	Not Available	0		NULL
+222	Muhammad Saad Qureshi Muhammad Abbas	Saad	It@800carguru.ae	Mobile App Developer	Admin Department	Not Available	1		NULL
+223	Ajmal Khan Naseem Gul	Ajmal Khan	rsa@800carguru.ae	Floor Driver	Service Center Operations Department	0501996425	0		2025-11-18 20:00:00
+224	Paul Yeboah	Paul		Helper	Service Center 1	0525487903	0		NULL
+225	Muhammad Farhan Fatih Khan	Muhammad_Farhan	rsa@800carguru.ae	Technician	Service Center Operations Department	Not Available	1		NULL
+226	Hamayun Babar Abdul Wahid	Hamayun	Hamayunbabar70@gmail.com	Technician	Service Center Operations Department	Not Available	0		2025-11-05 20:00:00
+227	Hamayun Babar Abdul Wahid	Hamayun			Select Department	Not Available	0		NULL
+228	Sawsen Ben Hamida	Suzy	info@800carguru.ae	Business Development Manager	Admin	0589776039	0		NULL
+229	Asim Rafaqqat Rafaqqat Ali	Asim	it@800carguru.ae	Junior Developer	Admin	Not Available	0		NULL
+230	Pradeep Singh Harjinder Singh	Pradeep	rsa@cg.ae	Mechanic	Service Center 2	Not Available	0		NULL
+231	Emmanuel Sarpong	Emmanuel	rsa@cg.ae	Technician	Service Center Operations Department	Not Available	0		2025-10-06 20:00:00
+232	Muhammad Hafeez Latif Abdul	Hafeez	rsa@cg.ae	Technician	SC-02 Floor Operations Department	Not Available	0		NULL
+233	Dilawer	Dilawer	rsa@cg.ae	Mechanic	Service Center 2	Not Available	0		NULL
+234	Aneeq Kashif Ahmed Ahmed	Aneeq Kashif	rsa@cg.ae	Purchaser	Spare Parts Department	521078490	1		NULL
+235	Saeed Rahman Khan Rahman Muhammad Khan	Saeed	rsa@cg.ae	Recovery- Driver	Onsite	0557973140	0		NULL
+236	Kamran Khan Madwali Khan	KamranKhan	rsa@cg.ae	Recovery Driver	RSA Operations	553054728	1		NULL
+237	Zohaib Khan Khalid Zaman	Zohaib Khan	rsa@cg.ae	Recovery Driver	Towing Service Department	0588362723	0		2025-08-19 20:00:00
+238	Saif Ali Khan Said Rehman	Saif Ali Khan	rsa@cg.ae	Recovery- Driver	Onsite	0553056110	0		NULL
+239	Muhammad Saleem	Muhammad Saleem	rsa@cg.ae	Recovery- Driver	Onsite	0521548068	0		NULL
+240	Yasir Shakir	YasirShakir	rsa@cg.ae	Recovery- Driver	Onsite	0586008485	0		NULL
+241	Saddam Akhtar Shoeb Akhtar	Saddam Akhtar	rsa@cg.ae	Sales Agent	Onsite	0588879316	0		NULL
+242	Daniyal Naveed Naveed Alam	Daniyal Naveed	rsa@cg.ae	Sales Agent	RSA Sales Department	504643273	0		2025-09-30 20:00:00
+243	Haris Fahim	Haris Fahim	info@800carguru.ae	Operations Coordinator	Third Party Garage Operations Department	507730632	0		2025-11-24 20:00:00
+244	Iftaqar Hussain Mohmmod	Iftaqar Hussain Mohmmod	rsa@cg.ae	Store Assistant	Spare Parts Department	0545373453	1		NULL
+245	Arshad	Arshad	rsa@cg.ae	RSA - Technician (DXB)	Onsite	0521548075	0		NULL
+246	Muhammad Saddiq Niaz Badin	Muhammad Saddiq	rsa@cg.ae	Tyre Technician	RSA Technicians	0586001142	0		NULL
+247	Muhammad Samair Muhammad Boota	Sameer	rsa@cg.ae	Tyre Technician	Service Center Operations Department	Not Available	0		2025-10-06 20:00:00
+248	Manjula	Manjula	rsa@cg.ae	Washer	Onsite	Not Available	0		NULL
+249	Shanzaib	Shanzaib	rsa@cg.ae	Washer	Onsite	0543080545	0		NULL
+`id`	`name`	`username`	`email`	`designation`	`department`	`phone`	`status`	`current_status`	`terminated_at`
+250	Mintu	Mintu	rsa@cg.ae	Washer	Onsite	0543076894	0		NULL
+251	Sheraz	Sheraz	rsa@cg.ae	Washer	Onsite	0543080542	0		NULL
+252	Bilal Ahmed Shahzad Ahmed	Bilal Ahmed 1	rsa@cg.ae	Floor Driver	Service Center Operations Department	Not Available	0		2025-10-31 20:00:00
+253	Muhammad Kabir Maqsood Ahmed Sheikh	Muhammad Kabir 	it@800carguru.ae	Web Developer	Admin	Not Available	0		NULL
+254	Rasika Madusanka Kathri Arachchi	Rasika	rsa@cg.ae	Car  Washer	Onsite	Not Available	0		NULL
+255	Harshaka Ilanga Sumanarathna Edirisinha	Harshaka 	rsa@cg.ae	Car  Washer	Onsite	Not Available	0		NULL
+256	Sheraz Ullah Rahman Abdur	Sheraz	rsa@cg.ae	Car  Washer	Onsite	Not Available	0		NULL
+257	Don Oshadhi Sajeewan Jayasinghe	Don	rsa@cg.ae	Car  Washer	Onsite	Not Available	0		NULL
+258	Usman Tariq Tariq Javaid 	Usman Tariq	rsa@cg.ae	Call Center RSA Agent	Call Center	Not Available	0		NULL
+259	Mubashir Abbas Karamat Hussainshah Syed	Mubashir	rsa@cg.ae	Service Advisor	Service Center 1	Not Available	0		NULL
+260	Shehab Badreldin Ahmed Mohamed	Shehab	info@800carguru.ae	Service Advisor	Service Center 1	Not Available	0		NULL
+261	Nazir Ali Shahid Hussain	Nazir	info@800carguru.ae	Service Advisor	Service Center Sales Department	588362730	1		NULL
+262	Sulaiman Mahmoud Alsayed	Sulaiman	info@800carguru.ae	Graphic Designer	Admin	Not Available	0		NULL
+263	Ali Mahmood Ali Al Zadjali	Ali Mahmood	info@800carguru.ae	Service Advisor	Service Center 1	Not Available	0		NULL
+264	Salini Puthiyoth	Salini	hr@800carguru.ae	HR Assistant	Admin Department	0504640207	0		2025-06-27 20:00:00
+265	Ajay Krishnakumar Nair	Ajay		Service Advisor	Service Center 1	0521548067	0		NULL
+266	Vimal Govindan Kutty	Vimal		Purchaser	Admin	0521078452	0		NULL
+267	Muhammad Rafeh Qureshi	Rafeh	admin@800carguru.ae	Operations Coordinator	Third Party Garage Operations Department	586037635	0		2025-09-30 20:00:00
+268	Syed Shah Muhammad Adeel 	Adeel	rsa@800carguru.ae	Head – Quotations & Workshop Control	Third Party Garage Operations Department	586037627	1		NULL
+269	Muhammad Ameer Hamza	Ameerhamza		Sales Agent	Call Center	Not Available	0		NULL
+270	Syeda Ayesha Ali	Ayeshaali		Sales Agent	Call Center	Not Available	0		NULL
+271	Syeda Zainab Ali	Zainabali		Sales Agent	Call Center	Not Available	0		NULL
+272	Syeda Marrium Ali	Marriumali		Sales Agent	Call Center	Not Available	0		NULL
+273	Shamma Humaid Ali Humaid Alketbi	Shammahumaid		Sales Agent	Call Center	Not Available	0		NULL
+274	Shama Khaled Saeed Omair Alshamsi	ShamaKhaled		Sales Agent	Tele Sales	Not Available	0		NULL
+275	Ahmad Hassan	Ahmadhassan	rsa@800carguru.ae	Sales Agent	RSA Sales Department	Not Available	1		NULL
+276	Shivambhai Girishbhai Purohit	Shivambhai		Service Advisor	Service Center 1	0521078452	0		NULL
+277	Hassan Mujtaba	Hassanmuj		Dispatcher	Call Center	522680930	0		NULL
+278	Muhib Khan	Muhibkhan		RSA - Technician (DXB)	Onsite	000000	0		NULL
+279	Emran Solanki Harun Abdul Kadir	Emransolanki		Service Advisor	Service Center 1	0543077365	0		NULL
+280	Waleed Khan Ahmad Khalid	Waleed		Purchaser	Admin	Not Available	0		NULL
+281	Mohammed Mahdy Idrees Musa	Mahdy		PHP Developer	Admin Department	Not Available	1		NULL
+282	Muhammad Usman Zahid Iqbal	Usmanzahid	rsa@800carguru.ae	Inspector	Service Center Operations Department	Not Available	0		2025-11-19 20:00:00
+283	Princy Francis Porthur	Princy		Sales Coordinator	Admin	501996704	0		NULL
+284	Safa Ara	Safa		Sales Coordinator	Admin	Not Available	0		NULL
+285	Rajesh Hegde	Rajeshh	info@800carguru.ae	Service Advisor	Service Center Sales Department	504640461	1		NULL
+286	Mohammed Hamudu Bayam	Bayam	rsa@800carguru.ae	Technician	Service Center Operations Department	Not Available	0		2025-10-06 20:00:00
+`id`	`name`	`username`	`email`	`designation`	`department`	`phone`	`status`	`current_status`	`terminated_at`
+287	Hashim Mohammed	Hashim	rsa@800carguru.ae	Technician	Service Center Operations Department	Not Available	0		2025-10-02 20:00:00
+288	Sahil Afzal Palawkar	Sahil		Service Advisor	Service Center 1	Not Available	0		NULL
+289	Mohammed Abdul Azeem Khan	Abdulazeem		Purchaser	Admin	Not Available	0		NULL
+290	Mirza Asif Baig	Mirza	Sito120@hotmail.com	Purchaser	Admin	Not Available	0		NULL
+291	Danish Hussain Hussain Ali Muhammad	Danishh		Service Advisor	Service Center 1	Not Available	0		NULL
+292	Rabeeha Rafi	Rabeeha		Sales Agent	Call Center	Not Available	0		NULL
+293	Santhosh Kumar Nanjundappa	Santhoshk		Service Advisor	Service Center 1	Not Available	0		NULL
+294	Shradha Dayanand Naik	Shradha		Sales Agent	Call Center	Not Available	0		NULL
+295	Audit Team	audit			Service Center 1	1234	1		NULL
+296	CRM	CRM		Sales Agent	Call Center	00000000	1		NULL
+297	Safvan Kovummal	Safvan		Service Advisor	Service Center 1	Not Available	0		NULL
+298	Midhun Abraham Joseph	Midhunj	Sito120@hotmail.com	Service Advisor	Service Center 1	0543077365	0		NULL
+299	NGI Insurance	ngi_carguru			INSURANCE		1		NULL
+300	Orient Takaful	orient_carguru			INSURANCE		1		NULL
+301	ADNT Insurance	adnt_carguru			INSURANCE		1		NULL
+302	Dilnawaz Ali Shaikh	Dilnawaz	info@800carguru.ae	Service Advisor	Service Center Sales Department	521679262	1		NULL
+303	RSA	RSA			Select Department	00	1		NULL
+304	Niraj Kumar Menaria	Nirajk	Sito120@hotmail.com	Service Advisor	Service Center 1	000000	0		NULL
+305	Battery Audit	Battery			Admin	0589776035	0		NULL
+306	Joel Joyson	Joelj	rsa@800carguru.ae	Dispatcher Agent	RSA Operations	Not Available	1		NULL
+307	Adari Mohamed Ahmed Hassan Alhefeiti	Adhari		Sales Agent	Tele Sales	000000	0		NULL
+308	Amila Lahiruwan Karunarathna	Amila		Service Advisor	Service Center 1	0521078452	0		NULL
+309	Thivakar Selvaraja	Thivakar		Service Advisor	Service Center 1	000000	0		NULL
+310	Firoz Ahmad Karim Khan 	Firoz	rsa@800carguru.ae	Technician	Service Center Operations Department	Not Available	0		2025-10-06 20:00:00
+311	Othman Said Mohammed	Othman		Service Advisor	Service Center 1	0566841201	0		NULL
+312	Elaheh Mohammad Bashiri	Elaheh		Service Coordinator	Service Center 1	000000	0		NULL
+313	Sajjad Ahmad Razzaq Ahmad	Sajjad		Service Advisor	Service Center 1	000000	0		NULL
+314	Mohua Das	Mohua		Service Advisor	Service Center 1	000000	0		NULL
+315	Ramil Munawar	Ramil		Service Advisor	Service Center 1	000000	0		NULL
+316	Mohammad Wahid	Wahid	rsa@800carguru.ae	Purchaser	Spare Parts Department	501996581	1		NULL
+317	MD Anas Raza	Anas	rsa@800carguru.ae	Technician	Service Center Operations Department	Not Available	0		2025-10-06 20:00:00
+318	Deepak Kumar Verma	Deepak	rsa@800carguru.ae	Technician	Service Center Operations Department	Not Available	0		2025-11-21 20:00:00
+319	Gabru	Gabru			Service Center 1	585335773	0		NULL
+320	Masoud Moazzim Balesahib	Masoud		Service Advisor	Service Center 1	000000	0		NULL
+321	Karim Abidi	Karim	info@800carguru.ae	Electrician	SC-02 Floor Operations Department	Not Available	0		2025-08-25 20:00:00
+322	Blaise Nkam Ndoh	Blaise	info@800carguru.ae	Inspector	SC-02 Floor Operations Department	Not Available	0		NULL
+`id`	`name`	`username`	`email`	`designation`	`department`	`phone`	`status`	`current_status`	`terminated_at`
+323	Bejoy Amal Raj	Bejoy	info@800carguru.ae	Service Advisor	Service Center Sales Department	586001140	1		NULL
+324	Ajmal Roshan Chirakkal	Ajmal		Service Advisor	Service Center 1	000000	0		NULL
+325	Akshay Sharma	Akshaysm	admin@800carguru.ae	Sales Agent	RSA Call Center Department	Not Available	0		2025-09-05 20:00:00
+326	Muhammad Faiz	Faiz	info@800carguru.ae	Service Advisor	Service Center Sales Department	586008488	1		NULL
+327	Maduranga De Silva	Maduranga	info@800carguru.ae	Service Advisor Coordinator	Service Center 1	0566037631	0		NULL
+328	Ali Elhassan Ali Musaad 	Ali Elhassan	info@800carguru.ae	Service Advisor	Service Center 1	0567085676	0		NULL
+329	John Kennedy Mukasa	John	info@800carguru.ae	Service Advisor 	Service Center 1	0521791342	0		NULL
+330	Rojo Jose Jose Ouseph	Rojo	info@800carguru.ae	Service Advisor 	Service Center 1	Not Available	0		NULL
+331	Muhammad Ibrahim Bajwa 	Bajwa	info@800carguru.ae	Service Advisor	Service Center Sales Department	521078452	1		NULL
+332	Blasius Penn Awa	Blasius	info@800carguru.ae	Mechanic	Service Center 1	Not Available	0		NULL
+333	Arif Nasar	Arif		Service Advisor	Service Center 1	Not Available	0		NULL
+334	Vivek Singh	Vivek	info@800carguru.ae	Service Advisor	Service Center Sales Department	543077393	1		NULL
+335	Karundeep Singh Bansal	Karundeep		Floor Supervisor	Service Center 1	000000	0		NULL
+336	Adhari Mohamed Ahmed Hassan Alhefeiti	Adhari	info@800carguru.ae	Sales Agent	RSA Sales Department	Not Available	0		2025-09-24 20:00:00
+337	Abdelaziz Mohamed Ibrahim Saleh Almansoori	Abdelaziz	info@800carguru.ae	Sales Agent	RSA Sales Department	Not Available	0		2025-09-24 20:00:00
+338	Sumayya Mohammed Ahmed Tahnoon Almansoori	Sumayya	info@800carguru.ae	Sales Agent	RSA Sales Department	Not Available	0		2025-12-17 20:00:00
+339	Osaaf	Osaaf			Super Admin	00	1		NULL
+340	Fauzul Azim	Fauzul	info@800carguru.ae	Sales Agent	RSA Sales Department	Not Available	1		NULL
+341	Gina Comayas	Gina		Office Girl	Admin Department	0586008494	1		NULL
+342	Ahsan Ghaffar	AhsanG		Sales Agent	Onsite	Not Available	0		NULL
+343	Sameer Daud Abdullah	Sameer		Sales Agent	Onsite	Not Available	0		NULL
+344	Muhammad Nadeem Khan	Nadeem	info@800carguru.ae	Asst. Accountant	Admin Department	586001134	0		2025-11-24 20:00:00
+345	Sayeed Ahmad	Sayeed 	info@800carguru.ae	SEO Specialist	Admin	N/A	0		NULL
+346	Hersin Hermish	Hersin	info@800carguru.ae	Technician	Service Center Operations Department	Not Available	1		NULL
+347	Blaise Nkam	Blaise	info@800carguru.ae	Mechanic	Service Center 1	N/A	0		NULL
+348	Umair Ramzan	UmairRamzan	info@800carguru.ae	Mechanic	SC-01 Floor Operations	N/A	0		NULL
+349	Karim Mahmoud	Karim Mahmoud	rsa@800carguru.ae	Technician	Service Center Operations Department	Not Available	0		2025-10-06 20:00:00
+350	Mohammed Mohenul	Mohenul	Info@800carguru.ae	Mechanic	Service Center 1	N/A	0		NULL
+351	Kayondo Brian	BrianKayondo	rsa@800carguru.ae	Technician	Service Center Operations Department	Not Available	0		2025-10-06 20:00:00
+352	Eric Mensah	Eric		Mechanic	Service Center 1	Not Available	0		NULL
+353	Michael Karanja Chege	Michael		Technician	Service Center 1	Not Available	0		NULL
+354	Muhammad Majid Muhammad Aslam	Majid		Technician	Service Center 1	Not Available	0		NULL
+355	Rinku OM Parkash	Rinku		Electrician	Service Center 1	Not Available	0		NULL
+356	Colins Ngunyi Ateafac	Collinsn		Tyre Technician	Service Center 1	Not Available	0		NULL
+357	Lotfi Ahmed	Lotfi		Car Washer	Service Center 1	Not Available	0		NULL
+358	Asif Khan	Asif		Floor Driver	Service Center 1	Not Available	0		NULL
+`id`	`name`	`username`	`email`	`designation`	`department`	`phone`	`status`	`current_status`	`terminated_at`
+359	Muhammad Rafay Mumtaz Ahmad	Rafay	rsa@800carguru.ae	Bike Driver	Spare Parts Department	588362741	1		NULL
+360	Ali Mohammad Mughal Baz	Alimughal		Driver	SC-01 Floor Operations	Not Available	0		NULL
+361	Abdullah Khan Wali	Abdullah1	rsa@800carguru.ae	Recovery Driver	RSA Operations	553056110	1		NULL
+362	Muhammad Zeshan	Zeshan	rs@800carguru.ae	Inspector	Service Center Operations Department	Not Available	0		2025-10-06 20:00:00
+363	Dinesh Babu Ram	Dinesh		Technician	Service Center 2	Not Available	0		NULL
+364	Muhammad Mawia Muhammad Amin	Mawia		Technician	SC-02 Floor Operations Department	Not Available	0		2025-06-15 20:00:00
+365	Djine Youagueu Edgar	Djine	rsa@800carguru.ae	Technician	Service Center Operations Department	Not Available	0		2025-10-06 20:00:00
+366	Hamayun Babar Abdul Wahid	Humayun		Technician	Service Center 2	Not Available	0		NULL
+367	Manjula Raj Manoharan	Manjula	rsa@800carguru.ae	Painter	Service Center Operations Department	Not Available	0		2025-11-20 20:00:00
+368	Pasindu Shanilka	Pasindu	rsa@800carguru.ae	Electrician	Service Center Operations Department	Not Available	1		NULL
+369	Sruthy Radhakrishnan	Sruthy	admin@800carguru.ae	Appointment Coordinator	SC-01 Operations Department	0504641025	0		2025-08-21 20:00:00
+370	Noora	Noora		Chef	Home Staff Department	Not Available	1		NULL
+371	Lulu	Lulu		Chef	Home Staff Department	Not Available	1		NULL
+372	Aysha	Aysha		Chef	Home Staff Department	Not Available	1		NULL
+373	Hana	Hana		Chef	Home Staff Department	Not Available	1		NULL
+374	Tutor	Tutor		Tutor	Home Staff Department	Not Available	0		NULL
+375	Muhammad Tahir Sawab Gul	Tahir	admin@800carguru.ae	House Driver	Home Staff Department	0569286084	1		NULL
+376	Junaid Irfan	Junaidirfan		Service Advisor	Service Center 1	0507729665	0		NULL
+377	Aftab Ahmad	Aftab		Technician	Service Center 1	Not Available	0		NULL
+378	Wajahat Iqbal	Wajahat		Purchaser	Admin	Not Available	0		NULL
+379	Zubair Ahmed Ghulam Mustafa	Zubair	rsa@800carguru.ae	Director Operations	Third Party Garage Operations Department	557973142	1		NULL
+380	Musa Njabala	Musa		Cleaner	Service Center 1	Not Available	0		NULL
+381	Mohan Anuradha Hewa Angappulige	Mohan	rsa@800carguru.ae	Car Wash Service Man	Service Center Operations Department	0543075523	0		2025-11-24 20:00:00
+382	Mehr Un Nisa Tasveer E Mustafa	Mehrun	rsa@800carguru.ae	Sales Agent	RSA Sales Department	586037631	0		2026-01-25 20:00:00
+383	George Enow Enow	George	rsa@800carguru.ae	Car Wash Service Man	Service Center Operations Department	Not Available	0		2025-10-06 20:00:00
+384	Ibrahim Qassim Ali Ahmed Al Yafei	IbrahimAli	legal@800carguru.ae	Business Relationship Manager	Admin Department	Not Available	0		2026-01-09 20:00:00
+385	Muthayl Humaid Murad Ahmed Jafar	Muthayl	info@800carguru.ae	Sales Agent	RSA Sales Department	Not Available	0		2025-09-24 20:00:00
+386	Adan Ishfaq	AdanQ		Sales Agent	RSA Sales Department	586037635	0		2025-11-24 20:00:00
+387	Anil Choppadandi	Anilc	rsa@800carguru.ae	Car Wash Service Man	Service Center Operations Department	Not Available	0		2025-09-18 20:00:00
+388	Shihab Ramkunnummal Puthiyapurayil	Shihab		Purchaser	Admin	Not Available	0		NULL
+389	Md Hallal Dalu Hawlader	Md Hallal	info@800carguru.ae	Floor Cleaner	Service Center Operations Department	Not Available	0		2025-10-06 20:00:00
+390	Abdul Bais	Bais	info@800carguru.ae	Floor Driver	Service Center Operations Department	Not Available	1		NULL
+391	Mehran Khan Fateh khan	Mehran Khan	info@800carguru.ae	Recovery Driver	RSA Operations	521548068	1		NULL
+392	Rahat Ullah Noor Khuda	RahatUllah	info@800carguru.ae	Recovery Driver	RSA Operations	586008485	1		NULL
+393	Muhammad Yasin Said Malang	Muhammad Yasin 	info@800carguru.ae	Recovery -Driver	Onsite	Not Available	0		NULL
+394	Mohamed  Elsaid Elmandouh Abdelhamid	Elsaid		Mechanic	Service Center 2	Not Available	0		NULL
+395	Remsha Saddat	Remshas		Sales Agent	Call Center	Not Available	0		NULL
+396	Saquib Anwar	SaquibA		Service Advisor	Service Center 1	000000	0		NULL
+`id`	`name`	`username`	`email`	`designation`	`department`	`phone`	`status`	`current_status`	`terminated_at`
+397	Muhammad Faizan Muhammad Younas	Faizany	mfaizanyounas1@gmail.com	Service Advisor	Service Advisor Department	Not Available	0		2025-07-27 20:00:00
+398	Ahmed Mohamed Rashad Abdelaal Mohamed	Ahmedmr	ahmedrashadmrm42@gmail.com	Service Advisor	Service Advisor	0507729665	0		NULL
+399	Syed Usman Hasani	Usmanhi	s.usman.h373@gmail.com	Floor Supervisor	SC-01 Floor Operations Department	Not Available	0		2025-07-08 20:00:00
+400	Abhijit  Balwant Godbole	Abhijitb	abhi200979@gmail.com	Service Coordinator	SC-01 Operations Department	Not Available	0		2025-08-29 20:00:00
+401	Master Admin	master_admin		Admin	Higher Management	000000	1		NULL
+402	Mohammed Basheer  Nharakkatt	Basheer	rsa@800carguru.ae	Purchaser	SC-02 Floor Operations Department	Not Available	0		2025-07-24 20:00:00
+403	Vikram Nagula	Vikram		Washer	Onsite Car Wash Department	Not Available	0		2025-06-29 20:00:00
+404	Akparotchele Leake	Leaka	rsa@800carguru.ae	Technician	Service Center Operations Department	Not Available	0		2025-10-06 20:00:00
+405	Andoh Fabris Takor	Fabris	rsa@800carguru.ae	Technician	Service Center Operations Department	Not Available	0		2025-10-06 20:00:00
+406	Imtiyaz Ahamed Imam Sab	Imtiyaz		Purchaser	SC-01 Operations Department	0501996885	0		2025-06-21 20:00:00
+407	Mary Grace Paguila Malinao	Mary	info@800carguru.ae	Sales Agent	RSA Sales Department	Not Available	0		2026-01-31 20:00:00
+408	Rose Ann Estillana Gumanit	Rose	info@800carguru.ae	Data Entry Operator	RSA Call Center Department	Not Available	0		2025-06-14 20:00:00
+409	Anannya Sen Ashoke Kumar Sen	Anannya	rsa@800carguru.ae	Sales Agent	RSA Sales Department	Not Available	1		NULL
+410	Ali Hassan Mukhtar Ahmad	Ali Hassan	info@800carguru.ae	Sales Agent	RSA Call Center Department	Not Available	0		2025-06-24 20:00:00
+411	Nancy Bisieri	Nancy	info@800carguru.ae	Tele Sales Agent	RSA Call Center Department	Not Available	0		2025-06-20 20:00:00
+412	Muhammad Ibrar Ul Haq	Muhammad Ibrar	info@800carguru.ae	Tyre Technician	RSA Operations	586001142	1		NULL
+413	Rahid Zaman Shahid Khan	Rahid	rsa@800carguru.ae	Recovery Driver	RSA Operations	586001138	1		NULL
+414	Dil Goni	Dil Goni		Car Wash Service Man	Service Center Operations Department	Not Available	0		2025-10-17 20:00:00
+415	Mufthar Ali Suja Koyante Thoduka	Mufthar		Tyre Sales Coordinator	SC-01 Operations Department	000000	0		2025-06-25 20:00:00
+416	Mir Muhammad Irtaza Ishfaq	Irtaza		Compliance Officer	RSA Operation Coordinators	0	0		2025-06-21 20:00:00
+417	Muhammad Rehman Ghulam Chishti	Rehman	rsa@800carguru.ae	Compliance Officer	RSA Sales Department	Not Available	0		2025-09-22 20:00:00
+418	Inzamam Ali Khan	Inzamam		Service Operations Asst	SC-01 Operations Department	Not Available	0		2025-06-29 20:00:00
+419	Usman Ramzan Ramzan Muhammad	Ramzan	usmanramzan017@gmail.com	Job Controller- Carwash 	Service Center Operations Department	Not Available	0		2025-10-14 20:00:00
+420	Muhammad Nawaz Babar Aman Ullah	Nawaz		Floor Operations	SC-01 Floor Operations Department	Not Available	0		2025-06-25 20:00:00
+421	Muhammad Nawaz Babar Aman Ullah	Nawaz			SC-01 Floor Operations Department	Not Available	0		NULL
+422	Farhat Ansar Ansar Ahmed	Farhat	farhatansar25@gmail.com	Sales Agent	RSA Sales Department	Not Available	0		2025-11-23 20:00:00
+423	Jalal Khan Muqarab Khan	JalalKhan	info@800carguru.ae	Minor Service Technician	RSA Operations	588362736	0		2026-01-22 20:00:00
+424	Anjana Kundukulangara Harikumar 	Anjana	anjanaharikumar2001@gmail.com	HR Executive	Admin Department	504640207	1		NULL
+425	Mohanad Elfatih Ahmed Mohamed	Mohanad	Mohanadelfatih21@gmail.com	Service Advisor	Service Center Sales Department	Not Available	1		NULL
+426	Humaira Munawar	Humaira	Humakhan19@icloud.com	Tele Sales Agent	RSA Call Center Department	Not Available	0		2025-07-16 20:00:00
+427	Huzaifa Malik Mehmood Tariq	Huzaifa	zafii.ji7512@gmail.com	Tyre Sales Coordinator	SC-01 Operations Department	Not Available	0		2025-07-23 20:00:00
+428	Dilan Rathnayake Peduru Arachchige	Dilan	dilanrathnayake777@gmail.com	Operations Coordinator	SC-01 Operations Department	Not Available	0		2025-07-29 20:00:00
+429	Uzair Abdullah Shaikh Muhammad Arshad Jabbar	Uzair	uzairabdullah1996@gmail.com	Field Sales Executive	RSA Field Sales Department	Not Available	0		2025-08-24 20:00:00
+430	Junaid Ahmad Ali Ikram	Junaid	Junaidkamboh73@gmail.com	Electrician	Service Center Operations Department	Not Available	1		NULL
+431	MA Christina Mallo Roncesvavalle	Christina	Christinamallo33@gmail.com	Tele Sales Agent	RSA Call Center Department	Not Available	0		2025-07-23 20:00:00
+432	Anand Kalikadavu Venu Venu Kunnikannan Vaniyan	Ananad		Spare Parts Purchaser	SC-01 Operations Department	Not Available	0		2025-07-11 20:00:00
+`id`	`name`	`username`	`email`	`designation`	`department`	`phone`	`status`	`current_status`	`terminated_at`
+433	Najma Ahmed Suleiman	Najma	Najmaahmed653@gmail.com	Tele Sales Agent	RSA Call Center Department	Not Available	0		2025-07-31 20:00:00
+434	Prajwal Rodrigues Francis Rodrigues	Prajwal	prajwalrodri10@gmail.com	Sales Agent	RSA Sales Department	557973462	0		2025-11-10 20:00:00
+435	Mehwish Fahad Fahad Saleem	Mehwish	mehwish.fah@gmail.com	Service Advisor	Service Center Sales Department	507729665	0		2026-01-29 20:00:00
+436	Gopika Radhakrishnan Nair Radhakrishnan Nair	Gopika	gopikanairmadhavam@gmail.com	Service Co-ordinator	SC-01 Operations Department	Not Available	0		2025-08-01 20:00:00
+437	Sona Shaju Puthoor Shaju Puthoor Lazar	Sona	sonashaju0008@gmail.com	Service Co-ordinator	SC-01 Operations Department	Not Available	0		2025-08-02 20:00:00
+438	Nurjihan Mohammed Mussa	Nurjihan	Jihan4.janet@gmail.com	Appointment Coordinator	SC-01 Operations Department	Not Available	0		2025-08-07 20:00:00
+439	Samina Musheer Musheer Hussain	Samina	Saminaayan19@gmail.com	Tele Sales Agent	RSA Call Center Department	Not Available	0		2025-07-30 20:00:00
+440	Abhishek Pushpan Ambadi 	Abhishek	ambady2002abhishek@gmail.com	Operations Coordinator	Third Party Garage Operations Department	Not Available	0		2025-10-06 20:00:00
+441	Shahzeb Khan Moosa khan	Shehzeb	Khanlodhi671@gmail.com	Purchaser	Spare Parts Department	501996885	1		NULL
+442	Rajadeepa Kulicham Parambil Ravindran 	Rajadeepa	rajadeeparejin@gmail.Com	Sales Agent	RSA Sales Department	Not Available	0		2025-10-08 20:00:00
+443	Pelagie Vieting Ghangha	Pelagie	Ghanghapelagiev@gmail.com	Tele Sales Agent	RSA Call Center Department	Not Available	0		2025-08-13 20:00:00
+444	Mihret Lemmesa Adnew	Mihret	mhrilem21@gmail.com	Tele Sales Agent	RSA Call Center Department	Not Available	0		2025-08-20 20:00:00
+445	Muhammad Abbas Ali Ali Amanat	AbbasAli	rabbasraaj@gmail.com	Bike Driver	RSA Operations	Not Available	1		NULL
+446	Kasem  Ahmad Alijandi	Kasem		Mechanic	Service Center Operations Department	Not Available	0		2025-10-06 20:00:00
+447	Ayesha Manzoor Hussain Manzoor Hussain Minhas	Ayesha	ayeshamanzoor19920@gmail.com	Sales Agent	RSA Sales Department	504349324	1		NULL
+448	Muhammad Usman Zafran Muhammad	Muhammad Usman	It@800carguru.ae	SEO Executive	Admin Department	Not Available	1		NULL
+449	Muhammad Usman Zafran Muhammad	Muhammad Usman			SC-01 Operations Department	Not Available	0		NULL
+450	Azazul Haque Maqbool Hasan	Azazul	azazulpbh@gmail.com	Head – Job Card Execution	Third Party Garage Operations Department	586008495	1		NULL
+451	Yasir Shaker Shaker Ali Awan	Yasir	info@800carguru.ae	Recovery Driver	RSA Operations	588362723	0		2025-12-11 20:00:00
+452	Asmaa Jafar Abdelmajid Jaafra	Asmaa	asma94ja@gmail.com	Tele Sales Agent	RSA Call Center Department	Not Available	0		2025-09-07 20:00:00
+453	Akhila Anitha Sundaresan Sundaresan D	Akhila	akhilaanithasundaresan1994@gmail.com	Service Co-ordinator	SC-01 Operations Department	Not Available	0		2025-08-31 20:00:00
+454	Kiran Baral	KiranB	2019kiranbaral2019@gmail.com	Sales Agent	RSA Sales Department	Not Available	0		2025-09-21 20:00:00
+455	Banu Khatun Md Fakruddin	Banu	banukhatun9883@gmail.com	Sales Agent	RSA Sales Department	581027627	0		2025-11-15 20:00:00
+456	Tuba saleem Muhammad Saleem	Tuba	tubasaleem997@gmail.com	Sales Agent	RSA Sales Department	 504350604	0		2025-10-15 20:00:00
+457	Aswathy Vijayakumar Yamuna Vijayakumar T R	Aswathy	aswathyvy4@gmail.com	Sales Agent	RSA Sales Department	522648557	0		2025-11-15 20:00:00
+458	Ahmad Aziz Aziz Abdul	AhmadAziz	Ahm925487@gmail.com	Sales Agent	RSA Sales Department	Not Available	0		2025-10-18 20:00:00
+459	Sherif Wael Gharib Abdelrahman	Sherif	sherifelabd00@gmail.com	Sales Agent	RSA Sales Department	Not Available	0		2025-09-23 20:00:00
+460	Mandeep Kaur Chand Lal	Mandeep	Mandeepkaurchand@gmail.com	Sales Agent	RSA Sales Department	Not Available	0		2025-10-14 20:00:00
+461	Wandana Ruwanie Gunarathne Herath  Mudiyanselage	Wandana	wanduruwi@gmail.com	Appointment Coordinator	SC-01 Operations Department	Not Available	0		2025-09-22 20:00:00
+462	Shahzaib Shah Khalid	Shahzaib Shah	Shahzaib090977@gmail.com	Service Advisor	Service Center Sales Department	553060550	0		2025-11-20 20:00:00
+463	Zaheer  Ahmed	Zaheer	zaheer17494@gmail.com	Sales Agent	RSA Sales Department	Not Available	1		NULL
+`id`	`name`	`username`	`email`	`designation`	`department`	`phone`	`status`	`current_status`	`terminated_at`
+464	Mohammed Aquib Khan Abdul Sadique Khan	Aquib	aquib29.khan@gmail.com	Sales Agent	RSA Sales Department	Not Available	0		2025-10-18 20:00:00
+465	Aneel Wadud	Aneel	aneel.wadud0@gmail.com	Sales Agent	RSA Sales Department	Not Available	0		2025-10-17 20:00:00
+466	Tariq Aziz	Tariq		Operations Coordinator	Third Party Garage Operations Department	Not Available	0		2025-09-27 20:00:00
+467	Kiran Rajan Rajan Thaikootathil Veluanchari	Kiran	kiranrajan6905@gmail.com	Helper	Service Center Operations Department	Not Available	0		2025-10-02 20:00:00
+468	Muhammed Anu Sharvan Rafeek Puthempura	Anusharvan	anusharvan11@gmail.com	Sales Agent	RSA Sales Department	545018949	0		2025-11-03 20:00:00
+470	Hamza Khan Gul Muhammad	Hamza Khan	hi9879899@gmail.com	Battery Technician	RSA Operations	Not Available	0		2025-10-30 20:00:00
+471	Mohammed Javed Ahmed Maqsood Ahmed	Javed	javed8653@gmail.com	Bike Driver	RSA Operations	Not Available	0		2025-09-27 20:00:00
+472	Bassem Ibrahim Zakaria Ibrahim Moussa	Bassem Zakaria	Bassemmoussa651@gmail.com	Sales Agent	RSA Sales Department	Not Available	0		2025-10-18 20:00:00
+473	Nishchal Bhusal	Nishchal	nishdeep12@gmail.com	Sales Agent	RSA Sales Department	Not Available	0		2025-10-14 20:00:00
+474	Sneha Nellikurishi Kalarikkal Ramankutty Panicker	Sneha NK	snehapanicker2002@gmail.com	Sales Agent	RSA Sales Department	Not Available	0		2025-10-02 20:00:00
+475	Maimnat Rafat Rafat Maqsood	Maimnat	maimnat07@gmail.com	Sales Agent	RSA Sales Department	Not Available	0		2025-12-26 20:00:00
+476	Aslam Shaik Makhbool Shaik	Aslam	aslamshaik4495@gmail.com	Service Advisor	Service Center Sales Department	Not Available	0		2025-11-14 20:00:00
+477	Mujtaba Ahmed Ghulam Murtaza	Mujtaba	info@800carguru.ae	Chief Finance Officer	Admin Department	Not Available	1		NULL
+478	Thashreefa Abdul Khadar  Abdul Khadar 	Thashreefa	thashriak013@gmail.com	Sales Agent	RSA Sales Department	Not Available	0		2025-12-23 20:00:00
+479	Abrar Khan Malik Sahib Noor 	Abrar	abrark985@gmail.com	Sales Agent	RSA Sales Department	Not Available	0		2025-10-29 20:00:00
+480	Areeba Shahid Shahid Saleem	Areeba	areebashahid7788@gmail.com	Sales Agent	RSA Sales Department	Not Available	0		2025-10-25 20:00:00
+481	Akramul Hussain Mufasil Ali	Akramul	akramulhussain536@gmail.com	Operations Coordinator	Third Party Garage Operations Department	Not Available	0		2025-10-25 20:00:00
+482	Syed Rehman Ali Zaidi Syed Farhan Ali	RehmanAli	rehmanzaidi6@gmail.com	Battery Technician	RSA Operations	521679270	1		NULL
+483	Sajnath Nisha Kunnil Rauf Abdul Rauf Kunnil Mohammed	Nisha	sajnathnisha93@icloud.com	Sales Agent	RSA Sales Department	Not Available	1		NULL
+484	Pooja Gangadhar Acharya	Pooja	poojatilak12@gmail.com	Sales Agent	RSA Sales Department	Not Available	1		NULL
+485	Pooja Gangadhar Acharya	Pooja	poojatilak12@gmail.com	Sales Agent	RSA Sales Department	Not Available	0		NULL
+486	Pooja Gangadhar Acharya	Pooja	poojatilak12@gmail.com	Sales Agent	RSA Sales Department	Not Available	0		NULL
+487	Abdul Wassay Muhammad Aslam Bhutta	Wassay	abdulwassaybhutta93@gmail.com	Tyre Sales Coordinator	RSA Sales Department	Not Available	0		2025-11-23 20:00:00
+488	Mehfuz Mehmood khan Mehmood Khwaja Gulam Khan	Mehfuz	Khanmehfuz50@yahoo.in	Operations Coordinator	Third Party Garage Operations Department	Not Available	0		2025-12-03 20:00:00
+489	Prakash Jagdish Lachhwani Jagdish Hargovind Lachhwani	Prakash	prakash.lachhwani1996@gmail.com	Accounts Receivable	Admin Department	Not Available	0		2025-12-25 20:00:00
+490	Chamodi Jeevendra Samuvel	Chamodi	chamodijeevendra@gmail.com	Sales Agent	RSA Sales Department	Not Available	1		NULL
+491	Mohammed Abdul Shafeeq Abdul Quddus	Shafeeq	Abdulshafeeq1515@gmail.com	Sales Agent	RSA Sales Department	Not Available	0		2025-12-30 20:00:00
+492	Adnan Nawab Noor Ul Wahab	Nawab	Adnanbacha112000@gmail.com	Battery Technician	RSA Operations	Not Available	1		NULL
+493	Sagar Vijay Avhad Vijay Nivrutti Avhad	Sagar	avhadsagar65@gmail.com	Head – Inspection & Minor Services Operations 	Third Party Garage Operations Department	0504349611	1		NULL
+494	Wahab Safdar Hussain	Wahab	Wahabjutt078@gmail.com	Battery Technician	RSA Operations	Not Available	1		NULL
+`id`	`name`	`username`	`email`	`designation`	`department`	`phone`	`status`	`current_status`	`terminated_at`
+495	Kripa Navungal Radhakrishnan	Kripa	kripanavungal@gmail.com	Sales Agent	RSA Sales Department	Not Available	1		2026-02-28 20:00:00
+496	Simran Onkar Singh	Simran	simrdhillonn02@gmail.com	Sales Agent	RSA Sales Department	Not Available	0		2026-01-20 20:00:00
+497	Danish Motorwala Kadar Yasin Motorwala	Danish	Motorwaladanish@gmail.com	Service Advisor Supervisor	Service Center Sales Department	543077356	1		NULL
+498	Nousheen MD Jahangir	Nousheen	nousheennoush320@gmail.com	Sales Agent	RSA Sales Department	Not Available	0		2026-02-09 20:00:00
+499	Darpan Shahsi Bhushan Singh	Darpan	darpans2255@gmail.com	Accounts Assistant	Admin Department	Not Available	0		2026-01-15 20:00:00
+500	Mohammed Jabir Odukkaran Sidheeq Sahadi	Jabir	jabirok786@gmail.com	Accounts Assistant	Admin Department	586001134	1		NULL
+501	Muhammed Shamil Kunnathu Valappil Abdul Salam Kunnathu Valappil	Shamil	Shamilkunnath3399@gmail.com	Accounts Assistant	Admin Department	581027626	1		NULL
+502	Junaid UR Rehman Karamat Ullah	Junaid Rehman	junaidurrehman511@gmail.com	Sales Agent	RSA Sales Department	588142076	1		NULL
+503	Shahabaz Mohammed Gulam Rasool  Mohammed	Shahbaz	career.shahabaz@gmail.com	Service Advisor	Service Center Sales Department	586037635	1		NULL
+504	Asha Omprakash Jha Ompraksh Bhuwaneshwar Jha	Asha	ashajha.dxb@gmail.com	HR Manager	Admin Department	Not Available	1		NULL
+505	Mohammed Shaz Nazir Mangalodan Nazeer	Shaz	shazzahs94@gmail.com	Vendor Portal Manager	Spare Parts Department	504643273	1		NULL
+506	Ahmed Farooq Lotfy Mostapha	Lotfy	ahmedflotfy@gmail.com	Sales Director	Service Center Sales Department	Not Available	1		NULL
+507	Abbas Ahmad Khan Salim Khan	Abbas Khan	Abbasahmad7676@gmail.com	Battery Technician	RSA Operations	521679264	1		NULL
+508	Omar Llavore Devela	Sam	sam.devela@gmail.com	Service Contract Sales Manager	RSA Sales Department	Not Available	1		NULL
+509	Muhammad Riaz Khan Wali Muhammad	Riyaz	rsa@cg.ae	Painter	Service Center Operations Department	Not Available	1		NULL
+510	Yogesh Kumar Kailash Chandra Dumka	Yogesh	yogeshdumka777@gmail.com	Operations Manager	Third Party Garage Operations Department	Not Available	1		NULL

@@ -2,6 +2,7 @@
 
 import { useParams } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
+import { AppLayout } from "@repo/ui";
 import { AIPanel } from "@/app/(components)/intelligence/AIPanel";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -111,6 +112,8 @@ function badgeClasses(badge: string): string {
 export default function CallCenterPerformancePage() {
   const { companyId } = useParams<{ companyId: string }>();
 
+  const [userId, setUserId] = useState<string | null>(null);
+  const [userResolved, setUserResolved] = useState(false);
   const [data, setData] = useState<SummaryData | null>(null);
   const [loading, setLoading] = useState(true);
   const [thresholds, setThresholds] = useState<E8Thresholds>(DEFAULT_THRESHOLDS);
@@ -122,12 +125,31 @@ export default function CallCenterPerformancePage() {
   });
   const [toDate, setToDate] = useState(() => new Date().toISOString().slice(0, 16));
 
+  // Load current user
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/auth/me", { cache: "no-store" });
+        if (res.ok) {
+          const json = await res.json();
+          if (!cancelled) setUserId(json?.userId ?? null);
+        }
+      } catch { /* ignore */ }
+      if (!cancelled) setUserResolved(true);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   const fetchData = useCallback(async () => {
+    if (!userResolved) return;
     setLoading(true);
+    const headers: HeadersInit = {};
+    if (userId) headers["x-user-id"] = userId;
     try {
       const [summaryRes, configRes] = await Promise.all([
         fetch(`/api/company/${companyId}/call-center/agent-summary?from=${encodeURIComponent(fromDate)}&to=${encodeURIComponent(toDate)}`),
-        fetch(`/api/company/${companyId}/intelligence/config`),
+        fetch(`/api/company/${companyId}/intelligence/config`, { headers }),
       ]);
       if (summaryRes.ok) setData(await summaryRes.json());
 
@@ -143,7 +165,7 @@ export default function CallCenterPerformancePage() {
     } finally {
       setLoading(false);
     }
-  }, [companyId, fromDate, toDate]);
+  }, [companyId, fromDate, toDate, userId, userResolved]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -152,6 +174,7 @@ export default function CallCenterPerformancePage() {
   const yesterday = data?.yesterday;
 
   return (
+    <AppLayout>
     <div className="space-y-6 p-4 md:p-6">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -292,6 +315,7 @@ export default function CallCenterPerformancePage() {
         </table>
       </div>
     </div>
+    </AppLayout>
   );
 }
 

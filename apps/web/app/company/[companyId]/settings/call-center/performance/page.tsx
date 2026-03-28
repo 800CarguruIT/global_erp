@@ -2,6 +2,7 @@
 
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { AppLayout } from "@repo/ui";
 
 interface Thresholds {
   badge_excellent_min: number;
@@ -84,10 +85,11 @@ export default function PerformanceThresholdsPage() {
   };
 
   if (loading) {
-    return <div className="p-6 text-zinc-400">Loading...</div>;
+    return <AppLayout><div className="p-6 text-zinc-400">Loading...</div></AppLayout>;
   }
 
   return (
+    <AppLayout>
     <div className="mx-auto max-w-3xl space-y-8 p-4 md:p-6">
       <div>
         <h1 className="text-2xl font-bold text-white">Performance Thresholds</h1>
@@ -139,6 +141,7 @@ export default function PerformanceThresholdsPage() {
         {status === "error" && <span className="text-sm text-red-400">Error saving</span>}
       </div>
     </div>
+    </AppLayout>
   );
 }
 
