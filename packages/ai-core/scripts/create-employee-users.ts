@@ -120,6 +120,8 @@ function isValidId(val: string): boolean {
 function buildUsernameMaps(sqlText: string): {
   passportToUsername: Map<string, string>;
   emiratesToUsername: Map<string, string>;
+  activePassports: Set<string>;
+  activeEmirates: Set<string>;
 } {
   const { columns, rows } = parseMysqlInsert(sqlText);
   const colIdx: Record<string, number> = {};
@@ -128,19 +130,29 @@ function buildUsernameMaps(sqlText: string): {
 
   const passportToUsername = new Map<string, string>();
   const emiratesToUsername = new Map<string, string>();
+  const activePassports = new Set<string>();
+  const activeEmirates = new Set<string>();
 
   for (const row of rows) {
     const username = get(row, "username").trim();
-    if (!username) continue;
+    const status = get(row, "status").trim();
+    const isActive = status === "1";
 
     const passport = get(row, "passport_number").trim();
-    if (isValidId(passport)) passportToUsername.set(passport.toUpperCase(), username);
-
     const emirates = get(row, "emirates_id").trim();
-    if (isValidId(emirates)) emiratesToUsername.set(emirates, username);
+
+    if (username) {
+      if (isValidId(passport)) passportToUsername.set(passport.toUpperCase(), username);
+      if (isValidId(emirates)) emiratesToUsername.set(emirates, username);
+    }
+
+    if (isActive) {
+      if (isValidId(passport)) activePassports.add(passport.toUpperCase());
+      if (isValidId(emirates)) activeEmirates.add(emirates);
+    }
   }
 
-  return { passportToUsername, emiratesToUsername };
+  return { passportToUsername, emiratesToUsername, activePassports, activeEmirates };
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -162,8 +174,9 @@ async function main() {
 
   console.log(`Parsing ${sqlFilePath} for usernames...`);
   const fileContents = await fs.readFile(sqlFilePath, "utf8");
-  const { passportToUsername, emiratesToUsername } = buildUsernameMaps(fileContents);
+  const { passportToUsername, emiratesToUsername, activePassports, activeEmirates } = buildUsernameMaps(fileContents);
   console.log(`Username map: ${passportToUsername.size} by passport, ${emiratesToUsername.size} by emirates ID`);
+  console.log(`Active employees in source: ${activePassports.size} by passport, ${activeEmirates.size} by emirates ID`);
 
   // Fetch all employees for this company (include doc fields for matching)
   console.log("Fetching employees from DB...");
@@ -190,8 +203,23 @@ async function main() {
   const alreadyLinked = new Set(rowsFrom(linkedResult).map((r) => r.employee_id));
   console.log(`Already have user accounts: ${alreadyLinked.size}`);
 
-  const toCreate = employees.filter((e) => !alreadyLinked.has(e.id));
-  console.log(`Creating user accounts for: ${toCreate.length} employees`);
+  // Filter to only active employees from the source dump
+  const isActiveInSource = (emp: typeof employees[0]): boolean => {
+    if (emp.doc_passport_number) {
+      const p = emp.doc_passport_number.trim().toUpperCase();
+      if (activePassports.has(p)) return true;
+    }
+    if (emp.doc_id_number) {
+      const e = emp.doc_id_number.trim();
+      if (activeEmirates.has(e)) return true;
+    }
+    return false;
+  };
+
+  const toCreate = employees.filter((e) => !alreadyLinked.has(e.id) && isActiveInSource(e));
+  const skippedInactive = employees.filter((e) => !alreadyLinked.has(e.id) && !isActiveInSource(e)).length;
+  console.log(`Active employees needing accounts: ${toCreate.length}`);
+  console.log(`Skipped (inactive or no doc match): ${skippedInactive}`);
 
   if (toCreate.length === 0) {
     console.log("Nothing to do.");
