@@ -41,6 +41,12 @@ yarn-error.log*
 
 # Local database backups/dumps
 backups/*.sql
+db/*.sql
+db/*.sql.gz
+migration-dump*.sql
+migration-dump*.sql.gz
+migration-dump*.zip
+gunzip
 
 # Local package manager cache
 .pnpm-store/

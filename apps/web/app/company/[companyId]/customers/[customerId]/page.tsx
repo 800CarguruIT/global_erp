@@ -66,6 +66,43 @@ type CustomerInvoiceRow = {
   action_url?: string | null;
 };
 
+type ContractEntitlement = {
+  id: string;
+  service_kind: "minor" | "major";
+  sequence_no: number;
+  status: "pending" | "done" | "expired" | "cancelled" | string;
+  planned_mileage?: number | null;
+  planned_date?: string | null;
+  consumed_mileage?: number | null;
+  consumed_at?: string | null;
+};
+
+type ContractRow = {
+  id: string;
+  status: string;
+  contract_type?: string | null;
+  package_name?: string | null;
+  package_code?: string | null;
+  plan_type?: string | null;
+  cylinder?: number | null;
+  mileage_limit?: number | null;
+  minor_quota: number;
+  major_quota: number;
+  minor_count?: number | null;
+  major_count?: number | null;
+  minor_used: number;
+  major_used: number;
+  package_price?: number | null;
+  final_amount?: number | null;
+  sold_at?: string | null;
+  payment_mode?: string | null;
+  advisor_name?: string | null;
+  car_plate?: string | null;
+  notes?: string | null;
+  created_at?: string | null;
+  entitlements: ContractEntitlement[];
+};
+
 type AppointmentFormState = {
   appointmentAt: string;
   type: "walkin" | "recovery";
@@ -180,6 +217,10 @@ export default function CustomerDetailPage({ params }: Params) {
   const [estimatePageSize, setEstimatePageSize] = useState<"10" | "25" | "50" | "100" | "all">("25");
   const [estimatePage, setEstimatePage] = useState(1);
   const [estimateCarFilter, setEstimateCarFilter] = useState<"selected" | "all" | string>("selected");
+  const [customerContracts, setCustomerContracts] = useState<ContractRow[]>([]);
+  const [contractsLoading, setContractsLoading] = useState(false);
+  const [contractsError, setContractsError] = useState<string | null>(null);
+  const [expandedContractId, setExpandedContractId] = useState<string | null>(null);
   const [topupOpen, setTopupOpen] = useState(false);
   const [topupForm, setTopupForm] = useState({
     amount: "",
@@ -244,6 +285,28 @@ export default function CustomerDetailPage({ params }: Params) {
     loadCustomerInvoices(companyId, customerId);
     loadWalletTransactions(companyId, customerId);
   }, [activeTab, companyId, customerId]);
+
+  useEffect(() => {
+    if (!companyId || !customerId) return;
+    if (activeTab !== "contracts") return;
+    loadCustomerContracts(companyId, customerId);
+  }, [activeTab, companyId, customerId]);
+
+  async function loadCustomerContracts(cId: string, custId: string) {
+    setContractsLoading(true);
+    setContractsError(null);
+    try {
+      const res = await fetch(`/api/customers/${custId}/contracts?companyId=${cId}`);
+      if (!res.ok) throw new Error("Failed to load contracts");
+      const data = await res.json().catch(() => ({}));
+      setCustomerContracts(Array.isArray(data?.data) ? data.data : []);
+    } catch (err: any) {
+      setContractsError(err?.message ?? "Failed to load contracts");
+      setCustomerContracts([]);
+    } finally {
+      setContractsLoading(false);
+    }
+  }
 
   async function loadCustomerInvoices(cId: string, custId: string) {
     setInvoiceLoading(true);
@@ -1237,6 +1300,101 @@ export default function CustomerDetailPage({ params }: Params) {
                       }}
                       formatDateTime={formatDateTime}
                     />
+                  </SectionCard>
+                </div>
+              )}
+
+              {activeTab === "contracts" && (
+                <div className="space-y-4 pt-4">
+                  <SectionCard title="CHSC Contracts">
+                    {contractsLoading && <div className="py-8 text-center text-sm opacity-60">Loading contracts…</div>}
+                    {contractsError && <div className="py-4 text-center text-sm text-red-400">{contractsError}</div>}
+                    {!contractsLoading && !contractsError && customerContracts.length === 0 && (
+                      <div className="py-8 text-center text-sm opacity-60">No contracts found.</div>
+                    )}
+                    {!contractsLoading && customerContracts.length > 0 && (
+                      <div className="space-y-3">
+                        {customerContracts.map((c) => {
+                          const isExpanded = expandedContractId === c.id;
+                          const statusColor =
+                            c.status === "active" ? "bg-green-500/20 text-green-400" :
+                            c.status === "expired" || c.status === "cancelled" ? "bg-red-500/20 text-red-400" :
+                            c.status === "completed" ? "bg-blue-500/20 text-blue-400" :
+                            "bg-yellow-500/20 text-yellow-400";
+                          const minorTotal = c.minor_count ?? c.minor_quota ?? 0;
+                          const majorTotal = c.major_count ?? c.major_quota ?? 0;
+                          return (
+                            <div key={c.id} className="rounded-lg border border-white/10 overflow-hidden">
+                              {/* Contract header */}
+                              <button
+                                type="button"
+                                className="w-full flex items-start gap-4 px-4 py-3 text-left hover:bg-white/5 transition-colors"
+                                onClick={() => setExpandedContractId(isExpanded ? null : c.id)}
+                              >
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="text-sm font-semibold">{c.package_name ?? "Package"}</span>
+                                    {c.package_code && <span className="text-[10px] opacity-50">{c.package_code}</span>}
+                                    <span className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full ${statusColor}`}>{c.status}</span>
+                                    {c.plan_type && <span className="text-[10px] opacity-50">{c.plan_type}</span>}
+                                    {c.cylinder && <span className="text-[10px] opacity-50">{c.cylinder}Cyl</span>}
+                                  </div>
+                                  <div className="mt-1 flex flex-wrap gap-4 text-[11px] opacity-70">
+                                    <span>Minor: {c.minor_used}/{minorTotal}</span>
+                                    <span>Major: {c.major_used}/{majorTotal}</span>
+                                    {c.car_plate && <span>Car: {c.car_plate}</span>}
+                                    {c.payment_mode && <span>Payment: {c.payment_mode}</span>}
+                                    {c.final_amount != null && <span>AED {Number(c.final_amount).toLocaleString()}</span>}
+                                    {c.sold_at && <span>Sold: {c.sold_at.slice(0, 10)}</span>}
+                                  </div>
+                                </div>
+                                <span className="text-[11px] opacity-40 mt-1">{isExpanded ? "▲" : "▼"}</span>
+                              </button>
+
+                              {/* Service history */}
+                              {isExpanded && (
+                                <div className="border-t border-white/10 px-4 py-3">
+                                  <div className="text-[11px] font-semibold uppercase opacity-50 mb-2">Service History</div>
+                                  {c.entitlements.length === 0 ? (
+                                    <div className="text-[11px] opacity-40">No service records.</div>
+                                  ) : (
+                                    <table className="w-full text-[11px]">
+                                      <thead>
+                                        <tr className="opacity-50">
+                                          <th className="text-left py-1 pr-3">#</th>
+                                          <th className="text-left py-1 pr-3">Type</th>
+                                          <th className="text-left py-1 pr-3">Status</th>
+                                          <th className="text-left py-1 pr-3">Mileage</th>
+                                          <th className="text-left py-1">Date</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {c.entitlements.map((ent) => {
+                                          const entColor =
+                                            ent.status === "done" ? "text-green-400" :
+                                            ent.status === "cancelled" || ent.status === "expired" ? "text-red-400" :
+                                            "text-yellow-400";
+                                          return (
+                                            <tr key={ent.id} className="border-t border-white/5">
+                                              <td className="py-1 pr-3 opacity-50">{ent.sequence_no}</td>
+                                              <td className="py-1 pr-3 capitalize">{ent.service_kind}</td>
+                                              <td className={`py-1 pr-3 capitalize font-semibold ${entColor}`}>{ent.status}</td>
+                                              <td className="py-1 pr-3">{ent.consumed_mileage ? `${ent.consumed_mileage.toLocaleString()} km` : ent.planned_mileage ? `~${ent.planned_mileage.toLocaleString()} km` : "—"}</td>
+                                              <td className="py-1">{ent.consumed_at ?? ent.planned_date ?? "—"}</td>
+                                            </tr>
+                                          );
+                                        })}
+                                      </tbody>
+                                    </table>
+                                  )}
+                                  {c.notes && <div className="mt-2 text-[11px] opacity-50">Note: {c.notes}</div>}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </SectionCard>
                 </div>
               )}

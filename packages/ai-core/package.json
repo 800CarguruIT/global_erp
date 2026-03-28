@@ -18,11 +18,13 @@
     "seed:docs": "ts-node --transpile-only --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" scripts/seed-docs.ts",
     "events:worker": "ts-node --transpile-only --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" scripts/notification-worker.ts",
     "import:employees": "ts-node --transpile-only --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" scripts/import-employees.ts",
-    "create:employee-users": "ts-node --transpile-only --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" scripts/create-employee-users.ts"
+    "create:employee-users": "ts-node --transpile-only --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" scripts/create-employee-users.ts",
+    "migrate:carguru": "ts-node --transpile-only --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" scripts/migrate-from-carguru.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
     "firebase-admin": "^12.3.0",
+    "mysql2": "^3.20.0",
     "nodemailer": "^6.9.16",
     "openai": "^6.9.1",
     "postgres": "^3.4.4"
