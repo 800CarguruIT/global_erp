@@ -9,9 +9,10 @@ import { serialize as e4 } from "./serializers/e4ChurnSerializer";
 import { serialize as e5 } from "./serializers/e5AnomalySerializer";
 import { serialize as e6 } from "./serializers/e6CollectionsSerializer";
 import { serialize as e7 } from "./serializers/e7CoachingSerializer";
+import { serialize as e8 } from "./serializers/e8CallCenterSerializer";
 import type { EngineKey, EngineResult, RunIntelligenceParams } from "./types";
 
-const SERIALIZERS: Record<EngineKey, typeof e1> = { e1, e2, e3, e4, e5, e6, e7 };
+const SERIALIZERS: Record<EngineKey, typeof e1> = { e1, e2, e3, e4, e5, e6, e7, e8 };
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));

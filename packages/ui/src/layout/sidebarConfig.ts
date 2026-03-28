@@ -64,6 +64,7 @@ export const SIDEBAR_CONFIG: Record<NavScope, Partial<Record<NavCategory, Sideba
       { label: "AI Config", href: "/company/[companyId]/settings/ai/config", permissionKeys: ["ai.config.view"] },
       { label: "AI Inquiries", href: "/company/[companyId]/settings/ai/inquiries", permissionKeys: ["ai.inquiries.view"] },
       { label: "AI Intelligence", href: "/company/[companyId]/settings/ai/intelligence", permissionKeys: ["ai.config.view"] },
+      { label: "Performance Thresholds", href: "/company/[companyId]/settings/call-center/performance", permissionKeys: ["ai.config.view"] },
       { labelKey: "global.nav.finance", href: "/company/[companyId]/accounting", permissionKeys: ["accounting.view", "accounting.post", "accounting.manage_chart"] },
       { label: "Inventory", href: "/company/[companyId]/inventory", permissionKeys: ["inventory.view", "inventory.create"] },
       { label: "Procurement", href: "/company/[companyId]/procurement", permissionKeys: ["procurement.view", "procurement.create"] },
@@ -90,6 +91,7 @@ export const SIDEBAR_CONFIG: Record<NavScope, Partial<Record<NavCategory, Sideba
       { label: "Data Center", href: "/company/[companyId]/data-center", permissionKeys: ["callcenter.datacenter.view"] },
       { label: "User Extensions", href: "/company/[companyId]/integrations/dialer/extensions", permissionKeys: ["callcenter.extensions.view"] },
       { label: "Master Performance", href: "/company/[companyId]/master-dashboard", permissionKeys: ["callcenter.master_performance.view"] },
+      { label: "Performance Summary", href: "/company/[companyId]/call-center/performance", permissionKeys: ["callcenter.view"] },
     ],
     Jobs: [
       { label: "RSA", href: "/company/[companyId]/jobs/rsa", moduleKey: "jobs", permissionKeys: ["jobs.view", "jobs.rsa.view"] },
@@ -255,6 +257,7 @@ export const SIDEBAR_TREE: Partial<Record<NavScope, SidebarItem[]>> = {
         { label: "Data Center", href: "/company/[companyId]/data-center", permissionKeys: ["callcenter.datacenter.view"] },
         { label: "User Extensions", href: "/company/[companyId]/integrations/dialer/extensions", permissionKeys: ["callcenter.extensions.view"] },
         { label: "Master Performance", href: "/company/[companyId]/master-dashboard", permissionKeys: ["callcenter.master_performance.view"] },
+        { label: "Performance Summary", href: "/company/[companyId]/call-center/performance", permissionKeys: ["callcenter.view"] },
       ],
     },
     {

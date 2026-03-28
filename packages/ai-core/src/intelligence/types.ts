@@ -1,4 +1,4 @@
-export type EngineKey = "e1" | "e2" | "e3" | "e4" | "e5" | "e6" | "e7";
+export type EngineKey = "e1" | "e2" | "e3" | "e4" | "e5" | "e6" | "e7" | "e8";
 
 export type SignalType = "diagnostic" | "predictive" | "prescriptive";
 
@@ -50,6 +50,7 @@ export const ENGINE_LABELS: Record<EngineKey, string> = {
   e5: "Anomaly Detection",
   e6: "Collections Intelligence",
   e7: "Coaching Intelligence",
+  e8: "Call Center Performance Intelligence",
 };
 
-export const ALL_ENGINE_KEYS: EngineKey[] = ["e1", "e2", "e3", "e4", "e5", "e6", "e7"];
+export const ALL_ENGINE_KEYS: EngineKey[] = ["e1", "e2", "e3", "e4", "e5", "e6", "e7", "e8"];

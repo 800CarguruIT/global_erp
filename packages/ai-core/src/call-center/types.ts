@@ -120,3 +120,51 @@ export interface DialerWebhookUpdate {
   recordingDurationSeconds?: number | null;
   rawPayload?: unknown;
 }
+
+// ─── Agent Performance Summary ───────────────────────────────────────────────
+
+export type PerformanceBadge = "Excellent" | "Good" | "Average" | "Needs Improvement";
+
+export interface CallCenterAgentSummaryRow {
+  userId: string;
+  agentName: string;
+  totalCalls: number;
+  heldCalls: number;
+  heldRatePct: number;
+  missRatePct: number;
+  avgDurationSeconds: number;
+  chscSold: number;
+  chscCarIn: number;
+  chscConversionPct: number;
+  nonChscCarIn: number;
+  todayAppts: number;
+  tomorrowAppts: number;
+  totalCollection: number;
+  revenuePerCall: number;
+  performanceScore: number;
+  performanceBadge: PerformanceBadge;
+}
+
+export interface CallCenterAgentSummaryFilter {
+  companyId: string;
+  from: Date;
+  to: Date;
+}
+
+export interface CallCenterAgentSummaryTotals {
+  totalCalls: number;
+  heldCalls: number;
+  heldRatePct: number;
+  avgDurationSeconds: number;
+  totalCollection: number;
+  totalAppts: number;
+  chscConversionPct: number;
+}
+
+export interface CallCenterAgentSummary {
+  from: string;
+  to: string;
+  agents: CallCenterAgentSummaryRow[];
+  totals: CallCenterAgentSummaryTotals;
+  yesterday: CallCenterAgentSummaryTotals;
+}
