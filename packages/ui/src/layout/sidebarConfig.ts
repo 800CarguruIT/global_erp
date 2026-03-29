@@ -88,8 +88,8 @@ export const SIDEBAR_CONFIG: Record<NavScope, Partial<Record<NavCategory, Sideba
       { label: "Data Center", href: "/company/[companyId]/data-center", permissionKeys: ["callcenter.datacenter.view"] },
       { label: "User Extensions", href: "/company/[companyId]/integrations/dialer/extensions", permissionKeys: ["callcenter.extensions.view"] },
       { label: "Master Performance", href: "/company/[companyId]/master-dashboard", permissionKeys: ["callcenter.master_performance.view"] },
-      { label: "Performance Summary", href: "/company/[companyId]/call-center/performance", permissionKeys: ["callcenter.performance.view"] },
-      { label: "Agent Dashboard", href: "/company/[companyId]/call-center/agent-dashboard", permissionKeys: ["callcenter.agent_dashboard.view"] },
+      { label: "Performance Summary", href: "/company/[companyId]/call-center/performance", permissionKeys: ["callcenter.view"] },
+      { label: "Agent Dashboard", href: "/company/[companyId]/call-center/agent-dashboard", permissionKeys: ["callcenter.view"] },
     ],
     Jobs: [
       { label: "RSA", href: "/company/[companyId]/jobs/rsa", moduleKey: "jobs", permissionKeys: ["jobs.view", "jobs.rsa.view"] },
@@ -251,8 +251,8 @@ export const SIDEBAR_TREE: Partial<Record<NavScope, SidebarItem[]>> = {
         { label: "Data Center", href: "/company/[companyId]/data-center", permissionKeys: ["callcenter.datacenter.view"] },
         { label: "User Extensions", href: "/company/[companyId]/integrations/dialer/extensions", permissionKeys: ["callcenter.extensions.view"] },
         { label: "Master Performance", href: "/company/[companyId]/master-dashboard", permissionKeys: ["callcenter.master_performance.view"] },
-        { label: "Performance Summary", href: "/company/[companyId]/call-center/performance", permissionKeys: ["callcenter.performance.view"] },
-        { label: "Agent Dashboard", href: "/company/[companyId]/call-center/agent-dashboard", permissionKeys: ["callcenter.agent_dashboard.view"] },
+        { label: "Performance Summary", href: "/company/[companyId]/call-center/performance", permissionKeys: ["callcenter.view"] },
+        { label: "Agent Dashboard", href: "/company/[companyId]/call-center/agent-dashboard", permissionKeys: ["callcenter.view"] },
       ],
     },
     {
