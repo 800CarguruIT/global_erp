@@ -3,7 +3,7 @@ import { CustomerDataCenter, getSql } from "@repo/ai-core/server";
 import { resolveDataCenterAccess } from "@/lib/data-center/access";
 
 type ParamsCtx = { params: Promise<{ companyId: string }> };
-type Segment = "chsc" | "non_chsc" | "insurance" | "warranty";
+type Segment = "chsc" | "chsc_inactive" | "non_chsc" | "non_chsc_inactive" | "insurance";
 type SqlRowsResult<T> = { rows: T[] };
 
 function getCurrentUserId(req: NextRequest): string | null {
@@ -18,36 +18,39 @@ function normalizePercent(value: unknown): number {
 
 function segmentWhereClause(sql: ReturnType<typeof getSql>, segment: Segment) {
   if (segment === "chsc") {
-    return sql`AND UPPER(TRIM(COALESCE(c.customer_type, ''))) = 'CHSC'`;
+    return sql`AND UPPER(TRIM(COALESCE(c.customer_type, ''))) = 'CHSC' AND c.is_active = TRUE`;
+  }
+  if (segment === "chsc_inactive") {
+    return sql`AND UPPER(TRIM(COALESCE(c.customer_type, ''))) = 'CHSC' AND c.is_active = FALSE`;
   }
   if (segment === "insurance") {
     return sql`AND UPPER(TRIM(COALESCE(c.customer_type, ''))) IN ('INSURANCE', 'INSURANCE CUSTOMER', 'INSURANCE CUSTOMERS')`;
   }
-  if (segment === "warranty") {
-    return sql`AND UPPER(TRIM(COALESCE(c.customer_type, ''))) IN ('BATTERY WARRANTY', 'BATTERY WARRANTY CUSTOMER', 'BATTERY WARRANTY CUSTOMERS', 'WARRANTY', 'WARRANTY CUSTOMER', 'WARRANTY CUSTOMERS')`;
+  if (segment === "non_chsc_inactive") {
+    return sql`AND UPPER(TRIM(COALESCE(c.customer_type, ''))) NOT IN (
+      'CHSC', 'INSURANCE', 'INSURANCE CUSTOMER', 'INSURANCE CUSTOMERS'
+    ) AND c.is_active = FALSE`;
   }
-  return sql`AND COALESCE(NULLIF(TRIM(c.customer_type), ''), '') <> '' AND UPPER(TRIM(COALESCE(c.customer_type, ''))) NOT IN (
-    'CHSC',
-    'INSURANCE', 'INSURANCE CUSTOMER', 'INSURANCE CUSTOMERS',
-    'BATTERY WARRANTY', 'BATTERY WARRANTY CUSTOMER', 'BATTERY WARRANTY CUSTOMERS',
-    'WARRANTY', 'WARRANTY CUSTOMER', 'WARRANTY CUSTOMERS'
-  )`;
+  // non_chsc (active)
+  return sql`AND UPPER(TRIM(COALESCE(c.customer_type, ''))) NOT IN (
+    'CHSC', 'INSURANCE', 'INSURANCE CUSTOMER', 'INSURANCE CUSTOMERS'
+  ) AND c.is_active = TRUE`;
 }
 
+function segmentLabel(segment: Segment): string {
+  return segment;
+}
+
+const ALL_SEGMENTS: Segment[] = ["chsc", "chsc_inactive", "non_chsc", "non_chsc_inactive", "insurance"];
+
 function splitCounts(totalCustomers: number, percentages: Record<Segment, number>): Record<Segment, number> {
-  const segments: Segment[] = ["chsc", "non_chsc", "insurance", "warranty"];
-  const totalPercent = segments.reduce((sum, s) => sum + percentages[s], 0);
-  const safeDenominator = totalPercent > 0 ? totalPercent : segments.length;
-  const raw = segments.map((s) => ({
+  const totalPercent = ALL_SEGMENTS.reduce((sum, s) => sum + (percentages[s] ?? 0), 0);
+  const safeDenominator = totalPercent > 0 ? totalPercent : ALL_SEGMENTS.length;
+  const raw = ALL_SEGMENTS.map((s) => ({
     segment: s,
-    value: (percentages[s] > 0 ? percentages[s] : totalPercent > 0 ? 0 : 1) * totalCustomers / safeDenominator,
+    value: ((percentages[s] ?? 0) > 0 ? (percentages[s] ?? 0) : totalPercent > 0 ? 0 : 1) * totalCustomers / safeDenominator,
   }));
-  const base: Record<Segment, number> = {
-    chsc: 0,
-    non_chsc: 0,
-    insurance: 0,
-    warranty: 0,
-  };
+  const base: Record<Segment, number> = { chsc: 0, chsc_inactive: 0, non_chsc: 0, non_chsc_inactive: 0, insurance: 0 };
   let used = 0;
   for (const row of raw) {
     const v = Math.floor(row.value);
@@ -91,9 +94,10 @@ export async function POST(req: NextRequest, ctx: ParamsCtx) {
     const percentagesInput = (body.percentages ?? {}) as Record<string, unknown>;
     const percentages: Record<Segment, number> = {
       chsc: normalizePercent(percentagesInput.chsc),
+      chsc_inactive: normalizePercent(percentagesInput.chsc_inactive),
       non_chsc: normalizePercent(percentagesInput.non_chsc),
+      non_chsc_inactive: normalizePercent(percentagesInput.non_chsc_inactive),
       insurance: normalizePercent(percentagesInput.insurance),
-      warranty: normalizePercent(percentagesInput.warranty),
     };
     const targets = splitCounts(totalCustomers, percentages);
     const sql = getSql();
@@ -101,16 +105,14 @@ export async function POST(req: NextRequest, ctx: ParamsCtx) {
       Array.isArray(result) ? result : result.rows;
     const selectedRows: Array<{ customerId: string; segment: Segment }> = [];
     const selectedSet = new Set<string>();
-    const segments: Segment[] = ["chsc", "non_chsc", "insurance", "warranty"];
 
-    for (const segment of segments) {
+    for (const segment of ALL_SEGMENTS) {
       const needed = targets[segment];
       if (needed <= 0) continue;
       const rowsRes = await sql<Array<{ customer_id: string }>>`
         SELECT c.id::text AS customer_id
         FROM customers c
         WHERE c.company_id = ${companyId}
-          AND c.is_active = TRUE
           ${segmentWhereClause(sql, segment)}
           AND NOT EXISTS (
             SELECT 1
@@ -137,14 +139,14 @@ export async function POST(req: NextRequest, ctx: ParamsCtx) {
         SELECT
           c.id::text AS customer_id,
           CASE
-            WHEN UPPER(TRIM(COALESCE(c.customer_type, ''))) = 'CHSC' THEN 'chsc'
+            WHEN UPPER(TRIM(COALESCE(c.customer_type, ''))) = 'CHSC' AND c.is_active = TRUE THEN 'chsc'
+            WHEN UPPER(TRIM(COALESCE(c.customer_type, ''))) = 'CHSC' AND c.is_active = FALSE THEN 'chsc_inactive'
             WHEN UPPER(TRIM(COALESCE(c.customer_type, ''))) IN ('INSURANCE', 'INSURANCE CUSTOMER', 'INSURANCE CUSTOMERS') THEN 'insurance'
-            WHEN UPPER(TRIM(COALESCE(c.customer_type, ''))) IN ('BATTERY WARRANTY', 'BATTERY WARRANTY CUSTOMER', 'BATTERY WARRANTY CUSTOMERS', 'WARRANTY', 'WARRANTY CUSTOMER', 'WARRANTY CUSTOMERS') THEN 'warranty'
+            WHEN c.is_active = FALSE THEN 'non_chsc_inactive'
             ELSE 'non_chsc'
           END::text AS segment
         FROM customers c
         WHERE c.company_id = ${companyId}
-          AND c.is_active = TRUE
           AND NOT EXISTS (
             SELECT 1
             FROM customer_assignments ca
@@ -166,12 +168,19 @@ export async function POST(req: NextRequest, ctx: ParamsCtx) {
       }
     }
 
+    // Map sub-segments to DB-compatible segment values
+    const dbSegment = (s: Segment): string => {
+      if (s === "chsc_inactive") return "chsc";
+      if (s === "non_chsc_inactive") return "non_chsc";
+      return s;
+    };
+
     const payload = selectedRows.map((row) => ({
       companyId,
       customerId: row.customerId,
       supervisorUserId: access.scope === "supervisor" ? access.supervisorUserId : null,
       agentUserId,
-      segment: row.segment,
+      segment: dbSegment(row.segment),
       status: "active" as const,
       assignedByUserId: userId,
       reason: "auto_assign",
@@ -188,9 +197,10 @@ export async function POST(req: NextRequest, ctx: ParamsCtx) {
     const result = await CustomerDataCenter.bulkAssignCustomers(payload);
     const assignedBySegment: Record<Segment, number> = {
       chsc: 0,
+      chsc_inactive: 0,
       non_chsc: 0,
+      non_chsc_inactive: 0,
       insurance: 0,
-      warranty: 0,
     };
     for (const row of selectedRows) assignedBySegment[row.segment] += 1;
 

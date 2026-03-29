@@ -125,6 +125,39 @@ export async function serialize(
   const totalHeld = agents.reduce((s, a) => s + a.held_calls, 0);
   const totalCollection = agents.reduce((s, a) => s + a.collection, 0);
 
+  // Inhouse vs Remote group comparison
+  const locationRes = await sql<{
+    location: string;
+    total_calls: number;
+    held_calls: number;
+    agent_count: number;
+  }[]>`
+    SELECT
+      COALESCE(u.dialer_location, 'inhouse') AS location,
+      COUNT(cs.id)::int AS total_calls,
+      COUNT(cs.id) FILTER (WHERE cs.status = 'completed' AND cs.duration_seconds > 0)::int AS held_calls,
+      COUNT(DISTINCT COALESCE(u.id::text, cs.to_number))::int AS agent_count
+    FROM call_sessions cs
+    LEFT JOIN users u ON (u.mobile = cs.to_number OR u.id = cs.created_by_user_id) AND u.company_id = ${companyId}
+    WHERE cs.company_id = ${companyId}
+      AND cs.created_at >= ${from} AND cs.created_at < ${to}
+    GROUP BY COALESCE(u.dialer_location, 'inhouse')
+  `;
+  const locRows = locationRes;
+  const inhouseRow = locRows.find((r) => r.location === "inhouse");
+  const remoteRow = locRows.find((r) => r.location === "remote");
+
+  function locSummary(row: typeof inhouseRow) {
+    const t = Number(row?.total_calls ?? 0);
+    const h = Number(row?.held_calls ?? 0);
+    return {
+      agents: Number(row?.agent_count ?? 0),
+      total_calls: t,
+      held_calls: h,
+      held_rate_pct: t > 0 ? Math.round((h / t) * 100) : 0,
+    };
+  }
+
   return {
     window_days: Math.max(1, Math.round(windowMs / (1000 * 60 * 60 * 24))),
     active_agents: agents.length,
@@ -132,6 +165,8 @@ export async function serialize(
       totalCalls > 0 ? Math.round((totalHeld / totalCalls) * 100) : 0,
     company_avg_collection_per_agent:
       agents.length > 0 ? Math.round(totalCollection / agents.length) : 0,
+    inhouse_summary: locSummary(inhouseRow),
+    remote_summary: locSummary(remoteRow),
     agents,
   };
 }

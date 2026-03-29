@@ -49,6 +49,7 @@ Focus areas:
 - Agents with high call volume but zero appointments (opportunity gap).
 - Top performers to recognise and share best practices from.
 - Collection-per-call outliers (both above and below average).
+- Compare inhouse agents vs remote agents using the inhouse_summary and remote_summary data. Flag significant gaps in held rate, call volume, or agent count between the two groups. If one group outperforms the other, recommend specific actions to close the gap.
 Generate coaching actions with specific metric targets and deadlines.`,
 };
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AppLayout } from "@repo/ui";
+import { AIPanel } from "@/app/(components)/intelligence/AIPanel";
 import type { MasterDashboardData } from "@repo/ai-core";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -142,6 +143,7 @@ export default function MasterDashboardPage({
   const [data, setData] = useState<MasterDashboardData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showAI, setShowAI] = useState(true);
 
   useEffect(() => {
     Promise.resolve(params).then((p) => setCompanyId(p?.companyId ?? null));
@@ -172,13 +174,15 @@ export default function MasterDashboardPage({
   const d = data;
   const ib = d?.inbound;
   const ob = d?.outbound;
+  const ih = d?.inhouse;
+  const rm = d?.remote;
   const pf = d?.portfolio;
   const fn = d?.funnel;
   const kpis = d?.topKpis;
 
   return (
     <AppLayout>
-      <div className="space-y-5 py-4">
+      <div className={`space-y-5 py-4 transition-all duration-300 ${showAI ? "xl:pr-[440px]" : ""}`}>
 
         {/* ── Header ── */}
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
@@ -205,6 +209,15 @@ export default function MasterDashboardPage({
               className="rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 px-3 py-1.5 text-xs text-white font-medium transition-colors"
             >
               {loading ? "Loading…" : "Apply"}
+            </button>
+            <button
+              onClick={() => setShowAI(!showAI)}
+              className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition flex items-center gap-1.5 ${
+                showAI ? "border-purple-500/50 bg-purple-500/10 text-purple-400" : "border-white/10 bg-slate-800 text-slate-400 hover:text-purple-400"
+              }`}
+            >
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
+              AI
             </button>
           </div>
         </div>
@@ -301,8 +314,8 @@ export default function MasterDashboardPage({
                   </thead>
                   <tbody>
                     {[
-                      { name: "Inbound Team", desc: "Orders · Follow-ups · Support", stats: ib?.teamStats, gradeColor: "text-blue-400 bg-blue-500/10" },
-                      { name: "Outbound Team", desc: "Sales · Bookings · Follow-ups", stats: ob?.teamStats, gradeColor: "text-yellow-400 bg-yellow-500/10" },
+                      { name: "Inhouse Team", desc: `${ih?.agentCount ?? 0} agents · Office-based`, stats: ih?.teamStats, gradeColor: "text-blue-400 bg-blue-500/10" },
+                      { name: "Remote Team", desc: `${rm?.agentCount ?? 0} agents · Remote work`, stats: rm?.teamStats, gradeColor: "text-yellow-400 bg-yellow-500/10" },
                       { name: "Portfolio Team", desc: "Account Mgmt · Upsell · Retention", stats: pf?.teamStats, gradeColor: "text-green-400 bg-green-500/10" },
                     ].map((row) => (
                       <tr key={row.name} className="border-b border-white/5 hover:bg-white/5 transition-colors">
@@ -388,170 +401,120 @@ export default function MasterDashboardPage({
           </div>
         )}
 
-        {/* ── Inbound Team Dashboard ── */}
-        {ib && (
-          <div className="rounded-xl border border-blue-500/20 bg-slate-900/60 p-4">
-            <SectionHeader icon="📞" title="Inbound Team Dashboard" subtitle="Orders | Follow-Ups | Complaints | Enquiries" />
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
-              {[
-                { label: "Calls Received", value: ib.callsReceived.toLocaleString(), color: "bg-blue-500/20 border-blue-500/30" },
-                { label: "Answer Rate", value: `${ib.answerRate.toFixed(1)}%`, color: "bg-green-500/20 border-green-500/30" },
-                { label: "Avg Response Time", value: fmtDuration(ib.avgResponseTimeSecs), color: "bg-orange-500/20 border-orange-500/30" },
-                { label: "Avg Handling Time", value: fmtDuration(ib.avgHandlingTimeSecs), color: "bg-purple-500/20 border-purple-500/30" },
-                { label: "First Call Resolution", value: `${ib.firstCallResolutionRate.toFixed(1)}%`, color: "bg-teal-500/20 border-teal-500/30" },
-                { label: "Bookings Created", value: ib.bookingsCreated.toLocaleString(), color: "bg-pink-500/20 border-pink-500/30" },
-              ].map((m) => (
-                <div key={m.label} className={`rounded-xl border p-3 ${m.color}`}>
-                  <div className="text-[10px] uppercase tracking-widest text-slate-400 mb-1">{m.label}</div>
-                  <div className="text-lg font-bold text-white">{m.value}</div>
+        {/* ── Inhouse vs Remote Team Dashboard ── */}
+        {(ih || rm) && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Inhouse */}
+            <div className="rounded-xl border border-blue-500/20 bg-slate-900/60 p-4 space-y-4">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">🏢</span>
+                <div>
+                  <div className="text-sm font-bold text-white">Inhouse Team</div>
+                  <div className="text-[10px] text-slate-500">{ih?.agentCount ?? 0} agents</div>
                 </div>
-              ))}
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {/* KPI table */}
-              <div>
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Inbound KPIs</div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { label: "Total Calls", value: (ih?.totalCalls ?? 0).toLocaleString() },
+                  { label: "Answer Rate", value: `${(ih?.answerRate ?? 0).toFixed(1)}%` },
+                  { label: "Avg Duration", value: fmtDuration(ih?.avgHandlingTimeSecs ?? 0) },
+                  { label: "Abandonment", value: `${(ih?.abandonmentRate ?? 0).toFixed(1)}%` },
+                ].map((m) => (
+                  <div key={m.label} className="rounded-lg border border-blue-500/10 bg-blue-500/5 p-2.5">
+                    <div className="text-[9px] uppercase tracking-widest text-slate-500">{m.label}</div>
+                    <div className="text-base font-bold text-white mt-0.5">{m.value}</div>
+                  </div>
+                ))}
+              </div>
+              {ih && ih.trend.length > 0 && (
+                <div className="rounded-lg border border-white/5 bg-slate-800/40 p-2.5">
+                  <div className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Call Trend</div>
+                  <SparkLine data={ih.trend.map((t) => t.calls)} color="#60a5fa" />
+                  <div className="flex justify-between text-[8px] text-slate-600 mt-1">
+                    {ih.trend.map((t) => <span key={t.date}>{t.date.slice(5)}</span>)}
+                  </div>
+                </div>
+              )}
+              {ih && (
                 <table className="w-full text-xs">
-                  <thead>
-                    <tr className="text-[10px] text-slate-500 border-b border-white/5">
-                      <th className="text-left py-1">Metric</th>
-                      <th className="text-right py-1">Today</th>
-                      <th className="text-right py-1">Target</th>
-                      <th className="text-right py-1">Status</th>
-                    </tr>
-                  </thead>
                   <tbody>
                     {[
-                      { metric: "Inquiry → Booking Rate", val: ib.teamStats.conversionRate, target: 20, higherBetter: true, barColor: "bg-blue-500" },
-                      { metric: "Resolution Rate", val: ib.firstCallResolutionRate, target: 90, higherBetter: true, barColor: "bg-green-500" },
-                      { metric: "Avg. Abandonment Rate", val: ib.abandonmentRate, target: 10, higherBetter: false, barColor: "bg-orange-500" },
-                      { metric: "Repeat Call Rate", val: ib.repeatCallRate, target: 15, higherBetter: false, barColor: "bg-purple-500" },
-                    ].map((kpi) => (
-                      <tr key={kpi.metric} className="border-b border-white/5">
-                        <td className="py-2">
-                          <div className="flex items-center gap-2">
-                            <KpiBar pct={Math.min(kpi.val, 100)} color={kpi.barColor} />
-                            <span className="text-slate-300">{kpi.metric}</span>
-                          </div>
-                        </td>
-                        <td className="text-right text-slate-200">{kpi.val.toFixed(1)}%</td>
-                        <td className="text-right text-slate-500">{kpi.higherBetter ? `> ${kpi.target}%` : `< ${kpi.target}%`}</td>
-                        <td className="text-right">
-                          <StatusBadge status={kpiStatus(kpi.val, kpi.target, kpi.higherBetter)} />
-                        </td>
+                      { m: "Answer Rate", v: ih.answerRate, t: 80, h: true, c: "bg-blue-500" },
+                      { m: "Abandonment", v: ih.abandonmentRate, t: 10, h: false, c: "bg-orange-500" },
+                      { m: "Score", v: ih.teamStats.score, t: 70, h: true, c: "bg-green-500" },
+                    ].map((k) => (
+                      <tr key={k.m} className="border-b border-white/5">
+                        <td className="py-1.5"><div className="flex items-center gap-2"><KpiBar pct={Math.min(k.v, 100)} color={k.c} /><span className="text-slate-400">{k.m}</span></div></td>
+                        <td className="text-right text-slate-300">{k.v.toFixed(1)}%</td>
+                        <td className="text-right"><StatusBadge status={kpiStatus(k.v, k.t, k.h)} /></td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-              </div>
-
-              {/* Trend */}
-              <div className="rounded-xl border border-white/5 bg-slate-800/40 p-3">
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Inbound Trend</div>
-                <div className="flex gap-4 mb-2 text-[10px]">
-                  <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-blue-400 inline-block" /> Calls</span>
-                  <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-green-400 inline-block" /> Bookings</span>
-                </div>
-                <SparkLine data={ib.trend.map((t) => t.calls)} color="#60a5fa" />
-                <SparkLine data={ib.trend.map((t) => t.bookings)} color="#34d399" />
-                <div className="flex justify-between text-[9px] text-slate-600 mt-1">
-                  {ib.trend.map((t) => (
-                    <span key={t.date}>{t.date.slice(5)}</span>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ── Outbound Team Dashboard ── */}
-        {ob && (
-          <div className="rounded-xl border border-green-500/20 bg-slate-900/60 p-4">
-            <SectionHeader icon="📤" title="Outbound Team Dashboard" subtitle="Sales Calls | Bookings | Follow-Ups" />
-            {ob.totalDials === 0 && (
-              <div className="mb-4 rounded-lg bg-yellow-500/10 border border-yellow-500/20 px-3 py-2 text-xs text-yellow-300 flex items-center gap-2">
-                <span>⚠</span>
-                <span>No outbound call sessions found for this period. Try extending the date range or verify outbound calls are logged in the system.</span>
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
-              {[
-                { label: "Total Dials", value: ob.totalDials.toLocaleString(), color: "bg-blue-500/20 border-blue-500/30" },
-                { label: "Answer Rate", value: `${ob.answerRate.toFixed(1)}%`, color: "bg-green-500/20 border-green-500/30" },
-                { label: "Talk Time", value: fmtDuration(ob.totalTalkTimeSecs), color: "bg-orange-500/20 border-orange-500/30" },
-                { label: "Contacts Made", value: ob.contactsMade.toLocaleString(), color: "bg-purple-500/20 border-purple-500/30" },
-                { label: "Bookings Set", value: ob.bookingsSet.toLocaleString(), color: "bg-teal-500/20 border-teal-500/30" },
-                { label: "Show-Up Rate", value: ob.bookingsSet === 0 ? "N/A" : `${ob.showUpRate.toFixed(1)}%`, color: "bg-pink-500/20 border-pink-500/30" },
-              ].map((m) => (
-                <div key={m.label} className={`rounded-xl border p-3 ${m.color}`}>
-                  <div className="text-[10px] uppercase tracking-widest text-slate-400 mb-1">{m.label}</div>
-                  <div className="text-lg font-bold text-white">{m.value}</div>
-                </div>
-              ))}
+              )}
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <div>
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Outbound KPIs</div>
+            {/* Remote */}
+            <div className="rounded-xl border border-green-500/20 bg-slate-900/60 p-4 space-y-4">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">🏠</span>
+                <div>
+                  <div className="text-sm font-bold text-white">Remote Team</div>
+                  <div className="text-[10px] text-slate-500">{rm?.agentCount ?? 0} agents</div>
+                </div>
+              </div>
+              {(rm?.totalCalls ?? 0) === 0 && (
+                <div className="rounded-lg bg-yellow-500/10 border border-yellow-500/20 px-3 py-2 text-[11px] text-yellow-300">
+                  No remote calls found. Set agents to &quot;remote&quot; in User Extensions.
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { label: "Total Calls", value: (rm?.totalCalls ?? 0).toLocaleString() },
+                  { label: "Answer Rate", value: `${(rm?.answerRate ?? 0).toFixed(1)}%` },
+                  { label: "Avg Duration", value: fmtDuration(rm?.avgHandlingTimeSecs ?? 0) },
+                  { label: "Abandonment", value: `${(rm?.abandonmentRate ?? 0).toFixed(1)}%` },
+                ].map((m) => (
+                  <div key={m.label} className="rounded-lg border border-green-500/10 bg-green-500/5 p-2.5">
+                    <div className="text-[9px] uppercase tracking-widest text-slate-500">{m.label}</div>
+                    <div className="text-base font-bold text-white mt-0.5">{m.value}</div>
+                  </div>
+                ))}
+              </div>
+              {rm && rm.trend.length > 0 && (
+                <div className="rounded-lg border border-white/5 bg-slate-800/40 p-2.5">
+                  <div className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Call Trend</div>
+                  <SparkLine data={rm.trend.map((t) => t.calls)} color="#34d399" />
+                  <div className="flex justify-between text-[8px] text-slate-600 mt-1">
+                    {rm.trend.map((t) => <span key={t.date}>{t.date.slice(5)}</span>)}
+                  </div>
+                </div>
+              )}
+              {rm && (
                 <table className="w-full text-xs">
-                  <thead>
-                    <tr className="text-[10px] text-slate-500 border-b border-white/5">
-                      <th className="text-left py-1">Metric</th>
-                      <th className="text-right py-1">Value</th>
-                      <th className="text-right py-1">Target</th>
-                      <th className="text-right py-1">Status</th>
-                    </tr>
-                  </thead>
                   <tbody>
                     {[
-                      { metric: "Lead → Booking Conversion", val: ob.leadToBookingConversion, target: 15, higherBetter: true, barColor: "bg-blue-500", naWhen: ob.totalDials === 0 },
-                      { metric: "Booking → Show Rate", val: ob.showUpRate, target: 80, higherBetter: true, barColor: "bg-green-500", naWhen: ob.bookingsSet === 0 },
-                      { metric: "No-Show Rate", val: ob.noShowRate, target: 20, higherBetter: false, barColor: "bg-orange-500", naWhen: ob.bookingsSet === 0 },
-                      { metric: "Sales Conversion Rate", val: ob.salesConversionRate, target: 25, higherBetter: true, barColor: "bg-purple-500", naWhen: ob.totalDials === 0 },
-                    ].map((kpi) => (
-                      <tr key={kpi.metric} className="border-b border-white/5">
-                        <td className="py-2">
-                          <div className="flex items-center gap-2">
-                            <KpiBar pct={kpi.naWhen ? 0 : Math.min(kpi.val, 100)} color={kpi.barColor} />
-                            <span className="text-slate-300">{kpi.metric}</span>
-                          </div>
-                        </td>
-                        <td className="text-right text-slate-200">{kpi.naWhen ? <span className="text-slate-500">N/A</span> : `${kpi.val.toFixed(1)}%`}</td>
-                        <td className="text-right text-slate-500">{kpi.higherBetter ? `> ${kpi.target}%` : `< ${kpi.target}%`}</td>
-                        <td className="text-right">
-                          {kpi.naWhen ? <span className="text-[10px] text-slate-600">—</span> : <StatusBadge status={kpiStatus(kpi.val, kpi.target, kpi.higherBetter)} />}
-                        </td>
+                      { m: "Answer Rate", v: rm.answerRate, t: 80, h: true, c: "bg-blue-500" },
+                      { m: "Abandonment", v: rm.abandonmentRate, t: 10, h: false, c: "bg-orange-500" },
+                      { m: "Score", v: rm.teamStats.score, t: 70, h: true, c: "bg-green-500" },
+                    ].map((k) => (
+                      <tr key={k.m} className="border-b border-white/5">
+                        <td className="py-1.5"><div className="flex items-center gap-2"><KpiBar pct={Math.min(k.v, 100)} color={k.c} /><span className="text-slate-400">{k.m}</span></div></td>
+                        <td className="text-right text-slate-300">{k.v.toFixed(1)}%</td>
+                        <td className="text-right"><StatusBadge status={kpiStatus(k.v, k.t, k.h)} /></td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-              </div>
-
-              <div className="rounded-xl border border-white/5 bg-slate-800/40 p-3">
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Outbound Trend</div>
-                <div className="flex gap-4 mb-2 text-[10px]">
-                  <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-blue-400 inline-block" /> Dials</span>
-                  <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-green-400 inline-block" /> Bookings</span>
-                </div>
-                <SparkLine data={ob.trend.map((t) => t.calls)} color="#60a5fa" />
-                <SparkLine data={ob.trend.map((t) => t.bookings)} color="#34d399" />
-                <div className="flex justify-between text-[9px] text-slate-600 mt-1">
-                  {ob.trend.map((t) => (
-                    <span key={t.date}>{t.date.slice(5)}</span>
-                  ))}
-                </div>
-              </div>
+              )}
             </div>
           </div>
         )}
 
-        {/* ── Remote Portfolio Team ── */}
+        {/* ── Portfolio Team ── */}
         {pf && (
           <div className="rounded-xl border border-purple-500/20 bg-slate-900/60 p-4">
-            <SectionHeader icon="👥" title="Remote Portfolio Team" subtitle="Account Management | Upsell | Retention" rightLabel="Period" />
+            <SectionHeader icon="👥" title="Portfolio Team" subtitle="Account Management | Upsell | Retention" rightLabel="Period" />
             {pf.customersManaged === 0 && (
               <div className="mb-4 rounded-lg bg-purple-500/10 border border-purple-500/20 px-3 py-2 text-xs text-purple-300 flex items-center gap-2">
                 <span>ℹ</span>
@@ -734,6 +697,29 @@ export default function MasterDashboardPage({
         </div>
 
       </div>
+
+      {/* ── AI Intelligence Right Sidebar ── */}
+      {showAI && companyId && (
+        <div className="hidden xl:block fixed top-[100px] right-0 h-[calc(100vh-100px)] w-[420px] z-30 border-l border-purple-500/10 bg-zinc-950/98 backdrop-blur-xl shadow-2xl shadow-purple-950/20 rounded-tl-xl">
+          <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-purple-500/5 to-transparent border-b border-zinc-800/40">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-purple-500/15">
+                <svg className="h-3.5 w-3.5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
+              </div>
+              <div>
+                <div className="text-sm font-semibold text-zinc-100">AI Intelligence</div>
+                <div className="text-[10px] text-zinc-500">Performance + Inhouse vs Remote</div>
+              </div>
+            </div>
+            <button onClick={() => setShowAI(false)} className="rounded-lg p-1.5 text-zinc-600 hover:text-zinc-300 hover:bg-zinc-800/50 transition">
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+          </div>
+          <div className="overflow-y-auto h-[calc(100vh-100px-57px)] px-3 py-3 [&_.grid]:!grid-cols-1 [&_.sm\:grid-cols-2]:!grid-cols-1">
+            <AIPanel companyId={companyId} engines={["e8"] as any} from={new Date(from)} to={new Date(to)} />
+          </div>
+        </div>
+      )}
     </AppLayout>
   );
 }

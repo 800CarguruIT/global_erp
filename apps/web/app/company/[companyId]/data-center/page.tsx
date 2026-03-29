@@ -50,9 +50,10 @@ type UserOption = {
 };
 type AutoAssignPercentages = {
   chsc: number;
+  chsc_inactive: number;
   non_chsc: number;
+  non_chsc_inactive: number;
   insurance: number;
-  warranty: number;
 };
 type AutoAssignResult = {
   requested: number;
@@ -100,10 +101,11 @@ export default function CompanyDataCenterPage({ params }: Props) {
   const [selectedAgentId, setSelectedAgentId] = useState("");
   const [totalToAssign, setTotalToAssign] = useState<number>(100);
   const [percentages, setPercentages] = useState<AutoAssignPercentages>({
-    chsc: 25,
-    non_chsc: 25,
-    insurance: 25,
-    warranty: 25,
+    chsc: 20,
+    chsc_inactive: 10,
+    non_chsc: 20,
+    non_chsc_inactive: 10,
+    insurance: 40,
   });
   const [assigning, setAssigning] = useState(false);
   const [assignError, setAssignError] = useState<string | null>(null);
@@ -253,7 +255,7 @@ export default function CompanyDataCenterPage({ params }: Props) {
   }, [companyId, userId]);
 
   const percentageTotal = useMemo(
-    () => percentages.chsc + percentages.non_chsc + percentages.insurance + percentages.warranty,
+    () => percentages.chsc + percentages.chsc_inactive + percentages.non_chsc + percentages.non_chsc_inactive + percentages.insurance,
     [percentages]
   );
 
@@ -439,10 +441,10 @@ export default function CompanyDataCenterPage({ params }: Props) {
             <h2 className="text-base font-semibold">Auto Assign Customers</h2>
             <button
               type="button"
-              onClick={() => setPercentages({ chsc: 25, non_chsc: 25, insurance: 25, warranty: 25 })}
+              onClick={() => setPercentages({ chsc: 20, chsc_inactive: 20, non_chsc: 20, non_chsc_inactive: 20, insurance: 20 })}
               className="rounded-md border border-slate-600/60 bg-slate-900/40 px-3 py-1.5 text-xs text-slate-200"
             >
-              Set Equal (25%)
+              Set Equal (20%)
             </button>
           </div>
 
@@ -454,8 +456,8 @@ export default function CompanyDataCenterPage({ params }: Props) {
                 onChange={(e) => setSelectedAgentId(e.target.value)}
                 className="w-full rounded-md border border-slate-700/60 bg-slate-900/70 px-3 py-2 text-xs text-slate-100"
               >
-                {agents.length === 0 ? <option value="">No agents found</option> : null}
-                {agents.map((a) => (
+                {agents.filter((a) => a.isAgent !== false).length === 0 ? <option value="">No agents found</option> : null}
+                {agents.filter((a) => a.isAgent !== false).map((a) => (
                   <option key={a.id} value={a.id}>
                     {a.name}
                   </option>
@@ -484,9 +486,9 @@ export default function CompanyDataCenterPage({ params }: Props) {
             </div>
           </div>
 
-          <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
+          <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-5">
             <div className="space-y-1">
-              <label className="text-xs text-slate-300">CHSC %</label>
+              <label className="text-xs text-slate-300">CHSC Active %</label>
               <input
                 type="number"
                 min={0}
@@ -496,12 +498,32 @@ export default function CompanyDataCenterPage({ params }: Props) {
               />
             </div>
             <div className="space-y-1">
-              <label className="text-xs text-slate-300">Non CHSC %</label>
+              <label className="text-xs text-slate-300">CHSC Inactive %</label>
+              <input
+                type="number"
+                min={0}
+                value={percentages.chsc_inactive}
+                onChange={(e) => setPercentages((v) => ({ ...v, chsc_inactive: Math.max(0, Number(e.target.value) || 0) }))}
+                className="w-full rounded-md border border-slate-700/60 bg-slate-900/70 px-3 py-2 text-xs text-slate-100"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-slate-300">Non CHSC Active %</label>
               <input
                 type="number"
                 min={0}
                 value={percentages.non_chsc}
                 onChange={(e) => setPercentages((v) => ({ ...v, non_chsc: Math.max(0, Number(e.target.value) || 0) }))}
+                className="w-full rounded-md border border-slate-700/60 bg-slate-900/70 px-3 py-2 text-xs text-slate-100"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-slate-300">Non CHSC Inactive %</label>
+              <input
+                type="number"
+                min={0}
+                value={percentages.non_chsc_inactive}
+                onChange={(e) => setPercentages((v) => ({ ...v, non_chsc_inactive: Math.max(0, Number(e.target.value) || 0) }))}
                 className="w-full rounded-md border border-slate-700/60 bg-slate-900/70 px-3 py-2 text-xs text-slate-100"
               />
             </div>
@@ -512,16 +534,6 @@ export default function CompanyDataCenterPage({ params }: Props) {
                 min={0}
                 value={percentages.insurance}
                 onChange={(e) => setPercentages((v) => ({ ...v, insurance: Math.max(0, Number(e.target.value) || 0) }))}
-                className="w-full rounded-md border border-slate-700/60 bg-slate-900/70 px-3 py-2 text-xs text-slate-100"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs text-slate-300">Warranty %</label>
-              <input
-                type="number"
-                min={0}
-                value={percentages.warranty}
-                onChange={(e) => setPercentages((v) => ({ ...v, warranty: Math.max(0, Number(e.target.value) || 0) }))}
                 className="w-full rounded-md border border-slate-700/60 bg-slate-900/70 px-3 py-2 text-xs text-slate-100"
               />
             </div>
@@ -539,8 +551,9 @@ export default function CompanyDataCenterPage({ params }: Props) {
           {assignResult ? (
             <div className="mt-3 rounded-lg border border-emerald-700/50 bg-emerald-950/25 p-3 text-xs text-emerald-200">
               Assigned {assignResult.assigned} of {assignResult.requested} requested.
-              {" "}CHSC {assignResult.assignedBySegment.chsc}, Non CHSC {assignResult.assignedBySegment.non_chsc},
-              {" "}Insurance {assignResult.assignedBySegment.insurance}, Warranty {assignResult.assignedBySegment.warranty}.
+              {" "}CHSC Active {assignResult.assignedBySegment.chsc ?? 0}, CHSC Inactive {assignResult.assignedBySegment.chsc_inactive ?? 0},
+              {" "}Non-CHSC Active {assignResult.assignedBySegment.non_chsc ?? 0}, Non-CHSC Inactive {assignResult.assignedBySegment.non_chsc_inactive ?? 0},
+              {" "}Insurance {assignResult.assignedBySegment.insurance ?? 0}.
             </div>
           ) : null}
         </div>

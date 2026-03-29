@@ -56,7 +56,7 @@ const YEASTAR_TOKEN_REFRESH_BUFFER_MS = 5 * 60_000;
 const YEASTAR_TOKEN_MAX_LIMIT_BACKOFF_MS = 60_000;
 const YEASTAR_RECORDING_QUERY_ATTEMPTS = 4;
 const YEASTAR_RECORDING_QUERY_WAIT_MS = 1200;
-const YEASTAR_RECORDING_DEFERRED_DELAYS_MS = [0, 30_000] as const;
+const YEASTAR_RECORDING_DEFERRED_DELAYS_MS = [0, 15_000, 45_000] as const;
 
 function safeJson(value: unknown): string {
   try {
@@ -1082,7 +1082,7 @@ async function resolveYeastarRecordingFromFallbackApis(args: {
   for (const endpoint of endpoints) {
     const buildBaseQuery = () => {
       const q = new URLSearchParams();
-      q.set("access_token", args.token);
+      // access_token is passed in the URL query string, not in the POST body
       q.set("call_id", args.providerCallId);
       q.set("id", args.providerCallId);
       if (args.hints.fromNumber) {
@@ -1120,19 +1120,27 @@ async function resolveYeastarRecordingFromFallbackApis(args: {
     for (const plan of queryPlans) {
       const pages = endpoint.isList ? [1, 2, 3, 4] : [1];
       for (const page of pages) {
-        const q = new URLSearchParams(plan.toString());
-        q.set("page", String(page));
-        q.set("page_size", "100");
+        // Build POST body from query params — Yeastar P-Series OpenAPI expects
+        // POST with JSON body for cdr/recording endpoints, not GET with query string.
+        const postBody: Record<string, unknown> = {};
+        plan.forEach((v, k) => {
+          postBody[k] = v;
+        });
+        if (endpoint.isList) {
+          postBody.page = page;
+          postBody.page_size = 100;
+        }
 
-        const url = `${args.base}/${endpoint.path}?${q.toString()}`;
+        const url = `${args.base}/${endpoint.path}?access_token=${encodeURIComponent(args.token)}`;
         const res = await requestJson({
           url,
-          method: "GET",
+          method: "POST",
           sslVerify: args.sslVerify,
           headers: {
             "User-Agent": args.userAgent,
             Authorization: args.token,
           },
+          body: postBody,
           timeoutMs: 5000,
         });
 
@@ -1276,7 +1284,78 @@ async function resolveYeastarRecordingForCall(args: {
 
     const userAgent = String(credentials.userAgent ?? "OpenAPI").trim() || "OpenAPI";
     const sslVerify = toBool(credentials.sslVerify, true);
-    for (let attempt = 0; attempt < YEASTAR_RECORDING_QUERY_ATTEMPTS; attempt += 1) {
+
+    // ── Attempt 1: POST /cdr/query with call_id (most reliable for completed calls) ──
+    const cdrDirectEndpoints = ["cdr/query", "recording/query", "record/query"];
+    for (const ep of cdrDirectEndpoints) {
+      const cdrUrl = `${base}/${ep}?access_token=${encodeURIComponent(token)}`;
+      const cdrRes = await requestJson({
+        url: cdrUrl,
+        method: "POST",
+        sslVerify,
+        headers: { "User-Agent": userAgent, Authorization: token },
+        body: { call_id: args.providerCallId, id: args.providerCallId },
+        timeoutMs: 5000,
+      });
+
+      const recordingUrlRaw = findFirstDeep(cdrRes.json, [
+        "recording_url",
+        "record_url",
+        "record_file",
+        "record_file_url",
+        "record_path",
+        "recording_path",
+        "monitor_record",
+        "recordingUrl",
+      ]);
+      const recordingIdRaw = findFirstDeep(cdrRes.json, [
+        "recording_id",
+        "record_id",
+        "recordingId",
+        "record_uuid",
+        "record_file_id",
+        "uuid",
+      ]);
+      const recordingDurationRaw = findFirstDeep(cdrRes.json, [
+        "recording_duration",
+        "record_duration",
+        "recordingDuration",
+        "duration",
+        "call_duration",
+      ]);
+
+      const recordingUrl = normalizeYeastarRecordingUrl(
+        recordingUrlRaw ? String(recordingUrlRaw).trim() : "",
+        base
+      );
+      const recordingId = recordingIdRaw ? String(recordingIdRaw).trim() : "";
+      const recordingDurationSeconds = Number(recordingDurationRaw);
+      await logWebhookLine({
+        ts: new Date().toISOString(),
+        stage: "recording_resolve_query",
+        providerCallId: args.providerCallId,
+        integrationId: integration.id,
+        tokenMode: tokenResult.mode ?? null,
+        endpoint: ep,
+        found: !!(recordingUrl || recordingId),
+        status: cdrRes.status,
+        errcode: Number(cdrRes.json?.errcode ?? -1),
+        errmsg: String(cdrRes.json?.errmsg ?? cdrRes.error ?? "").trim() || null,
+      });
+      if (recordingUrl || recordingId) {
+        return {
+          recordingUrl: recordingUrl || undefined,
+          recordingId: recordingId || undefined,
+          recordingDurationSeconds: Number.isFinite(recordingDurationSeconds)
+            ? recordingDurationSeconds
+            : undefined,
+          integrationCompanyId: integration.company_id ?? null,
+        };
+      }
+    }
+
+    // ── Attempt 2: GET /call/query (may work on some firmware versions) ──
+    for (let attempt = 0; attempt < 2; attempt += 1) {
       const queryUrl = `${base}/call/query?access_token=${encodeURIComponent(token)}&call_id=${encodeURIComponent(
         args.providerCallId
       )}`;
@@ -1284,10 +1363,7 @@ async function resolveYeastarRecordingForCall(args: {
         url: queryUrl,
         method: "GET",
         sslVerify,
-        headers: {
-          "User-Agent": userAgent,
-          Authorization: token,
-        },
+        headers: { "User-Agent": userAgent, Authorization: token },
         timeoutMs: 5000,
       });
 
@@ -1300,7 +1376,6 @@ async function resolveYeastarRecordingForCall(args: {
         "recording_path",
         "monitor_record",
         "recordingUrl",
-        "url",
       ]);
       const recordingIdRaw = findFirstDeep(queryRes.json, [
         "recording_id",
@@ -1308,7 +1383,6 @@ async function resolveYeastarRecordingForCall(args: {
         "recordingId",
         "record_uuid",
         "record_file_id",
-        "uuid",
       ]);
       const recordingDurationRaw = findFirstDeep(queryRes.json, [
         "recording_duration",
@@ -1331,6 +1405,7 @@ async function resolveYeastarRecordingForCall(args: {
           providerCallId: args.providerCallId,
           integrationId: integration.id,
           tokenMode: tokenResult.mode ?? undefined,
+          endpoint: "call/query",
           attempt: attempt + 1,
           found: true,
         });
@@ -1344,47 +1419,32 @@ async function resolveYeastarRecordingForCall(args: {
         };
       }
 
+      if (attempt < 1) await wait(YEASTAR_RECORDING_QUERY_WAIT_MS);
+    }
+
+    // ── Attempt 3: Full fallback with list endpoints + scoring ──
+    const fallbackResolved = await resolveYeastarRecordingFromFallbackApis({
+      base,
+      token,
+      userAgent,
+      sslVerify,
+      providerCallId: args.providerCallId,
+      integrationId: integration.id,
+      tokenMode: tokenResult.mode ?? undefined,
+      attempt: 1,
+      hints,
+    }).catch(() => null);
+    if (fallbackResolved?.recordingUrl || fallbackResolved?.recordingId) {
       await logWebhookLine({
         ts: new Date().toISOString(),
-        stage: "recording_resolve_query",
+        stage: "recording_resolve_fallback_hit",
         providerCallId: args.providerCallId,
         integrationId: integration.id,
-        tokenMode: tokenResult.mode ?? null,
-        attempt: attempt + 1,
-        found: false,
-        status: queryRes.status,
-        errcode: Number(queryRes.json?.errcode ?? -1),
-        errmsg: String(queryRes.json?.errmsg ?? queryRes.error ?? "").trim() || null,
+        tokenMode: tokenResult.mode ?? undefined,
+        recordingUrl: fallbackResolved.recordingUrl ?? null,
+        recordingId: fallbackResolved.recordingId ?? null,
       });
-
-      if (attempt === YEASTAR_RECORDING_QUERY_ATTEMPTS - 1) {
-        const fallbackResolved = await resolveYeastarRecordingFromFallbackApis({
-          base,
-          token,
-          userAgent,
-          sslVerify,
-          providerCallId: args.providerCallId,
-          integrationId: integration.id,
-          tokenMode: tokenResult.mode ?? undefined,
-          attempt: attempt + 1,
-          hints,
-        }).catch(() => null);
-        if (fallbackResolved?.recordingUrl || fallbackResolved?.recordingId) {
-          await logWebhookLine({
-            ts: new Date().toISOString(),
-            stage: "recording_resolve_fallback_hit",
-            providerCallId: args.providerCallId,
-            integrationId: integration.id,
-            tokenMode: tokenResult.mode ?? undefined,
-            attempt: attempt + 1,
-            recordingUrl: fallbackResolved.recordingUrl ?? null,
-            recordingId: fallbackResolved.recordingId ?? null,
-          });
-          return { ...fallbackResolved, integrationCompanyId: integration.company_id ?? null };
-        }
-      }
-
-      if (attempt < YEASTAR_RECORDING_QUERY_ATTEMPTS - 1) await wait(YEASTAR_RECORDING_QUERY_WAIT_MS);
+      return { ...fallbackResolved, integrationCompanyId: integration.company_id ?? null };
     }
   }
 
