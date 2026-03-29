@@ -41,7 +41,7 @@ State best approach per invoice bucket (critical/warning/watch).`,
   e7: `Engine: Coaching Intelligence.
 Identify agents with persistent underperformance vs company average.
 Generate specific coaching plans: focus area, method, expected improvement, checkpoint date.`,
-  e8: `Engine: Call Center Performance Intelligence.
+  e8: `Engine: Sales Center Performance Intelligence.
 Analyze per-agent call center metrics: held rate (answer rate), CHSC conversion, collection, appointments.
 Focus areas:
 - Agents whose held rate is significantly below company average (use alert_held_rate_gap_pp threshold).

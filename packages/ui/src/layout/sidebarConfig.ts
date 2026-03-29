@@ -1,7 +1,7 @@
 export type NavScope = "global" | "company" | "branch" | "vendor";
 export type NavCategory =
   | "Main"
-  | "Call Center"
+  | "Sales Center"
   | "Leads"
   | "Sales"
   | "Jobs"
@@ -82,7 +82,7 @@ export const SIDEBAR_CONFIG: Record<NavScope, Partial<Record<NavCategory, Sideba
       { label: "Inspections", href: "/company/[companyId]/inspections", permissionKeys: ["inspections.view", "inspections.create"] },
       { label: "Cars", href: "/company/[companyId]/cars", permissionKeys: ["fleet.cars.view"] },
     ],
-    "Call Center": [
+    "Sales Center": [
       { label: "Call history", href: "/company/[companyId]/call-center/history", permissionKeys: ["callcenter.history.view"] },
       { label: "Customers List", href: "/company/[companyId]/call-center/customers-list", permissionKeys: ["callcenter.customers.view"] },
       { label: "Data Center", href: "/company/[companyId]/data-center", permissionKeys: ["callcenter.datacenter.view"] },
@@ -242,7 +242,7 @@ export const SIDEBAR_TREE: Partial<Record<NavScope, SidebarItem[]>> = {
       ],
     },
     {
-      label: "Call Center",
+      label: "Sales Center",
       href: "/company/[companyId]/call-center/history",
       permissionKeys: ["callcenter.history.view", "callcenter.customers.view", "callcenter.datacenter.view", "callcenter.extensions.view", "callcenter.master_performance.view", "callcenter.performance.view", "callcenter.agent_dashboard.view"],
       children: [

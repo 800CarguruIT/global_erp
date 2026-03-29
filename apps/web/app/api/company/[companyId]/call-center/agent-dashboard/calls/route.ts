@@ -48,7 +48,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     WHERE cs.company_id = ${companyId}
       AND (
         cs.created_by_user_id = ${agentUserId}
-        ${ext ? sql`OR cs.to_number = ${ext}` : sql``}
+        ${ext ? sql`OR cs.to_number = ${ext} OR cs.from_number = ${ext}` : sql``}
       )
     ORDER BY cs.created_at DESC
     LIMIT ${limit} OFFSET ${offset}

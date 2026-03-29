@@ -193,7 +193,7 @@ export default function CallCenterPerformancePage() {
         {/* ── Header ── */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between mb-5">
           <div>
-            <h1 className="text-2xl font-bold text-white tracking-tight">Call Center Performance</h1>
+            <h1 className="text-2xl font-bold text-white tracking-tight">Sales Center Performance</h1>
             <p className="mt-0.5 text-sm text-zinc-500">
               {agentCount > 0 ? `${agentCount} agents` : "Agent performance summary"} &middot; AI-powered insights
             </p>
@@ -391,7 +391,7 @@ export default function CallCenterPerformancePage() {
                   </div>
                   <div>
                     <div className="text-sm font-semibold text-zinc-100">AI Insights</div>
-                    <div className="text-[10px] text-zinc-500">Call Center Performance Engine</div>
+                    <div className="text-[10px] text-zinc-500">Sales Center Performance Engine</div>
                   </div>
                 </div>
                 <button onClick={() => setShowAI(false)} className="rounded-lg p-1.5 text-zinc-600 hover:text-zinc-300 hover:bg-zinc-800/50 transition">
