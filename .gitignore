@@ -50,3 +50,6 @@ gunzip
 
 # Local package manager cache
 .pnpm-store/
+
+# Large log files
+tmp/*.log
