@@ -379,10 +379,29 @@ export function BranchWorkshopDashboard({
     });
   }, [companyId]);
 
+  // Load ALL resources on mount so tab counts show immediately
+  useEffect(() => {
+    async function loadAll() {
+      setLoading(true);
+      setError(null);
+      try {
+        await Promise.all([fetchJobCards(), fetchInspections(), fetchLeads(), fetchQuotes()]);
+        setLoadedResources({ jobCards: true, inspections: true, leads: true, quotes: true });
+      } catch {
+        setError("Failed to load workshop data.");
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [companyId]);
+
+  // Load tab-specific data when tab changes (handles lazy refresh)
   useEffect(() => {
     void loadTabData(activeTab as WorkshopTabId, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, companyId]);
+  }, [activeTab]);
 
   useEffect(() => {
     setCurrentPage(1);

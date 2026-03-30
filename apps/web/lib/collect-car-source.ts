@@ -28,7 +28,12 @@ function firstRow<T = Record<string, unknown>>(rows: unknown): T | null {
 }
 
 function resolveWalkinMedia(leadRow: Record<string, unknown>, rsaRow: Record<string, unknown> | null) {
-  const workflowRequired = (leadRow.workflow_required ?? {}) as Record<string, unknown>;
+  const rawWr = leadRow.workflow_required;
+  const workflowRequired = (
+    Array.isArray(rawWr)
+      ? (typeof rawWr[0] === "object" && rawWr[0] !== null ? rawWr[0] : {})
+      : (rawWr ?? {})
+  ) as Record<string, unknown>;
   return normalizeMediaMap({
     // Prefer explicit check-in capture, then legacy inspection media, then RSA fallback.
     video:

@@ -1,14 +1,21 @@
+import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import { getSql } from "../db";
 import type { CompanyRow } from "./types";
 
-const DEFAULT_COMPANY_ADMIN_PASSWORD = "Admin@123";
+function generateSecurePassword(length = 16): string {
+  const chars =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%&*";
+  const bytes = crypto.randomBytes(length);
+  return Array.from(bytes, (b) => chars[b % chars.length]).join("");
+}
 
 export async function ensureCompanyAdminForCompany(company: CompanyRow) {
   if (!company.company_email) return;
   const sql = getSql();
   const adminEmail = company.company_email.trim().toLowerCase();
-  const passwordHash = await bcrypt.hash(DEFAULT_COMPANY_ADMIN_PASSWORD, 10);
+  const plainPassword = generateSecurePassword();
+  const passwordHash = await bcrypt.hash(plainPassword, 10);
 
   const roleKey = `company_admin_${company.id}`;
 
@@ -59,8 +66,12 @@ export async function ensureCompanyAdminForCompany(company: CompanyRow) {
     SELECT ${roleId}, p.id FROM permissions p
     ON CONFLICT DO NOTHING
   `;
+
+  console.log(
+    `[CompanyBootstrap] Admin created for ${company.company_email} -- temporary password generated. User must change password on first login.`
+  );
+
+  return { userId, adminEmail, plainPassword };
 }
 
-export const CompanyBootstrapDefaults = {
-  defaultAdminPassword: DEFAULT_COMPANY_ADMIN_PASSWORD,
-};
+export { generateSecurePassword };

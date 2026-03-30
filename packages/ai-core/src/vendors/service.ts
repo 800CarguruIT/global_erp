@@ -130,8 +130,10 @@ export async function createVendor(input: CreateVendorInput): Promise<{
     );
   });
 
+  let vendorAdminPassword: string | null = null;
   try {
-    await ensureVendorAdminForVendor(vendor!);
+    const adminResult = await ensureVendorAdminForVendor(vendor!);
+    vendorAdminPassword = adminResult?.plainPassword ?? null;
   } catch (err) {
     console.error("Failed to bootstrap vendor admin", err);
   }
@@ -140,6 +142,7 @@ export async function createVendor(input: CreateVendorInput): Promise<{
     vendor: vendor!,
     contacts: createdContacts,
     bankAccounts: createdBankAccounts,
+    vendorAdminPassword,
   };
 }
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { receivePoItems } from "@repo/ai-core/workshop/procurement/repository";
 import { getSql } from "@repo/ai-core/db";
 import { upsertVerifiedCatalogEntry } from "@repo/ai-core/workshop/parts/catalog-lookup";
+import { resolveMainWarehouse } from "@repo/ai-core/workshop/inventory/warehouseResolver";
 
 type Params = { params: Promise<{ companyId: string; poId: string }> };
 
@@ -38,6 +39,9 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
   }
 
+  // Resolve main warehouse location for this company
+  const warehouse = await resolveMainWarehouse(companyId);
+
   const result = await receivePoItems(
     companyId,
     poId,
@@ -46,7 +50,8 @@ export async function POST(req: NextRequest, { params }: Params) {
       quantity: i.quantity ?? 0,
       action: String(i.action ?? "received").toLowerCase(),
     })),
-    userId
+    userId,
+    warehouse ? { locationId: warehouse.id, locationCode: warehouse.code } : undefined
   );
 
   // Auto-build verified parts catalog from received items with evidence

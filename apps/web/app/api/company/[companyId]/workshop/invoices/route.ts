@@ -26,6 +26,47 @@ export async function POST(req: NextRequest, { params }: Params) {
       ? await createInvoiceFromEstimate(companyId, body.estimateId)
       : await createInvoiceFromQualityCheck(companyId, body.qcId);
     const sql = getSql();
+
+    // Add service charges as invoice line items
+    const sc = body.serviceCharges;
+    if (sc && result.invoice.id) {
+      const invoiceId = result.invoice.id;
+      const vatRate = Number(result.invoice.vatRate ?? 5);
+      const charges: Array<{ name: string; amount: number }> = [];
+      if (Number(sc.inspectionFee ?? 0) > 0) charges.push({ name: "Inspection Fee", amount: Number(sc.inspectionFee) });
+      if (Number(sc.recoveryPickupFee ?? 0) > 0) charges.push({ name: "Recovery Pickup Fee", amount: Number(sc.recoveryPickupFee) });
+      if (Number(sc.recoveryDropoffFee ?? 0) > 0) charges.push({ name: "Recovery Dropoff Fee", amount: Number(sc.recoveryDropoffFee) });
+      if (Number(sc.labourCharge ?? 0) > 0) charges.push({ name: "Labour Charge", amount: Number(sc.labourCharge) });
+      if (charges.length > 0) {
+        const maxLineNo = await sql`SELECT COALESCE(MAX(line_no), 0)::int as max_line FROM invoice_items WHERE invoice_id = ${invoiceId}`;
+        let nextLine = Number(maxLineNo[0]?.max_line ?? 0) + 1;
+        for (const charge of charges) {
+          await sql`
+            INSERT INTO invoice_items (invoice_id, line_no, name, description, quantity, rate, line_sale, line_discount, line_final)
+            VALUES (${invoiceId}, ${nextLine}, ${charge.name}, ${'Service charge'}, 1, ${charge.amount}, ${charge.amount}, 0, ${charge.amount})
+          `;
+          nextLine++;
+        }
+        // Recalculate invoice totals
+        const serviceTotal = charges.reduce((s, c) => s + c.amount, 0);
+        const currentTotals = await sql`SELECT total_sale, total_discount, final_amount, vat_rate, vat_amount, grand_total FROM invoices WHERE id = ${invoiceId}`;
+        const cur = currentTotals[0];
+        const newTotalSale = Number(cur?.total_sale ?? 0) + serviceTotal;
+        const newFinalAmount = Number(cur?.final_amount ?? 0) + serviceTotal;
+        const curVatRate = Number(cur?.vat_rate ?? vatRate);
+        const newVat = Number((newFinalAmount * curVatRate / 100).toFixed(2));
+        const newGrandTotal = Number((newFinalAmount + newVat).toFixed(2));
+        await sql`
+          UPDATE invoices SET total_sale = ${newTotalSale}, final_amount = ${newFinalAmount}, vat_amount = ${newVat}, grand_total = ${newGrandTotal}, updated_at = now()
+          WHERE id = ${invoiceId}
+        `;
+        (result.invoice as any).grandTotal = newGrandTotal;
+        (result.invoice as any).totalSale = newTotalSale;
+        (result.invoice as any).finalAmount = newFinalAmount;
+        (result.invoice as any).vatAmount = newVat;
+      }
+    }
+
     const grandTotal = Number(result.invoice.grandTotal ?? 0) || 0;
     const customerId = String(result.invoice.customerId ?? "").trim() || null;
     const autoSettleEnabled = Boolean(body.autoSettleOnConvert);

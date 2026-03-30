@@ -1918,18 +1918,6 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                         ? `Completed at ${new Date(jobCard?.final_inspection_at).toLocaleString()}`
                         : "All checklist items and final car photos are required."}
                     </div>
-                    <button
-                      type="button"
-                      className="rounded-md bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-slate-900 disabled:opacity-60"
-                      onClick={saveFinalInspection}
-                      disabled={isSavingFinalInspection || isFinalInspectionDone || !canSaveFinalInspectionNow}
-                    >
-                      {isSavingFinalInspection
-                        ? "Saving..."
-                        : isFinalInspectionDone
-                        ? "Final Inspection Done"
-                        : "Save Final Inspection"}
-                    </button>
                   </div>
                 </div>
               )}
@@ -2069,14 +2057,6 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                     <div className="text-[11px] text-white/70">
                       {isCarWashDone ? "Car wash stage completed." : "All images + video are mandatory."}
                     </div>
-                    <button
-                      type="button"
-                      className="rounded-md bg-cyan-500 px-3 py-1.5 text-xs font-semibold text-slate-900 disabled:opacity-60"
-                      onClick={saveCarWashStage}
-                      disabled={isSavingCarWash || isCarWashDone || !canSaveCarWashNow}
-                    >
-                      {isSavingCarWash ? "Saving..." : isCarWashDone ? "Car Wash Done" : "Complete Car Wash"}
-                    </button>
                   </div>
                 </div>
               )}

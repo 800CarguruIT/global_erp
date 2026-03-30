@@ -28,142 +28,152 @@ export async function GET(req: NextRequest, { params }: Params) {
   const q = searchParams.get("q")?.toLowerCase() ?? null;
   const status = searchParams.get("status");
 
-  const leads = await listLeadsForCompany(companyId);
+  // 1. Fetch leads with pagination (was unbounded)
+  const leads = await listLeadsForCompany(companyId, { limit: 200 });
   const filtered = leads.filter((l) => {
     if (status && l.leadStatus !== status) return false;
     if (!q) return true;
     const hay = `${l.customerName ?? ""} ${l.customerPhone ?? ""} ${l.customerEmail ?? ""} ${l.source ?? ""}`.toLowerCase();
     return hay.includes(q);
   });
+
+  const leadIds = filtered.map((lead) => String(lead.id)).filter(Boolean);
+  const customerIds = [...new Set(filtered.map((l) => String(l.customerId)).filter(Boolean))];
+  if (!leadIds.length) {
+    return NextResponse.json({ data: filtered });
+  }
+
   const sql = getSql();
-  const wallets = await sql`
-    SELECT id, wallet_amount
-    FROM customers
-    WHERE company_id = ${companyId}
-  `;
-  const walletMap = wallets.reduce((acc: Record<string, number>, row: any) => {
-    if (row?.id) acc[row.id] = Number(row.wallet_amount ?? 0);
-    return acc;
-  }, {});
-  const enriched = filtered.map((lead) => ({
-    ...lead,
-    customerWalletAmount: lead.customerId ? walletMap[String(lead.customerId)] ?? 0 : 0,
-  }));
-  const formByLead = await listLatestFormsForLeads({
-    companyId,
-    leadIds: enriched.map((lead) => String(lead.id)),
-  }).catch(() => ({} as Record<string, any>));
-  const leadIds = enriched.map((lead) => String(lead.id)).filter(Boolean);
+
+  // 2. Run all enrichment queries in PARALLEL (was sequential)
+  const [walletRows, formByLead, bookingFormRows, inspectionRows, activeBookingRows] = await Promise.all([
+    // Wallet amounts -- only for customers in this result set (was fetching ALL customers)
+    customerIds.length
+      ? sql`SELECT id, wallet_amount FROM customers WHERE id::text = ANY(${sql.array(customerIds)})`
+      : Promise.resolve([]),
+    // Pre-inspection forms
+    listLatestFormsForLeads({ companyId, leadIds }).catch(() => ({} as Record<string, any>)),
+    // Booking forms with pre-inspection join
+    sql/* sql */ `
+      WITH latest_booking AS (
+        SELECT DISTINCT ON (lb.lead_id)
+          lb.lead_id, lb.booking_kind, lb.created_at
+        FROM lead_bookings lb
+        WHERE lb.company_id = ${companyId}
+          AND lb.lead_id::text = ANY(${sql.array(leadIds)})
+        ORDER BY lb.lead_id, lb.created_at DESC
+      )
+      SELECT
+        lb.lead_id, f.status, f.submitted_at,
+        f.appointment_type, f.answers, f.created_at
+      FROM latest_booking lb
+      LEFT JOIN LATERAL (
+        SELECT pif.status, pif.submitted_at, pif.appointment_type, pif.answers, pif.created_at
+        FROM pre_inspection_form_requests pif
+        WHERE pif.company_id = ${companyId}
+          AND pif.lead_id = lb.lead_id
+          AND pif.appointment_type = CASE
+            WHEN LOWER(lb.booking_kind) IN ('recovery', 'workshop_recovery') THEN 'recovery'
+            ELSE 'walkin'
+          END
+        ORDER BY CASE WHEN pif.status = 'submitted' THEN 0 ELSE 1 END, pif.created_at DESC
+        LIMIT 1
+      ) f ON TRUE
+    `.catch(() => [] as any[]),
+    // Inspection car fallback
+    sql/* sql */ `
+      SELECT DISTINCT ON (i.lead_id)
+        i.lead_id, i.car_id,
+        c.plate_number AS car_plate, c.model AS car_model, c.make AS car_make,
+        i.draft_payload
+      FROM inspections i
+      LEFT JOIN cars c ON c.id = i.car_id
+      WHERE i.company_id = ${companyId}
+        AND i.lead_id::text = ANY(${sql.array(leadIds)})
+      ORDER BY i.lead_id, i.updated_at DESC
+    `.catch(() => [] as any[]),
+    // Active bookings for each lead
+    sql/* sql */ `
+      SELECT DISTINCT ON (lb.lead_id)
+        lb.lead_id, lb.id AS booking_id, lb.booking_kind, lb.scheduled_at,
+        lb.status AS booking_status, lb.priority AS booking_priority,
+        lb.pickup_location, lb.dropoff_location, lb.notes AS booking_notes
+      FROM lead_bookings lb
+      WHERE lb.company_id = ${companyId}
+        AND lb.lead_id::text = ANY(${sql.array(leadIds)})
+        AND lb.status = 'active'
+      ORDER BY lb.lead_id, lb.created_at DESC
+    `.catch(() => [] as any[]),
+  ]);
+
+  // 3. Build lookup maps
+  const walletMap: Record<string, number> = {};
+  for (const row of walletRows) {
+    if (row?.id) walletMap[row.id] = Number(row.wallet_amount ?? 0);
+  }
+
   const fallbackFormByLead: Record<string, any> = {};
-  if (leadIds.length) {
-    try {
-      const bookingFormRows = await sql/* sql */ `
-        WITH latest_booking AS (
-          SELECT DISTINCT ON (lb.lead_id)
-            lb.lead_id,
-            lb.booking_kind,
-            lb.created_at
-          FROM lead_bookings lb
-          WHERE lb.company_id = ${companyId}
-            AND lb.lead_id::text = ANY(${sql.array(leadIds, "text")})
-          ORDER BY lb.lead_id, lb.created_at DESC
-        )
-        SELECT
-          lb.lead_id,
-          f.status,
-          f.submitted_at,
-          f.appointment_type,
-          f.answers,
-          f.created_at
-        FROM latest_booking lb
-        LEFT JOIN LATERAL (
-          SELECT
-            pif.status,
-            pif.submitted_at,
-            pif.appointment_type,
-            pif.answers,
-            pif.created_at
-          FROM pre_inspection_form_requests pif
-          WHERE pif.company_id = ${companyId}
-            AND pif.lead_id = lb.lead_id
-            AND pif.appointment_type = CASE
-              WHEN LOWER(lb.booking_kind) IN ('recovery', 'workshop_recovery') THEN 'recovery'
-              ELSE 'walkin'
-            END
-          ORDER BY
-            CASE WHEN pif.status = 'submitted' THEN 0 ELSE 1 END,
-            pif.created_at DESC
-          LIMIT 1
-        ) f ON TRUE
-      `;
-      for (const row of bookingFormRows ?? []) {
-        const leadId = String((row as any)?.lead_id ?? "");
-        if (!leadId) continue;
-        if (!(row as any)?.status) continue;
-        fallbackFormByLead[leadId] = {
-          status: (row as any).status ?? null,
-          submitted_at: (row as any).submitted_at ?? null,
-          appointment_type: (row as any).appointment_type ?? null,
-          answers: (row as any).answers ?? null,
-          created_at: (row as any).created_at ?? null,
-        };
-      }
-    } catch {
-      // ignore fallback query errors
+  for (const row of bookingFormRows ?? []) {
+    const leadId = String((row as any)?.lead_id ?? "");
+    if (leadId && (row as any)?.status) {
+      fallbackFormByLead[leadId] = {
+        status: (row as any).status ?? null,
+        submitted_at: (row as any).submitted_at ?? null,
+        appointment_type: (row as any).appointment_type ?? null,
+        answers: (row as any).answers ?? null,
+        created_at: (row as any).created_at ?? null,
+      };
     }
   }
-  const withFormStatus = enriched.map((lead) => {
-    const form = formByLead[String(lead.id)] ?? fallbackFormByLead[String(lead.id)];
+
+  const inspectionFallbackByLead: Record<string, any> = {};
+  for (const row of inspectionRows ?? []) {
+    inspectionFallbackByLead[String(row.lead_id)] = row;
+  }
+
+  const bookingByLead: Record<string, any> = {};
+  for (const row of activeBookingRows ?? []) {
+    bookingByLead[String(row.lead_id)] = {
+      bookingId: row.booking_id,
+      bookingKind: row.booking_kind,
+      scheduledAt: row.scheduled_at,
+      bookingStatus: row.booking_status,
+      bookingPriority: row.booking_priority,
+      pickupLocation: row.pickup_location,
+      dropoffLocation: row.dropoff_location,
+      bookingNotes: row.booking_notes,
+    };
+  }
+
+  // 4. Single enrichment pass
+  const result = filtered.map((lead) => {
+    const form = (formByLead as any)[String(lead.id)] ?? fallbackFormByLead[String(lead.id)];
+    const inspFallback = inspectionFallbackByLead[String(lead.id)] as any;
+    let carId = lead.carId;
+    let carModel = lead.carModel;
+    let carPlateNumber = lead.carPlateNumber;
+    if (inspFallback) {
+      const draft = (inspFallback.draft_payload ?? {}) as Record<string, unknown>;
+      carId = carId ?? inspFallback.car_id ?? null;
+      carModel = carModel ?? (String(draft.inspectionModel ?? draft.carModel ?? inspFallback.car_model ?? "").trim() || null);
+      carPlateNumber = carPlateNumber ?? (String(draft.inspectionPlate ?? draft.carPlate ?? inspFallback.car_plate ?? "").trim() || null);
+    }
     return {
       ...lead,
+      customerWalletAmount: lead.customerId ? walletMap[String(lead.customerId)] ?? 0 : 0,
       preInspectionStatus: form?.status ?? null,
       preInspectionSubmitted: form?.status === "submitted",
       preInspectionSubmittedAt: form?.submitted_at ?? null,
       preInspectionAppointmentType: form?.appointment_type ?? null,
       preInspectionAnswers: form?.answers ?? null,
+      carId,
+      carModel,
+      carPlateNumber,
+      ...(bookingByLead[String(lead.id)] ?? {}),
     };
   });
-  const leadIdsForCarFallback = withFormStatus.map((lead) => String(lead.id)).filter(Boolean);
-  let inspectionFallbackByLead: Record<string, any> = {};
-  if (leadIdsForCarFallback.length) {
-    try {
-      const inspectionRows = await sql/* sql */ `
-        SELECT DISTINCT ON (i.lead_id)
-          i.lead_id,
-          i.car_id,
-          c.plate_number AS car_plate,
-          c.model AS car_model,
-          c.make AS car_make,
-          i.draft_payload
-        FROM inspections i
-        LEFT JOIN cars c ON c.id = i.car_id
-        WHERE i.company_id = ${companyId}
-          AND i.lead_id::text = ANY(${sql.array(leadIdsForCarFallback, "text")})
-        ORDER BY i.lead_id, i.updated_at DESC
-      `;
-      inspectionFallbackByLead = Object.fromEntries(
-        (inspectionRows ?? []).map((row: any) => [String(row.lead_id), row])
-      );
-    } catch {
-      inspectionFallbackByLead = {};
-    }
-  }
-  const withCarFallback = withFormStatus.map((lead) => {
-    const fallback = inspectionFallbackByLead[String(lead.id)] as any;
-    if (!fallback) return lead;
-    const draft = (fallback.draft_payload ?? {}) as Record<string, unknown>;
-    const fallbackModelRaw = String(draft.inspectionModel ?? draft.carModel ?? fallback.car_model ?? "").trim();
-    const fallbackPlateRaw = String(draft.inspectionPlate ?? draft.carPlate ?? fallback.car_plate ?? "").trim();
-    const fallbackModel = fallbackModelRaw || null;
-    const fallbackPlate = fallbackPlateRaw || null;
-    return {
-      ...lead,
-      carId: lead.carId ?? fallback.car_id ?? null,
-      carModel: lead.carModel ?? fallbackModel,
-      carPlateNumber: lead.carPlateNumber ?? fallbackPlate,
-    };
-  });
-  return NextResponse.json({ data: withCarFallback });
+
+  return NextResponse.json({ data: result });
 }
 
 export async function POST(req: NextRequest, { params }: Params) {

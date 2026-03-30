@@ -1,31 +1,32 @@
 import { NextResponse, NextRequest } from "next/server";
 import { SESSION_COOKIE_NAME } from "./lib/auth/session-constants";
 
+// Only truly public paths that require NO authentication at all.
+// All other routes require at least a valid session cookie.
+// Routes with their own auth (e.g. /api/company/* with requirePermission)
+// still enforce fine-grained access internally.
 const publicPaths = [
+  // Auth pages & endpoints
   "/auth/login",
   "/auth/select-company",
   "/login",
   "/select-company",
-  "/api/mobile",
   "/api/auth/login",
   "/api/auth/logout",
-  "/api/customers",
-  "/api/company",
-  "/api/cars",
-  "/api/files",
+  // Mobile uses its own JWT auth (not session cookies)
+  "/api/mobile",
+  // Genuinely public endpoints (no auth required by design)
   "/api/public/recovery-requests",
   "/api/public/pre-inspection",
   "/api/public/estimate-approval",
-  "/api/i18n-generate",
-  "/api/yeastar",
+  // Webhook receivers (use provider-specific signature verification)
   "/api/webhooks/dialer",
   "/api/webhooks/channels",
-  "/api/global/call-center/incoming/stream",
-  // Allow global lead APIs to be accessed without forcing login (used by public call center/global flows)
-  "/api/global/leads",
+  // Static assets
   "/favicon.ico",
   "/_next",
   "/assets",
+  // Public pages
   "/pre-inspection",
   "/estimate-approval",
 ];
@@ -55,6 +56,13 @@ export async function middleware(req: NextRequest) {
 
   const token = req.cookies.get(SESSION_COOKIE_NAME)?.value;
   if (!token) {
+    // Return 401 JSON for API routes instead of redirecting
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
+    }
     return redirectTo(req, "/auth/login");
   }
 

@@ -292,6 +292,10 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
   const [inspectionLineItems, setInspectionLineItems] = useState<any[]>([]);
   const [newJobItems, setNewJobItems] = useState<ItemDraft[]>([]);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [serviceCharges, setServiceCharges] = useState({
+    inspectionFee: 0, recoveryPickupFee: 0, recoveryDropoffFee: 0, labourCharge: 0,
+    hasRecoveryPickup: false, hasRecoveryDropoff: false, currency: "AED", loaded: false,
+  });
   const [invoiceConvertError, setInvoiceConvertError] = useState<string | null>(null);
   const [isConvertingInvoice, setIsConvertingInvoice] = useState(false);
   const [topupOpen, setTopupOpen] = useState(false);
@@ -693,6 +697,11 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
               .then((res) => (res.ok ? res.json() : Promise.reject()))
               .then((data) => setLead(data?.data?.lead ?? data?.data?.data ?? data?.data ?? data))
               .catch(() => setLead(null));
+            // Load service charges for invoice preview
+            fetch(`/api/company/${companyId}/workshop/service-charges?leadId=${estimate.leadId}`)
+              .then((res) => (res.ok ? res.json() : Promise.reject()))
+              .then((data) => setServiceCharges({ ...data, loaded: true }))
+              .catch(() => {});
           }
           if (estimate.inspectionId && !inspectionSnapshot) {
             fetch(`/api/company/${companyId}/workshop/inspections/${estimate.inspectionId}`)
@@ -1842,6 +1851,12 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
           autoSettleOnConvert: true,
           autoCarOutOnAutoPaid: true,
           handoverType: "branch",
+          serviceCharges: {
+            inspectionFee: serviceCharges.inspectionFee,
+            recoveryPickupFee: serviceCharges.recoveryPickupFee,
+            recoveryDropoffFee: serviceCharges.recoveryDropoffFee,
+            labourCharge: serviceCharges.labourCharge,
+          },
         }),
       });
       const json = await res.json().catch(() => ({}));
@@ -2055,13 +2070,13 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
   const customerComplain = draft.customerComplain ?? "";
   const inspectorRemarks = draft.inspectorRemarks ?? "";
   const customerName =
-    customer?.name ?? customer?.customer_name ?? meta.customerName ?? "";
+    customer?.name ?? customer?.customer_name ?? meta.customerName ?? lead?.customerName ?? lead?.customer_name ?? "";
   const customerPhone =
-    customer?.phone ?? customer?.customer_phone ?? meta.customerPhone ?? "";
+    customer?.phone ?? customer?.customer_phone ?? meta.customerPhone ?? lead?.customerPhone ?? lead?.customer_phone ?? "";
   const carPlate =
-    car?.plate_number ?? car?.plateNumber ?? meta.carPlate ?? "";
+    car?.plate_number ?? car?.plateNumber ?? meta.carPlate ?? lead?.carPlateNumber ?? lead?.car_plate_number ?? "";
   const carModel =
-    [car?.make, car?.model].filter(Boolean).join(" ") || meta.carModel || "";
+    [car?.make, car?.model].filter(Boolean).join(" ") || meta.carModel || [lead?.carMake ?? lead?.car_make, lead?.carModel ?? lead?.car_model].filter(Boolean).join(" ") || "";
   const hasApprovedItems = draft.items.some((item) => item.status === "approved");
   const hasAnyItems = draft.items.length > 0;
   const canStartJobCard = hasAnyItems && hasApprovedItems;
@@ -2259,8 +2274,10 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
       ? Number(((invoiceSubTotalPreview * Math.max(0, invoiceDiscountPercent)) / 100).toFixed(2))
       : Number(draft.discountAmount || 0);
   const invoiceNetSubTotalPreview = Math.max(0, invoiceSubTotalPreview - invoiceDiscountAmountPreview);
-  const invoiceVatPreview = (invoiceNetSubTotalPreview * (Number(draft.vatRate) || 0)) / 100;
-  const invoiceGrandTotalPreview = invoiceNetSubTotalPreview + invoiceVatPreview;
+  const serviceChargesTotal = (serviceCharges.inspectionFee || 0) + (serviceCharges.recoveryPickupFee || 0) + (serviceCharges.recoveryDropoffFee || 0) + (serviceCharges.labourCharge || 0);
+  const invoiceNetWithServicesPreview = invoiceNetSubTotalPreview + serviceChargesTotal;
+  const invoiceVatPreview = (invoiceNetWithServicesPreview * (Number(draft.vatRate) || 0)) / 100;
+  const invoiceGrandTotalPreview = invoiceNetWithServicesPreview + invoiceVatPreview;
   const customerWalletBalance = Number(customer?.wallet_amount ?? customer?.walletAmount ?? 0) || 0;
   const customerIdForWallet = String(customer?.id ?? "").trim();
   const isZeroBillInvoice = invoiceGrandTotalPreview <= 0.00001;
@@ -2290,8 +2307,16 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
       title={`Create Estimate - ${estimate.id.slice(0, 8)}`}
       subtitle="Estimate workflow with inspection alignment, pricing approval, and job-card readiness."
       scopeLabel=""
+      contentClassName="max-w-none"
       primaryAction={
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => window.history.back()}
+            className="rounded-md border border-slate-400/40 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-white/15"
+          >
+            Back
+          </button>
           <a
             href={`/api/company/${companyId}/workshop/estimates/${estimate.id}/quote`}
             target="_blank"
@@ -2391,7 +2416,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
             <div className="space-y-4 p-4 text-sm">
               <div className="grid gap-4 lg:grid-cols-3">
                 <div className="space-y-1">
-                  <div className="text-xs font-semibold">Lead Advisor</div>
+                  <div className="text-xs font-semibold">Workshop Branch</div>
                   <input
                     className={`${theme.input} h-9`}
                     value={advisorName}
@@ -3557,6 +3582,12 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                   <span className="text-muted-foreground">Net Subtotal</span>
                   <span>AED {invoiceNetSubTotalPreview.toFixed(2)}</span>
                 </div>
+                {serviceChargesTotal > 0 && (
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-cyan-400">Service Charges</span>
+                    <span className="text-cyan-400">AED {serviceChargesTotal.toFixed(2)}</span>
+                  </div>
+                )}
                 <div className="flex items-center justify-between text-[11px]">
                   <span className="text-muted-foreground">VAT ({Number(draft.vatRate || 0).toFixed(2)}%)</span>
                   <span>AED {invoiceVatPreview.toFixed(2)}</span>
@@ -3574,9 +3605,19 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                     : "bg-emerald-600 text-white"
                 }`}
                 disabled={isConvertDisabled}
-                onClick={() => {
+                onClick={async () => {
                   setInvoiceConvertError(null);
                   setShowInvoiceModal(true);
+                  if (!serviceCharges.loaded) {
+                    try {
+                      const leadId = estimate?.leadId ?? (estimate as any)?.lead_id ?? null;
+                      const res = await fetch(`/api/company/${companyId}/workshop/service-charges${leadId ? `?leadId=${leadId}` : ""}`);
+                      if (res.ok) {
+                        const data = await res.json();
+                        setServiceCharges({ ...data, loaded: true });
+                      }
+                    } catch {}
+                  }
                 }}
               >
                 {reviewConvertLabel}
@@ -3664,18 +3705,81 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                     </div>
                   )}
                 </div>
+                {/* Service Charges */}
+                <div className="rounded-md border border-cyan-500/30 bg-cyan-500/5 px-3 py-2 space-y-2">
+                  <div className="text-[11px] font-semibold text-cyan-300">Service Charges</div>
+                  <div className="flex items-center justify-between gap-2">
+                    <label className="text-[11px] text-slate-300 flex-1">Inspection Fee</label>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] text-slate-500">AED</span>
+                      <input type="number" min={0} step={0.01}
+                        value={serviceCharges.inspectionFee}
+                        onChange={(e) => setServiceCharges((p) => ({ ...p, inspectionFee: Number(e.target.value) || 0 }))}
+                        className="w-20 rounded border border-slate-600 bg-slate-900/80 px-2 py-1 text-xs text-right text-white" />
+                    </div>
+                  </div>
+                  {serviceCharges.hasRecoveryPickup && (
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="text-[11px] text-slate-300 flex-1">Recovery Pickup Fee</label>
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] text-slate-500">AED</span>
+                        <input type="number" min={0} step={0.01}
+                          value={serviceCharges.recoveryPickupFee}
+                          onChange={(e) => setServiceCharges((p) => ({ ...p, recoveryPickupFee: Number(e.target.value) || 0 }))}
+                          className="w-20 rounded border border-slate-600 bg-slate-900/80 px-2 py-1 text-xs text-right text-white" />
+                      </div>
+                    </div>
+                  )}
+                  {serviceCharges.hasRecoveryDropoff && (
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="text-[11px] text-slate-300 flex-1">Recovery Dropoff Fee</label>
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] text-slate-500">AED</span>
+                        <input type="number" min={0} step={0.01}
+                          value={serviceCharges.recoveryDropoffFee}
+                          onChange={(e) => setServiceCharges((p) => ({ ...p, recoveryDropoffFee: Number(e.target.value) || 0 }))}
+                          className="w-20 rounded border border-slate-600 bg-slate-900/80 px-2 py-1 text-xs text-right text-white" />
+                      </div>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between gap-2">
+                    <label className="text-[11px] text-slate-300 flex-1">Labour Charge</label>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] text-slate-500">AED</span>
+                      <input type="number" min={0} step={0.01}
+                        value={serviceCharges.labourCharge}
+                        onChange={(e) => setServiceCharges((p) => ({ ...p, labourCharge: Number(e.target.value) || 0 }))}
+                        className="w-20 rounded border border-slate-600 bg-slate-900/80 px-2 py-1 text-xs text-right text-white" />
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between border-t border-cyan-500/20 pt-1 text-[11px] font-semibold text-cyan-200">
+                    <span>Service Charges Total</span>
+                    <span>AED {serviceChargesTotal.toFixed(2)}</span>
+                  </div>
+                </div>
+
                 <div className="rounded-md border border-slate-500/70 bg-slate-800/40 px-3 py-2">
                   <div className="flex items-center justify-between text-[11px]">
-                    <span className="text-muted-foreground">Subtotal</span>
+                    <span className="text-muted-foreground">Parts Subtotal</span>
                     <span>AED {invoiceSubTotalPreview.toFixed(2)}</span>
                   </div>
-                  <div className="mt-1 flex items-center justify-between text-[11px]">
+                  <div className="flex items-center justify-between text-[11px]">
                     <span className="text-muted-foreground">Discount</span>
                     <span>AED {invoiceDiscountAmountPreview.toFixed(2)}</span>
                   </div>
                   <div className="flex items-center justify-between text-[11px]">
-                    <span className="text-muted-foreground">Net Subtotal</span>
+                    <span className="text-muted-foreground">Parts (after discount)</span>
                     <span>AED {invoiceNetSubTotalPreview.toFixed(2)}</span>
+                  </div>
+                  {serviceChargesTotal > 0 && (
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-cyan-400">Service Charges</span>
+                      <span className="text-cyan-400">AED {serviceChargesTotal.toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-muted-foreground">Net Total</span>
+                    <span>AED {invoiceNetWithServicesPreview.toFixed(2)}</span>
                   </div>
                   <div className="flex items-center justify-between text-[11px]">
                     <span className="text-muted-foreground">VAT ({Number(draft.vatRate || 0).toFixed(2)}%)</span>

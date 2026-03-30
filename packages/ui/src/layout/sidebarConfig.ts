@@ -82,6 +82,7 @@ export const SIDEBAR_CONFIG: Record<NavScope, Partial<Record<NavCategory, Sideba
       { label: "Revenue Dashboard", href: "/company/[companyId]/revenue-dashboard", permissionKeys: ["company.dashboard.view"] },
       { label: "Inspections", href: "/company/[companyId]/inspections", permissionKeys: ["inspections.view", "inspections.create"] },
       { label: "Cars", href: "/company/[companyId]/cars", permissionKeys: ["fleet.cars.view"] },
+      { label: "Test Panel", href: "/company/[companyId]/test-panel" },
     ],
     "Sales Center": [
       { label: "Call history", href: "/company/[companyId]/call-center/history", permissionKeys: ["callcenter.history.view"] },
@@ -185,6 +186,7 @@ export const HOME_PAGE_OPTIONS: Record<NavScope, { label: string; href: string }
     { label: "HR", href: "/company/[companyId]/hr" },
     { label: "Branches", href: "/company/[companyId]/branches" },
     { label: "PIS Dashboard", href: "/company/[companyId]/pis" },
+    { label: "Advisor Portal", href: "/company/[companyId]/pis/advisor-portal" },
   ],
   branch: [
     { label: "Branch Dashboard", href: "/company/[companyId]/branches/[branchId]" },

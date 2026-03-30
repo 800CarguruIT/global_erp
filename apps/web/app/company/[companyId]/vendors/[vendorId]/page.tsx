@@ -237,6 +237,8 @@ export default function VendorDashboardPage() {
       deliveryDestinationName?: string | null;
       deliveryDestinationLocation?: string | null;
       deliveryDestinationUrl?: string | null;
+      vendorPartNumber?: string | null;
+      diagramFileId?: string | null;
       updatedAt?: string | null;
     }>
   >([]);
@@ -264,6 +266,16 @@ export default function VendorDashboardPage() {
     items: Array<{ partName: string; qty: string; price: string }>;
     updatedAt?: string | null;
   } | null>(null);
+
+  // Part details modal (part number + diagram before viewing order)
+  const [partDetailsModal, setPartDetailsModal] = useState<{
+    quoteId: string;
+    partName: string;
+    carInfo: string;
+  } | null>(null);
+  const [partDetailsForm, setPartDetailsForm] = useState({ partNumber: "", diagramFileId: "", diagramFileName: "" });
+  const [partDetailsSaving, setPartDetailsSaving] = useState(false);
+  const [partDetailsError, setPartDetailsError] = useState<string | null>(null);
 
   const currentTab = useMemo(
     () => TAB_CONFIG.find((tab) => tab.id === activeTab) ?? TAB_CONFIG[0]!,
@@ -374,6 +386,29 @@ export default function VendorDashboardPage() {
       brandTypeaheadTimersRef.current = {};
     };
   }, []);
+
+  // Load ALL tab data on mount so counts show immediately
+  useEffect(() => {
+    if (!companyId || !vendorId) return;
+    const controller = new AbortController();
+    const fetchQuiet = async (url: string) => {
+      try {
+        const res = await fetch(url, { signal: controller.signal });
+        if (!res.ok) return [];
+        const data = await res.json();
+        return Array.isArray(data?.data) ? data.data : [];
+      } catch { return []; }
+    };
+    Promise.all([
+      fetchQuiet(`/api/company/${companyId}/vendors/${vendorId}/bids`),
+      fetchQuiet(`/api/company/${companyId}/vendors/${vendorId}/bids?status=Ordered`),
+      fetchQuiet(`/api/company/${companyId}/vendors/${vendorId}/bids?status=completed`),
+      fetchQuiet(`/api/company/${companyId}/vendors/${vendorId}/bids?status=returns`),
+    ]).then(([b, o, c, r]) => {
+      setBids(b); setOrders(o); setCompleted(c); setReturns(r);
+    });
+    return () => controller.abort();
+  }, [companyId, vendorId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -876,8 +911,6 @@ export default function VendorDashboardPage() {
     form: PartFormData | undefined
   ): string | null => {
     if (!form) return "Enter at least one quote amount.";
-    if (!String(form.diagramFileId ?? "").trim()) return "Upload a part diagram (required).";
-    if (!String(form.partNumber ?? "").trim()) return "Part number is required.";
     const amountKeys: Array<keyof PartFormData> = ["oemAmount", "oeAmount", "aftmAmount", "usedAmount"];
     const hasAnyAmount = amountKeys.some((key) => toPositiveNumber(form[key] as string) > 0);
     if (!hasAnyAmount) return "Enter at least one quote amount.";
@@ -1001,7 +1034,7 @@ export default function VendorDashboardPage() {
             {row.deliveryDestinationBranchId ? (
               <div className="text-[10px] text-slate-400">Dest: {row.deliveryDestinationBranchId}</div>
             ) : null}
-            {row.deliveryNoteNo || row.deliveryNoteStatus || row.deliverySourceName || row.deliveryDestinationName ? (
+            {row.vendorPartNumber && row.diagramFileId ? (
               <button
                 type="button"
                 onClick={() => openDeliveryNoteModal(row)}
@@ -1009,7 +1042,23 @@ export default function VendorDashboardPage() {
               >
                 View
               </button>
-            ) : null}
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setPartDetailsModal({
+                    quoteId: row.id,
+                    partName: row.partName ?? "Part",
+                    carInfo: [row.carMake, row.carModel, row.carPlate].filter(Boolean).join(" | "),
+                  });
+                  setPartDetailsForm({ partNumber: row.vendorPartNumber ?? "", diagramFileId: row.diagramFileId ?? "", diagramFileName: "" });
+                  setPartDetailsError(null);
+                }}
+                className="mt-1 rounded border border-amber-500/60 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-200 hover:bg-amber-500/20"
+              >
+                Complete Details
+              </button>
+            )}
           </td>
           <td className="px-3 py-3 text-xs text-slate-300/80">
             {row.updatedAt ? new Date(row.updatedAt).toLocaleDateString() : "—"}
@@ -1366,6 +1415,119 @@ export default function VendorDashboardPage() {
         </div>
       </div>
 
+      {/* Part Details Modal */}
+      {partDetailsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-2xl border border-amber-400/25 bg-gradient-to-b from-slate-950 via-slate-900/95 to-slate-950 shadow-xl p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <div className="text-sm font-bold text-white">Complete Part Details</div>
+                <div className="text-[11px] text-slate-400">Required before viewing order</div>
+              </div>
+              <button type="button" onClick={() => setPartDetailsModal(null)} className="text-slate-500 hover:text-white text-lg">&times;</button>
+            </div>
+
+            <div className="mb-4 rounded-lg border border-slate-700/60 bg-slate-950/50 p-3">
+              <div className="text-sm font-semibold text-white">{partDetailsModal.partName}</div>
+              <div className="text-[10px] text-slate-400 mt-0.5">{partDetailsModal.carInfo}</div>
+            </div>
+
+            {partDetailsError && <div className="mb-3 rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-2 text-xs text-red-300">{partDetailsError}</div>}
+
+            <div className="space-y-3">
+              <div>
+                <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-400">Part Number <span className="text-red-400">*</span></label>
+                <input
+                  type="text"
+                  className="h-9 w-full rounded border border-slate-700 bg-slate-950/80 px-3 text-xs text-slate-100 placeholder:text-slate-500"
+                  placeholder="e.g. 4M0827211"
+                  value={partDetailsForm.partNumber}
+                  onChange={(e) => setPartDetailsForm((prev) => ({ ...prev, partNumber: e.target.value }))}
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-400">Part Diagram <span className="text-red-400">*</span></label>
+                {partDetailsForm.diagramFileId ? (
+                  <div className="flex items-center justify-between rounded border border-emerald-700/50 bg-emerald-950/30 px-3 py-2 text-xs text-emerald-300">
+                    <span className="truncate">{partDetailsForm.diagramFileName || "Diagram uploaded"}</span>
+                    <button type="button" onClick={() => setPartDetailsForm((prev) => ({ ...prev, diagramFileId: "", diagramFileName: "" }))} className="ml-2 text-slate-400 hover:text-rose-400">&times;</button>
+                  </div>
+                ) : (
+                  <label className="flex cursor-pointer items-center justify-center gap-2 rounded border-2 border-dashed border-slate-700 bg-slate-950/50 px-4 py-6 text-xs text-slate-400 hover:border-amber-500/40 hover:text-amber-300 transition">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        setPartDetailsSaving(true);
+                        try {
+                          const fd = new FormData();
+                          fd.append("file", file);
+                          fd.append("kind", "image");
+                          const res = await fetch("/api/files/upload", { method: "POST", body: fd });
+                          const data = await res.json().catch(() => ({}));
+                          if (!res.ok) throw new Error(data?.error ?? "Upload failed");
+                          setPartDetailsForm((prev) => ({ ...prev, diagramFileId: String(data?.fileId ?? ""), diagramFileName: file.name }));
+                        } catch (err: any) {
+                          setPartDetailsError(err?.message ?? "Upload failed");
+                        } finally {
+                          setPartDetailsSaving(false);
+                        }
+                      }}
+                    />
+                    {partDetailsSaving ? "Uploading..." : "Click to upload diagram photo"}
+                  </label>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-4 flex items-center justify-end gap-2">
+              <button type="button" onClick={() => setPartDetailsModal(null)} className="rounded border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:bg-slate-700">Cancel</button>
+              <button
+                type="button"
+                disabled={partDetailsSaving || !partDetailsForm.partNumber.trim() || !partDetailsForm.diagramFileId}
+                className="rounded bg-amber-500 px-4 py-1.5 text-xs font-bold text-slate-950 hover:bg-amber-400 disabled:opacity-50"
+                onClick={async () => {
+                  if (!partDetailsForm.partNumber.trim() || !partDetailsForm.diagramFileId) {
+                    setPartDetailsError("Both part number and diagram are required.");
+                    return;
+                  }
+                  setPartDetailsSaving(true);
+                  setPartDetailsError(null);
+                  try {
+                    const res = await fetch(
+                      `/api/company/${companyId}/vendors/${vendorId}/part-quotes/${partDetailsModal.quoteId}/part-details`,
+                      {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          partNumber: partDetailsForm.partNumber.trim(),
+                          diagramFileId: partDetailsForm.diagramFileId,
+                        }),
+                      }
+                    );
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok) throw new Error(data?.error ?? "Failed to save");
+                    // Update local state so View button appears
+                    setOrders((prev) => prev.map((o) => o.id === partDetailsModal.quoteId ? { ...o, vendorPartNumber: partDetailsForm.partNumber.trim(), diagramFileId: partDetailsForm.diagramFileId } : o));
+                    setPartDetailsModal(null);
+                  } catch (err: any) {
+                    setPartDetailsError(err?.message ?? "Failed to save part details");
+                  } finally {
+                    setPartDetailsSaving(false);
+                  }
+                }}
+              >
+                {partDetailsSaving ? "Saving..." : "Save & Continue"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {deliveryNoteModal ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-3 backdrop-blur-sm">
           <div className="w-full max-w-3xl overflow-hidden rounded-2xl border border-cyan-400/25 bg-gradient-to-b from-slate-950 via-slate-900/95 to-slate-950 shadow-[0_35px_90px_-45px_rgba(6,182,212,0.45)]">
@@ -1608,99 +1770,20 @@ export default function VendorDashboardPage() {
                           </div>
                         </div>
 
-                        <div className="mt-3 grid gap-3 md:grid-cols-[1fr,1fr]">
-                          <div className="space-y-2 rounded-lg border border-slate-700/60 bg-slate-950/30 p-3">
-                            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-300">Part Info</div>
-                            <div>
-                              <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                                Part Number <span className="text-rose-400">*</span>
-                                <span className="ml-1 font-normal normal-case text-slate-500">Confirm or correct</span>
-                              </div>
-                              <input
-                                type="text"
-                                className="h-9 w-full rounded border border-slate-700 bg-slate-950/80 px-2 text-xs text-slate-100 placeholder:text-slate-500"
-                                placeholder="e.g. 4M0827211"
-                                value={form?.partNumber ?? ""}
-                                onChange={(e) => updatePartForm(row.id, "partNumber", e.target.value)}
-                                onBlur={() => markDraftSaved(row.id)}
-                              />
-                            </div>
-                            <div>
-                              <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                                Part Diagram <span className="text-rose-400">*</span>
-                              </div>
-                              {form?.diagramFileId ? (
-                                <div className="flex items-center justify-between rounded border border-emerald-700/50 bg-emerald-950/30 px-2 py-1.5 text-xs text-emerald-300">
-                                  <span className="truncate">{form.diagramFileName || "Diagram uploaded"}</span>
-                                  <button
-                                    type="button"
-                                    className="ml-2 shrink-0 text-slate-400 hover:text-rose-400"
-                                    onClick={() => {
-                                      updatePartForm(row.id, "diagramFileId", "");
-                                      updatePartForm(row.id, "diagramFileName", "");
-                                    }}
-                                  >
-                                    ✕
-                                  </button>
-                                </div>
-                              ) : (
-                                <DropzoneFileInput
-                                  accept={{ "image/*": [] }}
-                                  disabled={diagramUploading[row.id]}
-                                  onFileSelect={async (file) => {
-                                    if (!file) return;
-                                    setDiagramUploading((prev) => ({ ...prev, [row.id]: true }));
-                                    try {
-                                      const fd = new FormData();
-                                      fd.append("file", file);
-                                      fd.append("kind", "image");
-                                      const res = await fetch("/api/files/upload", { method: "POST", body: fd });
-                                      const body = await res.json().catch(() => ({}));
-                                      if (!res.ok) throw new Error(String(body?.error ?? "Upload failed"));
-                                      const fileId = String(body?.fileId ?? "").trim();
-                                      if (!fileId) throw new Error("No file ID returned");
-                                      updatePartForm(row.id, "diagramFileId", fileId);
-                                      updatePartForm(row.id, "diagramFileName", file.name);
-                                      markDraftSaved(row.id);
-                                    } catch (err: any) {
-                                      alert(err?.message ?? "Failed to upload diagram");
-                                    } finally {
-                                      setDiagramUploading((prev) => ({ ...prev, [row.id]: false }));
-                                    }
-                                  }}
-                                  selectedFileName={diagramUploading[row.id] ? "Uploading..." : ""}
-                                  idleText="Drag & drop diagram / photo"
-                                  activeText="Drop to upload"
-                                  buttonText={diagramUploading[row.id] ? "..." : "Browse"}
-                                  className="border-slate-700"
-                                  textClassName="truncate text-slate-300"
-                                  buttonClassName="border-slate-600 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-200"
-                                />
-                              )}
-                            </div>
-                            <DropzoneFileInput
-                              onFileSelect={(file) => {
-                                updatePartForm(row.id, "attachmentName", file?.name ?? "");
-                                markDraftSaved(row.id);
-                              }}
-                              selectedFileName={form?.attachmentName ?? ""}
-                              idleText="Drag and drop part file"
-                              activeText="Drop part file"
-                              buttonText="Browse"
-                              className="border-slate-700"
-                              textClassName="truncate text-slate-300"
-                              buttonClassName="border-slate-600 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-200"
-                            />
+                        <div className="mt-3 space-y-3">
+                          {/* Remarks */}
+                          <div className="rounded-lg border border-slate-700/60 bg-slate-950/30 p-3">
+                            <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Remarks <span className="normal-case font-normal text-slate-600">(optional)</span></div>
                             <textarea
-                              className="h-20 w-full rounded border border-slate-700 bg-slate-950/80 px-2 py-1.5 text-xs text-slate-100 placeholder:text-slate-500"
-                              placeholder="Remarks"
+                              className="h-16 w-full rounded border border-slate-700 bg-slate-950/80 px-2 py-1.5 text-xs text-slate-100 placeholder:text-slate-500"
+                              placeholder="Add notes about this part..."
                               value={form?.remarks ?? ""}
                               onChange={(e) => updatePartForm(row.id, "remarks", e.target.value)}
                               onBlur={() => markDraftSaved(row.id)}
                             />
                           </div>
 
-                          <div className="space-y-2 rounded-lg border border-slate-700/60 bg-slate-950/30 p-3">
+                          <div className="rounded-lg border border-slate-700/60 bg-slate-950/30 p-3">
                             <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-300">Quote Options</div>
                             <div className="grid gap-2 sm:grid-cols-2">
                               {options.map((opt) => {

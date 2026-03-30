@@ -1110,6 +1110,8 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
 
   useEffect(() => {
     if (disableIncomingCallRealtime || !dialerEnabled) return;
+    // Only show incoming call popups when SDK is connected and extension is assigned
+    if (linkusStatus.state !== "connected" || !linkusStatus.extension) return;
 
     const companyId =
       scopeInfo.scope === "company" || scopeInfo.scope === "branch" || scopeInfo.scope === "vendor"
@@ -1717,7 +1719,7 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
       answeredPopupHideTimersRef.current.clear();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dialerEnabled, scopeInfo.scope, scopeInfo.companyId, disableIncomingCallRealtime]);
+  }, [dialerEnabled, scopeInfo.scope, scopeInfo.companyId, disableIncomingCallRealtime, linkusStatus.state, linkusStatus.extension]);
 
   async function handleLookup() {
     if (!scopeInfo.companyId) return;
@@ -2105,6 +2107,14 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
           >
             Find Customer
           </button>
+          {scopeInfo.companyId && (
+            <Link
+              href={`/company/${scopeInfo.companyId}/test-panel`}
+              className="rounded-full border border-blue-500/40 bg-blue-500/10 px-3 py-1 text-xs sm:text-sm text-blue-400 hover:border-blue-400 hover:bg-blue-500/20"
+            >
+              Test Panel
+            </Link>
+          )}
           <Link
             href={settingsHref}
             className="rounded-full border border-white/30 px-3 py-1 text-xs sm:text-sm hover:border-white"

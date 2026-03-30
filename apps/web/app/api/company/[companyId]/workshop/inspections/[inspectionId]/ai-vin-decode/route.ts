@@ -32,6 +32,21 @@ export async function POST(req: NextRequest, { params }: Params) {
       model: aiConfig.model,
     });
 
+    // If decode is missing make/model, try to fill from existing car record
+    if (inspection.carId && (!result.make || !result.model)) {
+      const db = getSql();
+      const [carRow] = await db<{ make: string | null; model: string | null; model_year: number | null; body_type: string | null }[]>`
+        SELECT make, model, model_year, body_type FROM cars WHERE id = ${inspection.carId}
+      `;
+      if (carRow) {
+        if (!result.make && carRow.make) result.make = carRow.make;
+        if (!result.model && carRow.model) result.model = carRow.model;
+        if (!result.year && carRow.model_year) result.year = carRow.model_year;
+        if (!result.bodyType && carRow.body_type) result.bodyType = carRow.body_type;
+        if (result.source === "nhtsa") result.source = "nhtsa+ai";
+      }
+    }
+
     // Return decoded data WITHOUT saving — user must confirm first
     return NextResponse.json({ data: result });
   } catch (err: any) {

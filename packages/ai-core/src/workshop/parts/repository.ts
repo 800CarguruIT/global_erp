@@ -178,6 +178,9 @@ export async function receivePartsForEstimateItem(
     quantity: number;
     costPerUnit?: number;
     purchaseOrderId?: string | null;
+    warehouseLocationId?: string | null;
+    warehouseLocationCode?: string | null;
+    poNumber?: string | null;
   }
 ): Promise<{ grnNumber: string; part: PartCatalogItem }> {
   const sql = getSql();
@@ -185,12 +188,17 @@ export async function receivePartsForEstimateItem(
   const resolvedDescription = (description ?? "").trim() || `Received part ${partNumber}`;
   const part = await ensurePartCatalogItem(companyId, partNumber, brand, resolvedDescription);
 
-  const grnNumber = `GRN-${new Date().toISOString().slice(0, 10)}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+  const locationCode = payload.warehouseLocationCode ?? "MAIN";
+  const locationId = payload.warehouseLocationId ?? null;
+  const grnNumber = payload.poNumber
+    ? `GRN-${payload.poNumber}-${estimateItemId.slice(0, 6).toUpperCase()}`
+    : `GRN-${new Date().toISOString().slice(0, 10)}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 
   await sql`
     INSERT INTO inventory_movements (
       company_id,
       part_id,
+      location_id,
       location_code,
       direction,
       quantity,
@@ -202,7 +210,8 @@ export async function receivePartsForEstimateItem(
     ) VALUES (
       ${companyId},
       ${part.id},
-      ${"MAIN"},
+      ${locationId},
+      ${locationCode},
       ${"in"},
       ${quantity},
       ${"receipt"},
@@ -216,7 +225,7 @@ export async function receivePartsForEstimateItem(
     sql,
     companyId,
     partId: part.id,
-    locationCode: "MAIN",
+    locationCode,
     quantity,
   });
 
@@ -242,7 +251,13 @@ export async function receivePartsForEstimateItem(
 export async function receivePartsForInventoryRequestItem(
   companyId: string,
   requestItemId: string,
-  payload: { quantity: number; purchaseOrderId?: string | null }
+  payload: {
+    quantity: number;
+    purchaseOrderId?: string | null;
+    warehouseLocationId?: string | null;
+    warehouseLocationCode?: string | null;
+    poNumber?: string | null;
+  }
 ): Promise<{ grnNumber: string; part: PartCatalogItem } | null> {
   const sql = getSql();
   const rows = await sql`
@@ -281,15 +296,17 @@ export async function receivePartsForInventoryRequestItem(
     }
   );
 
-  const grnNumber = `GRN-${new Date().toISOString().slice(0, 10)}-${Math.random()
-    .toString(36)
-    .slice(2, 6)
-    .toUpperCase()}`;
+  const locationCode = payload.warehouseLocationCode ?? "MAIN";
+  const locationId = payload.warehouseLocationId ?? null;
+  const grnNumber = payload.poNumber
+    ? `GRN-${payload.poNumber}-${requestItemId.slice(0, 6).toUpperCase()}`
+    : `GRN-${new Date().toISOString().slice(0, 10)}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 
   await sql`
     INSERT INTO inventory_movements (
       company_id,
       part_id,
+      location_id,
       location_code,
       direction,
       quantity,
@@ -301,7 +318,8 @@ export async function receivePartsForInventoryRequestItem(
     ) VALUES (
       ${companyId},
       ${part.id},
-      ${"MAIN"},
+      ${locationId},
+      ${locationCode},
       ${"in"},
       ${payload.quantity},
       ${"receipt"},
@@ -312,12 +330,11 @@ export async function receivePartsForInventoryRequestItem(
     )
   `;
 
-  // Fallback: ensure stock row exists even if trigger is missing.
   await upsertInventoryStockFallback({
     sql,
     companyId,
     partId: part.id,
-    locationCode: "MAIN",
+    locationCode,
     quantity: payload.quantity,
   });
 

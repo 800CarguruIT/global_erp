@@ -37,10 +37,12 @@ export async function routeLead(companyId: string, leadId: string, pipelineValue
 
   const queueId = await repo.createQueueEntry(companyId, leadId, pipelineValue);
   const now = new Date();
+  const lockedUntil = new Date(now.getTime() + windowMin * 60 * 1000);
   await repo.updateQueueEntry(queueId, {
     status: "offered",
     offered_to_user_id: best.advisorUserId,
     offered_at: now.toISOString(),
+    locked_until: lockedUntil.toISOString(),
     current_tier: tier,
   });
   await repo.addHistory(companyId, queueId, leadId, best.advisorUserId, "offered", tier);
@@ -105,8 +107,11 @@ export async function cascadeLead(companyId: string, queueId: string) {
 
   const next = available[0];
   const newTier = getTierForScore(next.compositeScore, config.tier_boundaries.elite_min_score);
+  const cascadeNow = new Date();
+  const cascadeWindowMin = getAcceptWindow(newTier, ld);
+  const cascadeLockedUntil = new Date(cascadeNow.getTime() + cascadeWindowMin * 60 * 1000);
   await repo.updateQueueEntry(queueId, {
-    status: "offered", offered_to_user_id: next.advisorUserId, offered_at: new Date().toISOString(), cascade_count: newCascade, current_tier: newTier,
+    status: "offered", offered_to_user_id: next.advisorUserId, offered_at: cascadeNow.toISOString(), locked_until: cascadeLockedUntil.toISOString(), cascade_count: newCascade, current_tier: newTier,
   });
   await repo.addHistory(companyId, queueId, q.lead_id, next.advisorUserId, "offered", newTier);
 

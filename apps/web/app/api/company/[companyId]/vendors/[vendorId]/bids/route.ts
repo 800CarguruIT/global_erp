@@ -50,6 +50,8 @@ export async function GET(req: NextRequest, { params }: Params) {
       pq.delivery_note_payload,
       pq.updated_at,
       pq.status,
+      pq.vendor_part_number,
+      pq.diagram_file_id,
       li.status AS line_item_status,
       COALESCE(li.product_name, iori.part_name) AS part_name,
       COALESCE(v.name, 'Vendor') AS vendor_name,
@@ -245,6 +247,8 @@ export async function GET(req: NextRequest, { params }: Params) {
     deliveryDestinationLocation: row.delivery_destination_location_text ?? null,
     deliveryDestinationUrl: row.delivery_destination_location_url ?? null,
     updatedAt: row.updated_at,
+    vendorPartNumber: row.vendor_part_number ?? null,
+    diagramFileId: row.diagram_file_id ?? null,
     status:
       normalizedStatusParam === "ordered" && String(row.line_item_status ?? "").toLowerCase() === "approved"
         ? "Approved"

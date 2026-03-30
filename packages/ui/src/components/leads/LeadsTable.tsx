@@ -353,47 +353,49 @@ export function LeadsTable({
                   {renderActions ? (
                     renderActions(lead)
                   ) : (
-                    <div className="flex flex-wrap gap-1">
-                      <a
-                        href={detailHref}
-                        className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-primary hover:shadow-md"
-                      >
-                        Open
-                      </a>
-                      {canAssign ? (
+                    <div className="flex flex-col gap-1.5">
+                      {(lead as any).bookingId ? (
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-400">
+                              Booked
+                            </span>
+                            <span className="text-[10px] text-muted-foreground capitalize">
+                              {((lead as any).bookingKind ?? "").replace(/_/g, " ")}
+                            </span>
+                          </div>
+                          <div className="text-[10px] text-muted-foreground">
+                            {new Date((lead as any).scheduledAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                          </div>
+                          {(lead as any).bookingPriority && (
+                            <span className={`inline-block rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase ${
+                              (lead as any).bookingPriority === "high" ? "bg-red-500/10 text-red-400 border border-red-500/20" :
+                              (lead as any).bookingPriority === "medium" ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" :
+                              "bg-zinc-500/10 text-zinc-400 border border-zinc-500/20"
+                            }`}>
+                              {(lead as any).bookingPriority}
+                            </span>
+                          )}
+                          {(lead as any).pickupLocation && (
+                            <div className="text-[10px] text-muted-foreground truncate max-w-[160px]" title={(lead as any).pickupLocation}>
+                              Pickup: {(lead as any).pickupLocation}
+                            </div>
+                          )}
+                          <button
+                            className="rounded-md border border-indigo-300/40 bg-indigo-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-indigo-400 transition hover:bg-indigo-500/20"
+                            onClick={() => onBook?.(lead.id, lead)}
+                            type="button"
+                          >
+                            Edit Booking
+                          </button>
+                        </div>
+                      ) : canBook ? (
                         <button
-                          className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-primary hover:shadow-md"
-                          onClick={() => onAssign?.(lead.id, lead)}
-                          type="button"
-                        >
-                          Assign
-                        </button>
-                      ) : null}
-                      {canBook ? (
-                        <button
-                          className="rounded-md border border-indigo-300/60 bg-indigo-500/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-indigo-700 shadow-sm transition hover:bg-indigo-500/20 hover:shadow-md"
+                          className="rounded-md border border-indigo-300/40 bg-indigo-500/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-indigo-400 shadow-sm transition hover:bg-indigo-500/20 hover:shadow-md"
                           onClick={() => onBook?.(lead.id, lead)}
                           type="button"
                         >
                           Book
-                        </button>
-                      ) : null}
-                      {canCarIn ? (
-                        <button
-                          className="rounded-md border border-emerald-300/60 bg-emerald-500/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-emerald-600 shadow-sm transition hover:bg-emerald-500/20 hover:shadow-md"
-                          onClick={() => onCarIn?.(lead.id, lead)}
-                          type="button"
-                        >
-                          Car In
-                        </button>
-                      ) : null}
-                      {canRequestRecovery ? (
-                        <button
-                          className="rounded-md border border-cyan-300/60 bg-cyan-500/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-cyan-600 shadow-sm transition hover:bg-cyan-500/20 hover:shadow-md"
-                          onClick={() => onRequestRecovery?.(lead.id, lead)}
-                          type="button"
-                        >
-                          Request Recovery
                         </button>
                       ) : null}
                     </div>

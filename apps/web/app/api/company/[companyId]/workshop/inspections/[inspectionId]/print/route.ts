@@ -327,6 +327,7 @@ function buildPremiumInspectionHtml(payload: {
   companyAddress: string;
   companyPhone: string;
   companyEmail: string;
+  status?: string;
   companyLogo?: string | null;
   inspectionId: string;
   inspectionDate: string;
@@ -404,206 +405,262 @@ function buildPremiumInspectionHtml(payload: {
         .join("")
     : `<div class="muted">No findings selected yet.</div>`;
 
+  const healthColor = (h: number) => h >= 85 ? "#059669" : h >= 70 ? "#d97706" : h >= 50 ? "#ea580c" : "#dc2626";
+  const healthLabel = (h: number) => h >= 85 ? "Excellent" : h >= 70 ? "Good" : h >= 50 ? "Needs Attention" : "Critical";
+  const severityColor = (s: string) => s === "Safety Risk" ? "#dc2626" : s === "Mandatory" ? "#d97706" : s === "Recommended" ? "#0891b2" : "#64748b";
+  const severityBg = (s: string) => s === "Safety Risk" ? "#fef2f2" : s === "Mandatory" ? "#fffbeb" : s === "Recommended" ? "#ecfeff" : "#f8fafc";
+  const checkStatusColor = (s: string) => s === "OK" ? "#059669" : s === "ISSUE" ? "#dc2626" : "#94a3b8";
+  const safetyCount = payload.priority["Safety Risk"].length;
+  const mandatoryCount = payload.priority["Mandatory"].length;
+
   return `<!doctype html>
   <html>
     <head>
       <meta charset="utf-8" />
       <title>Vehicle Inspection Report</title>
       <style>
-        @page { size: A4; margin: 14mm; }
-        * { box-sizing: border-box; }
-        body { font-family: "Segoe UI", Arial, sans-serif; margin: 0; color: #0f172a; font-size: 12px; }
-        .report { border: 1px solid #dbe2ea; border-radius: 10px; padding: 14px; }
-        .section { border: 1px solid #dbe2ea; border-radius: 8px; padding: 10px; margin-top: 10px; page-break-inside: avoid; }
-        .title { font-size: 18px; font-weight: 700; }
-        .muted { color: #475569; font-size: 11px; }
-        .header { display: flex; justify-content: space-between; gap: 10px; }
-        .brand { display: flex; gap: 10px; align-items: center; }
-        .logo { width: 56px; height: 56px; border: 1px solid #dbe2ea; border-radius: 8px; object-fit: contain; }
-        .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; margin-top: 8px; }
-        .gallery { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-        .gallery-card { border: 1px solid #dbe2ea; border-radius: 8px; padding: 6px; }
-        .gallery-card img { width: 100%; height: 110px; object-fit: cover; border-radius: 6px; }
-        .health-grid { display: grid; grid-template-columns: 180px 1fr; gap: 10px; }
-        .score { font-size: 32px; font-weight: 700; color: #0b4a6f; }
-        .bar-wrap { margin-top: 5px; }
-        .bar-head { display: flex; justify-content: space-between; font-size: 11px; }
-        .bar { height: 6px; border-radius: 99px; background: #e2e8f0; overflow: hidden; }
-        .bar > div { height: 100%; background: #0891b2; }
-        .priority-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-        .box { border: 1px solid #dbe2ea; border-radius: 8px; padding: 8px; }
-        .box h4 { margin: 0 0 6px; font-size: 12px; }
-        .item { border: 1px solid #e2e8f0; border-radius: 6px; padding: 6px; margin-top: 6px; }
-        .item-title { font-weight: 600; }
-        .finding { border: 1px solid #dbe2ea; border-radius: 8px; padding: 8px; margin-top: 8px; }
-        .finding-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-        .chip { border: 1px solid #0891b2; color: #0b4a6f; border-radius: 999px; padding: 2px 8px; font-size: 10px; font-weight: 700; }
-        .evidence { width: 230px; max-width: 100%; height: 120px; border-radius: 6px; border: 1px solid #dbe2ea; object-fit: cover; margin-top: 4px; }
-        .footer { margin-top: 8px; text-align: right; color: #64748b; font-size: 10px; }
+        @page { size: A4; margin: 12mm 14mm; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: "Segoe UI", -apple-system, Arial, sans-serif; color: #1e293b; font-size: 11px; line-height: 1.5; }
+        .page { padding: 0; }
+        h2 { font-size: 13px; font-weight: 700; color: #0f172a; margin-bottom: 8px; padding-bottom: 4px; border-bottom: 2px solid #0891b2; }
+        h3 { font-size: 11px; font-weight: 700; color: #334155; margin-bottom: 4px; }
+        .muted { color: #64748b; font-size: 10px; }
+        .section { margin-top: 14px; page-break-inside: avoid; }
+
+        /* Header */
+        .header { display: flex; justify-content: space-between; align-items: flex-start; padding: 12px 16px; background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%); border-radius: 8px; color: white; }
+        .header-left { display: flex; gap: 12px; align-items: center; }
+        .logo { width: 52px; height: 52px; border-radius: 8px; object-fit: contain; background: white; padding: 4px; }
+        .header-title { font-size: 18px; font-weight: 800; letter-spacing: -0.3px; }
+        .header-company { font-size: 11px; opacity: 0.85; margin-top: 2px; }
+        .header-right { text-align: right; font-size: 10px; }
+        .header-right div { margin-bottom: 2px; }
+        .header-id { font-size: 9px; opacity: 0.6; font-family: monospace; }
+
+        /* Info Grid */
+        .info-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0; margin-top: 10px; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; }
+        .info-cell { padding: 8px 12px; border-bottom: 1px solid #e2e8f0; }
+        .info-cell:nth-child(3n+2) { border-left: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0; }
+        .info-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; font-weight: 600; }
+        .info-value { font-size: 11px; font-weight: 600; color: #0f172a; margin-top: 1px; }
+
+        /* Health Score */
+        .health-container { display: flex; gap: 16px; align-items: flex-start; margin-top: 8px; }
+        .health-score-box { width: 120px; text-align: center; padding: 12px; border-radius: 8px; flex-shrink: 0; }
+        .health-number { font-size: 36px; font-weight: 800; line-height: 1; }
+        .health-label { font-size: 10px; font-weight: 600; margin-top: 4px; }
+        .health-bars { flex: 1; }
+        .bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+        .bar-label { width: 110px; font-size: 10px; color: #475569; }
+        .bar-track { flex: 1; height: 8px; background: #f1f5f9; border-radius: 4px; overflow: hidden; }
+        .bar-fill { height: 100%; border-radius: 4px; transition: width 0.3s; }
+        .bar-pct { width: 35px; text-align: right; font-size: 10px; font-weight: 700; }
+
+        /* Priority Summary */
+        .priority-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+        .priority-card { border-radius: 6px; padding: 8px 10px; }
+        .priority-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+        .priority-count { font-size: 20px; font-weight: 800; margin-top: 2px; }
+        .priority-items { margin-top: 4px; }
+        .priority-item { font-size: 10px; padding: 2px 0; border-top: 1px solid rgba(0,0,0,0.06); }
+
+        /* Findings Table */
+        .findings-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+        .findings-table th { background: #f8fafc; padding: 6px 8px; text-align: left; font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; font-weight: 700; border-bottom: 2px solid #e2e8f0; }
+        .findings-table td { padding: 8px; border-bottom: 1px solid #f1f5f9; vertical-align: top; font-size: 10px; }
+        .findings-table tr:last-child td { border-bottom: none; }
+        .severity-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 9px; font-weight: 700; text-transform: uppercase; }
+        .finding-detail { margin-top: 8px; padding: 8px 10px; background: #f8fafc; border-radius: 6px; border-left: 3px solid #0891b2; }
+        .finding-detail p { margin: 2px 0; font-size: 10px; }
+        .finding-evidence { margin-top: 6px; }
+        .finding-evidence img { width: 180px; height: 100px; object-fit: cover; border-radius: 4px; border: 1px solid #e2e8f0; }
+
+        /* Process Checks */
+        .checks-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+        .check-card { border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px; }
+        .check-header { display: flex; justify-content: space-between; align-items: center; }
+        .check-name { font-size: 11px; font-weight: 600; }
+        .check-status { padding: 2px 8px; border-radius: 4px; font-size: 9px; font-weight: 700; color: white; }
+        .check-evidence { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
+        .check-evidence img { width: 80px; height: 55px; object-fit: cover; border-radius: 4px; border: 1px solid #e2e8f0; }
+
+        /* Gallery */
+        .gallery { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-top: 8px; }
+        .gallery-card { text-align: center; }
+        .gallery-card img { width: 100%; height: 80px; object-fit: cover; border-radius: 4px; border: 1px solid #e2e8f0; }
+        .gallery-label { font-size: 8px; color: #94a3b8; margin-top: 2px; text-transform: uppercase; }
+
+        /* Issues */
+        .issue-item { display: flex; gap: 8px; padding: 6px 0; border-bottom: 1px solid #f1f5f9; align-items: flex-start; }
+        .issue-item img { width: 80px; height: 60px; object-fit: cover; border-radius: 4px; border: 1px solid #e2e8f0; }
+
+        /* Summary */
+        .summary-box { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 6px; padding: 10px 14px; margin-top: 8px; font-size: 11px; color: #0c4a6e; line-height: 1.6; }
+
+        /* Footer */
+        .footer { margin-top: 12px; padding-top: 8px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; color: #94a3b8; font-size: 9px; }
+
+        /* Alert banner */
+        .alert { padding: 8px 12px; border-radius: 6px; margin-top: 8px; font-size: 10px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+        .alert-danger { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+        .alert-warning { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+        .alert-success { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
       </style>
     </head>
     <body>
-      <div class="report">
-        <div class="section">
-          <div class="header">
-            <div class="brand">
-              ${
-                payload.companyLogo
-                  ? `<img class="logo" src="${payload.companyLogo}" alt="logo" />`
-                  : `<div class="logo" style="display:flex;align-items:center;justify-content:center;">LOGO</div>`
-              }
-              <div>
-                <div class="title">Vehicle Inspection Report</div>
-                <div><strong>${escapeHtml(payload.companyName)}</strong></div>
-                <div class="muted">${escapeHtml(payload.companyAddress)}</div>
-                <div class="muted">${escapeHtml(payload.companyPhone)} | ${escapeHtml(payload.companyEmail)}</div>
-              </div>
-            </div>
+      <div class="page">
+        <!-- Header -->
+        <div class="header">
+          <div class="header-left">
+            ${payload.companyLogo
+              ? `<img class="logo" src="${payload.companyLogo}" alt="logo" />`
+              : `<div class="logo" style="display:flex;align-items:center;justify-content:center;font-size:10px;color:#0f172a;font-weight:700;">LOGO</div>`
+            }
             <div>
-              <div><strong>Inspection ID:</strong> ${escapeHtml(payload.inspectionId)}</div>
-              <div><strong>Date:</strong> ${escapeHtml(payload.inspectionDate)}</div>
+              <div class="header-title">Vehicle Inspection Report</div>
+              <div class="header-company">${escapeHtml(payload.companyName)} | ${escapeHtml(payload.companyPhone)}</div>
             </div>
           </div>
-          <div class="meta-grid">
-            <div><strong>Customer:</strong> ${escapeHtml(payload.customerName)}</div>
-            <div><strong>Inspector:</strong> ${escapeHtml(payload.inspectorName)}</div>
-            <div><strong>Vehicle:</strong> ${escapeHtml(payload.vehicleText)}</div>
-            <div><strong>Mileage:</strong> ${escapeHtml(payload.mileage)}</div>
-            <div><strong>VIN:</strong> ${escapeHtml(payload.vin)}</div>
-            <div><strong>Plate:</strong> ${escapeHtml(payload.plate)}</div>
+          <div class="header-right">
+            <div style="font-weight:600;">${escapeHtml(payload.inspectionDate)}</div>
+            <div class="header-id">ID: ${escapeHtml(payload.inspectionId)}</div>
+            <div style="margin-top:4px;padding:2px 8px;background:rgba(255,255,255,0.15);border-radius:4px;display:inline-block;font-weight:600;">${escapeHtml(payload.status?.toUpperCase?.() ?? "PENDING")}</div>
           </div>
         </div>
 
-        <div class="section">
-          <div><strong>Vehicle Overview Photos</strong></div>
-          ${
-            payload.gallery.length
-              ? `<div class="gallery">
-                  ${payload.gallery
-                    .map(
-                      (g) => `
-                    <div class="gallery-card">
-                      <div class="muted">${escapeHtml(g.label)}</div>
-                      <img src="${g.url}" alt="${escapeHtml(g.label)}" />
-                    </div>`
-                    )
-                    .join("")}
-                </div>`
-              : `<div class="muted">No check-in photos available.</div>`
-          }
+        <!-- Vehicle & Customer Info -->
+        <div class="info-grid">
+          <div class="info-cell"><div class="info-label">Customer</div><div class="info-value">${escapeHtml(payload.customerName)}</div></div>
+          <div class="info-cell"><div class="info-label">Vehicle</div><div class="info-value">${escapeHtml(payload.vehicleText)}</div></div>
+          <div class="info-cell"><div class="info-label">Plate</div><div class="info-value">${escapeHtml(payload.plate || "-")}</div></div>
+          <div class="info-cell"><div class="info-label">VIN</div><div class="info-value" style="font-family:monospace;font-size:10px;">${escapeHtml(payload.vin)}</div></div>
+          <div class="info-cell"><div class="info-label">Mileage</div><div class="info-value">${escapeHtml(payload.mileage)} km</div></div>
+          <div class="info-cell"><div class="info-label">Inspector</div><div class="info-value">${escapeHtml(payload.inspectorName)}</div></div>
         </div>
 
+        ${safetyCount > 0 ? `<div class="alert alert-danger">WARNING: ${safetyCount} safety risk issue(s) found requiring immediate attention.</div>` : ""}
+        ${mandatoryCount > 0 && safetyCount === 0 ? `<div class="alert alert-warning">${mandatoryCount} mandatory repair item(s) identified.</div>` : ""}
+        ${safetyCount === 0 && mandatoryCount === 0 ? `<div class="alert alert-success">No critical issues found. Vehicle is in good condition.</div>` : ""}
+
+        <!-- Vehicle Photos -->
+        ${payload.gallery.length ? `
         <div class="section">
-          <div><strong>Vehicle Inspection Inputs</strong></div>
-          <div class="meta-grid">
-            <div><strong>Tyre Size (Front):</strong> ${escapeHtml(payload.tyreSizeFront || "-")}</div>
-            <div><strong>Tyre Size (Rear):</strong> ${escapeHtml(payload.tyreSizeRear || "-")}</div>
-            <div><strong>Customer Complaint:</strong> ${escapeHtml(payload.customerComplain || "-")}</div>
-            <div><strong>Inspector Remarks:</strong> ${escapeHtml(payload.inspectorRemarks || "-")}</div>
+          <h2>Vehicle Overview Photos</h2>
+          <div class="gallery">
+            ${payload.gallery.map((g) => `<div class="gallery-card"><img src="${g.url}" alt="${escapeHtml(g.label)}" /><div class="gallery-label">${escapeHtml(g.label)}</div></div>`).join("")}
           </div>
-        </div>
+        </div>` : ""}
 
+        <!-- Health Score -->
         <div class="section">
-          <div><strong>Overall Vehicle Health</strong></div>
-          <div class="health-grid">
-            <div>
-              <div class="score">${payload.overallHealth}%</div>
-              <div class="muted">${
-                payload.overallHealth >= 85
-                  ? "Excellent"
-                  : payload.overallHealth >= 70
-                  ? "Good"
-                  : payload.overallHealth >= 50
-                  ? "Needs Attention"
-                  : "Critical"
-              }</div>
+          <h2>Overall Vehicle Health</h2>
+          <div class="health-container">
+            <div class="health-score-box" style="background:${healthColor(payload.overallHealth)}15;">
+              <div class="health-number" style="color:${healthColor(payload.overallHealth)}">${payload.overallHealth}%</div>
+              <div class="health-label" style="color:${healthColor(payload.overallHealth)}">${healthLabel(payload.overallHealth)}</div>
             </div>
-            <div>
-              ${payload.categoryHealth
-                .map(
-                  (c) => `
-                <div class="bar-wrap">
-                  <div class="bar-head"><span>${escapeHtml(c.label)}</span><span>${c.health}%</span></div>
-                  <div class="bar"><div style="width:${Math.max(0, Math.min(100, Number(c.health) || 0))}%"></div></div>
+            <div class="health-bars">
+              ${payload.categoryHealth.map((c) => `
+                <div class="bar-row">
+                  <div class="bar-label">${escapeHtml(c.label)}</div>
+                  <div class="bar-track"><div class="bar-fill" style="width:${Math.max(0, Math.min(100, c.health))}%;background:${healthColor(c.health)}"></div></div>
+                  <div class="bar-pct" style="color:${healthColor(c.health)}">${c.health}%</div>
                 </div>
-              `
-                )
-                .join("")}
+              `).join("")}
             </div>
           </div>
         </div>
 
+        <!-- Priority Issues -->
         <div class="section">
-          <div><strong>Priority Issues Summary</strong></div>
+          <h2>Priority Issues Summary</h2>
           <div class="priority-grid">
-            ${prioritySection("Safety Risk", payload.priority["Safety Risk"])}
-            ${prioritySection("Mandatory", payload.priority["Mandatory"])}
-            ${prioritySection("Recommended", payload.priority["Recommended"])}
-            ${prioritySection("Optional", payload.priority["Optional"])}
+            ${(["Safety Risk", "Mandatory", "Recommended", "Optional"] as const).map((level) => {
+              const items = payload.priority[level];
+              const color = severityColor(level);
+              const bg = severityBg(level);
+              return `<div class="priority-card" style="background:${bg};border-left:3px solid ${color};">
+                <div class="priority-title" style="color:${color}">${level}</div>
+                <div class="priority-count" style="color:${color}">${items.length}</div>
+                ${items.length ? `<div class="priority-items">${items.map((item) => `<div class="priority-item">${escapeHtml(item.part)} <span class="muted">(${escapeHtml(item.group)})</span></div>`).join("")}</div>` : `<div class="muted" style="margin-top:4px;">No items</div>`}
+              </div>`;
+            }).join("")}
           </div>
         </div>
 
+        <!-- Findings Detail -->
+        ${payload.findings.length ? `
         <div class="section">
-          <div><strong>Detailed Inspection Findings</strong></div>
-          ${findingsRows}
-        </div>
+          <h2>Detailed Inspection Findings</h2>
+          <table class="findings-table">
+            <thead><tr><th style="width:25%">Part</th><th>Group</th><th>Severity</th><th>Condition</th><th>Action Required</th></tr></thead>
+            <tbody>
+              ${payload.findings.map((f) => `
+                <tr>
+                  <td><strong>${escapeHtml(f.part)}</strong>${f.partNumber ? `<br><span class="muted">#${escapeHtml(f.partNumber)}</span>` : ""}</td>
+                  <td>${escapeHtml(f.group)}</td>
+                  <td><span class="severity-badge" style="background:${severityBg(f.severity)};color:${severityColor(f.severity)}">${escapeHtml(f.severity)}</span></td>
+                  <td>${escapeHtml(f.observed)}</td>
+                  <td>${escapeHtml(f.action)}</td>
+                </tr>
+                ${f.evidenceUrl ? `<tr><td colspan="5" class="finding-evidence"><img src="${f.evidenceUrl}" alt="evidence" /></td></tr>` : ""}
+              `).join("")}
+            </tbody>
+          </table>
+        </div>` : ""}
 
+        <!-- Inspection Checks -->
         <div class="section">
-          <div><strong>Inspection Checks</strong></div>
-          ${
-            payload.processChecks.length
-              ? payload.processChecks
-                  .map(
-                    (check) => `
-                <div class="item">
-                  <div class="item-title">${escapeHtml(check.label)} - ${escapeHtml(check.status || "-")}</div>
-                  <div class="muted">${escapeHtml(check.note || "-")}</div>
-                  ${
-                    (check.evidenceUrls ?? []).length
-                      ? `<div style="margin-top:6px; display:flex; flex-wrap:wrap; gap:6px;">
-                          ${check.evidenceUrls
-                            .map(
-                              (url) => `<img class="evidence" style="height:90px; width:160px;" src="${url}" alt="check evidence" />`
-                            )
-                            .join("")}
-                        </div>`
-                      : `<div class="muted">No check evidence image.</div>`
-                  }
+          <h2>Inspection Checks</h2>
+          <div class="checks-grid">
+            ${payload.processChecks.map((check) => `
+              <div class="check-card">
+                <div class="check-header">
+                  <span class="check-name">${escapeHtml(check.label)}</span>
+                  <span class="check-status" style="background:${checkStatusColor(check.status)}">${escapeHtml(check.status || "N/A")}</span>
                 </div>
-              `
-                  )
-                  .join("")
-              : `<div class="muted">No process check data.</div>`
-          }
+                ${check.note ? `<div class="muted" style="margin-top:4px;">${escapeHtml(check.note)}</div>` : ""}
+                ${(check.evidenceUrls ?? []).length ? `<div class="check-evidence">${check.evidenceUrls.map((url) => `<img src="${url}" alt="check" />`).join("")}</div>` : ""}
+              </div>
+            `).join("")}
+          </div>
         </div>
 
+        <!-- Tyre & Input Info -->
         <div class="section">
-          <div><strong>Issues / Damages Notes</strong></div>
-          ${
-            payload.issueEntries.length
-              ? payload.issueEntries
-                  .map(
-                    (issue) => `
-                <div class="item">
-                  <div class="muted">${escapeHtml(issue.description || "-")}</div>
-                  ${
-                    issue.evidenceUrl
-                      ? `<img class="evidence" src="${issue.evidenceUrl}" alt="issue evidence" />`
-                      : `<div class="muted">No issue evidence image.</div>`
-                  }
-                </div>
-              `
-                  )
-                  .join("")
-              : `<div class="muted">No issue notes.</div>`
-          }
+          <h2>Vehicle Inputs</h2>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;">
+            <div><span class="muted">Tyre Front:</span> <strong>${escapeHtml(payload.tyreSizeFront || "-")}</strong></div>
+            <div><span class="muted">Tyre Rear:</span> <strong>${escapeHtml(payload.tyreSizeRear || "-")}</strong></div>
+            <div><span class="muted">Customer Complaint:</span> ${escapeHtml(payload.customerComplain || "None")}</div>
+            <div><span class="muted">Inspector Remarks:</span> ${escapeHtml(payload.inspectorRemarks || "None")}</div>
+          </div>
         </div>
 
+        <!-- Issues / Damages -->
+        ${payload.issueEntries.length ? `
         <div class="section">
-          <div><strong>Inspection Summary</strong></div>
-          <div>${escapeHtml(payload.summaryText)}</div>
+          <h2>Issues / Damages Notes</h2>
+          ${payload.issueEntries.map((issue) => `
+            <div class="issue-item">
+              ${issue.evidenceUrl ? `<img src="${issue.evidenceUrl}" alt="issue" />` : ""}
+              <div>${escapeHtml(issue.description || "-")}</div>
+            </div>
+          `).join("")}
+        </div>` : ""}
+
+        <!-- Summary -->
+        <div class="section">
+          <h2>Inspection Summary</h2>
+          <div class="summary-box">${escapeHtml(payload.summaryText)}</div>
         </div>
-        <div class="footer">Generated by system</div>
+
+        <!-- Footer -->
+        <div class="footer">
+          <div>${escapeHtml(payload.companyName)} | ${escapeHtml(payload.companyEmail)}</div>
+          <div>Generated ${new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</div>
+        </div>
       </div>
     </body>
   </html>`;
@@ -794,9 +851,9 @@ export async function GET(_req: NextRequest, { params }: Params) {
       startAt: formatDateOnly(inspection.startAt ?? inspection.createdAt),
       completedAt: formatDateOnly(inspection.completeAt),
       customerCode: String((customer as any)?.code ?? inspection.customerId ?? "-"),
-      customerName: String((customer as any)?.name ?? "-"),
+      customerName: String((customer as any)?.name ?? ((inspection as any)?.draftPayload as any)?.customerName ?? "-"),
       customerPhone: String((customer as any)?.phone ?? "-"),
-      carPlate: String((car as any)?.plate_number ?? "-"),
+      carPlate: String((car as any)?.plate_number ?? ((inspection as any)?.draftPayload as any)?.inspectionPlate ?? ((inspection as any)?.draftPayload as any)?.carPlate ?? "-"),
       carModel: String([((car as any)?.make ?? ""), ((car as any)?.model ?? "")].filter(Boolean).join(" ") || "-"),
       advisorRemark: String(inspection.agentRemark ?? "-"),
       customerRemark: String(inspection.customerRemark ?? "-"),
@@ -815,12 +872,20 @@ export async function GET(_req: NextRequest, { params }: Params) {
         severity: String((row as any)?.severity ?? "-"),
         techReason: String((row as any)?.techReason ?? "-"),
       })),
-      findings: (lineItems ?? []).map((row) => ({
-        productName: String((row as any)?.productName ?? (row as any)?.description ?? "-"),
-        qty: String((row as any)?.quantity ?? "-"),
-        status: titleize(String((row as any)?.status ?? "-")),
-        reason: String((row as any)?.reason ?? "-"),
-      })),
+      findings: (lineItems ?? []).map((row) => {
+        const rawReason = String((row as any)?.reason ?? (row as any)?.priority ?? "Recommended").trim();
+        const normalizedReason = rawReason === "safety_risk" ? "Safety Risk"
+          : rawReason === "mandatory" ? "Mandatory"
+          : rawReason === "recommended" ? "Recommended"
+          : rawReason === "optional" ? "Optional"
+          : rawReason;
+        return {
+          productName: String((row as any)?.productName ?? (row as any)?.product_name ?? (row as any)?.part ?? (row as any)?.description ?? "-"),
+          qty: String((row as any)?.quantity ?? "-"),
+          status: titleize(String((row as any)?.status ?? "-")),
+          reason: normalizedReason,
+        };
+      }),
     };
     const draft = ((inspection as any)?.draftPayload ?? {}) as any;
     const issueEntriesDraft: Array<{ id?: string; description?: string; imageFileId?: string }> = Array.isArray(draft?.inspectionIssueEntries)
@@ -849,14 +914,19 @@ export async function GET(_req: NextRequest, { params }: Params) {
       return Array.from(map.values());
     })();
     const partRows = mergedRawRows.map((row) => {
-      const part = String((row as any)?.productName ?? "").trim() || String((row as any)?.description ?? "").trim() || "Item";
+      const part = String((row as any)?.productName ?? (row as any)?.product_name ?? (row as any)?.part ?? "").trim() || String((row as any)?.description ?? "").trim() || "Item";
       const partNumber = String((row as any)?.partNumber ?? (row as any)?.catalogPartCode ?? "").trim();
       const rawGroupLabel =
         String((row as any)?.catalogGroupName ?? "").trim() ||
         String((row as any)?.groupName ?? "").trim() ||
         String((row as any)?.group_name ?? "").trim() ||
         groupLabelFromKey(String((row as any)?.catalogGroupKey ?? "").trim());
-      const severity = String((row as any)?.reason ?? "Recommended");
+      const rawSeverity = String((row as any)?.reason ?? (row as any)?.priority ?? (row as any)?.status ?? "Recommended").trim();
+      const severity = rawSeverity === "safety_risk" ? "Safety Risk"
+        : rawSeverity === "mandatory" || rawSeverity === "Mandatory" ? "Mandatory"
+        : rawSeverity === "recommended" || rawSeverity === "Recommended" ? "Recommended"
+        : rawSeverity === "optional" || rawSeverity === "Optional" ? "Optional"
+        : "Recommended";
       const observed = String((row as any)?.description ?? "").trim() || `${part} requires inspection attention.`;
       const category = mapGroupToCategory(rawGroupLabel, part, observed);
       const group = rawGroupLabel === "General" ? category : rawGroupLabel;
@@ -877,7 +947,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
         observed,
         why,
         action,
-        mediaFileId: String((row as any)?.mediaFileId ?? "").trim(),
+        mediaFileId: String((row as any)?.mediaFileId ?? (row as any)?.media_file_id ?? "").trim(),
       };
     });
 
@@ -1063,7 +1133,21 @@ severityCounts=${JSON.stringify(categorySeverityCounts)}
     );
     const findingsWithEvidence = await Promise.all(
       partRows.map(async (r) => {
-        const rowEvidence = await readFileAsDataUrl(r.mediaFileId);
+        // Try mediaFileId first, then first entry in mediaFiles array from draft
+        let mediaId = r.mediaFileId;
+        if (!mediaId) {
+          const draftRow = draftPartRows.find((dp: any) => {
+            const dpName = String(dp?.part ?? dp?.productName ?? "").trim().toLowerCase();
+            return dpName && dpName === r.part.trim().toLowerCase();
+          });
+          if (draftRow) {
+            mediaId = String(draftRow?.mediaFileId ?? "").trim();
+            if (!mediaId && Array.isArray(draftRow?.mediaFiles) && draftRow.mediaFiles.length > 0) {
+              mediaId = String(draftRow.mediaFiles[0]?.id ?? "").trim();
+            }
+          }
+        }
+        const rowEvidence = await readFileAsDataUrl(mediaId);
         let fallbackIssueUrl = "";
         if (!rowEvidence) {
           const partLower = String(r.part ?? "").toLowerCase().trim();
@@ -1107,7 +1191,7 @@ severityCounts=${JSON.stringify(categorySeverityCounts)}
         ).filter(Boolean);
         return {
           label: entry.label,
-          status: String(draft?.processChecks?.[entry.key] ?? "").toUpperCase(),
+          status: String(draft?.processChecks?.[entry.key] ?? draft?.checks?.[entry.key] ?? "").toUpperCase(),
           note: String(draft?.processCheckIssueNotes?.[entry.key] ?? ""),
           evidenceUrls,
         };
@@ -1127,12 +1211,13 @@ severityCounts=${JSON.stringify(categorySeverityCounts)}
       companyPhone: reportPayload.companyPhone,
       companyEmail: reportPayload.companyEmail,
       companyLogo,
+      status: reportPayload.status,
       inspectionId: reportPayload.inspectionId,
       inspectionDate: formatDateOnly(inspection.completeAt ?? inspection.startAt ?? inspection.createdAt),
-      customerName: reportPayload.customerName,
+      customerName: reportPayload.customerName !== "-" ? reportPayload.customerName : String(draft?.customerName ?? "-"),
       vehicleText: `${String((car as any)?.make ?? draft?.inspectionMake ?? "")} ${String((car as any)?.model ?? draft?.inspectionModel ?? "")} ${String(draft?.inspectionYear ?? "")}`.trim() || reportPayload.carModel,
       vin: String(draft?.inspectionVin ?? (car as any)?.vin ?? "-"),
-      plate: reportPayload.carPlate,
+      plate: reportPayload.carPlate !== "-" ? reportPayload.carPlate : String(draft?.inspectionPlate ?? draft?.carPlate ?? "-"),
       mileage: String(draft?.carInMileage ?? (car as any)?.mileage ?? "-"),
       tyreSizeFront: String(draft?.tyreSizeFront ?? "-"),
       tyreSizeRear: String(draft?.tyreSizeRear ?? "-"),

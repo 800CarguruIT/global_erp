@@ -54,7 +54,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
   }
   // Vendor-confirmed part number takes precedence over the system-resolved one.
-  const finalPartNumber = vendorPartNumber;
+  const finalPartNumber = toStringOrNull(body.partNumber);
   const resolvedBrand = oemBrand ?? oeBrand ?? aftmBrand ?? usedBrand ?? null;
   if (!resolvedBrand) {
     return NextResponse.json({ error: "Select at least one quote type with brand." }, { status: 400 });
@@ -98,13 +98,6 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   const vendorPartNumber = toStringOrNull(body.partNumber);
   const diagramFileId = toStringOrNull(body.diagramFileId);
-
-  if (!vendorPartNumber) {
-    return NextResponse.json({ error: "Part number is required." }, { status: 400 });
-  }
-  if (!diagramFileId) {
-    return NextResponse.json({ error: "Part diagram is required." }, { status: 400 });
-  }
 
   let resolvedPartNumber: string | null = null;
   if (isEstimate && lineItemId) {

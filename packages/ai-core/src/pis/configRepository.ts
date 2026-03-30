@@ -8,6 +8,7 @@ const DEFAULTS: Record<string, unknown> = {
   sla_thresholds: { lead_to_assignment_min: 2, assignment_to_accept_min: 15, accept_to_first_contact_min: 5, first_contact_to_booking_hr: 24, booking_to_car_in_min: 30, car_in_to_estimate_min: 30, estimate_approval_rate_pct: 75, wip_on_time_pct: 85, job_complete_to_invoice_min: 30, invoice_to_pickup_hr: 4, invoice_to_follow_up_hr: 48 },
   lead_distribution: { tier1_accept_window_min: 10, tier2_accept_window_min: 7, tier3_accept_window_min: 5, lock_duration_min: 120, no_call_penalty_points: 5, max_cascade_attempts: 5 },
   revenue_targets: { monthly_target_aed: 2000000, gp_target_pct: 45, foc_max_pct: 30 },
+  service_charges: { inspection_fee: 150, recovery_pickup_fee: 200, recovery_dropoff_fee: 200, labour_charge: 0, currency: "AED" },
 };
 
 export async function getConfig(companyId: string): Promise<PisConfig> {
@@ -46,4 +47,27 @@ export async function getAllConfigs(companyId: string): Promise<Record<string, u
   const result: Record<string, unknown> = { ...DEFAULTS };
   for (const r of rows) result[r.config_key] = r.config_value;
   return result;
+}
+
+export interface ServiceChargesConfig {
+  inspection_fee: number;
+  recovery_pickup_fee: number;
+  recovery_dropoff_fee: number;
+  labour_charge: number;
+  currency: string;
+}
+
+export async function getServiceCharges(companyId: string): Promise<ServiceChargesConfig> {
+  const sql = getSql();
+  const rows = await sql<{ config_value: unknown }[]>`
+    SELECT config_value FROM pis_config WHERE company_id = ${companyId} AND config_key = 'service_charges'
+  `;
+  const val = (rows[0]?.config_value ?? DEFAULTS.service_charges) as ServiceChargesConfig;
+  return {
+    inspection_fee: Number(val.inspection_fee ?? 150),
+    recovery_pickup_fee: Number(val.recovery_pickup_fee ?? 200),
+    recovery_dropoff_fee: Number(val.recovery_dropoff_fee ?? 200),
+    labour_charge: Number(val.labour_charge ?? 0),
+    currency: String(val.currency ?? "AED"),
+  };
 }

@@ -32,6 +32,9 @@ export const simulateDistribution = leadDistEngine.simulateDistribution;
 export const getQueueItems = leadDistRepo.getQueueItems;
 export const getQueueHistory = leadDistRepo.getQueueHistory;
 
+// --- AUTO-ASSIGN ---
+export { triggerAutoAssignOnCarIn, applyAdvisorToLead } from "./leadDistribution/autoAssign";
+
 // --- COMMISSION ---
 export const computeCommissions = commissionEngine.computeCommissions;
 export const getCommissions = commissionEngine.getCommissions;

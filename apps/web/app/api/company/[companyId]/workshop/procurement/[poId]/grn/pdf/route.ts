@@ -43,120 +43,145 @@ function buildHtml(payload: {
     )
     .join("");
 
+  const totalQty = payload.rows.reduce((s, r) => s + Number(r.quantity ?? 0), 0);
+  const statusColor = payload.status === "received" ? "#059669" : payload.status === "issued" ? "#0891b2" : "#d97706";
+
   return `<!doctype html>
   <html>
     <head>
       <meta charset="utf-8" />
       <title>GRN ${escapeHtml(payload.poNumber)}</title>
       <style>
-        @page { size: A4; margin: 18mm 14mm; }
-        * { box-sizing: border-box; }
-        body { font-family: "Segoe UI", Arial, sans-serif; color: #0f172a; margin: 0; }
-        .topbar {
-          display: flex;
-          justify-content: space-between;
-          align-items: stretch;
-          border: 1px solid #d1d5db;
-          border-radius: 10px;
-          overflow: hidden;
-          background: #fff;
-          margin-bottom: 12px;
-        }
-        .brand { flex: 1; padding: 14px 16px; }
-        .brand h1 { margin: 0; font-size: 14px; letter-spacing: 0.3px; color: #0f172a; }
-        .brand .company { margin-top: 6px; font-size: 14px; font-weight: 700; color: #0f172a; }
-        .brand p { margin: 4px 0 0; font-size: 12px; color: #475569; }
-        .meta-panel {
-          width: 230px;
-          border-left: 1px solid #e5e7eb;
-          background: #fff;
-          padding: 12px 14px;
-        }
-        .logo-box {
-          width: 92px;
-          height: 92px;
-          border: 1px solid #e5e7eb;
-          border-radius: 8px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          margin-bottom: 10px;
-          overflow: hidden;
-          background: #fff;
-        }
-        .logo-box img { width: 100%; height: 100%; object-fit: contain; }
-        .meta-row {
-          display: flex;
-          justify-content: space-between;
-          gap: 8px;
-          padding: 4px 0;
-          border-bottom: 1px dashed #e5e7eb;
-          font-size: 12px;
-        }
-        .meta-row:last-child { border-bottom: 0; }
-        .meta-key { color: #64748b; font-weight: 600; }
-        .meta-val { color: #111827; font-weight: 700; }
-        .bar {
-          border: 1px solid #d1d5db;
-          border-radius: 8px;
-          background: #f8fafc;
-          color: #0f172a;
-          text-align: center;
-          font-weight: 700;
-          letter-spacing: 0.5px;
-          padding: 7px;
-          text-transform: uppercase;
-          font-size: 12px;
-          margin-bottom: 8px;
-        }
-        table { width: 100%; border-collapse: collapse; font-size: 11px; }
-        th, td { border: 1px solid #d1d5db; padding: 7px 8px; text-align: left; }
-        th { background: #f8fafc; color: #475569; text-transform: uppercase; font-size: 11px; }
-        .num { text-align: right; }
-        .empty { margin-top: 12px; font-size: 12px; color: #64748b; }
+        @page { size: A4; margin: 12mm 14mm; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: "Segoe UI", -apple-system, Arial, sans-serif; color: #1e293b; font-size: 11px; line-height: 1.5; }
+        h2 { font-size: 13px; font-weight: 700; color: #0f172a; margin-bottom: 8px; padding-bottom: 4px; border-bottom: 2px solid #059669; }
+
+        .header { display: flex; justify-content: space-between; align-items: flex-start; padding: 14px 18px; background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%); border-radius: 8px; color: white; }
+        .header-left { display: flex; gap: 14px; align-items: center; }
+        .logo { width: 52px; height: 52px; border-radius: 8px; object-fit: contain; background: white; padding: 4px; }
+        .header-title { font-size: 20px; font-weight: 800; letter-spacing: -0.3px; }
+        .header-sub { font-size: 11px; opacity: 0.85; margin-top: 2px; }
+        .header-right { text-align: right; font-size: 10px; }
+        .header-badge { display: inline-block; margin-top: 6px; padding: 3px 12px; border-radius: 4px; font-weight: 700; font-size: 10px; text-transform: uppercase; background: ${statusColor}; color: white; }
+
+        .info-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0; margin-top: 12px; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; }
+        .info-cell { padding: 10px 14px; border-bottom: 1px solid #e2e8f0; }
+        .info-cell:nth-child(3n+2) { border-left: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0; }
+        .info-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; font-weight: 600; }
+        .info-value { font-size: 12px; font-weight: 600; color: #0f172a; margin-top: 2px; }
+
+        .summary-cards { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 12px; }
+        .summary-card { text-align: center; padding: 12px; border-radius: 8px; }
+        .summary-card .number { font-size: 24px; font-weight: 800; line-height: 1; }
+        .summary-card .label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; font-weight: 600; }
+
+        .section { margin-top: 16px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+        th { background: #f8fafc; padding: 8px 10px; text-align: left; font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; font-weight: 700; border-bottom: 2px solid #e2e8f0; }
+        td { padding: 10px; border-bottom: 1px solid #f1f5f9; vertical-align: top; font-size: 11px; }
+        tr:last-child td { border-bottom: none; }
+        .grn-num { font-weight: 700; color: #059669; font-family: monospace; font-size: 11px; }
+        .qty { text-align: center; font-weight: 700; font-size: 12px; }
+        .timestamp { font-size: 10px; color: #64748b; }
+
+        .footer { margin-top: 20px; padding-top: 10px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; color: #94a3b8; font-size: 9px; }
+        .empty { padding: 24px; text-align: center; color: #94a3b8; font-size: 12px; border: 1px dashed #e2e8f0; border-radius: 6px; margin-top: 8px; }
+
+        .signatures { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-top: 30px; }
+        .sig-box { border-top: 1px solid #cbd5e1; padding-top: 8px; text-align: center; }
+        .sig-label { font-size: 10px; color: #64748b; font-weight: 600; }
       </style>
     </head>
     <body>
-      <div class="topbar">
-        <div class="brand">
-          <h1>Goods Receipt Note</h1>
-          <p class="company">${escapeHtml(payload.companyName)}</p>
-          <p>${escapeHtml(payload.companyAddress)}</p>
-          <p>Phone: ${escapeHtml(payload.companyPhone)} | Email: ${escapeHtml(payload.companyEmail)}</p>
-          <p>TRN: ${escapeHtml(payload.companyTrn)}</p>
-        </div>
-        <div class="meta-panel">
-          <div class="logo-box">
-            ${
-              payload.companyLogo
-                ? `<img src="${payload.companyLogo}" alt="Company logo" />`
-                : `<span style="color:#64748b; font-size:11px;">NO LOGO</span>`
-            }
+      <!-- Header -->
+      <div class="header">
+        <div class="header-left">
+          ${payload.companyLogo
+            ? `<img class="logo" src="${payload.companyLogo}" alt="logo" />`
+            : `<div class="logo" style="display:flex;align-items:center;justify-content:center;font-size:10px;color:#0f172a;font-weight:700;">LOGO</div>`
+          }
+          <div>
+            <div class="header-title">Goods Receipt Note</div>
+            <div class="header-sub">${escapeHtml(payload.companyName)} | ${escapeHtml(payload.companyPhone)}</div>
           </div>
-          <div class="meta-row"><span class="meta-key">PO Number</span><span class="meta-val">${escapeHtml(payload.poNumber)}</span></div>
-          <div class="meta-row"><span class="meta-key">PO Date</span><span class="meta-val">${escapeHtml(new Date(payload.createdAt).toLocaleDateString())}</span></div>
-          <div class="meta-row"><span class="meta-key">Status</span><span class="meta-val">${escapeHtml(payload.status)}</span></div>
+        </div>
+        <div class="header-right">
+          <div style="font-weight:700;font-size:12px;">${escapeHtml(payload.poNumber)}</div>
+          <div style="margin-top:2px;">${escapeHtml(new Date(payload.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }))}</div>
+          <div class="header-badge">${escapeHtml(payload.status)}</div>
         </div>
       </div>
-      <div class="bar">GRN Entries</div>
-      ${
-        payload.rows.length
-          ? `
-        <table>
-          <thead>
-            <tr>
-              <th>GRN Number</th>
-              <th>Part</th>
-              <th>Qty</th>
-              <th>Received By</th>
-              <th>Received At</th>
-            </tr>
-          </thead>
-          <tbody>${rowsHtml}</tbody>
-        </table>
-      `
-          : `<div class="empty">No GRN entries found for this PO.</div>`
-      }
+
+      <!-- Company Info -->
+      <div class="info-grid">
+        <div class="info-cell"><div class="info-label">Company</div><div class="info-value">${escapeHtml(payload.companyName)}</div></div>
+        <div class="info-cell"><div class="info-label">Address</div><div class="info-value">${escapeHtml(payload.companyAddress)}</div></div>
+        <div class="info-cell"><div class="info-label">TRN</div><div class="info-value">${escapeHtml(payload.companyTrn)}</div></div>
+        <div class="info-cell"><div class="info-label">Phone</div><div class="info-value">${escapeHtml(payload.companyPhone)}</div></div>
+        <div class="info-cell"><div class="info-label">Email</div><div class="info-value">${escapeHtml(payload.companyEmail)}</div></div>
+        <div class="info-cell"><div class="info-label">PO Number</div><div class="info-value" style="font-family:monospace;">${escapeHtml(payload.poNumber)}</div></div>
+      </div>
+
+      <!-- Summary Cards -->
+      <div class="summary-cards">
+        <div class="summary-card" style="background:#f0fdf4;border:1px solid #bbf7d0;">
+          <div class="number" style="color:#059669;">${payload.rows.length}</div>
+          <div class="label" style="color:#059669;">GRN Entries</div>
+        </div>
+        <div class="summary-card" style="background:#ecfeff;border:1px solid #a5f3fc;">
+          <div class="number" style="color:#0891b2;">${totalQty.toFixed(0)}</div>
+          <div class="label" style="color:#0891b2;">Total Qty Received</div>
+        </div>
+        <div class="summary-card" style="background:#f8fafc;border:1px solid #e2e8f0;">
+          <div class="number" style="color:${statusColor};">${escapeHtml(payload.status.toUpperCase())}</div>
+          <div class="label" style="color:#64748b;">PO Status</div>
+        </div>
+      </div>
+
+      <!-- GRN Table -->
+      <div class="section">
+        <h2>Receipt Details</h2>
+        ${payload.rows.length ? `
+          <table>
+            <thead>
+              <tr>
+                <th style="width:5%">#</th>
+                <th style="width:25%">GRN Number</th>
+                <th style="width:25%">Part / Description</th>
+                <th style="width:10%">Qty</th>
+                <th style="width:15%">Received By</th>
+                <th style="width:20%">Date & Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${payload.rows.map((row, i) => `
+                <tr>
+                  <td style="text-align:center;color:#94a3b8;font-weight:600;">${i + 1}</td>
+                  <td><span class="grn-num">${escapeHtml(row.grnNumber)}</span></td>
+                  <td><strong>${escapeHtml(row.partName || "-")}</strong></td>
+                  <td class="qty">${Number(row.quantity ?? 0).toFixed(0)}</td>
+                  <td>${escapeHtml(row.receivedBy || "-")}</td>
+                  <td class="timestamp">${escapeHtml(new Date(row.createdAt).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }))}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        ` : `<div class="empty">No GRN entries recorded for this purchase order.</div>`}
+      </div>
+
+      <!-- Signatures -->
+      <div class="signatures">
+        <div class="sig-box"><div class="sig-label">Received By</div></div>
+        <div class="sig-box"><div class="sig-label">Verified By</div></div>
+        <div class="sig-box"><div class="sig-label">Approved By</div></div>
+      </div>
+
+      <!-- Footer -->
+      <div class="footer">
+        <div>${escapeHtml(payload.companyName)} | ${escapeHtml(payload.companyEmail)}</div>
+        <div>Generated ${new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</div>
+      </div>
     </body>
   </html>`;
 }

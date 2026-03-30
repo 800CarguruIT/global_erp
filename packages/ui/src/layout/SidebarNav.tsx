@@ -421,7 +421,7 @@ export function SidebarNav({
 
 
   if (!sections.length && !filteredTreeItems?.length) {
-    return <div className="mx-auto max-w-6xl">{children}</div>;
+    return <div className="w-full">{children}</div>;
   }
 
   const navBaseClass =

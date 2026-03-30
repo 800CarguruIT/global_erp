@@ -9,6 +9,7 @@ const SECTIONS = [
   { key: "sla_thresholds", label: "SLA Thresholds", desc: "SLA targets for each funnel stage" },
   { key: "lead_distribution", label: "Lead Distribution", desc: "Accept windows, lock duration, penalties" },
   { key: "revenue_targets", label: "Revenue Targets", desc: "Monthly revenue and GP targets" },
+  { key: "service_charges", label: "Service Charges", desc: "Inspection and recovery fees added to invoice (AED)" },
 ];
 
 export default function PisAdminPage() {

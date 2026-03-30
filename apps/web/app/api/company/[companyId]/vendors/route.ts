@@ -66,7 +66,15 @@ export async function POST(req: NextRequest, ctx: ParamsContext) {
       companyId,
     });
 
-    return NextResponse.json(created, { status: 201 });
+    const response: any = { ...created };
+    if (created.vendorAdminPassword) {
+      response.vendorAdminCredentials = {
+        email: values.email,
+        password: created.vendorAdminPassword,
+        note: "Save this password -- it will not be shown again.",
+      };
+    }
+    return NextResponse.json(response, { status: 201 });
   } catch (error) {
     console.error("Vendors POST error", error);
     return NextResponse.json(

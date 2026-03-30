@@ -136,13 +136,26 @@ const REPORT_CATEGORY_WEIGHTS: Record<string, number> = {
 };
 const lineItemStatusOptions = ["Safety Risk", "Mandatory", "Recommended", "Optional"] as const;
 const TYRE_SIZE_OPTIONS = [
-  "195/65R15",
-  "205/55R16",
-  "215/55R17",
-  "225/45R17",
-  "225/55R18",
-  "235/55R19",
-  "245/45R19",
+  // R13
+  "155/65R13", "165/65R13", "175/70R13",
+  // R14
+  "165/60R14", "165/70R14", "175/65R14", "175/70R14", "185/60R14", "185/65R14", "185/70R14", "195/60R14", "195/70R14",
+  // R15
+  "175/65R15", "185/55R15", "185/60R15", "185/65R15", "195/55R15", "195/60R15", "195/65R15", "205/60R15", "205/65R15", "215/65R15", "215/70R15",
+  // R16
+  "195/50R16", "195/55R16", "205/45R16", "205/50R16", "205/55R16", "205/60R16", "215/55R16", "215/60R16", "215/65R16", "225/55R16", "225/60R16", "225/65R16", "235/60R16", "235/65R16",
+  // R17
+  "205/45R17", "205/50R17", "215/45R17", "215/50R17", "215/55R17", "215/60R17", "215/65R17", "225/45R17", "225/50R17", "225/55R17", "225/60R17", "225/65R17", "235/45R17", "235/55R17", "235/60R17", "235/65R17", "245/45R17", "245/65R17", "255/65R17", "265/65R17", "265/70R17",
+  // R18
+  "215/45R18", "215/55R18", "225/40R18", "225/45R18", "225/55R18", "225/60R18", "235/40R18", "235/45R18", "235/50R18", "235/55R18", "235/60R18", "235/65R18", "245/40R18", "245/45R18", "245/50R18", "245/60R18", "255/35R18", "255/45R18", "255/55R18", "255/60R18", "265/35R18", "265/60R18", "265/65R18", "275/65R18", "285/60R18",
+  // R19
+  "225/40R19", "225/45R19", "235/35R19", "235/40R19", "235/45R19", "235/50R19", "235/55R19", "245/35R19", "245/40R19", "245/45R19", "245/50R19", "255/35R19", "255/40R19", "255/45R19", "255/50R19", "255/55R19", "265/30R19", "265/50R19", "275/35R19", "275/40R19", "275/45R19", "275/55R19", "285/45R19",
+  // R20
+  "235/35R20", "245/35R20", "245/40R20", "245/45R20", "255/35R20", "255/40R20", "255/45R20", "255/50R20", "255/55R20", "265/35R20", "265/40R20", "265/45R20", "265/50R20", "275/35R20", "275/40R20", "275/45R20", "275/50R20", "275/55R20", "275/60R20", "285/30R20", "285/35R20", "285/40R20", "285/45R20", "285/50R20", "295/40R20", "305/50R20", "315/35R20",
+  // R21
+  "255/35R21", "265/35R21", "265/40R21", "265/45R21", "275/35R21", "275/40R21", "275/45R21", "285/30R21", "285/35R21", "285/40R21", "285/45R21", "295/35R21", "295/40R21", "305/30R21", "315/35R21", "325/30R21",
+  // R22
+  "265/35R22", "275/35R22", "275/40R22", "285/30R22", "285/35R22", "285/40R22", "285/45R22", "295/30R22", "295/35R22", "305/30R22", "305/40R22", "315/30R22", "325/55R22",
 ];
 const carMediaKeys: CarMediaKey[] = ["front", "rear", "right", "left", "video"];
 const carMediaRejectReasons = ["Blur", "Wrong angle", "Not same car", "Blocked view", "Poor lighting"];
@@ -795,6 +808,17 @@ export function InspectionDetailPageClient({
           if (carRes.ok) {
             const carData = await carRes.json();
             setCar(carData);
+            // Pre-fill vehicle form fields from existing car data if not already set from draft
+            const cd = carData?.data ?? carData;
+            if (cd) {
+              setInspectionVin((prev) => prev || String(cd.vin ?? ""));
+              setInspectionPlate((prev) => prev || String(cd.plate_number ?? cd.plateNumber ?? ""));
+              setInspectionMake((prev) => prev || String(cd.make ?? ""));
+              setInspectionModel((prev) => prev || String(cd.model ?? ""));
+              setInspectionYear((prev) => prev || String(cd.model_year ?? cd.modelYear ?? ""));
+              setTyreSizeFront((prev) => prev || String(cd.tyre_size_front ?? cd.tyreSizeFront ?? ""));
+              setTyreSizeRear((prev) => prev || String(cd.tyre_size_back ?? cd.tyreSizeBack ?? ""));
+            }
           }
         }
         if (payload?.leadId) {
@@ -891,6 +915,41 @@ export function InspectionDetailPageClient({
                 productId: p.productId ?? null,
               }))
             );
+          } else if (Array.isArray(draft?.parts) && draft.parts.length > 0) {
+            // No saved line items in DB -- restore from draft payload (unsaved AI suggestions)
+            const draftParts = draft.parts
+              .filter((p: any) => {
+                // Skip entries with no part name at all
+                const name = String(p?.part ?? p?.productName ?? p?.name ?? "").trim();
+                return name.length > 0;
+              })
+              .map((p: any, idx: number) => {
+                const hasValidId = typeof p.id === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(p.id);
+                return {
+                  clientRowKey: p.clientRowKey ?? (hasValidId ? p.id : `draft-${idx}-${Date.now()}`),
+                  id: hasValidId ? p.id : null,
+                  productId: p.productId ?? null,
+                  productType: p.productType ?? null,
+                  productName: p.productName ?? null,
+                  part: String(p.part ?? p.productName ?? p.name ?? "").trim(),
+                  description: String(p.description ?? ""),
+                  qty: String(p.qty ?? p.quantity ?? 1),
+                  reason: String(p.reason ?? "Mandatory"),
+                  actionType: p.actionType ?? null,
+                  priority: p.priority ?? null,
+                  aiDescription: p.aiDescription ?? null,
+                  catalogGroupKey: String(p.catalogGroupKey ?? ""),
+                  catalogPartCode: String(p.catalogPartCode ?? p.partNumber ?? ""),
+                  mediaFileId: p.mediaFileId ?? null,
+                  mediaFiles: Array.isArray(p.mediaFiles) ? p.mediaFiles : null,
+                  partOrdered: p.partOrdered ?? 0,
+                  orderStatus: p.orderStatus ?? null,
+                  isSaved: hasValidId,
+                };
+              });
+            if (draftParts.length > 0) {
+              setParts(draftParts);
+            }
           }
         }
       } catch (err: any) {
@@ -1201,17 +1260,22 @@ export function InspectionDetailPageClient({
       vinPartsEpcId: vinPartsEpcIdState.trim(),
       vinPartsJsId: vinPartsJsIdState.trim(),
       parts: rows.map((p) => ({
-        id: p.id,
+        id: p.id ?? null,
         productId: p.productId ?? null,
         productType: p.productType ?? null,
-        part: p.part,
-        description: p.description,
-        qty: p.qty,
-        reason: p.reason,
+        productName: (p as any).productName ?? null,
+        part: String(p.part ?? ""),
+        description: String(p.description ?? ""),
+        qty: String(p.qty ?? "1"),
+        reason: String(p.reason ?? "Mandatory"),
+        actionType: (p as any).actionType ?? null,
+        priority: (p as any).priority ?? null,
+        aiDescription: (p as any).aiDescription ?? null,
         catalogGroupKey: p.catalogGroupKey ?? "",
         catalogPartCode: p.catalogPartCode ?? "",
         clientRowKey: p.clientRowKey ?? "",
         mediaFileId: p.mediaFileId ?? null,
+        mediaFiles: (p as any).mediaFiles ?? null,
       })),
       lineItemAiAnswers,
       lineItemAiQuestionsByRow,
@@ -2169,12 +2233,12 @@ export function InspectionDetailPageClient({
 
   const serializeChecksForCompare = (value: Record<string, CheckValue>) => JSON.stringify(value ?? {});
   const processChecksCompleted = processCheckItems.every(
-    (item) => Boolean(processChecks[item.key]) && (processCheckMediaMulti[item.key]?.length ?? 0) > 0
+    (item) => Boolean(processChecks[item.key] || checks[item.key]) && (processCheckMediaMulti[item.key]?.length ?? 0) > 0
   );
   const processIssueNotesComplete = processCheckItems.every(
-    (item) => processChecks[item.key] !== "issue" || Boolean((processCheckIssueNotes[item.key] ?? "").trim())
+    (item) => (processChecks[item.key] || checks[item.key]) !== "issue" || Boolean((processCheckIssueNotes[item.key] ?? "").trim())
   );
-  const hasAnyProcessIssue = processCheckItems.some((item) => processChecks[item.key] === "issue");
+  const hasAnyProcessIssue = processCheckItems.some((item) => (processChecks[item.key] || checks[item.key]) === "issue");
   const step1Complete = isReadOnly || collectCarCompleted;
   const step2Complete = isReadOnly || Boolean(startedAt);
   const rejectedMediaMissingReplacement = useMemo(
@@ -2201,7 +2265,10 @@ export function InspectionDetailPageClient({
       Boolean((tyreSizeRear ?? "").trim()) &&
       Boolean((form.carInMileage ?? "").trim()) &&
       Boolean((inspectionVin ?? "").trim()) &&
-      Boolean((inspectionPlate ?? "").trim()));
+      Boolean((inspectionPlate ?? "").trim()) &&
+      Boolean((inspectionMake ?? "").trim()) &&
+      Boolean((inspectionModel ?? "").trim()) &&
+      Boolean((inspectionYear ?? "").trim()));
   const hasUnsavedLineItems = parts.some((p) => !p.isSaved);
   const hasUnsavedChanges =
     !isReadOnly &&
@@ -2951,10 +3018,17 @@ export function InspectionDetailPageClient({
     }
     setError(null);
     const nextErrors: { part?: string; qty?: string; media?: string } = {};
-    if (!row.part.trim()) {
+    // Resolve part name from multiple possible fields
+    const partName = ((row as any).part ?? (row as any).productName ?? "").trim();
+    if (!partName) {
       nextErrors.part = "Part is required.";
     }
-    const qtyNumber = Number(row.qty);
+    // Ensure part field is synced for the save payload
+    if (partName && !row.part) {
+      setParts((prev) => prev.map((p, i) => i === index ? { ...p, part: partName } : p));
+    }
+    const rawQty = row.qty || (row as any).quantity || "1";
+    const qtyNumber = Number(rawQty);
     if (!Number.isFinite(qtyNumber) || qtyNumber < 1) {
       nextErrors.qty = "Quantity must be a number and at least 1.";
     }
@@ -2964,15 +3038,20 @@ export function InspectionDetailPageClient({
     }
     if (nextErrors.part || nextErrors.qty || nextErrors.media) {
       setLineItemErrors((prev) => ({ ...prev, [index]: nextErrors }));
+      const partLabel = partName || `Item ${index + 1}`;
+      const errorMsgs = [nextErrors.part, nextErrors.qty, nextErrors.media].filter(Boolean).join("; ");
+      toast.error(`${partLabel}: ${errorMsgs}`);
       return;
     }
-    const wasExisting = Boolean(row.id);
+    const isValidUuid = (val: any) => typeof val === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+    const existingId = isValidUuid(row.id) ? row.id : null;
+    const wasExisting = Boolean(existingId);
     setParts((prev) => prev.map((p, i) => (i === index ? { ...p, isSaving: true } : p)));
     try {
       const payload = {
         leadId: leadId ?? null,
         productId: row.productId ?? null,
-        productName: row.part,
+        productName: ((row as any).part || (row as any).productName || (row as any).partName || "").trim(),
         partNumber: row.catalogPartCode?.trim?.() || null,
         catalogGroupKey: row.catalogGroupKey?.trim?.() || null,
         clientRowKey: row.clientRowKey ?? null,
@@ -2986,15 +3065,15 @@ export function InspectionDetailPageClient({
       };
       const res = await fetch(
         `/api/company/${companyId}/workshop/inspections/${inspectionId}/line-items` +
-          (row.id ? `/${row.id}` : ""),
+          (existingId ? `/${existingId}` : ""),
         {
-          method: row.id ? "PATCH" : "POST",
+          method: existingId ? "PATCH" : "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         }
       );
-      if (!res.ok) throw new Error("Failed to save line item");
       const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? `Failed to save line item (HTTP ${res.status})`);
       const saved = data?.data ?? {};
       const nextParts = currentParts.map((p, i) =>
         i === index
@@ -3024,9 +3103,11 @@ export function InspectionDetailPageClient({
       initialChecksSignatureRef.current = serializeChecksForCompare(checks);
       toast.success("Line item saved successfully.");
       setLineItemErrors((prev) => ({ ...prev, [index]: {} }));
-    } catch (err) {
+    } catch (err: any) {
       setParts((prev) => prev.map((p, i) => (i === index ? { ...p, isSaving: false } : p)));
-      setError("Failed to save line item");
+      const msg = err?.message ?? "Failed to save line item";
+      setError(msg);
+      toast.error(msg);
     }
   };
 
@@ -3404,12 +3485,28 @@ export function InspectionDetailPageClient({
       if (rejectedMediaMissingReplacement) return "Upload replacement media for every rejected car image/video.";
       return "Complete car media review before moving to next step.";
     }
-    if (inspectionStep === 4 && !step4Complete) return "Complete car plate, tyre sizes, mileage and VIN.";
+    if (inspectionStep === 4 && !step4Complete) return "Complete all vehicle fields: plate, make, model, year, VIN, tyre sizes, and mileage.";
     if (inspectionStep === 5 && !step5Complete) {
       if (hasAnyProcessIssue && !processIssueNotesComplete) {
         return "Add description for each check marked as ISSUE.";
       }
-      return "Complete inspection checks and save all line items with required media before review.";
+      const issues: string[] = [];
+      if (hasUnsavedLineItems) issues.push("Save all draft line items");
+      if (requiredMediaMissing) {
+        const missing = parts.filter((row) => getMediaRequirement(row).required && !row.mediaFileId).map((r) => (r as any).productName || r.part || "item");
+        issues.push(`Upload required media for: ${missing.join(", ")}`);
+      }
+      if (parts.length === 0) issues.push("Add at least one line item");
+      if (!processChecksCompleted) {
+        const missingChecks = processCheckItems.filter((item) => !(processChecks[item.key] || checks[item.key]) || (processCheckMediaMulti[item.key]?.length ?? 0) === 0);
+        const labels = missingChecks.map((c) => {
+          const needsStatus = !(processChecks[c.key] || checks[c.key]);
+          const needsMedia = (processCheckMediaMulti[c.key]?.length ?? 0) === 0;
+          return `${c.label} (${[needsStatus ? "select status" : "", needsMedia ? "upload image" : ""].filter(Boolean).join(" + ")})`;
+        });
+        issues.push(`Complete checks: ${labels.join(", ")}`);
+      }
+      return issues.length > 0 ? issues.join(". ") + "." : "Complete inspection checks and save all line items with required media before review.";
     }
     return "Please complete the current step.";
   };
@@ -4575,33 +4672,36 @@ export function InspectionDetailPageClient({
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-white/70">Car Make</label>
+                    <label className="text-xs font-semibold text-white/70">Car Make <span className="text-red-400">*</span></label>
                     <input
                       type="text"
-                      className={theme.input}
+                      className={`${theme.input} ${!inspectionMake.trim() && !isReadOnly ? "border-red-500/40" : ""}`}
                       value={inspectionMake}
                       readOnly={isReadOnly || isCollectCarPending}
                       onChange={(e) => setInspectionMake(e.target.value)}
+                      placeholder="Required"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-white/70">Car Model</label>
+                    <label className="text-xs font-semibold text-white/70">Car Model <span className="text-red-400">*</span></label>
                     <input
                       type="text"
-                      className={theme.input}
+                      className={`${theme.input} ${!inspectionModel.trim() && !isReadOnly ? "border-red-500/40" : ""}`}
                       value={inspectionModel}
                       readOnly={isReadOnly || isCollectCarPending}
                       onChange={(e) => setInspectionModel(e.target.value)}
+                      placeholder="Required"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-white/70">Car Year</label>
+                    <label className="text-xs font-semibold text-white/70">Car Year <span className="text-red-400">*</span></label>
                     <input
                       type="text"
-                      className={theme.input}
+                      className={`${theme.input} ${!inspectionYear.trim() && !isReadOnly ? "border-red-500/40" : ""}`}
                       value={inspectionYear}
                       readOnly={isReadOnly || isCollectCarPending}
                       onChange={(e) => setInspectionYear(e.target.value)}
+                      placeholder="Required"
                     />
                   </div>
                   <div>
@@ -4761,9 +4861,7 @@ export function InspectionDetailPageClient({
                           accept="image/*"
                           disabled={isReadOnly || isCollectCarPending}
                           onChange={(e) => {
-                            const files = e.target.files;
-                            if (!files) return;
-                            void handleCheckMediaUpload(item.key, Array.from(files));
+                            void uploadProcessCheckFiles(item.key, e.target.files);
                           }}
                           className="mt-1 text-xs text-white/70"
                         />
@@ -4900,14 +4998,21 @@ export function InspectionDetailPageClient({
                     <span className="rounded-full border border-amber-500/40 px-2 py-0.5 text-amber-300">
                       Ordered: {parts.filter((p) => (p.orderStatus ?? "").toLowerCase() === "ordered").length}
                     </span>
-                    {!isReadOnly && !isCollectCarPending && (
+                    {!isReadOnly && (
                       <button
                         type="button"
-                        className="rounded-md bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white disabled:opacity-50"
-                        onClick={() => void saveAllDraftLineItems()}
+                        className={`rounded-md px-2.5 py-1 text-[11px] font-semibold text-white disabled:opacity-50 ${isCollectCarPending ? "bg-slate-600 cursor-not-allowed" : "bg-emerald-600"}`}
+                        onClick={() => {
+                          if (isCollectCarPending) {
+                            toast.error("Complete Collect Car stage (Step 1) before saving parts.");
+                            return;
+                          }
+                          void saveAllDraftLineItems();
+                        }}
                         disabled={parts.filter((p) => !p.isSaved).length === 0}
+                        title={isCollectCarPending ? "Complete Collect Car stage first" : "Save all draft items"}
                       >
-                        Save All
+                        {isCollectCarPending ? "Complete Step 1 First" : "Save All"}
                       </button>
                     )}
                   </div>
@@ -4988,6 +5093,19 @@ export function InspectionDetailPageClient({
                               ))}
                             </div>
                           </div>
+                        </div>
+
+                        {/* Row 2b: Quantity */}
+                        <div className="mt-2 flex items-center gap-2">
+                          <div className="text-[10px] font-semibold uppercase tracking-wide text-white/40">Qty</div>
+                          <input
+                            type="number"
+                            min={1}
+                            value={part.qty}
+                            readOnly={isReadOnly}
+                            onChange={(e) => updatePartField(idx, "qty", e.target.value)}
+                            className="w-16 rounded border border-white/20 bg-white/5 px-2 py-1 text-xs text-white text-center"
+                          />
                         </div>
 
                         {/* Row 3: AI Description (auto-generated) */}

@@ -131,22 +131,23 @@ export async function updateGatepass(
   }>
 ): Promise<void> {
   const sql = getSql();
+  const updates: Record<string, any> = {};
+  if (patch.handoverType !== undefined) updates.handover_type = patch.handoverType;
+  if (patch.status !== undefined) updates.status = patch.status;
+  if (patch.paymentOk !== undefined) updates.payment_ok = patch.paymentOk;
+  if (patch.supervisorId !== undefined) updates.supervisor_id = patch.supervisorId;
+  if (patch.supervisorApprovedAt !== undefined) updates.supervisor_approved_at = patch.supervisorApprovedAt;
+  if (patch.customerSigned !== undefined) updates.customer_signed = patch.customerSigned;
+  if (patch.customerName !== undefined) updates.customer_name = patch.customerName;
+  if (patch.customerIdNumber !== undefined) updates.customer_id_number = patch.customerIdNumber;
+  if (patch.handoverFormRef !== undefined) updates.handover_form_ref = patch.handoverFormRef;
+  if (patch.customerSignatureRef !== undefined) updates.customer_signature_ref = patch.customerSignatureRef;
+  if (patch.finalVideoRef !== undefined) updates.final_video_ref = patch.finalVideoRef;
+  if (patch.finalNote !== undefined) updates.final_note = patch.finalNote;
+  updates.updated_at = new Date();
   await sql/* sql */ `
     UPDATE gatepasses
-    SET ${sql({
-      handover_type: patch.handoverType,
-      status: patch.status,
-      payment_ok: patch.paymentOk,
-      supervisor_id: patch.supervisorId,
-      supervisor_approved_at: patch.supervisorApprovedAt,
-      customer_signed: patch.customerSigned,
-      customer_name: patch.customerName,
-      customer_id_number: patch.customerIdNumber,
-      handover_form_ref: patch.handoverFormRef,
-      customer_signature_ref: patch.customerSignatureRef,
-      final_video_ref: patch.finalVideoRef,
-      final_note: patch.finalNote,
-    })}
+    SET ${sql(updates)}
     WHERE company_id = ${companyId} AND id = ${gatepassId}
   `;
 }

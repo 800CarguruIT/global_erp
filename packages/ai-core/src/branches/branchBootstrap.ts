@@ -1,14 +1,15 @@
 import bcrypt from "bcryptjs";
 import { getSql } from "../db";
 import type { Branch } from "./types";
-import { CompanyBootstrapDefaults } from "../company/companyBootstrap";
+import { generateSecurePassword } from "../company/companyBootstrap";
 
 export async function ensureBranchAdminForBranch(branch: Branch) {
   const email = branch.email?.trim().toLowerCase();
   if (!email) return;
 
   const sql = getSql();
-  const passwordHash = await bcrypt.hash(CompanyBootstrapDefaults.defaultAdminPassword, 10);
+  const plainPassword = generateSecurePassword();
+  const passwordHash = await bcrypt.hash(plainPassword, 10);
   const roleKey = `branch_admin_${branch.id}`;
 
   const roleRes = await sql<{ id: string }[]>`

@@ -1322,93 +1322,116 @@ export function LeadsMain({
                           </div>
                         ) : null}
                         {leadType === "workshop" ? (
+                          <div>
+                            <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-white/50">Booking Type</label>
+                            <select
+                              value={bookingWorkshopType}
+                              onChange={(e) => {
+                                setBookingWorkshopType(e.target.value === "recovery" ? "recovery" : "walkin");
+                              }}
+                              className="w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white"
+                              disabled={!bookingLeadTypeConfirmed}
+                            >
+                              <option value="walkin" style={{ color: "#0f172a", backgroundColor: "#ffffff" }}>
+                                Walk-in
+                              </option>
+                              <option value="recovery" style={{ color: "#0f172a", backgroundColor: "#ffffff" }}>
+                                Recovery
+                              </option>
+                            </select>
+                          </div>
+                        ) : null}
+                        <div>
+                          <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-white/50">Priority</label>
                           <select
-                            value={bookingWorkshopType}
-                            onChange={(e) => {
-                              setBookingWorkshopType(e.target.value === "recovery" ? "recovery" : "walkin");
-                              setBookingLeadTypeConfirmed(false);
-                            }}
+                            value={bookingPriority}
+                            onChange={(e) =>
+                              setBookingPriority(
+                                e.target.value === "low" || e.target.value === "high" ? e.target.value : "medium"
+                              )
+                            }
                             className="w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white"
                             disabled={!bookingLeadTypeConfirmed}
                           >
-                            <option value="walkin" style={{ color: "#0f172a", backgroundColor: "#ffffff" }}>
-                              Walk-in
+                            <option value="low" style={{ color: "#0f172a", backgroundColor: "#ffffff" }}>
+                              Low
                             </option>
-                            <option value="recovery" style={{ color: "#0f172a", backgroundColor: "#ffffff" }}>
-                              Recovery
+                            <option value="medium" style={{ color: "#0f172a", backgroundColor: "#ffffff" }}>
+                              Medium
+                            </option>
+                            <option value="high" style={{ color: "#0f172a", backgroundColor: "#ffffff" }}>
+                              High
                             </option>
                           </select>
-                        ) : null}
-                        <select
-                          value={bookingPriority}
-                          onChange={(e) =>
-                            setBookingPriority(
-                              e.target.value === "low" || e.target.value === "high" ? e.target.value : "medium"
-                            )
-                          }
-                          className="w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white"
-                          disabled={!bookingLeadTypeConfirmed}
-                        >
-                          <option value="low" style={{ color: "#0f172a", backgroundColor: "#ffffff" }}>
-                            Low Priority
-                          </option>
-                          <option value="medium" style={{ color: "#0f172a", backgroundColor: "#ffffff" }}>
-                            Medium Priority
-                          </option>
-                          <option value="high" style={{ color: "#0f172a", backgroundColor: "#ffffff" }}>
-                            High Priority
-                          </option>
-                        </select>
-                        <input
-                          type="datetime-local"
-                          value={bookingScheduledAt}
-                          onChange={(e) => setBookingScheduledAt(e.target.value)}
-                          className="w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white"
-                          disabled={!bookingLeadTypeConfirmed}
-                        />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-white/50">Scheduled Date & Time</label>
+                          <input
+                            type="datetime-local"
+                            value={bookingScheduledAt}
+                            onChange={(e) => setBookingScheduledAt(e.target.value)}
+                            className="w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white"
+                            disabled={!bookingLeadTypeConfirmed}
+                          />
+                        </div>
                         {requiresPickup ? (
                           <>
-                            <input
-                              value={bookingPickupLocation}
-                              onChange={(e) => setBookingPickupLocation(e.target.value)}
-                              placeholder="Pickup location"
-                              className="w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60"
-                              disabled={!bookingLeadTypeConfirmed}
-                            />
-                            <input
-                              value={bookingPickupGoogleLocation}
-                              onChange={(e) => setBookingPickupGoogleLocation(e.target.value)}
-                              placeholder="Pickup Google Maps URL (optional)"
-                              className="w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60"
-                              disabled={!bookingLeadTypeConfirmed}
-                            />
+                            <div>
+                              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-white/50">Pickup Location</label>
+                              <input
+                                value={bookingPickupLocation}
+                                onChange={(e) => setBookingPickupLocation(e.target.value)}
+                                placeholder="Enter pickup address"
+                                className="w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60"
+                                disabled={!bookingLeadTypeConfirmed}
+                              />
+                            </div>
+                            <div>
+                              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-white/50">Pickup Google Maps URL <span className="normal-case font-normal text-white/30">(optional)</span></label>
+                              <input
+                                value={bookingPickupGoogleLocation}
+                                onChange={(e) => setBookingPickupGoogleLocation(e.target.value)}
+                                placeholder="https://maps.google.com/..."
+                                className="w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60"
+                                disabled={!bookingLeadTypeConfirmed}
+                              />
+                            </div>
                           </>
                         ) : null}
                         {requiresDropoff ? (
                           <>
-                            <input
-                              value={bookingDropoffLocation}
-                              onChange={(e) => setBookingDropoffLocation(e.target.value)}
-                              placeholder="Dropoff location"
-                              className="w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60"
-                              disabled={!bookingLeadTypeConfirmed}
-                            />
-                            <input
-                              value={bookingDropoffGoogleLocation}
-                              onChange={(e) => setBookingDropoffGoogleLocation(e.target.value)}
-                              placeholder="Dropoff Google Maps URL (optional)"
-                              className="w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60"
-                              disabled={!bookingLeadTypeConfirmed}
-                            />
+                            <div>
+                              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-white/50">Dropoff Location</label>
+                              <input
+                                value={bookingDropoffLocation}
+                                onChange={(e) => setBookingDropoffLocation(e.target.value)}
+                                placeholder="Enter dropoff address"
+                                className="w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60"
+                                disabled={!bookingLeadTypeConfirmed}
+                              />
+                            </div>
+                            <div>
+                              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-white/50">Dropoff Google Maps URL <span className="normal-case font-normal text-white/30">(optional)</span></label>
+                              <input
+                                value={bookingDropoffGoogleLocation}
+                                onChange={(e) => setBookingDropoffGoogleLocation(e.target.value)}
+                                placeholder="https://maps.google.com/..."
+                                className="w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60"
+                                disabled={!bookingLeadTypeConfirmed}
+                              />
+                            </div>
                           </>
                         ) : null}
-                        <textarea
-                          value={bookingNotes}
-                          onChange={(e) => setBookingNotes(e.target.value)}
-                          placeholder="Notes"
-                          className="h-20 w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60"
-                          disabled={!bookingLeadTypeConfirmed}
-                        />
+                        <div>
+                          <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-white/50">Notes <span className="normal-case font-normal text-white/30">(optional)</span></label>
+                          <textarea
+                            value={bookingNotes}
+                            onChange={(e) => setBookingNotes(e.target.value)}
+                            placeholder="Add any remarks or special instructions"
+                            className="h-20 w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60"
+                            disabled={!bookingLeadTypeConfirmed}
+                          />
+                        </div>
                       </div>
                       <div className="flex items-center justify-end gap-2">
                         <button
@@ -1926,30 +1949,7 @@ export function LeadsMain({
             </>
           )}
         </div>
-        <aside className="space-y-3">
-          <Card>
-            <div className="space-y-2">
-              <div className="text-sm font-semibold">{t("leads.ai.title")}</div>
-              {loading ? (
-                <div className="text-sm text-muted-foreground">{t("leads.ai.loading")}</div>
-              ) : aiSuggestions.length === 0 ? (
-                <div className="text-sm text-muted-foreground">{t("leads.ai.actions.empty")}</div>
-              ) : (
-                <ul className="list-disc pl-5 text-sm text-muted-foreground space-y-1">
-                  {aiSuggestions.map((a, idx) => (
-                    <li key={idx}>{a}</li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </Card>
-          <Card>
-            <div className="space-y-2">
-              <div className="text-sm font-semibold">{t("leads.ai.appreciation.title")}</div>
-              <div className="text-sm text-muted-foreground">{loading ? t("leads.ai.loading") : aiAppreciation}</div>
-            </div>
-          </Card>
-        </aside>
+        {/* AI sidebar cards removed — AI Intelligence panel is now in the page layout */}
       </div>
     </MainPageShell>
   );

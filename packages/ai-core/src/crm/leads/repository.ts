@@ -28,95 +28,42 @@ let leadAssignmentColumnsSupported: boolean | null = null;
 async function ensureLeadAssignmentColumns(): Promise<boolean> {
   if (leadAssignmentColumnsSupported !== null)
     return leadAssignmentColumnsSupported;
-  const sql = getSql();
-  try {
-    const res = await sql /* sql */ `
-      SELECT column_name
-      FROM information_schema.columns
-      WHERE table_name = 'leads'
-        AND column_name IN (
-          'branch_id',
-          'assigned_user_id',
-          'service_type',
-          'workshop_visit_mode',
-          'assigned_at',
-          'customer_details_requested',
-          'customer_details_approved',
-          'recovery_direction',
-          'recovery_flow',
-          'pickup_from',
-          'dropoff_to',
-          'pickup_google_location',
-          'dropoff_google_location',
-          'checkin_at',
-          'workflow_required'
-        )
-    `;
-    const names = (res as any)?.map((r: any) => r.column_name) ?? [];
-    const missing = [
-      "branch_id",
-      "assigned_user_id",
-      "service_type",
-      "workshop_visit_mode",
-      "assigned_at",
-      "customer_details_requested",
-      "customer_details_approved",
-      "recovery_direction",
-      "recovery_flow",
-      "pickup_from",
-      "dropoff_to",
-      "pickup_google_location",
-      "dropoff_google_location",
-      "checkin_at",
-      "workflow_required",
-    ].filter((c) => !names.includes(c));
-    if (missing.length) {
-      // add columns if they don't exist; keep null defaults to avoid migrations blocking
-      await sql /* sql */ `
-        ALTER TABLE leads
-        ADD COLUMN IF NOT EXISTS branch_id uuid NULL,
-        ADD COLUMN IF NOT EXISTS assigned_user_id uuid NULL,
-        ADD COLUMN IF NOT EXISTS service_type text NULL,
-        ADD COLUMN IF NOT EXISTS workshop_visit_mode text NULL,
-        ADD COLUMN IF NOT EXISTS assigned_at timestamptz NULL,
-        ADD COLUMN IF NOT EXISTS customer_details_requested boolean NULL DEFAULT FALSE,
-        ADD COLUMN IF NOT EXISTS customer_details_approved boolean NULL DEFAULT FALSE,
-        ADD COLUMN IF NOT EXISTS recovery_direction text NULL,
-        ADD COLUMN IF NOT EXISTS recovery_flow text NULL,
-        ADD COLUMN IF NOT EXISTS pickup_from text NULL,
-        ADD COLUMN IF NOT EXISTS dropoff_to text NULL,
-        ADD COLUMN IF NOT EXISTS pickup_google_location text NULL,
-        ADD COLUMN IF NOT EXISTS dropoff_google_location text NULL,
-        ADD COLUMN IF NOT EXISTS checkin_at timestamptz NULL,
-        ADD COLUMN IF NOT EXISTS workflow_required jsonb NULL
-      `;
-    }
-    leadAssignmentColumnsSupported = true;
-  } catch {
-    leadAssignmentColumnsSupported = false;
-  }
-  return leadAssignmentColumnsSupported;
+  // Assume columns exist (they are added by migrations).
+  // If they don't, the first query using them will fail gracefully
+  // and set the flag to false.
+  leadAssignmentColumnsSupported = true;
+  return true;
 }
 
-export async function listLeadsForCompany(companyId: string): Promise<Lead[]> {
+export async function listLeadsForCompany(
+  companyId: string,
+  opts?: { limit?: number; offset?: number },
+): Promise<Lead[]> {
   const sql = getSql();
-  await releaseExpiredAssignments(companyId, 5);
+  // Run assignment release in background -- don't block the read
+  releaseExpiredAssignments(companyId, 5).catch(() => {});
+  const limit = opts?.limit ?? 200;
+  const offset = opts?.offset ?? 0;
   const rows = await sql /* sql */ `
       SELECT
-        l.*,
+        l.id, l.company_id, l.customer_id, l.car_id, l.branch_id,
+        l.agent_employee_id, l.assigned_user_id, l.assigned_at,
+        l.lead_type, l.lead_status, l.lead_stage, l.source,
+        l.agent_remark, l.customer_remark,
+        l.created_at, l.updated_at, l.closed_at,
+        l.health_score, l.sentiment_score,
+        l.customer_details_requested, l.customer_details_approved,
+        l.recovery_direction, l.recovery_flow,
+        l.pickup_from, l.dropoff_to,
+        l.workshop_visit_mode, l.service_type,
+        l.checkin_at,
         c.name AS customer_name,
         c.phone AS customer_phone,
         c.email AS customer_email,
         car.plate_number AS car_plate_number,
         car.model AS car_model,
         COALESCE(b.display_name, b.name, b.code) AS branch_name,
-        COALESCE(e.full_name, au.full_name, au.email) AS agent_name,
-        l.customer_details_requested,
-        l.customer_details_approved,
-        l.recovery_direction,
-        l.recovery_flow,
-        l.pickup_from,
-        l.dropoff_to
+        COALESCE(e.full_name, au.full_name, au.email) AS agent_name
       FROM leads l
       LEFT JOIN customers c ON c.id = l.customer_id
       LEFT JOIN cars car ON car.id = l.car_id
@@ -125,6 +72,7 @@ export async function listLeadsForCompany(companyId: string): Promise<Lead[]> {
       LEFT JOIN users au ON au.id = l.assigned_user_id
       WHERE l.company_id = ${companyId}
       ORDER BY l.created_at DESC
+      LIMIT ${limit} OFFSET ${offset}
     `;
   return rows.map(mapLeadRow);
 }
@@ -705,6 +653,19 @@ export async function updateLeadPartial(
         updated_at = now()
       WHERE company_id = ${companyId} AND id = ${leadId}
     `;
+  }
+
+  // Auto-assign advisor when car checks in
+  const isCarIn =
+    storedStatus === "car_in" ||
+    newStage === "checkin";
+  const wasAlreadyCarIn =
+    current.leadStatus === "car_in" ||
+    current.leadStage === "checkin";
+  if (isCarIn && !wasAlreadyCarIn) {
+    import("../../pis/leadDistribution/autoAssign")
+      .then((mod) => mod.triggerAutoAssignOnCarIn(companyId, leadId))
+      .catch((err) => console.error("[AutoAssign] Failed to trigger:", err));
   }
 }
 

@@ -48,13 +48,7 @@ type UserOption = {
   email?: string;
   isAgent?: boolean;
 };
-type AutoAssignPercentages = {
-  chsc: number;
-  chsc_inactive: number;
-  non_chsc: number;
-  non_chsc_inactive: number;
-  insurance: number;
-};
+type AutoAssignPercentages = Record<string, number>;
 type AutoAssignResult = {
   requested: number;
   assigned: number;
@@ -62,6 +56,7 @@ type AutoAssignResult = {
   assignedBySegment: AutoAssignPercentages;
   agentUserId: string;
 };
+type InsuranceCompanyOption = { name: string; count: number };
 
 function toDateInput(date: Date): string {
   return date.toISOString().slice(0, 10);
@@ -98,6 +93,7 @@ export default function CompanyDataCenterPage({ params }: Props) {
   const [refreshKey, setRefreshKey] = useState(0);
   const [agentReport, setAgentReport] = useState<AgentReportRow[]>([]);
   const [agents, setAgents] = useState<UserOption[]>([]);
+  const [insuranceCompanies, setInsuranceCompanies] = useState<InsuranceCompanyOption[]>([]);
   const [selectedAgentId, setSelectedAgentId] = useState("");
   const [totalToAssign, setTotalToAssign] = useState<number>(100);
   const [percentages, setPercentages] = useState<AutoAssignPercentages>({
@@ -105,7 +101,6 @@ export default function CompanyDataCenterPage({ params }: Props) {
     chsc_inactive: 10,
     non_chsc: 20,
     non_chsc_inactive: 10,
-    insurance: 40,
   });
   const [assigning, setAssigning] = useState(false);
   const [assignError, setAssignError] = useState<string | null>(null);
@@ -254,8 +249,50 @@ export default function CompanyDataCenterPage({ params }: Props) {
     };
   }, [companyId, userId]);
 
+  // Load insurance companies
+  useEffect(() => {
+    if (!companyId || !userId) return;
+    let cancelled = false;
+    async function loadInsuranceCompanies() {
+      try {
+        const res = await fetch(`/api/company/${companyId}/data-center/insurance-companies`, {
+          cache: "no-store",
+          headers: { "x-user-id": userId },
+        });
+        if (!res.ok) return;
+        const json = await res.json();
+        const list = (json?.data as InsuranceCompanyOption[] | undefined) ?? [];
+        if (!cancelled) {
+          setInsuranceCompanies(list);
+          if (list.length > 0) {
+            const equalPct = Math.floor(40 / list.length);
+            const insurancePcts: Record<string, number> = {};
+            list.forEach((ic, i) => {
+              insurancePcts[`insurance:${ic.name}`] = i === 0 ? 40 - equalPct * (list.length - 1) : equalPct;
+            });
+            setPercentages((prev) => {
+              const next: AutoAssignPercentages = {
+                chsc: prev.chsc ?? 20,
+                chsc_inactive: prev.chsc_inactive ?? 10,
+                non_chsc: prev.non_chsc ?? 20,
+                non_chsc_inactive: prev.non_chsc_inactive ?? 10,
+              };
+              // Remove old plain insurance key
+              delete next.insurance;
+              return { ...next, ...insurancePcts };
+            });
+          }
+        }
+      } catch {
+        if (!cancelled) setInsuranceCompanies([]);
+      }
+    }
+    void loadInsuranceCompanies();
+    return () => { cancelled = true; };
+  }, [companyId, userId]);
+
   const percentageTotal = useMemo(
-    () => percentages.chsc + percentages.chsc_inactive + percentages.non_chsc + percentages.non_chsc_inactive + percentages.insurance,
+    () => Object.values(percentages).reduce((sum, v) => sum + (v || 0), 0),
     [percentages]
   );
 
@@ -441,10 +478,23 @@ export default function CompanyDataCenterPage({ params }: Props) {
             <h2 className="text-base font-semibold">Auto Assign Customers</h2>
             <button
               type="button"
-              onClick={() => setPercentages({ chsc: 20, chsc_inactive: 20, non_chsc: 20, non_chsc_inactive: 20, insurance: 20 })}
+              onClick={() => {
+                const insKeys = insuranceCompanies.map((ic) => `insurance:${ic.name}`);
+                const totalKeys = 4 + insKeys.length;
+                const equalPct = Math.floor(100 / totalKeys);
+                const remainder = 100 - equalPct * totalKeys;
+                const next: AutoAssignPercentages = {
+                  chsc: equalPct + (remainder > 0 ? 1 : 0),
+                  chsc_inactive: equalPct + (remainder > 1 ? 1 : 0),
+                  non_chsc: equalPct + (remainder > 2 ? 1 : 0),
+                  non_chsc_inactive: equalPct + (remainder > 3 ? 1 : 0),
+                };
+                insKeys.forEach((k, i) => { next[k] = equalPct + (remainder > 4 + i ? 1 : 0); });
+                setPercentages(next);
+              }}
               className="rounded-md border border-slate-600/60 bg-slate-900/40 px-3 py-1.5 text-xs text-slate-200"
             >
-              Set Equal (20%)
+              Set Equal ({Math.floor(100 / (4 + insuranceCompanies.length))}%)
             </button>
           </div>
 
@@ -492,7 +542,7 @@ export default function CompanyDataCenterPage({ params }: Props) {
               <input
                 type="number"
                 min={0}
-                value={percentages.chsc}
+                value={percentages.chsc ?? 0}
                 onChange={(e) => setPercentages((v) => ({ ...v, chsc: Math.max(0, Number(e.target.value) || 0) }))}
                 className="w-full rounded-md border border-slate-700/60 bg-slate-900/70 px-3 py-2 text-xs text-slate-100"
               />
@@ -502,7 +552,7 @@ export default function CompanyDataCenterPage({ params }: Props) {
               <input
                 type="number"
                 min={0}
-                value={percentages.chsc_inactive}
+                value={percentages.chsc_inactive ?? 0}
                 onChange={(e) => setPercentages((v) => ({ ...v, chsc_inactive: Math.max(0, Number(e.target.value) || 0) }))}
                 className="w-full rounded-md border border-slate-700/60 bg-slate-900/70 px-3 py-2 text-xs text-slate-100"
               />
@@ -512,7 +562,7 @@ export default function CompanyDataCenterPage({ params }: Props) {
               <input
                 type="number"
                 min={0}
-                value={percentages.non_chsc}
+                value={percentages.non_chsc ?? 0}
                 onChange={(e) => setPercentages((v) => ({ ...v, non_chsc: Math.max(0, Number(e.target.value) || 0) }))}
                 className="w-full rounded-md border border-slate-700/60 bg-slate-900/70 px-3 py-2 text-xs text-slate-100"
               />
@@ -522,21 +572,38 @@ export default function CompanyDataCenterPage({ params }: Props) {
               <input
                 type="number"
                 min={0}
-                value={percentages.non_chsc_inactive}
+                value={percentages.non_chsc_inactive ?? 0}
                 onChange={(e) => setPercentages((v) => ({ ...v, non_chsc_inactive: Math.max(0, Number(e.target.value) || 0) }))}
                 className="w-full rounded-md border border-slate-700/60 bg-slate-900/70 px-3 py-2 text-xs text-slate-100"
               />
             </div>
-            <div className="space-y-1">
-              <label className="text-xs text-slate-300">Insurance %</label>
-              <input
-                type="number"
-                min={0}
-                value={percentages.insurance}
-                onChange={(e) => setPercentages((v) => ({ ...v, insurance: Math.max(0, Number(e.target.value) || 0) }))}
-                className="w-full rounded-md border border-slate-700/60 bg-slate-900/70 px-3 py-2 text-xs text-slate-100"
-              />
-            </div>
+            {insuranceCompanies.map((ic) => {
+              const key = `insurance:${ic.name}`;
+              return (
+                <div key={key} className="space-y-1">
+                  <label className="text-xs text-cyan-300">{ic.name} %</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={percentages[key] ?? 0}
+                    onChange={(e) => setPercentages((v) => ({ ...v, [key]: Math.max(0, Number(e.target.value) || 0) }))}
+                    className="w-full rounded-md border border-cyan-700/60 bg-slate-900/70 px-3 py-2 text-xs text-slate-100"
+                  />
+                </div>
+              );
+            })}
+            {insuranceCompanies.length === 0 && (
+              <div className="space-y-1">
+                <label className="text-xs text-slate-300">Insurance %</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={percentages.insurance ?? 0}
+                  onChange={(e) => setPercentages((v) => ({ ...v, insurance: Math.max(0, Number(e.target.value) || 0) }))}
+                  className="w-full rounded-md border border-slate-700/60 bg-slate-900/70 px-3 py-2 text-xs text-slate-100"
+                />
+              </div>
+            )}
           </div>
 
           <div className="mt-2 text-xs text-muted-foreground">
@@ -552,8 +619,12 @@ export default function CompanyDataCenterPage({ params }: Props) {
             <div className="mt-3 rounded-lg border border-emerald-700/50 bg-emerald-950/25 p-3 text-xs text-emerald-200">
               Assigned {assignResult.assigned} of {assignResult.requested} requested.
               {" "}CHSC Active {assignResult.assignedBySegment.chsc ?? 0}, CHSC Inactive {assignResult.assignedBySegment.chsc_inactive ?? 0},
-              {" "}Non-CHSC Active {assignResult.assignedBySegment.non_chsc ?? 0}, Non-CHSC Inactive {assignResult.assignedBySegment.non_chsc_inactive ?? 0},
-              {" "}Insurance {assignResult.assignedBySegment.insurance ?? 0}.
+              {" "}Non-CHSC Active {assignResult.assignedBySegment.non_chsc ?? 0}, Non-CHSC Inactive {assignResult.assignedBySegment.non_chsc_inactive ?? 0}
+              {Object.entries(assignResult.assignedBySegment)
+                .filter(([k]) => k.startsWith("insurance:"))
+                .map(([k, v]) => `, ${k.replace("insurance:", "")} ${v}`)
+                .join("")}
+              {assignResult.assignedBySegment.insurance != null ? `, Insurance ${assignResult.assignedBySegment.insurance}` : ""}.
             </div>
           ) : null}
         </div>

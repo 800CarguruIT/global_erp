@@ -795,10 +795,15 @@ async function createManualPoItemGrnMovement(args: {
   hasMovementPoColumn: boolean;
   hasMovementCreatedByColumn: boolean;
   receivedBy?: string | null;
+  warehouseLocationId?: string | null;
+  warehouseLocationCode?: string | null;
 }): Promise<void> {
   const sql = getSql();
   const qty = Number(args.quantity ?? 0);
   if (qty <= 0) return;
+
+  const locationCode = args.warehouseLocationCode ?? "MAIN";
+  const locationId = args.warehouseLocationId ?? null;
 
   const catalog =
     args.poItemPartCatalogId
@@ -815,6 +820,7 @@ async function createManualPoItemGrnMovement(args: {
       INSERT INTO inventory_movements (
         company_id,
         part_id,
+        location_id,
         location_code,
         direction,
         quantity,
@@ -827,7 +833,8 @@ async function createManualPoItemGrnMovement(args: {
       ) VALUES (
         ${args.companyId},
         ${catalog.id},
-        ${"MAIN"},
+        ${locationId},
+        ${locationCode},
         ${"in"},
         ${qty},
         ${"receipt"},
@@ -843,6 +850,7 @@ async function createManualPoItemGrnMovement(args: {
       INSERT INTO inventory_movements (
         company_id,
         part_id,
+        location_id,
         location_code,
         direction,
         quantity,
@@ -854,7 +862,8 @@ async function createManualPoItemGrnMovement(args: {
       ) VALUES (
         ${args.companyId},
         ${catalog.id},
-        ${"MAIN"},
+        ${locationId},
+        ${locationCode},
         ${"in"},
         ${qty},
         ${"receipt"},
@@ -869,6 +878,7 @@ async function createManualPoItemGrnMovement(args: {
       INSERT INTO inventory_movements (
         company_id,
         part_id,
+        location_id,
         location_code,
         direction,
         quantity,
@@ -880,7 +890,8 @@ async function createManualPoItemGrnMovement(args: {
       ) VALUES (
         ${args.companyId},
         ${catalog.id},
-        ${"MAIN"},
+        ${locationId},
+        ${locationCode},
         ${"in"},
         ${qty},
         ${"receipt"},
@@ -895,6 +906,7 @@ async function createManualPoItemGrnMovement(args: {
       INSERT INTO inventory_movements (
         company_id,
         part_id,
+        location_id,
         location_code,
         direction,
         quantity,
@@ -905,7 +917,8 @@ async function createManualPoItemGrnMovement(args: {
       ) VALUES (
         ${args.companyId},
         ${catalog.id},
-        ${"MAIN"},
+        ${locationId},
+        ${locationCode},
         ${"in"},
         ${qty},
         ${"receipt"},
@@ -1328,9 +1341,12 @@ export async function receivePoItems(
   companyId: string,
   poId: string,
   items: Array<{ itemId: string; quantity: number; action?: string }>,
-  userId?: string | null
+  userId?: string | null,
+  warehouseOpts?: { locationId?: string | null; locationCode?: string | null }
 ): Promise<{ po: PurchaseOrder; items: PurchaseOrderItem[]; grns: PurchaseOrderGrnEntry[] }> {
   const sql = getSql();
+  const whLocationId = warehouseOpts?.locationId ?? null;
+  const whLocationCode = warehouseOpts?.locationCode ?? "MAIN";
   const hasMovementPoColumn = await hasInventoryMovementPurchaseOrderIdColumn();
   const hasMovementCreatedByColumn = await hasInventoryMovementCreatedByColumn();
   const poMetaRows = await sql/* sql */ `
@@ -1429,6 +1445,9 @@ export async function receivePoItems(
           quantity: entry.quantity,
           costPerUnit: current.unitCost,
           purchaseOrderId: poId,
+          warehouseLocationId: whLocationId,
+          warehouseLocationCode: whLocationCode,
+          poNumber,
         } as any);
       } catch {
         // ignore inventory errors to not block PO receive
@@ -1451,24 +1470,36 @@ export async function receivePoItems(
         // ignore line-item sync errors to avoid blocking PO receive
       }
     }
-    const quoteIdToUpdate = current.quoteId
-      ? current.quoteId
-      : (
-          await sql/* sql */ `
-            SELECT id
-            FROM part_quotes
-            WHERE company_id = ${companyId}
-              AND (${resolvedLineItemId}::uuid IS NOT NULL AND line_item_id = ${resolvedLineItemId})
-            ORDER BY
-              CASE
-                WHEN ${poVendorId}::uuid IS NOT NULL AND vendor_id = ${poVendorId} THEN 0
-                WHEN vendor_id IS NULL THEN 1
-                ELSE 2
-              END,
-              updated_at DESC
-            LIMIT 1
-          `
-        )[0]?.id;
+    let quoteIdToUpdate = current.quoteId ?? null;
+    if (!quoteIdToUpdate && resolvedLineItemId) {
+      quoteIdToUpdate = (
+        await sql/* sql */ `
+          SELECT id FROM part_quotes
+          WHERE company_id = ${companyId} AND line_item_id = ${resolvedLineItemId}
+          ORDER BY CASE WHEN ${poVendorId}::uuid IS NOT NULL AND vendor_id = ${poVendorId} THEN 0 WHEN vendor_id IS NULL THEN 1 ELSE 2 END, updated_at DESC
+          LIMIT 1
+        `.catch(() => [])
+      )[0]?.id ?? null;
+    }
+    if (!quoteIdToUpdate && resolvedEstimateItemId) {
+      quoteIdToUpdate = (
+        await sql/* sql */ `
+          SELECT id FROM part_quotes
+          WHERE company_id = ${companyId} AND estimate_item_id = ${resolvedEstimateItemId}
+          ORDER BY CASE WHEN ${poVendorId}::uuid IS NOT NULL AND vendor_id = ${poVendorId} THEN 0 WHEN vendor_id IS NULL THEN 1 ELSE 2 END, updated_at DESC
+          LIMIT 1
+        `.catch(() => [])
+      )[0]?.id ?? null;
+    }
+    if (!quoteIdToUpdate && poVendorId) {
+      quoteIdToUpdate = (
+        await sql/* sql */ `
+          SELECT pq.id FROM part_quotes pq
+          WHERE pq.company_id = ${companyId} AND pq.vendor_id = ${poVendorId}
+          ORDER BY pq.updated_at DESC LIMIT 1
+        `.catch(() => [])
+      )[0]?.id ?? null;
+    }
     if (quoteIdToUpdate) {
       try {
         const nextQuoteStatus = status === "received" ? "Received" : status === "return" ? "Return" : "Ordered";
@@ -1520,6 +1551,9 @@ export async function receivePoItems(
         await receivePartsForInventoryRequestItem(companyId, current.inventoryRequestItemId, {
           quantity: entry.quantity,
           purchaseOrderId: poId,
+          warehouseLocationId: whLocationId,
+          warehouseLocationCode: whLocationCode,
+          poNumber,
         });
       } catch {
         // ignore inventory errors to not block PO receive
