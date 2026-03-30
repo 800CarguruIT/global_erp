@@ -6,17 +6,37 @@ import { AppLayout, EmployeeForm } from "@repo/ui";
 export default function CompanyEmployeeEditPage({
   params,
 }: {
-  params: { companyId: string; id: string };
+  params: Promise<{ companyId: string; id: string }>;
 }) {
+  const [companyId, setCompanyId] = useState<string>("");
+  const [employeeId, setEmployeeId] = useState<string>("");
   const [initial, setInitial] = useState<any | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let active = true;
+    async function unwrapParams() {
+      try {
+        const resolved = await params;
+        if (active) {
+          setCompanyId(resolved.companyId ?? "");
+          setEmployeeId(resolved.id ?? "");
+        }
+      } catch {
+        if (active) setError("Failed to resolve params");
+      }
+    }
+    unwrapParams();
+    return () => { active = false; };
+  }, [params]);
+
+  useEffect(() => {
+    if (!companyId || !employeeId) return;
     async function load() {
       setError(null);
       try {
         const res = await fetch(
-          `/api/hr/employees/${params.id}?scope=company&companyId=${params.companyId}`
+          `/api/hr/employees/${employeeId}?scope=company&companyId=${companyId}`
         );
         if (!res.ok) throw new Error("Failed to load employee");
         const data = await res.json();
@@ -79,7 +99,7 @@ export default function CompanyEmployeeEditPage({
       }
     }
     load();
-  }, [params.companyId, params.id]);
+  }, [companyId, employeeId]);
 
   return (
     <AppLayout>
@@ -89,7 +109,7 @@ export default function CompanyEmployeeEditPage({
           <button
             className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs sm:text-sm transition"
             onClick={() =>
-              (window.location.href = `/company/${params.companyId}/hr/employees`)
+              (window.location.href = `/company/${companyId}/hr/employees`)
             }
           >
             ← Back to Employees
@@ -99,7 +119,7 @@ export default function CompanyEmployeeEditPage({
         {initial ? (
           <EmployeeForm
             mode="edit"
-            scope={{ type: "company", companyId: params.companyId }}
+            scope={{ type: "company", companyId }}
             initialValues={initial}
           />
         ) : (

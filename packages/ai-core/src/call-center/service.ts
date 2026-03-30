@@ -9,9 +9,12 @@ import {
   listCallSessions,
   listCallRecordingsBySessionIds,
   updateCallSessionStatusByProviderCallId,
+  getAgentSummary as getAgentSummaryRepo,
 } from "./repository";
 import type {
   CallCenterDashboardFilter,
+  CallCenterAgentSummary,
+  CallCenterAgentSummaryFilter,
   CallSession,
   CallStatus,
   DialerWebhookUpdate,
@@ -178,4 +181,11 @@ export async function getDashboardData(filter: CallCenterDashboardFilter) {
 
 export async function listRecordingsForSessions(sessionIds: string[]) {
   return listCallRecordingsBySessionIds(sessionIds);
+}
+
+export async function getAgentSummary(
+  filter: CallCenterAgentSummaryFilter,
+  thresholds?: Record<string, number>
+): Promise<CallCenterAgentSummary> {
+  return getAgentSummaryRepo(filter, thresholds);
 }

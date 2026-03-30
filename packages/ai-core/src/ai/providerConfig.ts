@@ -25,14 +25,15 @@ function normalizeBaseUrl(baseUrl?: string | null): string | null {
 }
 
 export async function getCompanyAiProviderConfig(
-  companyId: string
+  companyId: string,
+  provider: string = "openai"
 ): Promise<CompanyAiProviderConfig | null> {
   const sql = getSql();
   const rows = await sql<CompanyAiProviderRow[]>`
     SELECT company_id, provider, base_url, api_key, is_active, updated_at
     FROM company_ai_provider_config
     WHERE company_id = ${companyId}
-      AND provider = 'openai'
+      AND provider = ${provider}
     LIMIT 1
   `;
   const row = rows[0];
@@ -47,13 +48,35 @@ export async function getCompanyAiProviderConfig(
   };
 }
 
+export async function getAllCompanyAiProviderConfigs(
+  companyId: string
+): Promise<CompanyAiProviderConfig[]> {
+  const sql = getSql();
+  const rows = await sql<CompanyAiProviderRow[]>`
+    SELECT company_id, provider, base_url, api_key, is_active, updated_at
+    FROM company_ai_provider_config
+    WHERE company_id = ${companyId}
+    ORDER BY provider
+  `;
+  return rows.map((row) => ({
+    companyId: row.company_id,
+    provider: row.provider,
+    baseUrl: row.base_url,
+    apiKey: row.api_key,
+    isActive: row.is_active,
+    updatedAt: row.updated_at,
+  }));
+}
+
 export async function upsertCompanyAiProviderConfig(input: {
   companyId: string;
+  provider?: string;
   baseUrl?: string | null;
   apiKey?: string | null;
   isActive?: boolean;
 }) {
   const sql = getSql();
+  const provider = input.provider ?? "openai";
   const hasBaseUrl = Object.prototype.hasOwnProperty.call(input, "baseUrl");
   const hasApiKey = Object.prototype.hasOwnProperty.call(input, "apiKey");
   const normalizedBaseUrl = hasBaseUrl ? normalizeBaseUrl(input.baseUrl) : undefined;
@@ -64,12 +87,12 @@ export async function upsertCompanyAiProviderConfig(input: {
     INSERT INTO company_ai_provider_config (company_id, provider, base_url, api_key, is_active)
     VALUES (
       ${input.companyId},
-      'openai',
+      ${provider},
       ${normalizedBaseUrl ?? null},
       ${normalizedApiKey ?? null},
       ${isActive}
     )
-    ON CONFLICT (company_id) DO UPDATE
+    ON CONFLICT (company_id, provider) DO UPDATE
     SET
       base_url = CASE
         WHEN ${hasBaseUrl}::boolean THEN ${normalizedBaseUrl ?? null}
@@ -83,15 +106,15 @@ export async function upsertCompanyAiProviderConfig(input: {
       updated_at = now()
   `;
 
-  return getCompanyAiProviderConfig(input.companyId);
+  return getCompanyAiProviderConfig(input.companyId, provider);
 }
 
-export async function clearCompanyAiProviderConfig(companyId: string) {
+export async function clearCompanyAiProviderConfig(companyId: string, provider: string = "openai") {
   const sql = getSql();
   await sql`
     DELETE FROM company_ai_provider_config
     WHERE company_id = ${companyId}
-      AND provider = 'openai'
+      AND provider = ${provider}
   `;
 }
 

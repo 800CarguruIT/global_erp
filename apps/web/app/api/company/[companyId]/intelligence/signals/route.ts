@@ -13,7 +13,7 @@ function parseDate(value: string | null): Date | null {
 function parseEngineKeys(raw: string | null): EngineKey[] {
   if (!raw) return [...Intelligence.ALL_ENGINE_KEYS];
   const parts = raw.split(",").map((s) => s.trim()) as EngineKey[];
-  const valid: EngineKey[] = ["e1", "e2", "e3", "e4", "e5", "e6", "e7"];
+  const valid: EngineKey[] = ["e1", "e2", "e3", "e4", "e5", "e6", "e7", "e8"];
   return parts.filter((k): k is EngineKey => valid.includes(k));
 }
 

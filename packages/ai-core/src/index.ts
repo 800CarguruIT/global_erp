@@ -118,6 +118,7 @@ export type { EngineKey, EngineResult, Signal, EngineConfig } from "./intelligen
 export { canUseAi } from "./ai/policy";
 export {
   clearCompanyAiProviderConfig,
+  getAllCompanyAiProviderConfigs,
   getCompanyAiProviderConfig,
   maskApiKey,
   upsertCompanyAiProviderConfig,
@@ -126,3 +127,5 @@ export * as Files from "./files/repository";
 export type { FileKind, FileRecord } from "./files/types";
 export * as MasterDashboard from "./master-dashboard/service";
 export type { MasterDashboardData, MasterDashboardFilter } from "./master-dashboard/types";
+export * as Pis from "./pis/service";
+export type { PisFilter, PisMasterData, AdvisorScore, PisConfig } from "./pis/types";

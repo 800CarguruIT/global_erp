@@ -41,10 +41,20 @@ State best approach per invoice bucket (critical/warning/watch).`,
   e7: `Engine: Coaching Intelligence.
 Identify agents with persistent underperformance vs company average.
 Generate specific coaching plans: focus area, method, expected improvement, checkpoint date.`,
+  e8: `Engine: Sales Center Performance Intelligence.
+Analyze per-agent call center metrics: held rate (answer rate), CHSC conversion, collection, appointments.
+Focus areas:
+- Agents whose held rate is significantly below company average (use alert_held_rate_gap_pp threshold).
+- CHSC conversion imbalances — agents below the target_chsc_loyalty_pct.
+- Agents with high call volume but zero appointments (opportunity gap).
+- Top performers to recognise and share best practices from.
+- Collection-per-call outliers (both above and below average).
+- Compare inhouse agents vs remote agents using the inhouse_summary and remote_summary data. Flag significant gaps in held rate, call volume, or agent count between the two groups. If one group outperforms the other, recommend specific actions to close the gap.
+Generate coaching actions with specific metric targets and deadlines.`,
 };
 
 const DEFAULT_PROMPTS: Record<EngineKey, string> = Object.fromEntries(
-  (["e1", "e2", "e3", "e4", "e5", "e6", "e7"] as EngineKey[]).map((key) => [
+  (["e1", "e2", "e3", "e4", "e5", "e6", "e7", "e8"] as EngineKey[]).map((key) => [
     key,
     `${BASE_SYSTEM}\n\n${ENGINE_ADDITIONS[key]}`,
   ])

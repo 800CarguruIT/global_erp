@@ -793,5 +793,82 @@ export async function getMasterDashboardData(
     overallConversionRate: pct(Number(leads.booked), Number(calls.total) || 1),
   };
 
-  return { period: { from, to }, topKpis, inbound, outbound, portfolio, funnel };
+  // ── Inhouse vs Remote metrics (by users.dialer_location) ────────────────
+
+  const [locationCallsRes, locationTrendRes] = await Promise.all([
+    sql<{
+      location: string;
+      total: number;
+      completed: number;
+      duration: number;
+      agent_count: number;
+    }[]>`
+      SELECT
+        COALESCE(u.dialer_location, 'inhouse') AS location,
+        COUNT(cs.id)::int AS total,
+        COUNT(cs.id) FILTER (WHERE cs.status = 'completed' AND cs.duration_seconds > 0)::int AS completed,
+        COALESCE(SUM(cs.duration_seconds) FILTER (WHERE cs.status = 'completed' AND cs.duration_seconds > 0), 0)::int AS duration,
+        COUNT(DISTINCT COALESCE(u.id::text, cs.to_number))::int AS agent_count
+      FROM call_sessions cs
+      LEFT JOIN users u ON (u.mobile = cs.to_number OR u.id = cs.created_by_user_id) AND u.company_id = ${companyId}
+      WHERE cs.company_id = ${companyId}
+        AND cs.created_at BETWEEN ${from} AND ${to}
+      GROUP BY COALESCE(u.dialer_location, 'inhouse')
+    `,
+    sql<{ day: string; location: string; calls: number; bookings: number }[]>`
+      SELECT
+        TO_CHAR(DATE_TRUNC('day', cs.created_at), 'YYYY-MM-DD') AS day,
+        COALESCE(u.dialer_location, 'inhouse') AS location,
+        COUNT(cs.id)::int AS calls,
+        0::int AS bookings
+      FROM call_sessions cs
+      LEFT JOIN users u ON (u.mobile = cs.to_number OR u.id = cs.created_by_user_id) AND u.company_id = ${companyId}
+      WHERE cs.company_id = ${companyId}
+        AND cs.created_at BETWEEN ${from} AND ${to}
+      GROUP BY DATE_TRUNC('day', cs.created_at), COALESCE(u.dialer_location, 'inhouse')
+      ORDER BY day
+    `,
+  ]);
+
+  const locationCalls = rowsFrom(locationCallsRes);
+  const locationTrend = rowsFrom(locationTrendRes);
+
+  function buildLocationMetrics(loc: string): import("./types").TeamLocationMetrics {
+    const c = locationCalls.find((r) => r.location === loc) ?? { total: 0, completed: 0, duration: 0, agent_count: 0 };
+    const total = Number(c.total);
+    const completed = Number(c.completed);
+    const dur = Number(c.duration);
+    const locAnswerRate = pct(completed, total);
+    const locScore = Math.round(locAnswerRate * 0.5 + (completed > 0 ? Math.min(100, (dur / completed / 60) * 10) : 0) * 0.5);
+
+    const trend: DailyDataPoint[] = locationTrend
+      .filter((r) => r.location === loc)
+      .map((r) => ({ date: r.day, calls: Number(r.calls), bookings: 0, revenue: 0 }));
+
+    return {
+      totalCalls: total,
+      answerRate: locAnswerRate,
+      avgHandlingTimeSecs: completed > 0 ? Math.round(dur / completed) : 0,
+      avgResponseTimeSecs: 0,
+      bookingsCreated: 0,
+      totalCollection: 0,
+      agentCount: Number(c.agent_count),
+      abandonmentRate: pct(total - completed, total),
+      repeatCallRate: 0,
+      trend,
+      teamStats: {
+        totalCalls: total,
+        answerRate: locAnswerRate,
+        bookings: 0,
+        conversionRate: 0,
+        score: locScore,
+        grade: gradeFromScore(locScore),
+      },
+    };
+  }
+
+  const inhouseMetrics = buildLocationMetrics("inhouse");
+  const remoteMetrics = buildLocationMetrics("remote");
+
+  return { period: { from, to }, topKpis, inbound, outbound, inhouse: inhouseMetrics, remote: remoteMetrics, portfolio, funnel };
 }

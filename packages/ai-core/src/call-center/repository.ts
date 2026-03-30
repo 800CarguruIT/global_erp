@@ -11,6 +11,11 @@ import type {
   CallStatus,
   ListCallsFilter,
   StartOutboundCallInput,
+  CallCenterAgentSummary,
+  CallCenterAgentSummaryFilter,
+  CallCenterAgentSummaryRow,
+  CallCenterAgentSummaryTotals,
+  PerformanceBadge,
 } from "./types";
 
 type CallSessionRow = {
@@ -557,4 +562,235 @@ export async function listCallRecordingsBySessionIds(
     url: row.url,
     durationSeconds: row.duration_seconds,
   }));
+}
+
+// ─── Agent Performance Summary ───────────────────────────────────────────────
+
+const DEFAULT_THRESHOLDS = {
+  badge_excellent_min: 85,
+  badge_good_min: 70,
+  badge_average_min: 50,
+  weight_held_rate: 40,
+  weight_chsc_conversion: 25,
+  weight_revenue_per_call: 20,
+  weight_appointments: 15,
+};
+
+function computeBadge(score: number, thresholds: typeof DEFAULT_THRESHOLDS): PerformanceBadge {
+  if (score >= thresholds.badge_excellent_min) return "Excellent";
+  if (score >= thresholds.badge_good_min) return "Good";
+  if (score >= thresholds.badge_average_min) return "Average";
+  return "Needs Improvement";
+}
+
+function buildTotals(agents: CallCenterAgentSummaryRow[]): CallCenterAgentSummaryTotals {
+  const totalCalls = agents.reduce((s, a) => s + a.totalCalls, 0);
+  const heldCalls = agents.reduce((s, a) => s + a.heldCalls, 0);
+  const totalDur = agents.reduce((s, a) => s + a.avgDurationSeconds * a.heldCalls, 0);
+  const totalCollection = agents.reduce((s, a) => s + a.totalCollection, 0);
+  const totalAppts = agents.reduce((s, a) => s + a.todayAppts + a.tomorrowAppts, 0);
+  const totalChscSold = agents.reduce((s, a) => s + a.chscSold, 0);
+  const totalChscCarIn = agents.reduce((s, a) => s + a.chscCarIn, 0);
+  return {
+    totalCalls,
+    heldCalls,
+    heldRatePct: totalCalls > 0 ? Math.round((heldCalls / totalCalls) * 100) : 0,
+    avgDurationSeconds: heldCalls > 0 ? Math.round(totalDur / heldCalls) : 0,
+    totalCollection,
+    totalAppts,
+    chscConversionPct: totalChscCarIn > 0 ? Math.round((totalChscSold / totalChscCarIn) * 100) : 0,
+  };
+}
+
+export async function getAgentSummary(
+  filter: CallCenterAgentSummaryFilter,
+  thresholds?: Partial<typeof DEFAULT_THRESHOLDS>
+): Promise<CallCenterAgentSummary> {
+  const sql = getSql();
+  const { companyId, from, to } = filter;
+  const t = { ...DEFAULT_THRESHOLDS, ...thresholds };
+
+  // Yesterday window for delta comparison
+  const dayMs = 24 * 60 * 60 * 1000;
+  const yesterdayFrom = new Date(from.getTime() - dayMs);
+  const yesterdayTo = new Date(to.getTime() - dayMs);
+
+  const [callMetrics, crmMetrics, yesterdayCallMetrics, yesterdayCrm] = await Promise.all([
+    // Q1: Per-agent call metrics (group by extension/to_number)
+    sql<{
+      user_id: string;
+      agent_name: string;
+      total_calls: number;
+      held_calls: number;
+      avg_duration: number | null;
+    }[]>`
+      SELECT
+        COALESCE(u.id::text, cs.to_number) AS user_id,
+        COALESCE(u.full_name, e.full_name, u.email, 'Ext ' || cs.to_number) AS agent_name,
+        COUNT(cs.id)::int AS total_calls,
+        COUNT(cs.id) FILTER (WHERE cs.status = 'completed' AND cs.duration_seconds > 0)::int AS held_calls,
+        AVG(cs.duration_seconds) FILTER (WHERE cs.status = 'completed' AND cs.duration_seconds > 0) AS avg_duration
+      FROM call_sessions cs
+      LEFT JOIN users u ON u.mobile = cs.to_number AND u.company_id = ${companyId}
+      LEFT JOIN employees e ON e.id = u.employee_id
+      WHERE cs.company_id = ${companyId}
+        AND cs.created_at >= ${from} AND cs.created_at < ${to}
+      GROUP BY COALESCE(u.id::text, cs.to_number), COALESCE(u.full_name, e.full_name, u.email, 'Ext ' || cs.to_number)
+    `,
+
+    // Q2: Per-agent CRM metrics (CHSC, appointments, collection)
+    sql<{
+      user_id: string;
+      chsc_sold: number;
+      chsc_car_in: number;
+      non_chsc_car_in: number;
+      today_appts: number;
+      tomorrow_appts: number;
+      total_collection: number;
+    }[]>`
+      SELECT
+        COALESCE(l.lead_owner_user_id, l.created_by_user_id) AS user_id,
+        COUNT(DISTINCT l.id) FILTER (
+          WHERE l.lead_status = 'closed_won'
+            AND UPPER(TRIM(COALESCE(c.customer_type, ''))) = 'CHSC'
+        )::int AS chsc_sold,
+        COUNT(DISTINCT l.id) FILTER (
+          WHERE UPPER(TRIM(COALESCE(c.customer_type, ''))) = 'CHSC'
+        )::int AS chsc_car_in,
+        COUNT(DISTINCT l.id) FILTER (
+          WHERE UPPER(TRIM(COALESCE(c.customer_type, ''))) <> 'CHSC'
+        )::int AS non_chsc_car_in,
+        COUNT(DISTINCT lb.id) FILTER (
+          WHERE lb.scheduled_at::date = CURRENT_DATE AND lb.status = 'active'
+        )::int AS today_appts,
+        COUNT(DISTINCT lb.id) FILTER (
+          WHERE lb.scheduled_at::date = CURRENT_DATE + 1 AND lb.status = 'active'
+        )::int AS tomorrow_appts,
+        0::numeric AS total_collection
+      FROM leads l
+      LEFT JOIN customers c ON c.id = l.customer_id
+      LEFT JOIN lead_bookings lb ON lb.lead_id = l.id AND lb.company_id = ${companyId}
+      WHERE l.company_id = ${companyId}
+        AND COALESCE(l.lead_owner_user_id, l.created_by_user_id) IS NOT NULL
+        AND l.created_at >= ${from} AND l.created_at < ${to}
+      GROUP BY COALESCE(l.lead_owner_user_id, l.created_by_user_id)
+    `,
+
+    // Q3: Yesterday call totals
+    sql<{ total_calls: number; held_calls: number; avg_duration: number | null }[]>`
+      SELECT
+        COUNT(*)::int AS total_calls,
+        COUNT(*) FILTER (WHERE status = 'completed' AND duration_seconds > 0)::int AS held_calls,
+        AVG(duration_seconds) FILTER (WHERE status = 'completed' AND duration_seconds > 0) AS avg_duration
+      FROM call_sessions
+      WHERE company_id = ${companyId}
+        AND created_at >= ${yesterdayFrom} AND created_at < ${yesterdayTo}
+    `,
+
+    // Q4: Yesterday CRM totals
+    sql<{ total_collection: number; total_appts: number; chsc_sold: number; chsc_car_in: number }[]>`
+      SELECT
+        0::numeric AS total_collection,
+        COUNT(DISTINCT lb.id) FILTER (WHERE lb.status = 'active')::int AS total_appts,
+        COUNT(DISTINCT l.id) FILTER (
+          WHERE l.lead_status = 'closed_won'
+            AND UPPER(TRIM(COALESCE(c.customer_type, ''))) = 'CHSC'
+        )::int AS chsc_sold,
+        COUNT(DISTINCT l.id) FILTER (
+          WHERE UPPER(TRIM(COALESCE(c.customer_type, ''))) = 'CHSC'
+        )::int AS chsc_car_in
+      FROM leads l
+      LEFT JOIN customers c ON c.id = l.customer_id
+      LEFT JOIN lead_bookings lb ON lb.lead_id = l.id AND lb.company_id = ${companyId}
+      WHERE l.company_id = ${companyId}
+        AND l.created_at >= ${yesterdayFrom} AND l.created_at < ${yesterdayTo}
+    `,
+  ]);
+
+  // Merge call + CRM metrics per agent
+  const crmMap = new Map(crmMetrics.map((r) => [r.user_id, r]));
+
+  // Find max values for normalization
+  const maxCollection = Math.max(...callMetrics.map((a) => Number(crmMap.get(a.user_id)?.total_collection ?? 0)), 1);
+  const maxAppts = Math.max(...callMetrics.map((a) => {
+    const crm = crmMap.get(a.user_id);
+    return (crm?.today_appts ?? 0) + (crm?.tomorrow_appts ?? 0);
+  }), 1);
+
+  const agents: CallCenterAgentSummaryRow[] = callMetrics.map((cm) => {
+    const crm = crmMap.get(cm.user_id);
+    const totalCalls = Number(cm.total_calls);
+    const heldCalls = Number(cm.held_calls);
+    const heldRatePct = totalCalls > 0 ? Math.round((heldCalls / totalCalls) * 100) : 0;
+    const missRatePct = 100 - heldRatePct;
+    const avgDur = cm.avg_duration != null ? Math.round(Number(cm.avg_duration)) : 0;
+    const chscSold = Number(crm?.chsc_sold ?? 0);
+    const chscCarIn = Number(crm?.chsc_car_in ?? 0);
+    const chscConvPct = chscCarIn > 0 ? Math.round((chscSold / chscCarIn) * 100) : 0;
+    const nonChscCarIn = Number(crm?.non_chsc_car_in ?? 0);
+    const todayAppts = Number(crm?.today_appts ?? 0);
+    const tomorrowAppts = Number(crm?.tomorrow_appts ?? 0);
+    const totalCollection = Number(crm?.total_collection ?? 0);
+    const revenuePerCall = totalCalls > 0 ? Math.round(totalCollection / totalCalls) : 0;
+
+    // Weighted performance score (0-100)
+    const normRevPerCall = maxCollection > 0 ? (totalCollection / maxCollection) * 100 : 0;
+    const normAppts = maxAppts > 0 ? ((todayAppts + tomorrowAppts) / maxAppts) * 100 : 0;
+    const score = Math.round(
+      (heldRatePct * t.weight_held_rate +
+        chscConvPct * t.weight_chsc_conversion +
+        normRevPerCall * t.weight_revenue_per_call +
+        normAppts * t.weight_appointments) / 100
+    );
+
+    return {
+      userId: cm.user_id,
+      agentName: cm.agent_name,
+      totalCalls,
+      heldCalls,
+      heldRatePct,
+      missRatePct,
+      avgDurationSeconds: avgDur,
+      chscSold,
+      chscCarIn,
+      chscConversionPct: chscConvPct,
+      nonChscCarIn,
+      todayAppts,
+      tomorrowAppts,
+      totalCollection,
+      revenuePerCall,
+      performanceScore: score,
+      performanceBadge: computeBadge(score, t),
+    };
+  });
+
+  // Sort by score descending
+  agents.sort((a, b) => b.performanceScore - a.performanceScore);
+
+  const totals = buildTotals(agents);
+
+  // Yesterday totals
+  const yc = yesterdayCallMetrics[0];
+  const yCrm = yesterdayCrm[0];
+  const yesterday: CallCenterAgentSummaryTotals = {
+    totalCalls: Number(yc?.total_calls ?? 0),
+    heldCalls: Number(yc?.held_calls ?? 0),
+    heldRatePct: yc && Number(yc.total_calls) > 0
+      ? Math.round((Number(yc.held_calls) / Number(yc.total_calls)) * 100)
+      : 0,
+    avgDurationSeconds: yc?.avg_duration != null ? Math.round(Number(yc.avg_duration)) : 0,
+    totalCollection: Number(yCrm?.total_collection ?? 0),
+    totalAppts: Number(yCrm?.total_appts ?? 0),
+    chscConversionPct: Number(yCrm?.chsc_car_in ?? 0) > 0
+      ? Math.round((Number(yCrm?.chsc_sold ?? 0) / Number(yCrm.chsc_car_in)) * 100)
+      : 0,
+  };
+
+  return {
+    from: from.toISOString(),
+    to: to.toISOString(),
+    agents,
+    totals,
+    yesterday,
+  };
 }

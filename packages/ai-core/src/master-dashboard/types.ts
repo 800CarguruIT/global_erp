@@ -67,6 +67,20 @@ export interface OutboundMetrics {
   teamStats: TeamStats;
 }
 
+export interface TeamLocationMetrics {
+  totalCalls: number;
+  answerRate: number;
+  avgHandlingTimeSecs: number;
+  avgResponseTimeSecs: number;
+  bookingsCreated: number;
+  totalCollection: number;
+  agentCount: number;
+  abandonmentRate: number;
+  repeatCallRate: number;
+  trend: DailyDataPoint[];
+  teamStats: TeamStats;
+}
+
 export interface RevenueBreakdownItem {
   label: string;
   value: number;
@@ -111,6 +125,8 @@ export interface MasterDashboardData {
   topKpis: TopKpis;
   inbound: InboundMetrics;
   outbound: OutboundMetrics;
+  inhouse: TeamLocationMetrics;
+  remote: TeamLocationMetrics;
   portfolio: PortfolioMetrics;
   funnel: ConversionFunnel;
 }

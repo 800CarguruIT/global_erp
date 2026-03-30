@@ -1,7 +1,8 @@
 export type NavScope = "global" | "company" | "branch" | "vendor";
 export type NavCategory =
   | "Main"
-  | "Call Center"
+  | "Sales Center"
+  | "Service Center"
   | "Leads"
   | "Sales"
   | "Jobs"
@@ -64,6 +65,7 @@ export const SIDEBAR_CONFIG: Record<NavScope, Partial<Record<NavCategory, Sideba
       { label: "AI Config", href: "/company/[companyId]/settings/ai/config", permissionKeys: ["ai.config.view"] },
       { label: "AI Inquiries", href: "/company/[companyId]/settings/ai/inquiries", permissionKeys: ["ai.inquiries.view"] },
       { label: "AI Intelligence", href: "/company/[companyId]/settings/ai/intelligence", permissionKeys: ["ai.config.view"] },
+      { label: "Performance Thresholds", href: "/company/[companyId]/settings/call-center/performance", permissionKeys: ["ai.config.view"] },
       { labelKey: "global.nav.finance", href: "/company/[companyId]/accounting", permissionKeys: ["accounting.view", "accounting.post", "accounting.manage_chart"] },
       { label: "Inventory", href: "/company/[companyId]/inventory", permissionKeys: ["inventory.view", "inventory.create"] },
       { label: "Procurement", href: "/company/[companyId]/procurement", permissionKeys: ["procurement.view", "procurement.create"] },
@@ -81,15 +83,29 @@ export const SIDEBAR_CONFIG: Record<NavScope, Partial<Record<NavCategory, Sideba
       { label: "Inspections", href: "/company/[companyId]/inspections", permissionKeys: ["inspections.view", "inspections.create"] },
       { label: "Cars", href: "/company/[companyId]/cars", permissionKeys: ["fleet.cars.view"] },
     ],
-    "Call Center": [
-      { labelKey: "global.nav.callCenter", href: "/company/[companyId]/call-center", permissionKeys: ["callcenter.view"] },
-      { label: "Dashboard", href: "/company/[companyId]/call-center/dashboard", permissionKeys: ["callcenter.dashboard.view"] },
-      { label: "Outbound Dialer", href: "/company/[companyId]/call-center/outbound", permissionKeys: ["callcenter.outbound.view"] },
+    "Sales Center": [
       { label: "Call history", href: "/company/[companyId]/call-center/history", permissionKeys: ["callcenter.history.view"] },
       { label: "Customers List", href: "/company/[companyId]/call-center/customers-list", permissionKeys: ["callcenter.customers.view"] },
       { label: "Data Center", href: "/company/[companyId]/data-center", permissionKeys: ["callcenter.datacenter.view"] },
       { label: "User Extensions", href: "/company/[companyId]/integrations/dialer/extensions", permissionKeys: ["callcenter.extensions.view"] },
       { label: "Master Performance", href: "/company/[companyId]/master-dashboard", permissionKeys: ["callcenter.master_performance.view"] },
+      { label: "Performance Summary", href: "/company/[companyId]/call-center/performance", permissionKeys: ["callcenter.view"] },
+      { label: "Agent Dashboard", href: "/company/[companyId]/call-center/agent-dashboard", permissionKeys: ["callcenter.view"] },
+    ],
+    "Service Center": [
+      { label: "Master", href: "/company/[companyId]/pis/master", permissionKeys: ["pis.dashboard.view"] },
+      { label: "Advisors", href: "/company/[companyId]/pis/advisors", permissionKeys: ["pis.advisors.view"] },
+      { label: "Lead Distribution", href: "/company/[companyId]/pis/lead-distribution", permissionKeys: ["pis.lead_distribution.view"] },
+      { label: "Funnel", href: "/company/[companyId]/pis/funnel", permissionKeys: ["pis.funnel.view"] },
+      { label: "Estimates", href: "/company/[companyId]/pis/estimates", permissionKeys: ["pis.estimates.view"] },
+      { label: "WIP", href: "/company/[companyId]/pis/wip", permissionKeys: ["pis.wip.view"] },
+      { label: "Collections", href: "/company/[companyId]/pis/collections", permissionKeys: ["pis.collections.view"] },
+      { label: "AI Engines", href: "/company/[companyId]/pis/engines", permissionKeys: ["pis.engines.view"] },
+      { label: "Signals", href: "/company/[companyId]/pis/signals", permissionKeys: ["pis.signals.view"] },
+      { label: "Admin", href: "/company/[companyId]/pis/admin", permissionKeys: ["pis.admin.manage"] },
+      { label: "Advisor Extensions", href: "/company/[companyId]/pis/extensions", permissionKeys: ["pis.advisors.view"] },
+      { label: "Calls History", href: "/company/[companyId]/pis/calls", permissionKeys: ["pis.dashboard.view"] },
+      { label: "Advisor Portal", href: "/company/[companyId]/pis/advisor-portal", permissionKeys: ["pis.lead_distribution.view"] },
     ],
     Jobs: [
       { label: "RSA", href: "/company/[companyId]/jobs/rsa", moduleKey: "jobs", permissionKeys: ["jobs.view", "jobs.rsa.view"] },
@@ -156,10 +172,9 @@ export const HOME_PAGE_OPTIONS: Record<NavScope, { label: string; href: string }
   ],
   company: [
     { label: "Company Overview", href: "/company/[companyId]" },
-    { label: "Call Center", href: "/company/[companyId]/call-center" },
-    { label: "Call Center Dashboard", href: "/company/[companyId]/call-center/dashboard" },
+    { label: "Agent Dashboard", href: "/company/[companyId]/call-center/agent-dashboard" },
+    { label: "Performance Summary", href: "/company/[companyId]/call-center/performance" },
     { label: "Master Performance", href: "/company/[companyId]/master-dashboard" },
-    { label: "Outbound Dialer", href: "/company/[companyId]/call-center/outbound" },
     { label: "Leads", href: "/company/[companyId]/leads" },
     { label: "Jobs", href: "/company/[companyId]/jobs" },
     { label: "Workshop Jobs", href: "/company/[companyId]/jobs/workshop" },
@@ -169,6 +184,7 @@ export const HOME_PAGE_OPTIONS: Record<NavScope, { label: string; href: string }
     { label: "Inventory", href: "/company/[companyId]/inventory" },
     { label: "HR", href: "/company/[companyId]/hr" },
     { label: "Branches", href: "/company/[companyId]/branches" },
+    { label: "PIS Dashboard", href: "/company/[companyId]/pis" },
   ],
   branch: [
     { label: "Branch Dashboard", href: "/company/[companyId]/branches/[branchId]" },
@@ -243,18 +259,37 @@ export const SIDEBAR_TREE: Partial<Record<NavScope, SidebarItem[]>> = {
       ],
     },
     {
-      label: "Call Center",
-      href: "/company/[companyId]/call-center",
-      permissionKeys: ["callcenter.view", "callcenter.dashboard.view", "callcenter.outbound.view", "callcenter.history.view", "callcenter.customers.view", "callcenter.datacenter.view", "callcenter.extensions.view", "callcenter.master_performance.view"],
+      label: "Sales Center",
+      href: "/company/[companyId]/call-center/history",
+      permissionKeys: ["callcenter.history.view", "callcenter.customers.view", "callcenter.datacenter.view", "callcenter.extensions.view", "callcenter.master_performance.view", "callcenter.performance.view", "callcenter.agent_dashboard.view"],
       children: [
-        { label: "Overview", href: "/company/[companyId]/call-center", exactMatch: true, permissionKeys: ["callcenter.view"] },
-        { label: "Dashboard", href: "/company/[companyId]/call-center/dashboard", permissionKeys: ["callcenter.dashboard.view"] },
-        { label: "Outbound Dialer", href: "/company/[companyId]/call-center/outbound", permissionKeys: ["callcenter.outbound.view"] },
         { label: "History", href: "/company/[companyId]/call-center/history", permissionKeys: ["callcenter.history.view"] },
         { label: "Customers List", href: "/company/[companyId]/call-center/customers-list", permissionKeys: ["callcenter.customers.view"] },
         { label: "Data Center", href: "/company/[companyId]/data-center", permissionKeys: ["callcenter.datacenter.view"] },
         { label: "User Extensions", href: "/company/[companyId]/integrations/dialer/extensions", permissionKeys: ["callcenter.extensions.view"] },
         { label: "Master Performance", href: "/company/[companyId]/master-dashboard", permissionKeys: ["callcenter.master_performance.view"] },
+        { label: "Performance Summary", href: "/company/[companyId]/call-center/performance", permissionKeys: ["callcenter.view"] },
+        { label: "Agent Dashboard", href: "/company/[companyId]/call-center/agent-dashboard", permissionKeys: ["callcenter.view"] },
+      ],
+    },
+    {
+      label: "Service Center",
+      href: "/company/[companyId]/pis",
+      permissionKeys: ["pis.dashboard.view"],
+      children: [
+        { label: "Master", href: "/company/[companyId]/pis/master", permissionKeys: ["pis.dashboard.view"] },
+        { label: "Advisors", href: "/company/[companyId]/pis/advisors", permissionKeys: ["pis.advisors.view"] },
+        { label: "Lead Distribution", href: "/company/[companyId]/pis/lead-distribution", permissionKeys: ["pis.lead_distribution.view"] },
+        { label: "Funnel", href: "/company/[companyId]/pis/funnel", permissionKeys: ["pis.funnel.view"] },
+        { label: "Estimates", href: "/company/[companyId]/pis/estimates", permissionKeys: ["pis.estimates.view"] },
+        { label: "WIP", href: "/company/[companyId]/pis/wip", permissionKeys: ["pis.wip.view"] },
+        { label: "Collections", href: "/company/[companyId]/pis/collections", permissionKeys: ["pis.collections.view"] },
+        { label: "AI Engines", href: "/company/[companyId]/pis/engines", permissionKeys: ["pis.engines.view"] },
+        { label: "Signals", href: "/company/[companyId]/pis/signals", permissionKeys: ["pis.signals.view"] },
+        { label: "Admin", href: "/company/[companyId]/pis/admin", permissionKeys: ["pis.admin.manage"] },
+        { label: "Advisor Extensions", href: "/company/[companyId]/pis/extensions", permissionKeys: ["pis.advisors.view"] },
+        { label: "Calls History", href: "/company/[companyId]/pis/calls", permissionKeys: ["pis.dashboard.view"] },
+        { label: "Advisor Portal", href: "/company/[companyId]/pis/advisor-portal", permissionKeys: ["pis.lead_distribution.view"] },
       ],
     },
     {

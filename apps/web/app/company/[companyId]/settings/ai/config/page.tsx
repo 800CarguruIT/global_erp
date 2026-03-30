@@ -90,6 +90,13 @@ export default function CompanyAiConfigPage({ params }: Params) {
   const [baseUrl, setBaseUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [isActive, setIsActive] = useState(true);
+
+  // Anthropic provider state
+  const [anthropicExistingMask, setAnthropicExistingMask] = useState<string | null>(null);
+  const [anthropicApiKey, setAnthropicApiKey] = useState("");
+  const [anthropicIsActive, setAnthropicIsActive] = useState(true);
+  const [anthropicSaving, setAnthropicSaving] = useState(false);
+
   const [sdkServerUrl, setSdkServerUrl] = useState("");
   const [sdkDefaultExtension, setSdkDefaultExtension] = useState("");
   const [sdkSaving, setSdkSaving] = useState(false);
@@ -137,10 +144,25 @@ export default function CompanyAiConfigPage({ params }: Params) {
       if (cancelled) return;
 
       if (providerRes.status === "fulfilled" && providerRes.value.ok) {
-        const json: CompanyAiProviderResponse = await providerRes.value.json();
-        setIsActive(Boolean(json.isActive));
-        setBaseUrl(json.baseUrl ?? "");
-        setExistingMask(json.apiKeyMasked ?? null);
+        const json = await providerRes.value.json();
+        // Support new multi-provider format or legacy single-provider
+        if (json.providers) {
+          const openai = json.providers.find((p: any) => p.provider === "openai");
+          const anthropic = json.providers.find((p: any) => p.provider === "anthropic");
+          if (openai) {
+            setIsActive(Boolean(openai.isActive));
+            setBaseUrl(openai.baseUrl ?? "");
+            setExistingMask(openai.apiKeyMasked ?? null);
+          }
+          if (anthropic) {
+            setAnthropicIsActive(Boolean(anthropic.isActive));
+            setAnthropicExistingMask(anthropic.apiKeyMasked ?? null);
+          }
+        } else {
+          setIsActive(Boolean(json.isActive));
+          setBaseUrl(json.baseUrl ?? "");
+          setExistingMask(json.apiKeyMasked ?? null);
+        }
       } else {
         setError("Failed to load company AI provider config");
       }
@@ -300,6 +322,36 @@ export default function CompanyAiConfigPage({ params }: Params) {
       setError(err?.message ?? "Failed to clear company AI provider config");
     } finally {
       setClearing(false);
+    }
+  }
+
+  async function onSaveAnthropicProvider(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!companyId) return;
+    setAnthropicSaving(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const payload: Record<string, unknown> = {
+        provider: "anthropic",
+        isActive: anthropicIsActive,
+      };
+      if (anthropicApiKey.trim()) payload.apiKey = anthropicApiKey.trim();
+
+      const res = await fetch(`/api/company/${companyId}/ai/provider`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error("Failed to save Anthropic provider config");
+      const json = await res.json();
+      setAnthropicExistingMask(json.apiKeyMasked ?? null);
+      setAnthropicApiKey("");
+      setSuccess("Anthropic provider saved successfully.");
+    } catch (err: any) {
+      setError(err?.message ?? "Failed to save Anthropic provider config");
+    } finally {
+      setAnthropicSaving(false);
     }
   }
 
@@ -500,6 +552,44 @@ export default function CompanyAiConfigPage({ params }: Params) {
                   className={primaryButtonClass}
                 >
                   {sdkSaving ? "Saving..." : "Save SDK Settings"}
+                </button>
+              </form>
+            )}
+          </div>
+        )}
+
+        {activeTab === "provider" && (
+          <div className={`rounded-2xl p-4 ${theme.cardBg} ${theme.cardBorder}`}>
+            <div className="text-sm font-semibold mb-3">Anthropic (Claude) — AI Intelligence Engine</div>
+            {!companyId || loading ? (
+              <div className={`text-sm ${theme.mutedText}`}>Loading...</div>
+            ) : (
+              <form onSubmit={onSaveAnthropicProvider} className="space-y-4">
+                <div className="space-y-1">
+                  <label className="text-sm font-medium">Provider</label>
+                  <input value="Anthropic (Claude)" disabled className={inputClass} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-sm font-medium">API Key</label>
+                  <input
+                    type="password"
+                    placeholder={anthropicExistingMask ? `Current: ${anthropicExistingMask}` : "sk-ant-api03-..."}
+                    value={anthropicApiKey}
+                    onChange={(e) => setAnthropicApiKey(e.target.value)}
+                    className={inputClass}
+                  />
+                  <p className={`text-xs ${theme.mutedText}`}>Required for AI Intelligence engines (e1-e8). Leave empty to keep current key.</p>
+                </div>
+                <label className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" checked={anthropicIsActive} onChange={(e) => setAnthropicIsActive(e.target.checked)} />
+                  Enable Anthropic provider
+                </label>
+                <button
+                  type="submit"
+                  disabled={anthropicSaving || !companyId}
+                  className={primaryButtonClass}
+                >
+                  {anthropicSaving ? "Saving..." : "Save Anthropic"}
                 </button>
               </form>
             )}

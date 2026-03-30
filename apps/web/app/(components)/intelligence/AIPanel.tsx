@@ -26,8 +26,25 @@ export function AIPanel({ companyId, branchId, engines, from, to, refreshInterva
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [activeTab, setActiveTab] = useState<SignalType>("diagnostic");
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [userResolved, setUserResolved] = useState(false);
+
+  // Resolve userId from session once
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/auth/me", { cache: "no-store" });
+        if (res.ok) {
+          const json = await res.json();
+          setUserId(json?.userId ?? null);
+        }
+      } catch { /* ignore */ }
+      setUserResolved(true);
+    })();
+  }, []);
 
   const fetchSignals = useCallback(async () => {
+    if (!userResolved) return;
     setLoading(true);
     try {
       const params = new URLSearchParams();
@@ -36,7 +53,10 @@ export function AIPanel({ companyId, branchId, engines, from, to, refreshInterva
       if (from) params.set("from", from.toISOString().slice(0, 10));
       if (to) params.set("to", to.toISOString().slice(0, 10));
 
-      const res = await fetch(`/api/company/${companyId}/intelligence/signals?${params}`);
+      const headers: HeadersInit = {};
+      if (userId) headers["x-user-id"] = userId;
+
+      const res = await fetch(`/api/company/${companyId}/intelligence/signals?${params}`, { headers });
       if (!res.ok) return;
       const json = await res.json();
       if (Array.isArray(json.engines)) {
@@ -48,7 +68,7 @@ export function AIPanel({ companyId, branchId, engines, from, to, refreshInterva
     } finally {
       setLoading(false);
     }
-  }, [companyId, branchId, engines, from, to]);
+  }, [companyId, branchId, engines, from, to, userId, userResolved]);
 
   useEffect(() => {
     fetchSignals();
