@@ -129,3 +129,8 @@ export * as MasterDashboard from "./master-dashboard/service";
 export type { MasterDashboardData, MasterDashboardFilter } from "./master-dashboard/types";
 export * as Pis from "./pis/service";
 export type { PisFilter, PisMasterData, AdvisorScore, PisConfig } from "./pis/types";
+export * as Rcc from "./revenue-command-center/service";
+export type {
+  RccFilter, RccOverviewData, RccLeadSourceData, RccPipelineData,
+  RccLeakageData, RccAiEngineData, AiSignal,
+} from "./revenue-command-center/types";

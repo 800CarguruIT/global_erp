@@ -3,6 +3,7 @@ export type NavCategory =
   | "Main"
   | "Sales Center"
   | "Service Center"
+  | "Lead Management"
   | "Leads"
   | "Sales"
   | "Jobs"
@@ -125,6 +126,9 @@ export const SIDEBAR_CONFIG: Record<NavScope, Partial<Record<NavCategory, Sideba
       { label: "Profit & Loss", href: "/company/[companyId]/accounting/reports/pnl", permissionKeys: ["accounting.view"] },
       { label: "Cash Flow", href: "/company/[companyId]/accounting/reports/cashflow", permissionKeys: ["accounting.view"] },
       { label: "Balance Sheet", href: "/company/[companyId]/accounting/reports/balance-sheet", permissionKeys: ["accounting.view"] },
+    ],
+    "Lead Management": [
+      { label: "Revenue Command Center", href: "/company/[companyId]/revenue-command-center", permissionKeys: ["rcc.dashboard.view"] },
     ],
     Reports: [{ label: "Overview", href: "/company/[companyId]/reports/overview", moduleKey: "reports", permissionKeys: ["reports.view"] }],
     HR: [{ label: "Overview", href: "/company/[companyId]/hr/overview", moduleKey: "hr", permissionKeys: ["hr.employees.view", "company.users.view", "hr.branch_users.view", "hr.vendor_users.view"] }],
@@ -387,6 +391,18 @@ export const SIDEBAR_TREE: Partial<Record<NavScope, SidebarItem[]>> = {
         { label: "Templates", href: "/company/[companyId]/marketing/templates", permissionKeys: ["marketing.templates.view"] },
         { label: "Social", href: "/company/[companyId]/marketing/posts", permissionKeys: ["marketing.social.view"] },
         { label: "Dialer", href: "/company/[companyId]/settings/integrations/dialer", permissionKeys: ["integrations.dialer.use"] },
+      ],
+    },
+    {
+      label: "Lead Management",
+      href: "/company/[companyId]/revenue-command-center",
+      permissionKeys: ["rcc.dashboard.view"],
+      children: [
+        { label: "Command Center", href: "/company/[companyId]/revenue-command-center", exactMatch: true, permissionKeys: ["rcc.dashboard.view"] },
+        { label: "Lead Sources", href: "/company/[companyId]/revenue-command-center/lead-sources", permissionKeys: ["rcc.dashboard.view"] },
+        { label: "Pipeline", href: "/company/[companyId]/revenue-command-center/pipeline", permissionKeys: ["rcc.dashboard.view"] },
+        { label: "Leakage & Fix", href: "/company/[companyId]/revenue-command-center/leakage", permissionKeys: ["rcc.dashboard.view"] },
+        { label: "AI Engine", href: "/company/[companyId]/revenue-command-center/ai-engine", permissionKeys: ["rcc.dashboard.view"] },
       ],
     },
     { label: "Finance", href: "/company/[companyId]/accounting", permissionKeys: ["accounting.view"] },

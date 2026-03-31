@@ -42,7 +42,10 @@
       "Bash(node -e \"const postgres = require\\(''./node_modules/postgres''\\); const sql = postgres\\(''postgres://autoguru:autoguru@localhost:5432/global_erp_dev'', { max: 1 }\\); sql\\\\`SELECT count\\(*\\) FROM leads WHERE company_id=''d32af79a-fdde-4052-a8f1-6bc69ba3544e'' AND customer_id IS NULL\\\\`.then\\(r => { console.log\\(''leads no customer:'', r[0].count\\); return sql.end\\(\\); }\\).catch\\(e => { console.error\\(e.message\\); process.exit\\(1\\); }\\);\")",
       "Bash(find apps/web/app/api/company/*/recovery-requests -name \"route.ts\")",
       "Bash(npx tsc:*)",
-      "Bash(DATABASE_URL=\"postgres://autoguru:autoguru@localhost:5432/global_erp_dev\" npx ts-node --transpile-only --compiler-options '{\"\"module\"\":\"\"CommonJS\"\"}' scripts/migrate.ts)"
+      "Bash(DATABASE_URL=\"postgres://autoguru:autoguru@localhost:5432/global_erp_dev\" npx ts-node --transpile-only --compiler-options '{\"\"module\"\":\"\"CommonJS\"\"}' scripts/migrate.ts)",
+      "Bash(ls -la \"/c/Users/ABC/Documents/Global ERP/apps/web/app/\\(components\\)/\")",
+      "Bash(DATABASE_URL=\"postgres://autoguru:autoguru@localhost:5432/global_erp_dev\" pnpm -s ts-node --transpile-only --compiler-options '{\"\"module\"\":\"\"CommonJS\"\"}' packages/ai-core/scripts/query-rcc.ts)",
+      "Bash(ls -la /c/Users/ABC/Documents/'Global ERP'/apps/web/app/'\\(components\\)'/shell/)"
     ]
   }
 }

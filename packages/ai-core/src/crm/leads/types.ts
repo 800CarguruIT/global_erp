@@ -20,7 +20,7 @@ export type LeadStage =
   | "follow_up"
   | "cancelled";
 
-export type LeadSource = "call" | "website" | "ads" | "whatsapp" | "walk_in" | "referral" | "other";
+export type LeadSource = "call" | "inbound_call" | "outbound_call" | "website" | "ads" | "whatsapp" | "walk_in" | "referral" | "mobile_app" | "social_media" | "other";
 
 export type LeadWorkflowRequired = {
   acceptLeadConfirmed?: boolean;
