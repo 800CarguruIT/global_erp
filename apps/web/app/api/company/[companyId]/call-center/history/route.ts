@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { CallCenter, Crm, Users } from "@repo/ai-core";
+import { CallCenter, Crm, Users, getSql } from "@repo/ai-core";
 
 type ParamsCtx = { params: Promise<{ companyId: string }> };
 
@@ -47,39 +47,31 @@ export async function GET(req: NextRequest, ctx: ParamsCtx) {
       recordingMap.set(r.callSessionId, { url: r.url, durationSeconds: r.durationSeconds });
     });
 
-    const uniqueUserIds = Array.from(new Set(filtered.map((s) => s.createdByUserId).filter(Boolean)));
-    const userMap = new Map<string, { name: string | null; email: string | null }>();
-    await Promise.all(
-      uniqueUserIds.map(async (id) => {
-        try {
-          const { user } = await Users.getUserWithEmployee(id);
-          userMap.set(id, { name: user?.name ?? user?.email ?? null, email: user?.email ?? null });
-        } catch {
-          userMap.set(id, { name: null, email: null });
-        }
-      })
-    );
+    const sql = getSql();
 
+    // Batch fetch users in one query instead of N individual calls
+    const uniqueUserIds = Array.from(new Set(filtered.map((s) => s.createdByUserId).filter(Boolean))) as string[];
+    const userMap = new Map<string, { name: string | null; email: string | null }>();
+    if (uniqueUserIds.length > 0) {
+      const userRows = await sql<{ id: string; name: string | null; email: string | null }[]>`
+        SELECT id, name, email FROM users WHERE id = ANY(${uniqueUserIds}::uuid[])
+      `.catch(() => []);
+      for (const u of userRows) userMap.set(u.id, { name: u.name ?? u.email ?? null, email: u.email ?? null });
+    }
+
+    // Batch fetch customers by ID in one query
     const uniqueCustomerIds = Array.from(
-      new Set(
-        filtered
-          .filter((s) => s.toEntityType === "customer" && s.toEntityId)
-          .map((s) => s.toEntityId as string)
-      )
+      new Set(filtered.filter((s) => s.toEntityType === "customer" && s.toEntityId).map((s) => s.toEntityId as string))
     );
     const customerMap = new Map<string, { name: string | null; phone: string | null }>();
-    await Promise.all(
-      uniqueCustomerIds.map(async (id) => {
-        try {
-          const customer = await Crm.getCustomerById(id);
-          customerMap.set(id, { name: customer?.name ?? null, phone: (customer as any)?.phone ?? null });
-        } catch {
-          customerMap.set(id, { name: null, phone: null });
-        }
-      })
-    );
+    if (uniqueCustomerIds.length > 0) {
+      const custRows = await sql<{ id: string; name: string | null; phone: string | null }[]>`
+        SELECT id, name, phone FROM customers WHERE id = ANY(${uniqueCustomerIds}::uuid[])
+      `.catch(() => []);
+      for (const c of custRows) customerMap.set(c.id, { name: c.name ?? null, phone: c.phone ?? null });
+    }
 
-    // For sessions without a linked customer, resolve by phone (handles +971/971 prefix variants)
+    // Batch fetch customers by phone in one query (for sessions without linked customer)
     const uniqueExternalPhones = Array.from(
       new Set(
         filtered
@@ -89,18 +81,16 @@ export async function GET(req: NextRequest, ctx: ParamsCtx) {
       )
     );
     const phoneCustomerMap = new Map<string, { name: string | null; phone: string | null }>();
-    await Promise.all(
-      uniqueExternalPhones.map(async (phone) => {
-        try {
-          const matches = await Crm.listCustomers(companyId, { search: phone });
-          if (matches.length > 0) {
-            phoneCustomerMap.set(phone, { name: matches[0].name ?? null, phone: (matches[0] as any).phone ?? null });
-          }
-        } catch {
-          // ignore
-        }
-      })
-    );
+    if (uniqueExternalPhones.length > 0) {
+      const phoneRows = await sql<{ phone: string; name: string | null }[]>`
+        SELECT DISTINCT ON (phone) phone, name
+        FROM customers
+        WHERE company_id = ${companyId}
+          AND phone = ANY(${uniqueExternalPhones}::text[])
+        ORDER BY phone, updated_at DESC
+      `.catch(() => []);
+      for (const c of phoneRows) phoneCustomerMap.set(c.phone, { name: c.name ?? null, phone: c.phone });
+    }
 
     const payload = filtered.map((s) => {
       const computedDurationSeconds =

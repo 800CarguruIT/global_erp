@@ -253,9 +253,12 @@ export async function listEmployeesWithUserStatus(params: {
   limit?: number;
   offset?: number;
   status?: "active" | "inactive" | "no_account";
+  department?: string;
+  branchId?: string;
+  roleId?: string;
 }): Promise<{ rows: EmployeeUserRow[]; total: number }> {
   const sql = getSql();
-  const { companyId, q, limit = 50, offset = 0, status } = params;
+  const { companyId, q, limit = 50, offset = 0, status, department, branchId, roleId } = params;
 
   const search = q?.trim().length
     ? sql`AND (
@@ -266,10 +269,22 @@ export async function listEmployeesWithUserStatus(params: {
     : sql``;
 
   const statusFilter =
-    status === "active"     ? sql`AND u.id IS NOT NULL AND u.is_active = true`  :
-    status === "inactive"   ? sql`AND u.id IS NOT NULL AND u.is_active = false` :
-    status === "no_account" ? sql`AND u.id IS NULL`                             :
+    status === "active"     ? sql`AND e.is_active = true`  :
+    status === "inactive"   ? sql`AND e.is_active = false` :
+    status === "no_account" ? sql`AND u.id IS NULL`        :
     sql``;
+
+  const departmentFilter = department
+    ? sql`AND LOWER(e.department) = ${department.toLowerCase()}`
+    : sql``;
+
+  const branchFilter = branchId
+    ? sql`AND u.branch_id = ${branchId}::uuid`
+    : sql``;
+
+  const roleFilter = roleId
+    ? sql`AND u.id IN (SELECT ur.user_id FROM user_roles ur WHERE ur.role_id = ${roleId}::uuid)`
+    : sql``;
 
   // Total count (same WHERE, no LIMIT)
   const countResult = await sql<{ total: number }[]>`
@@ -280,6 +295,9 @@ export async function listEmployeesWithUserStatus(params: {
       AND e.company_id = ${companyId}
       ${search}
       ${statusFilter}
+      ${departmentFilter}
+      ${branchFilter}
+      ${roleFilter}
   `;
   const total = (rowsFrom<any>(countResult)[0]?.total ?? 0) as number;
 
@@ -290,11 +308,12 @@ export async function listEmployeesWithUserStatus(params: {
       e.auto_code,
       e.full_name     AS employee_name,
       e.department,
+      e.is_active     AS employee_is_active,
       COALESCE(e.email_company, e.email_personal) AS employee_email,
       u.id            AS user_id,
       u.email,
       u.full_name,
-      u.is_active,
+      u.is_active     AS user_is_active,
       u.mobile,
       u.company_id,
       u.branch_id,
@@ -307,6 +326,9 @@ export async function listEmployeesWithUserStatus(params: {
       AND e.company_id = ${companyId}
       ${search}
       ${statusFilter}
+      ${departmentFilter}
+      ${branchFilter}
+      ${roleFilter}
     ORDER BY e.full_name ASC
     LIMIT ${limit} OFFSET ${offset}
   `;
@@ -320,7 +342,7 @@ export async function listEmployeesWithUserStatus(params: {
     user_id: r.user_id ?? null,
     email: r.email ?? null,
     full_name: r.full_name ?? null,
-    is_active: r.is_active ?? null,
+    is_active: r.employee_is_active ?? null,
     last_login_at: r.last_login_at ?? null,
     mobile: r.mobile ?? null,
     company_id: r.company_id ?? null,
@@ -350,4 +372,18 @@ export async function listEmployeesWithUserStatus(params: {
   }
 
   return { rows: employees, total };
+}
+
+export async function listEmployeeDepartments(companyId: string): Promise<string[]> {
+  const sql = getSql();
+  const rows = await sql<{ department: string }[]>`
+    SELECT DISTINCT e.department
+    FROM employees e
+    WHERE e.scope = 'company'
+      AND e.company_id = ${companyId}
+      AND e.department IS NOT NULL
+      AND e.department != ''
+    ORDER BY e.department ASC
+  `;
+  return rowsFrom<any>(rows).map((r: any) => r.department);
 }

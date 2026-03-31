@@ -23,6 +23,8 @@ type EmployeeUserRow = {
 
 type StatusFilter = "all" | "active" | "inactive" | "no_account";
 
+type FilterOption = { value: string; label: string };
+
 const PAGE_SIZE = 50;
 
 const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
@@ -48,6 +50,12 @@ export default function CompanyUsersPage({
   const [inputQuery, setInputQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [statusUpdating, setStatusUpdating] = useState<Record<string, boolean>>({});
+  const [departmentFilter, setDepartmentFilter] = useState("");
+  const [branchFilter, setBranchFilter]         = useState("");
+  const [roleFilter, setRoleFilter]             = useState("");
+  const [departments, setDepartments]           = useState<FilterOption[]>([]);
+  const [branches, setBranches]                 = useState<FilterOption[]>([]);
+  const [roles, setRoles]                       = useState<FilterOption[]>([]);
 
   useEffect(() => {
     Promise.resolve(params).then((p: any) => {
@@ -57,11 +65,43 @@ export default function CompanyUsersPage({
     });
   }, [params]);
 
-  async function load(opts?: { p?: number; q?: string; status?: StatusFilter }) {
+  // Load filter options (departments, branches, roles)
+  useEffect(() => {
+    if (!companyId) return;
+    // Departments
+    fetch(`/api/company/${companyId}/admin/users/departments`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        const list = (data?.data ?? []) as string[];
+        setDepartments(list.map((d) => ({ value: d, label: d })));
+      })
+      .catch(() => null);
+    // Branches
+    fetch(`/api/company/${companyId}/branches`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        const list = (data?.data ?? data ?? []) as any[];
+        setBranches(list.map((b: any) => ({ value: b.id, label: b.name })));
+      })
+      .catch(() => null);
+    // Roles
+    fetch(`/api/company/${companyId}/admin/roles`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        const list = (data?.data ?? data ?? []) as any[];
+        setRoles(list.map((r: any) => ({ value: r.id, label: r.name })));
+      })
+      .catch(() => null);
+  }, [companyId]);
+
+  async function load(opts?: { p?: number; q?: string; status?: StatusFilter; dept?: string; branch?: string; role?: string }) {
     if (!companyId) return;
     const p      = opts?.p      ?? page;
     const q      = opts?.q      ?? query;
     const status = opts?.status ?? statusFilter;
+    const dept   = opts?.dept   ?? departmentFilter;
+    const branch = opts?.branch ?? branchFilter;
+    const role   = opts?.role   ?? roleFilter;
 
     setLoading(true);
     setError(null);
@@ -71,6 +111,9 @@ export default function CompanyUsersPage({
       sp.set("pageSize", String(PAGE_SIZE));
       if (q) sp.set("q", q);
       if (status !== "all") sp.set("status", status);
+      if (dept) sp.set("department", dept);
+      if (branch) sp.set("branchId", branch);
+      if (role) sp.set("roleId", role);
 
       const res = await fetch(`/api/company/${companyId}/admin/users/employees?${sp.toString()}`);
       if (!res.ok) throw new Error("Failed to load employees");
@@ -89,18 +132,49 @@ export default function CompanyUsersPage({
   function handleSearch() {
     setQuery(inputQuery);
     setPage(1);
-    load({ p: 1, q: inputQuery, status: statusFilter });
+    load({ p: 1, q: inputQuery });
   }
 
   function handleStatusChange(s: StatusFilter) {
     setStatusFilter(s);
     setPage(1);
-    load({ p: 1, q: query, status: s });
+    load({ p: 1, status: s });
   }
+
+  function handleDepartmentChange(v: string) {
+    setDepartmentFilter(v);
+    setPage(1);
+    load({ p: 1, dept: v });
+  }
+
+  function handleBranchChange(v: string) {
+    setBranchFilter(v);
+    setPage(1);
+    load({ p: 1, branch: v });
+  }
+
+  function handleRoleChange(v: string) {
+    setRoleFilter(v);
+    setPage(1);
+    load({ p: 1, role: v });
+  }
+
+  function clearFilters() {
+    setDepartmentFilter("");
+    setBranchFilter("");
+    setRoleFilter("");
+    setStatusFilter("all");
+    setQuery("");
+    setInputQuery("");
+    setPage(1);
+    load({ p: 1, q: "", status: "all", dept: "", branch: "", role: "" });
+  }
+
+  const hasActiveFilters = !!(departmentFilter || branchFilter || roleFilter || (statusFilter !== "all") || query);
 
   function goToPage(p: number) {
     setPage(p);
-    load({ p, q: query, status: statusFilter });
+    load({ p });
   }
 
   async function toggleStatus(userId: string, next: boolean) {
@@ -191,6 +265,59 @@ export default function CompanyUsersPage({
           </div>
         </div>
 
+        {/* Filter dropdowns */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Department */}
+          <select
+            value={departmentFilter}
+            onChange={(e) => handleDepartmentChange(e.target.value)}
+            className="h-9 rounded-lg border border-white/10 bg-white/5 px-3 pr-8 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-white/20 [&>option]:bg-gray-900 [&>option]:text-foreground"
+          >
+            <option value="">All Departments</option>
+            {departments.map((d) => (
+              <option key={d.value} value={d.value}>{d.label}</option>
+            ))}
+          </select>
+
+          {/* Branch */}
+          {branches.length > 0 && (
+            <select
+              value={branchFilter}
+              onChange={(e) => handleBranchChange(e.target.value)}
+              className="h-9 rounded-lg border border-white/10 bg-white/5 px-3 pr-8 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-white/20 [&>option]:bg-gray-900 [&>option]:text-foreground"
+            >
+              <option value="">All Branches</option>
+              {branches.map((b) => (
+                <option key={b.value} value={b.value}>{b.label}</option>
+              ))}
+            </select>
+          )}
+
+          {/* Role */}
+          {roles.length > 0 && (
+            <select
+              value={roleFilter}
+              onChange={(e) => handleRoleChange(e.target.value)}
+              className="h-9 rounded-lg border border-white/10 bg-white/5 px-3 pr-8 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-white/20 [&>option]:bg-gray-900 [&>option]:text-foreground"
+            >
+              <option value="">All Roles</option>
+              {roles.map((r) => (
+                <option key={r.value} value={r.value}>{r.label}</option>
+              ))}
+            </select>
+          )}
+
+          {/* Clear all filters */}
+          {hasActiveFilters && (
+            <button
+              onClick={clearFilters}
+              className="h-9 rounded-lg border border-white/10 bg-white/5 px-3 text-sm text-muted-foreground transition hover:bg-white/10 hover:text-foreground"
+            >
+              Clear Filters
+            </button>
+          )}
+        </div>
+
         {/* Table */}
         {loading ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -255,24 +382,20 @@ export default function CompanyUsersPage({
                         )}
                       </td>
 
-                      {/* Status */}
+                      {/* Status (employee-level) */}
                       <td className="px-4 py-3">
-                        {row.user_id ? (
-                          <button
-                            disabled={!!statusUpdating[row.user_id]}
-                            onClick={() => toggleStatus(row.user_id!, !(row.is_active ?? true))}
-                            title="Click to toggle"
-                            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold transition disabled:opacity-50 ${
-                              row.is_active
-                                ? "bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25"
-                                : "bg-red-500/15 text-red-400 hover:bg-red-500/25"
-                            }`}
-                          >
-                            <span className={`h-1.5 w-1.5 rounded-full ${row.is_active ? "bg-emerald-500" : "bg-red-500"}`} />
-                            {row.is_active ? "Active" : "Inactive"}
-                          </button>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2.5 py-0.5 text-xs font-semibold text-amber-400">
+                        <span
+                          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                            row.is_active === false
+                              ? "bg-red-500/15 text-red-400"
+                              : "bg-emerald-500/15 text-emerald-400"
+                          }`}
+                        >
+                          <span className={`h-1.5 w-1.5 rounded-full ${row.is_active === false ? "bg-red-500" : "bg-emerald-500"}`} />
+                          {row.is_active === false ? "Inactive" : "Active"}
+                        </span>
+                        {!row.user_id && (
+                          <span className="ml-1.5 inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2.5 py-0.5 text-xs font-semibold text-amber-400">
                             <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
                             No Account
                           </span>

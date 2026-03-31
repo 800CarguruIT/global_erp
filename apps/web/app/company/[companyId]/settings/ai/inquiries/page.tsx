@@ -141,8 +141,8 @@ export default function CompanyAiInquiriesPage({ params }: Params) {
   // Filters
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
-  const [dateFrom, setDateFrom] = useState(todayDefaultFrom);
-  const [dateTo, setDateTo] = useState(todayDefaultTo);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [filterToNumber, setFilterToNumber] = useState("");
   const [filterConversion, setFilterConversion] = useState("");
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -155,6 +155,10 @@ export default function CompanyAiInquiriesPage({ params }: Params) {
   const [callsModalItems, setCallsModalItems] = useState<InquiryRow[]>([]);
   const [callsModalLoading, setCallsModalLoading] = useState(false);
   const callsModalGroupRef = useRef<GroupedRow | null>(null);
+  const [callsModalPage, setCallsModalPage] = useState(1);
+  const [callsModalTotalPages, setCallsModalTotalPages] = useState(1);
+  const [callsModalTotalCount, setCallsModalTotalCount] = useState(0);
+  const MODAL_PAGE_LIMIT = 25;
 
   const [actionById, setActionById] = useState<Record<string, string>>({});
   const [leadTypeById, setLeadTypeById] = useState<Record<string, "rsa" | "recovery" | "workshop">>({});
@@ -166,8 +170,15 @@ export default function CompanyAiInquiriesPage({ params }: Params) {
   const [transcriptModalRow, setTranscriptModalRow] = useState<InquiryRow | null>(null);
   const [analysisModalRow, setAnalysisModalRow] = useState<InquiryRow | null>(null);
 
-  // Auto-analyze control
-  const [autoAnalyzeInterval, setAutoAnalyzeInterval] = useState<number>(0); // 0 = off
+  // Auto-analyze control — persisted in localStorage so it survives refresh
+  const [autoAnalyzeInterval, setAutoAnalyzeIntervalRaw] = useState<number>(() => {
+    if (typeof window === "undefined") return 0;
+    try { const v = localStorage.getItem("ai_auto_analyze_interval"); return v ? Number(v) : 0; } catch { return 0; }
+  });
+  const setAutoAnalyzeInterval = useCallback((val: number) => {
+    setAutoAnalyzeIntervalRaw(val);
+    try { localStorage.setItem("ai_auto_analyze_interval", String(val)); } catch { /* quota */ }
+  }, []);
   const [autoAnalyzeRunning, setAutoAnalyzeRunning] = useState(false);
   const [autoAnalyzeLogs, setAutoAnalyzeLogs] = useState<{
     ts: string; processed: number; succeeded: number; skipped: number; failed: number;
@@ -228,16 +239,18 @@ export default function CompanyAiInquiriesPage({ params }: Params) {
     fromNumber: string | null,
     _filters: Record<string, unknown>,
     cid: string,
+    targetPage: number = 1,
   ) => {
     setCallsModalLoading(true);
     try {
-      // Show ALL calls for this number — no date filter, no conversion filter
-      const qs = new URLSearchParams({ limit: "200", _: String(Date.now()) });
+      const qs = new URLSearchParams({ limit: String(MODAL_PAGE_LIMIT), page: String(targetPage), _: String(Date.now()) });
       if (fromNumber) qs.set("fromNumber", fromNumber);
       const res = await fetch(`/api/company/${cid}/ai/inquiries?${qs}`, { cache: "no-store" });
       const json = await res.json().catch(() => ({}));
       const newItems: InquiryRow[] = Array.isArray(json?.inquiries) ? json.inquiries : [];
       setCallsModalItems(newItems);
+      setCallsModalTotalPages(typeof json?.totalPages === "number" ? Math.max(1, json.totalPages) : 1);
+      setCallsModalTotalCount(typeof json?.totalCount === "number" ? json.totalCount : newItems.length);
       setTranscriptModalRow((prev) => prev ? (newItems.find((r) => r.id === prev.id) ?? prev) : null);
       setAnalysisModalRow((prev) => prev ? (newItems.find((r) => r.id === prev.id) ?? prev) : null);
     } catch { /* ignore */ } finally {
@@ -365,13 +378,17 @@ export default function CompanyAiInquiriesPage({ params }: Params) {
     callsModalGroupRef.current = group;
     setCallsModalGroup(group);
     setCallsModalItems([]);
-    void loadCallsForGroup(group.from_number, {}, companyId);
+    setCallsModalPage(1);
+    setCallsModalTotalPages(1);
+    setCallsModalTotalCount(0);
+    void loadCallsForGroup(group.from_number, {}, companyId, 1);
   }
 
   function closeCallsModal() {
     callsModalGroupRef.current = null;
     setCallsModalGroup(null);
     setCallsModalItems([]);
+    setCallsModalPage(1);
   }
 
   async function verifyInquiry(row: InquiryRow, locationText: string, verifiedMobile: boolean, verifiedLocation: boolean) {
@@ -729,8 +746,8 @@ export default function CompanyAiInquiriesPage({ params }: Params) {
           <div className="fixed inset-0 z-[9998] flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/80 backdrop-blur-[2px]" onClick={closeCallsModal} />
             <div
-              className={`relative z-[9999] flex w-full max-w-6xl flex-col rounded-2xl border shadow-2xl ${theme.cardBorder}`}
-              style={{ background: "rgba(2, 8, 23, 0.98)", maxHeight: "90vh" }}
+              className={`relative z-[9999] flex w-full flex-col rounded-2xl border shadow-2xl ${theme.cardBorder}`}
+              style={{ background: "rgba(2, 8, 23, 0.98)", maxHeight: "92vh", maxWidth: "95vw" }}
             >
               {/* Header */}
               <div className="flex items-center justify-between gap-3 border-b border-white/10 px-5 py-4 shrink-0">
@@ -747,12 +764,9 @@ export default function CompanyAiInquiriesPage({ params }: Params) {
                     <p className="text-xs text-muted-foreground">
                       {callsModalLoading ? "Loading..." : (
                         <>
-                          {(() => {
-                            const startOfToday = new Date(); startOfToday.setHours(0,0,0,0);
-                            const todayCount = callsModalItems.filter(r => new Date(r.created_at) >= startOfToday).length;
-                            const convertedCount = callsModalItems.filter(r => r.conversion_status === "converted").length;
-                            return `Today: ${todayCount} · All time: ${callsModalItems.length} · ${convertedCount} converted · ${callsModalItems.length - convertedCount} pending`;
-                          })()}
+                          Total: {callsModalTotalCount} · Page {callsModalPage} of {callsModalTotalPages}
+                          {callsModalGroup.converted_count != null ? ` · ${callsModalGroup.converted_count} converted` : ""}
+                          {callsModalGroup.pending_count != null ? ` · ${callsModalGroup.pending_count} pending` : ""}
                         </>
                       )}
                     </p>
@@ -882,12 +896,6 @@ export default function CompanyAiInquiriesPage({ params }: Params) {
                               <td className="py-2 pr-3 text-xs">{row.lead_outcome ?? "-"}</td>
                               <td className="py-2 pr-3">
                                 <div className="flex flex-wrap gap-2">
-                                  <button type="button" onClick={() => openVerifyModal(row)}
-                                    disabled={Boolean(actionById[row.id]) || rowLocked || (row.verified_mobile && row.verified_location)}
-                                    className={`rounded border px-2 py-1 text-xs disabled:opacity-50 ${theme.surfaceSubtle} ${theme.cardBorder}`}
-                                  >
-                                    {actionById[row.id] === "verify" ? "Verifying..." : row.verified_mobile && row.verified_location ? "Verified" : "Verify"}
-                                  </button>
                                   <button type="button" onClick={() => void analyzeRecording(row)}
                                     disabled={Boolean(actionById[row.id]) || rowLocked || !isUsableRecordingUrl(row.recording_url)}
                                     className={`rounded border px-2 py-1 text-xs disabled:opacity-50 ${theme.surfaceSubtle} ${theme.cardBorder}`}
@@ -919,6 +927,34 @@ export default function CompanyAiInquiriesPage({ params }: Params) {
                   </div>
                 )}
               </div>
+
+              {/* Pagination footer */}
+              {callsModalTotalPages > 1 ? (
+                <div className="flex items-center justify-between border-t border-white/10 px-5 py-3 shrink-0">
+                  <span className="text-xs text-muted-foreground">
+                    Showing {((callsModalPage - 1) * MODAL_PAGE_LIMIT) + 1}–{Math.min(callsModalPage * MODAL_PAGE_LIMIT, callsModalTotalCount)} of {callsModalTotalCount}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      disabled={callsModalPage <= 1 || callsModalLoading}
+                      onClick={() => { const p = callsModalPage - 1; setCallsModalPage(p); void loadCallsForGroup(callsModalGroup?.from_number ?? null, {}, companyId, p); }}
+                      className="rounded border border-white/20 bg-white/5 px-3 py-1 text-xs text-muted-foreground hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      Prev
+                    </button>
+                    <span className="px-2 text-xs text-muted-foreground">{callsModalPage} / {callsModalTotalPages}</span>
+                    <button
+                      type="button"
+                      disabled={callsModalPage >= callsModalTotalPages || callsModalLoading}
+                      onClick={() => { const p = callsModalPage + 1; setCallsModalPage(p); void loadCallsForGroup(callsModalGroup?.from_number ?? null, {}, companyId, p); }}
+                      className="rounded border border-white/20 bg-white/5 px-3 py-1 text-xs text-muted-foreground hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
         ) : null}

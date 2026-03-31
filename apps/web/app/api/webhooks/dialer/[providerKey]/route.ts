@@ -2094,7 +2094,7 @@ function shouldIgnoreYeastarAuxEvent(update: DialerWebhookUpdate): {
   // extension (1–6 digits), this is a ring group leg shadow event. Yeastar type 30020 uses
   // a UUID call_id that is different from the type 30012 CDR call_id — so they can't update
   // the same session. Ignoring these prevents duplicate "unknown" rows in call history.
-  if ((operation === "call_over" || operation === "call_answer") && !hasKnownFrom) {
+  if (operation === "call_over" && !hasKnownFrom) {
     const toVal = String(update.toNumber ?? "").trim();
     if (/^\d{1,6}$/.test(toVal)) {
       return { ignore: true, operation, type: eventType };
@@ -2583,6 +2583,20 @@ async function handle(providerKey: string, req: NextRequest) {
   }
 
   await CallCenter.handleDialerWebhookUpdate(update);
+
+  // Trigger auto-analysis for completed calls (both inbound and outbound).
+  // Uses a delay to give the deferred recording resolve time to save the recording.
+  if (/(completed|hangup|bye|over|done|finished|failed)/i.test(String(update.status ?? ""))) {
+    const internalSecret = process.env.INTERNAL_SECRET ?? "";
+    if (internalSecret) {
+      const autoAnalyzeBase = (process.env.NEXTAUTH_URL ?? "http://localhost:3000").replace(/\/+$/, "");
+      const analyzeUrl = `${autoAnalyzeBase}/api/internal/ai/auto-analyze-inquiries?providerCallId=${encodeURIComponent(update.providerCallId)}`;
+      // Wait 60s to let deferred recording resolve (0s, 15s, 45s) finish first
+      setTimeout(() => {
+        void fetch(analyzeUrl, { headers: { "x-internal-secret": internalSecret } }).catch(() => {});
+      }, 60_000);
+    }
+  }
 
   // Publish real-time event for ALL directions and statuses so the UI can track
   // every transition (initiated → ringing → answered → ended) without polling.

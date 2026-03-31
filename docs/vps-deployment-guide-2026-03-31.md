@@ -1,30 +1,38 @@
 # AWS EC2 Upgrade & Deployment Guide — Global ERP
 
-**Date:** 2026-03-31
-**Scope:** Upgrade existing EC2 instance + deploy last 3 days of changes + run 14 DB migrations
+**Date:** 2026-04-01 (updated)
+**Scope:** Upgrade existing EC2 instance + deploy recent changes (Mar 28 → Apr 1) + run 16 DB migrations
 **Assumption:** EC2 already running with Docker, Nginx, SSL, repo cloned, env files configured
 
 ---
 
 ## Table of Contents
 
-1. [Changes Summary (Last 3 Days)](#1-changes-summary-last-3-days)
-2. [New Database Migrations (14 files)](#2-new-database-migrations)
+1. [Changes Summary (Mar 28 → Apr 1)](#1-changes-summary)
+2. [New Database Migrations (16 files)](#2-new-database-migrations)
 3. [Part A: Upgrade EC2 Instance](#part-a-upgrade-ec2-instance)
 4. [Part B: Deploy to DEV](#part-b-deploy-to-dev)
 5. [Part C: Deploy to PROD](#part-c-deploy-to-prod)
 6. [Post-Deployment Checks](#6-post-deployment-checks)
-7. [Rollback Plan](#7-rollback-plan)
-8. [Quick Copy-Paste Commands](#8-quick-copy-paste-commands)
+7. [Data Preservation — Live Data Safety](#7-data-preservation--live-data-safety)
+8. [Rollback Plan](#8-rollback-plan)
+9. [Quick Copy-Paste Commands](#9-quick-copy-paste-commands)
 
 ---
 
-## 1. Changes Summary (Last 3 Days)
+## 1. Changes Summary
 
-### Commits (Mar 28 → Mar 31)
+### Commits (Mar 28 → Apr 1)
 
 | Commit | Description |
 |--------|-------------|
+| _uncommitted_ | Users page: department/branch/role filter dropdowns + employee `is_active` status |
+| _uncommitted_ | AI Inquiries: performance indexes + query rewrite |
+| _uncommitted_ | Sidebar: restructured navigation (categories: Main, Sales, Service Center, Jobs) |
+| _uncommitted_ | Call recording proxy + webhook `"recording"` key fix |
+| `bab5f26` | Test — inquiries refactor, job card fixes, recording proxy, auth middleware |
+| `26906b0` | Push changes — migration doc update |
+| `042e59a` | Fix: add missing "recording" key to Yeastar webhook recording URL lookup |
 | `93ea99a` | Revenue Command Center (RCC) — AI engine, lead sources, pipeline, leakage, marketing spend |
 | `8a93ff2` | Add `tmp/*.log` to `.gitignore` |
 | `7c320b8` | Test flows — PIS advisor portal, test panel, vendor bids, inspection print, invoice pay, GRN PDF |
@@ -43,6 +51,10 @@
 - **PIS (Performance Incentive System)** — Advisor portal, lead distribution, commission, SLA
 - **Multi-provider AI** — OpenAI + Anthropic dual provider
 - **Call Center → Sales Center** rename
+- **Sidebar restructure** — Simplified navigation categories (Main, Sales, Service Center, Jobs)
+- **Users page filters** — Filter by department, branch, role + employee-level `is_active` status
+- **AI Inquiries performance** — DB indexes + optimized queries for call recordings/phone matching
+- **Call recording fix** — Recording URL lookup + proxy improvements
 - **Test Panel** for flow testing
 - **Vendor part details & bids** improvements
 - **Service charges + main warehouse config**
@@ -51,7 +63,7 @@
 
 ## 2. New Database Migrations
 
-**14 new migrations** (173 → 186):
+**16 new migrations** (173 → 188):
 
 | # | File | What it does |
 |---|------|--------------|
@@ -69,8 +81,14 @@
 | 184 | `184_service_charges_config.sql` | Service charges config |
 | 185 | `185_rcc_marketing_spend.sql` | RCC marketing spend table |
 | 186 | `186_rcc_permissions.sql` | RCC permissions |
+| **187** | **`187_employee_is_active.sql`** | **Add `is_active` column to employees table** |
+| **188** | **`188_inquiries_performance.sql`** | **Performance indexes for AI inquiries + customer phone matching** |
 
 > Migration runner auto-skips already-applied migrations via `schema_migrations` table.
+>
+> **Note on migration 187:** Adds `is_active boolean NOT NULL DEFAULT true` to employees. All existing employees will default to active. No data loss.
+>
+> **Note on migration 188:** Creates indexes only (no schema changes). May take a few seconds on large `customers` table due to expression indexes.
 
 ---
 
@@ -112,7 +130,7 @@ docker stats --no-stream
 | `t3.large` | 2 | 8 GB | **Recommended** — comfortable for dev+prod+builds |
 | `t3.xlarge` | 4 | 16 GB | **Ideal** — fast builds, headroom for AI features |
 
-> With 14 new migrations, RCC module, PIS system, and AI multi-provider — **t3.large (8GB)** is the sweet spot.
+> With 16 migrations (including performance indexes), RCC, PIS, sidebar restructure, and AI multi-provider — **t3.large (8GB)** is the sweet spot.
 
 ### A2. Resize EC2 Instance (if needed)
 
@@ -291,12 +309,17 @@ curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:3001
 Open `https://dev.yourdomain.com`:
 
 - [ ] Login works
+- [ ] Sidebar restructured — categories: **Main**, **Sales**, **Service Center**, **Jobs**
 - [ ] Sidebar shows **Revenue Command Center**
 - [ ] Sidebar shows **Sales Center** (not "Call Center")
 - [ ] PIS → Advisor Portal loads
+- [ ] Settings → Users page: department/branch/role filter dropdowns work
+- [ ] Settings → Users page: status badge shows employee Active/Inactive (not user account)
 - [ ] Inspection → Estimate → Approval flow
 - [ ] Invoice creation + payment
 - [ ] Vendor → Part details + bids
+- [ ] AI Inquiries page loads fast (performance indexes applied)
+- [ ] Call recordings play correctly
 - [ ] AI Panel responds (multi-provider)
 
 ---
@@ -351,11 +374,15 @@ curl -s -o /dev/null -w "%{http_code}" https://yourdomain.com
 Open `https://yourdomain.com`:
 
 - [ ] Login with real credentials
+- [ ] Sidebar restructured correctly (Main, Sales, Service Center, Jobs)
 - [ ] Revenue Command Center accessible + data loads
 - [ ] Sales Center + WebSocket connection
 - [ ] PIS Advisor Portal functional
+- [ ] Settings → Users: filters + employee-level status
 - [ ] Full flow: Inspection → Estimate → Approval → Invoice → Payment
 - [ ] Vendor bids + part details
+- [ ] AI Inquiries page loads fast
+- [ ] Call recordings play correctly
 - [ ] AI features respond
 - [ ] No console errors
 
@@ -382,7 +409,74 @@ docker compose -p global-erp-prod -f docker-compose.prod.yml logs -f web
 
 ---
 
-## 7. Rollback Plan
+## 7. Data Preservation — Live Data Safety
+
+> **Important:** All live data (customers, cars, employees, users, companies) is stored in PostgreSQL volumes (`postgres_data` for prod, `postgres_dev_data` for dev). These volumes persist across container rebuilds.
+
+### What is SAFE (data is preserved):
+
+| Action | Data safe? | Why |
+|--------|-----------|-----|
+| `docker compose down` | Yes | Only stops containers, volumes remain |
+| `docker compose build --no-cache` | Yes | Rebuilds app image only, not DB |
+| `docker compose up -d` | Yes | Reconnects to existing volume |
+| `pnpm db:migrate` | Yes | Only adds new tables/columns, never drops existing |
+| `git pull` | Yes | Only updates code, not DB data |
+
+### What is DANGEROUS (data loss risk):
+
+| Action | Risk |
+|--------|------|
+| `docker compose down -v` | **DELETES ALL VOLUMES** including DB data |
+| `docker volume rm postgres_data` | **DELETES PROD DB** |
+| `docker system prune --volumes` | **DELETES ALL UNUSED VOLUMES** |
+| Dropping/recreating DB manually | **DELETES ALL DATA** |
+
+### Verify data is intact after deploy:
+
+```bash
+# PROD — check row counts for critical tables
+docker compose -p global-erp-prod -f docker-compose.prod.yml exec postgres \
+  psql -U autoguru -d global_erp_prod -c "
+    SELECT 'companies' AS tbl, COUNT(*) FROM companies
+    UNION ALL SELECT 'customers', COUNT(*) FROM customers
+    UNION ALL SELECT 'cars', COUNT(*) FROM cars
+    UNION ALL SELECT 'employees', COUNT(*) FROM employees
+    UNION ALL SELECT 'users', COUNT(*) FROM users
+    ORDER BY tbl;
+  "
+
+# DEV — same check
+docker compose -p global-erp-dev -f docker-compose.dev.yml exec postgres \
+  psql -U autoguru -d global_erp_dev -c "
+    SELECT 'companies' AS tbl, COUNT(*) FROM companies
+    UNION ALL SELECT 'customers', COUNT(*) FROM customers
+    UNION ALL SELECT 'cars', COUNT(*) FROM cars
+    UNION ALL SELECT 'employees', COUNT(*) FROM employees
+    UNION ALL SELECT 'users', COUNT(*) FROM users
+    ORDER BY tbl;
+  "
+```
+
+> **Run these counts BEFORE and AFTER deploy** to confirm no data was lost.
+
+### Backup critical tables individually (extra safety):
+
+```bash
+# Export just the critical tables (PROD)
+for TABLE in companies customers cars employees users; do
+  docker compose -p global-erp-prod -f docker-compose.prod.yml exec postgres \
+    pg_dump -U autoguru -d global_erp_prod -t $TABLE --data-only \
+    > /opt/backups/prod-${TABLE}-$(date +%Y%m%d-%H%M%S).sql
+done
+
+# Verify exports
+ls -lh /opt/backups/prod-{companies,customers,cars,employees,users}-*.sql | tail -5
+```
+
+---
+
+## 8. Rollback Plan
 
 ### PROD Rollback Steps:
 
@@ -408,7 +502,7 @@ docker compose -p global-erp-prod -f docker-compose.prod.yml exec -T postgres \
 
 ---
 
-## 8. Quick Copy-Paste Commands
+## 9. Quick Copy-Paste Commands
 
 ### Full Deploy Sequence (SSH into EC2, then run):
 
@@ -442,6 +536,27 @@ docker compose -p global-erp-prod -f docker-compose.prod.yml exec web pnpm db:mi
 docker compose -p global-erp-prod -f docker-compose.prod.yml ps
 
 echo ">>> PROD deployed. Run smoke tests on yourdomain.com <<<"
+
+# ── VERIFY DATA (run after both deploys) ─────────
+echo "=== PROD data counts ==="
+docker compose -p global-erp-prod -f docker-compose.prod.yml exec postgres \
+  psql -U autoguru -d global_erp_prod -c "
+    SELECT 'companies' AS tbl, COUNT(*) FROM companies
+    UNION ALL SELECT 'customers', COUNT(*) FROM customers
+    UNION ALL SELECT 'cars', COUNT(*) FROM cars
+    UNION ALL SELECT 'employees', COUNT(*) FROM employees
+    UNION ALL SELECT 'users', COUNT(*) FROM users
+    ORDER BY tbl;"
+
+echo "=== DEV data counts ==="
+docker compose -p global-erp-dev -f docker-compose.dev.yml exec postgres \
+  psql -U autoguru -d global_erp_dev -c "
+    SELECT 'companies' AS tbl, COUNT(*) FROM companies
+    UNION ALL SELECT 'customers', COUNT(*) FROM customers
+    UNION ALL SELECT 'cars', COUNT(*) FROM cars
+    UNION ALL SELECT 'employees', COUNT(*) FROM employees
+    UNION ALL SELECT 'users', COUNT(*) FROM users
+    ORDER BY tbl;"
 ```
 
 ### Useful Aliases (add to `~/.bashrc`):
@@ -485,4 +600,4 @@ alias prod-migrate="cd /opt/global-erp && docker compose -p global-erp-prod -f d
 
 ---
 
-**Prepared:** 2026-03-31 | **Applies to:** Commits `42f3732` → `93ea99a` (12 commits, 14 migrations)
+**Prepared:** 2026-04-01 | **Applies to:** Commits `42f3732` → `bab5f26` + uncommitted (16 commits + uncommitted changes, 16 migrations)

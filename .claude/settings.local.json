@@ -49,7 +49,8 @@
       "Bash(grep -E \"\\\\.\\(ts|js|sql\\)$\")",
       "Bash(find '/c/Users/ABC/Documents/Global ERP' -name *dashboard* -o -name *callcenter* -o -name *call-center*)",
       "Bash(grep -E \"\\\\.\\(tsx|ts\\)$\")",
-      "Bash(grep -r \"ai_intelligence_config\\\\|signal.*empty\\\\|no signals\\\\|allSignals.length\" '/c/Users/ABC/Documents/Global ERP' --include=*.ts --include=*.tsx)"
+      "Bash(grep -r \"ai_intelligence_config\\\\|signal.*empty\\\\|no signals\\\\|allSignals.length\" '/c/Users/ABC/Documents/Global ERP' --include=*.ts --include=*.tsx)",
+      "Bash(npx tsx:*)"
     ]
   }
 }

@@ -163,8 +163,8 @@ async function getYeastarTokenForPlayback(credentials: Record<string, any>): Pro
   const userAgent = String(credentials.userAgent ?? "OpenAPI").trim() || "OpenAPI";
   const accessId = String(credentials.accessId ?? credentials.linkusAccessId ?? "").trim();
   const accessKey = String(credentials.accessKey ?? credentials.linkusAccessKey ?? "").trim();
-  const clientId = String(credentials.clientId ?? credentials.client_id ?? accessId ?? "").trim();
-  const clientSecret = String(credentials.clientSecret ?? credentials.client_secret ?? accessKey ?? "").trim();
+  const clientId = String(credentials.clientId ?? credentials.client_id ?? "").trim();
+  const clientSecret = String(credentials.clientSecret ?? credentials.client_secret ?? "").trim();
   const candidates = [
     {
       mode: "userpass",

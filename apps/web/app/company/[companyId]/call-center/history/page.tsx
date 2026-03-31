@@ -113,18 +113,8 @@ function CallCenterTabs({ companyId }: { companyId: string }) {
         <h1 className="text-2xl font-semibold">Call Center</h1>
         <p className="text-sm text-muted-foreground">Call history and AI lead inquiries.</p>
       </div>
-      <div className="flex flex-wrap gap-2">
-        <button type="button" onClick={() => setView("history")}
-          className={`rounded-full border px-3 py-1 text-sm ${view === "history" ? "bg-primary text-primary-foreground border-primary" : `${theme.surfaceSubtle} ${theme.cardBorder}`}`}>
-          Call History
-        </button>
-        <button type="button" onClick={() => setView("inquiries")}
-          className={`rounded-full border px-3 py-1 text-sm ${view === "inquiries" ? "bg-primary text-primary-foreground border-primary" : `${theme.surfaceSubtle} ${theme.cardBorder}`}`}>
-          AI Inquiries
-        </button>
-      </div>
       <div className={panelClass}>
-        {view === "history" ? <CallHistoryPanel companyId={companyId} /> : <LeadInquiriesPanel companyId={companyId} />}
+        <CallHistoryPanel companyId={companyId} />
       </div>
     </div>
   );
@@ -331,24 +321,23 @@ function CallHistoryPanel({ companyId }: { companyId: string }) {
             <thead>
               <tr className="border-b text-xs uppercase text-muted-foreground" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
                 <th className="px-4 py-3 text-left">Customer</th>
-                <th className="px-4 py-3 text-left">Direction</th>
-                <th className="px-4 py-3 text-left">From</th>
-                <th className="px-4 py-3 text-left">To</th>
-                <th className="px-4 py-3 text-left">Status</th>
-                <th className="px-4 py-3 text-left">Started</th>
                 <th className="px-4 py-3 text-left">Agent</th>
-                <th className="px-4 py-3 text-left">Notes</th>
+                <th className="px-4 py-3 text-left">Direction</th>
+                <th className="px-4 py-3 text-left">Status</th>
+                <th className="px-4 py-3 text-left">Duration</th>
+                <th className="px-4 py-3 text-left">Time</th>
                 <th className="px-4 py-3 text-left">Recording</th>
+                <th className="px-4 py-3 text-left">Notes</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((row, idx) => {
                 const started = row.startedAt ? new Date(row.startedAt) : null;
                 const isOutbound = row.direction === "outbound";
-                const agentLabel = row.agent?.name ?? row.agent?.email ?? "—";
+                const agentLabel = row.agent?.name ?? row.agent?.email ?? (isOutbound ? row.from : row.to) ?? "—";
                 const externalPhone = isOutbound ? row.to : row.from;
                 const hasPhone = Boolean(externalPhone) && externalPhone!.toLowerCase() !== "unknown";
-                const customerLabel = row.customer?.name ?? row.customer?.phone ?? (hasPhone ? null : "—");
+                const customerLabel = row.customer?.name ?? (hasPhone ? null : "—");
                 const recordingProxyUrl = isUsableRecordingUrl(row.recording?.url)
                   ? `/api/company/${companyId}/call-center/history/recording-proxy?recordingUrl=${encodeURIComponent(String(row.recording?.url ?? ""))}`
                   : "";
@@ -357,7 +346,7 @@ function CallHistoryPanel({ companyId }: { companyId: string }) {
                   <tr key={row.id} className={`align-top transition-colors hover:bg-white/[0.03] ${idx !== rows.length - 1 ? "border-b" : ""}`}
                     style={{ borderColor: "rgba(255,255,255,0.06)" }}>
 
-                    {/* Customer */}
+                    {/* Customer + Phone */}
                     <td className="px-4 py-3">
                       {customerLabel === null ? (
                         <span className="inline-flex items-center rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-400">
@@ -366,7 +355,12 @@ function CallHistoryPanel({ companyId }: { companyId: string }) {
                       ) : (
                         <div className="font-medium">{customerLabel}</div>
                       )}
-                      {row.customer?.phone && <div className="text-xs text-muted-foreground">{row.customer.phone}</div>}
+                      {hasPhone ? <div className="font-mono text-xs text-muted-foreground">{externalPhone}</div> : null}
+                    </td>
+
+                    {/* Agent */}
+                    <td className="px-4 py-3">
+                      <div className="text-xs font-medium">{agentLabel}</div>
                     </td>
 
                     {/* Direction */}
@@ -380,12 +374,6 @@ function CallHistoryPanel({ companyId }: { companyId: string }) {
                       </span>
                     </td>
 
-                    {/* From */}
-                    <td className="px-4 py-3 font-mono text-xs">{row.from}</td>
-
-                    {/* To */}
-                    <td className="px-4 py-3 font-mono text-xs">{row.to}</td>
-
                     {/* Status */}
                     <td className="px-4 py-3">
                       <span className={`text-xs font-medium capitalize ${statusColor(row.status)}`}>
@@ -393,7 +381,12 @@ function CallHistoryPanel({ companyId }: { companyId: string }) {
                       </span>
                     </td>
 
-                    {/* Started */}
+                    {/* Duration */}
+                    <td className="px-4 py-3 text-xs whitespace-nowrap">
+                      {row.durationSeconds ? formatDuration(row.durationSeconds) : <span className="text-muted-foreground">—</span>}
+                    </td>
+
+                    {/* Time */}
                     <td className="px-4 py-3 whitespace-nowrap text-xs">
                       {started ? (
                         <>
@@ -401,22 +394,6 @@ function CallHistoryPanel({ companyId }: { companyId: string }) {
                           <div className="text-muted-foreground">{started.toLocaleTimeString()}</div>
                         </>
                       ) : "—"}
-                      {row.durationSeconds ? (
-                        <div className="mt-0.5 text-muted-foreground">{formatDuration(row.durationSeconds)}</div>
-                      ) : null}
-                    </td>
-
-                    {/* Agent */}
-                    <td className="px-4 py-3">
-                      <div className="text-xs font-medium">{agentLabel}</div>
-                      {row.agent?.email && row.agent.email !== agentLabel && (
-                        <div className="text-xs text-muted-foreground">{row.agent.email}</div>
-                      )}
-                    </td>
-
-                    {/* Notes */}
-                    <td className="px-4 py-3">
-                      <NotesCell companyId={companyId} row={row} />
                     </td>
 
                     {/* Recording */}
@@ -434,10 +411,15 @@ function CallHistoryPanel({ companyId }: { companyId: string }) {
                           <button type="button" onClick={() => void resolveRecordingNow(row)}
                             disabled={Boolean(resolvingById[row.id]) || !String(row.providerCallId ?? "").trim()}
                             className={`rounded-full border px-2 py-0.5 text-xs transition disabled:opacity-60 ${cardBorder} ${cardBg}`}>
-                            {resolvingById[row.id] ? "Resolving…" : "Resolve Recording"}
+                            {resolvingById[row.id] ? "Resolving…" : "Resolve"}
                           </button>
                         </div>
                       )}
+                    </td>
+
+                    {/* Notes */}
+                    <td className="px-4 py-3">
+                      <NotesCell companyId={companyId} row={row} />
                     </td>
                   </tr>
                 );

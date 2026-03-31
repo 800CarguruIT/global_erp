@@ -10,14 +10,8 @@ import {
 
 const CATEGORIES = [
   "Main",
-  "Call Center",
-  "Leads",
   "Sales",
-  "Jobs",
-  "Accounting",
-  "Reports",
-  "HR",
-  "Analytics",
+  "Service Center",
 ] as const;
 
 export type Category = (typeof CATEGORIES)[number];
@@ -65,37 +59,13 @@ export function CategoryNav({
 }
 
 CategoryNav.getActiveCategory = function getActiveCategory(pathname: string): Category {
-  if (pathname.startsWith("/global")) {
-    if (pathname.includes("/call-center")) return "Call Center";
-    if (pathname.includes("/leads")) return "Leads";
-    if (pathname.includes("/sales")) return "Sales";
-    if (pathname.includes("/jobs")) return "Jobs";
-    if (pathname.includes("/accounting")) return "Accounting";
-    if (pathname.includes("/reports")) return "Reports";
-    if (pathname.includes("/hr")) return "HR";
-    if (pathname.includes("/analytics")) return "Analytics";
-    return "Main";
-  }
-  if (pathname.includes("/call-center")) return "Call Center";
-  if (pathname.includes("/leads") || pathname.includes("/crm")) return "Leads";
-  if (pathname.includes("/sales")) return "Sales";
-  if (pathname.includes("/jobs")) return "Jobs";
-  if (pathname.includes("/accounting")) return "Accounting";
-  if (pathname.includes("/reports")) return "Reports";
-  if (pathname.includes("/hr")) return "HR";
-  if (pathname.includes("/analytics")) return "Analytics";
+  if (pathname.includes("/call-center") || pathname.includes("/leads") || pathname.includes("/estimates")) return "Sales";
+  if (pathname.includes("/pis") || pathname.includes("/car-in-dashboard")) return "Service Center";
   return "Main";
 };
 
 const CATEGORY_MODULE_MAP: Partial<Record<Category, ModuleKey>> = {
-  "Call Center": "callCenter",
-  Leads: "leads",
   Sales: "sales",
-  Jobs: "jobs",
-  Accounting: "accounting",
-  Reports: "reports",
-  HR: "hr",
-  Analytics: "analytics",
 };
 
 function getHref(scopeInfo: ScopeInfo, category: Category, currentPath: string): string {
@@ -114,21 +84,9 @@ function getHref(scopeInfo: ScopeInfo, category: Category, currentPath: string):
   switch (category) {
     case "Main":
       return base || "/";
-    case "Call Center":
-      return `${base}/call-center`;
-    case "Leads":
-      return `${base}/leads`;
     case "Sales":
-      return `${base}/sales`;
-    case "Jobs":
-      return `${base}/jobs`;
-    case "Accounting":
-      return `${base}/accounting`;
-    case "Reports":
-      return `${base}/reports`;
-    case "HR":
-      return `${base}/hr`;
-    case "Analytics":
-      return `${base}/analytics`;
+      return `${base}/call-center`;
+    case "Service Center":
+      return `${base}/pis/advisor-portal`;
   }
 }
