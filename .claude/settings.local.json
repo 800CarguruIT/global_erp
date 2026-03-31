@@ -45,7 +45,8 @@
       "Bash(DATABASE_URL=\"postgres://autoguru:autoguru@localhost:5432/global_erp_dev\" npx ts-node --transpile-only --compiler-options '{\"\"module\"\":\"\"CommonJS\"\"}' scripts/migrate.ts)",
       "Bash(ls -la \"/c/Users/ABC/Documents/Global ERP/apps/web/app/\\(components\\)/\")",
       "Bash(DATABASE_URL=\"postgres://autoguru:autoguru@localhost:5432/global_erp_dev\" pnpm -s ts-node --transpile-only --compiler-options '{\"\"module\"\":\"\"CommonJS\"\"}' packages/ai-core/scripts/query-rcc.ts)",
-      "Bash(ls -la /c/Users/ABC/Documents/'Global ERP'/apps/web/app/'\\(components\\)'/shell/)"
+      "Bash(ls -la /c/Users/ABC/Documents/'Global ERP'/apps/web/app/'\\(components\\)'/shell/)",
+      "Bash(grep -E \"\\\\.\\(ts|js|sql\\)$\")"
     ]
   }
 }

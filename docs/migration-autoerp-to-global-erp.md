@@ -526,7 +526,7 @@ Benefits:
 
 ---
 
-## 4. Architecture Comparison
+## 5. Architecture Comparison
 
 ### AutoERP Architecture
 ```
@@ -573,31 +573,37 @@ Benefits:
             └─────────┘        └─────────┘
 ```
 
-### Target Architecture (Unified)
+### Target Architecture (Unified Multi-Portal)
 ```
-                    ┌──────────────────┐
-                    │  Docker / Cloud  │
-                    └──────┬───────────┘
-              ┌────────────┼────────────┐
-        ┌─────┴──────┐  ┌─┴──────┐  ┌──┴─────────┐
-        │  Next.js   │  │ Voice  │  │   Mobile   │
-        │  16 App    │  │ Bridge │  │   (Expo)   │
-        │  (unified) │  │        │  │  from AE   │
-        │  500+ APIs │  └────────┘  └────────────┘
-        └─────┬──────┘
-         ┌────┴────┐
-    ┌────┤ ai-core ├────┐
-    │    │ (backend)│    │
-    │    └─────────┘    │
-┌───┴─────┐      ┌─────┴───┐      ┌──────────┐
-│Postgres │      │Firebase │      │  Redis   │
-│  16     │      │  (RT)   │      │(optional)│
-└─────────┘      └─────────┘      └──────────┘
+                         ┌──────────────────┐
+                         │  Docker / Nginx  │
+                         └──────┬───────────┘
+    ┌──────────┬──────────┬─────┼──────┬──────────┬──────────┐
+┌───┴──┐  ┌───┴───┐  ┌───┴──┐  │  ┌───┴──┐  ┌───┴──┐  ┌───┴────┐
+│Admin │  │Company│  │Work- │  │  │Vendor│  │ RSA  │  │Recovery│
+│:3001 │  │ :3002 │  │shop  │  │  │:3004 │  │:3005 │  │ :3006  │
+└──┬───┘  └──┬────┘  │:3003 │  │  └──┬───┘  └──┬───┘  └──┬─────┘
+   │         │       └──┬───┘  │     │         │         │
+   └─────────┴──────────┴──────┴─────┴─────────┴─────────┘
+                        │                    ┌──────────┐
+                  ┌─────┴──────┐             │  Mobile  │
+                  │ @repo/ui   │             │  (Expo)  │
+                  │ @repo/     │             └──────────┘
+                  │  ai-core   │
+                  │ @repo/     │
+                  │  portal-   │
+                  │  config    │
+                  └─────┬──────┘
+              ┌─────────┼─────────┐
+         ┌────┴────┐ ┌──┴─────┐ ┌┴────────┐
+         │Postgres │ │Firebase│ │  Redis  │
+         │  16     │ │  (RT)  │ │(option) │
+         └─────────┘ └────────┘ └─────────┘
 ```
 
 ---
 
-## 5. Database Comparison
+## 6. Database Comparison
 
 ### Overlapping Entities (Exist in Both - Already Merged via Global ERP)
 
@@ -652,7 +658,7 @@ All existing Global ERP tables are retained as-is. Key unique modules:
 
 ---
 
-## 6. UI/UX Comparison
+## 7. UI/UX Comparison
 
 ### Design Philosophy
 
@@ -692,15 +698,17 @@ All existing Global ERP tables are retained as-is. Key unique modules:
 
 ---
 
-## 7. Migration Strategy: Target Architecture
+## 8. Migration Strategy: Target Architecture
 
-### Principle: "Extend Global ERP, Don't Replace"
+### Principle: "Extend Global ERP, Split into Portals"
 
 The unified system will:
 - Use Global ERP as the foundation (code, DB, infrastructure)
+- **Split `apps/web` into 6 dedicated portal apps** (Admin, Company, Workshop, Vendor, RSA, Recovery)
+- Port AutoERP's **PortalShell**, **portal-nav.ts**, and **multi-portal architecture patterns**
 - **Enhance existing tables** for towing/RSA with AutoERP's additional fields
 - Add new tables only for genuinely missing modules (rental, insurance, workflow engine)
-- Port AutoERP's superior UI components
+- Port AutoERP's superior UI components (DataTable, collapsible sidebar)
 - Preserve ALL legacy CarGuru data untouched
 
 ### Target Tech Stack
@@ -713,17 +721,19 @@ The unified system will:
 | **TypeScript** | 5.9+ | Global ERP |
 | **Database** | PostgreSQL 16, raw `postgres` client | Global ERP |
 | **Package Manager** | pnpm + Turborepo | Global ERP |
-| **Auth** | Session cookies (web) + JWT (mobile) | Global ERP |
+| **Auth** | Session cookies (shared) + JWT (mobile) | Global ERP |
 | **AI** | OpenAI + Anthropic (dual provider) | Global ERP |
 | **Forms** | react-hook-form + Zod | Global ERP |
 | **UI Library** | @repo/ui (enhanced with AutoERP components) | Merged |
+| **Portal Config** | @repo/portal-config (nav, branding, ports) | AutoERP pattern |
+| **Portal Shell** | PortalShell + PortalSidebar + PortalHeader | AutoERP pattern |
 | **Charts** | Recharts | Global ERP |
 | **Theming** | 5 themes + RTL + enhanced animations | Merged |
 | **Mobile** | Expo (ported from AutoERP) | AutoERP |
 
 ---
 
-## 8. Database Migration Plan
+## 9. Database Migration Plan
 
 ### Safety-First Principles
 
@@ -1034,7 +1044,7 @@ ON CONFLICT DO NOTHING;
 
 ---
 
-## 9. Legacy CarGuru Data Safety Plan
+## 10. Legacy CarGuru Data Safety Plan
 
 ### Critical: Zero Data Loss Guarantee
 
@@ -1111,73 +1121,174 @@ diff table_counts_before.txt table_counts_after_test.txt
 
 ---
 
-## 10. Frontend Unification Plan
+## 10. Frontend Unification Plan (Multi-Portal)
 
-### Step 1: Port AutoERP DataTable to Global ERP
+### Step 1: Create Portal Infrastructure
 
-Port `packages/ui/src/components/DataTable.tsx` (604 lines) from AutoERP into Global ERP's `packages/ui/src/`:
+**1a. Create `packages/portal-config/`** (from AutoERP pattern):
+- `portal-nav.ts` - Navigation groups per portal type (see Section 3)
+- `portal-brands.ts` - Brand colors, icons per portal
+- `portal-ports.ts` - Port assignments (3001-3006)
+- `index.ts` - Barrel export
 
-Features to bring:
+**1b. Port `PortalShell` from AutoERP** into `packages/ui/src/platform/`:
+- `PortalShell.tsx` - Main layout wrapper
+- `PortalSidebar.tsx` - Collapsible sidebar (64px/256px, pinnable, hover-expand)
+- `PortalHeader.tsx` - Breadcrumbs, search, notifications, language, theme
+- `PortalFooter.tsx` - Footer component
+
+Adapt to Global ERP:
+- Use FontAwesome icons instead of Lucide
+- Integrate Global ERP's 5-theme system + RTL support
+- Integrate Linkus call notification system
+- Use Global ERP's ScopeProvider for company/branch context
+
+**1c. Create `packages/auth/`** for shared portal auth:
+- `requirePortalAccess(portalId)` - Server-side layout guard
+- `getPortalContext()` - Portal mode detection
+- Shared session validation (reuse Global ERP's existing session system)
+
+### Step 2: Port DataTable Component
+
+Port `packages/ui/src/components/DataTable.tsx` (604 lines) from AutoERP:
 - Column sorting with visual indicators
 - Column-level text search with popover
 - Date range filtering (auto-detect)
 - Configurable pagination [10, 25, 50, 100]
-- Null-safe sorting
-- Responsive design
+- Null-safe sorting, responsive design
+- Adapt to FontAwesome icons, theme tokens, RTL
 
-Adapt to Global ERP:
-- Use FontAwesome icons instead of Lucide
-- Apply Global ERP theme tokens
-- Support RTL layout
+### Step 3: Create 6 Portal Apps
 
-### Step 2: Enhance Sidebar Navigation
+Scaffold each portal app from `apps/web` pages:
 
-Port AutoERP's collapsible sidebar pattern:
-- 64px collapsed / 256px expanded
-- Hover-expand with smooth transitions
-- Pinnable state (localStorage persistence)
-- Staggered animation for nav items
-
-Merge with Global ERP's:
-- Category-based navigation structure
-- Company/branch context switcher
-- Real-time call notification integration
-
-### Step 3: Add New Module Pages
-
+**P1: `apps/admin/`** (from `apps/web/app/global/*`):
 ```
-apps/web/app/company/[companyId]/
-├── rental/
-│   ├── page.tsx                    (available vehicles)
-│   ├── bookings/page.tsx          (booking management)
-│   └── [bookingId]/page.tsx       (booking detail)
-├── insurance/
-│   ├── policies/page.tsx          (policy list)
-│   └── claims/page.tsx            (claims management)
-├── warranty/
-│   ├── policies/page.tsx          (warranty list)
-│   └── claims/page.tsx            (claims management)
-├── tow-trucks/
-│   └── page.tsx                    (truck fleet management)
-└── bookings/
-    └── page.tsx                    (centralized booking calendar)
+apps/admin/app/
+├── layout.tsx              # AdminShell (PortalShell with ADMIN brand)
+├── page.tsx                # Dashboard
+├── companies/
+├── settings/security/
+├── accounting/
+└── api/auth/, api/global/
 ```
 
-Corresponding API routes:
+**P2: `apps/company/`** (from `apps/web/app/company/[companyId]/*`):
 ```
-apps/web/app/api/company/[companyId]/
-├── rental/
-│   ├── vehicles/route.ts
-│   └── bookings/route.ts
-├── insurance/
-│   ├── policies/route.ts
-│   └── claims/route.ts
-├── warranty/
-│   ├── policies/route.ts
-│   └── claims/route.ts
-├── tow-trucks/route.ts
-└── bookings/route.ts
+apps/company/app/
+├── layout.tsx              # CompanyShell
+├── page.tsx                # Company dashboard
+├── leads/                  # CRM leads (workshop + RSA + recovery)
+├── call-center/
+├── customers/
+├── marketing/
+├── pis/
+├── revenue-command-center/
+├── data-center/
+├── accounting/
+├── hr/
+├── rental/                 # NEW module
+├── insurance/              # NEW module
+├── bookings/               # NEW module
+└── api/
 ```
+
+**P3: `apps/workshop/`** (from `apps/web/app/company/[companyId]/branches/[branchId]/*`):
+```
+apps/workshop/app/
+├── layout.tsx              # WorkshopShell
+├── page.tsx                # Workshop dashboard
+├── inspections/
+├── estimates/
+├── job-cards/
+├── work-orders/
+├── quality-checks/
+├── gatepasses/
+├── inventory/
+├── procurement/
+├── accounting/
+├── bookings/               # Workshop bookings
+└── api/
+```
+
+**P4: `apps/vendor/`** (from `apps/web/app/company/[companyId]/vendors/[vendorId]/*`):
+```
+apps/vendor/app/
+├── layout.tsx              # VendorShell
+├── page.tsx                # Vendor dashboard
+├── procurement/
+├── quotes/
+├── accounts/
+└── api/
+```
+
+**P5: `apps/rsa/`** (from `apps/web/app/company/[companyId]/leads/rsa/*` + RSA APIs):
+```
+apps/rsa/app/
+├── layout.tsx              # RsaShell
+├── page.tsx                # RSA dashboard
+├── jobs/                   # RSA jobs list + 9-step workflow
+├── inspections/            # RSA field inspections
+├── earnings/               # Workshop + vendor earnings
+├── dispatch/               # Dispatch board
+├── bookings/               # RSA bookings
+└── api/
+```
+
+**P6: `apps/recovery/`** (from `apps/web/app/company/[companyId]/recovery-requests/*`):
+```
+apps/recovery/app/
+├── layout.tsx              # RecoveryShell
+├── page.tsx                # Recovery dashboard
+├── requests/               # Recovery requests list + 5-step workflow
+├── trucks/                 # Tow truck fleet management (NEW)
+├── storage/                # Vehicle storage (NEW)
+├── cc-dashboard/           # Call center recovery dashboard
+├── bookings/               # Recovery bookings
+└── api/
+```
+
+### Step 4: Update Turborepo Config
+
+```json
+// turbo.json - add new portal apps
+{
+  "pipeline": {
+    "build": { "dependsOn": ["^build"] },
+    "dev": { "cache": false, "persistent": true }
+  }
+}
+```
+
+```yaml
+# pnpm-workspace.yaml
+packages:
+  - "apps/*"
+  - "packages/*"
+```
+
+### Step 5: Move Shared Feature Modules to `@repo/ui`
+
+Port AutoERP's portal-agnostic module pattern. Each module lives in `packages/ui/src/modules/` and can be imported by any portal:
+
+```
+packages/ui/src/modules/
+├── crm/              # Customer, Lead, Vehicle components
+├── workshop/         # Inspection, Estimate, JobCard, QC components
+├── accounting/       # COA, Journal, Invoice, Reports components
+├── hr/               # Employee, Attendance, Payroll components
+├── recovery/         # RecoveryRequest, TowTruck components
+├── rsa/              # RSA Job, RSA Inspection components
+├── rental/           # RentalVehicle, RentalBooking components (NEW)
+├── insurance/        # Policy, Claim components (NEW)
+├── marketing/        # Campaign, Template components
+├── inventory/        # Stock, Parts, Transfer components
+└── settings/         # Roles, Users, Config components
+```
+
+### Step 6: Deprecate `apps/web`
+
+Once all pages are migrated to portal apps, `apps/web` is removed. The migration is incremental - portals can coexist with `apps/web` during transition.
 
 ---
 
@@ -1243,7 +1354,7 @@ const [vehicle] = await sql`
 
 ---
 
-## 12. Performance Optimization Strategy
+## 13. Performance Optimization Strategy
 
 ### Database Performance
 
@@ -1259,11 +1370,13 @@ const [vehicle] = await sql`
 
 | Optimization | Description |
 |-------------|-------------|
+| **Separate portal bundles** | Each portal builds independently = smaller JS bundles per app |
 | **Server Components** | Default to server rendering (already in Global ERP) |
 | **React 19 Streaming** | Suspense streaming for heavy pages |
-| **Dynamic imports** | Lazy-load new modules (rental, insurance, booking calendar) |
+| **Dynamic imports** | Lazy-load heavy components within each portal |
 | **Virtualized DataTable** | Add virtualization for 1000+ row tables |
 | **Image optimization** | Sharp + Next.js Image (already in Global ERP) |
+| **Shared package treeshaking** | Each portal only imports its needed modules from @repo/ui |
 
 ### API Performance
 
@@ -1276,75 +1389,90 @@ const [vehicle] = await sql`
 
 ---
 
-## 13. Risk Assessment & Mitigation
+## 14. Risk Assessment & Mitigation
 
 | Risk | Probability | Impact | Mitigation |
 |------|------------|--------|------------|
 | **Data loss during migration** | LOW | CRITICAL | Full backup, test on clone, row count verification |
 | **Breaking existing features** | LOW | HIGH | Only ADD columns/tables, never modify existing |
-| **Performance regression** | LOW | MEDIUM | New tables have proper indexes from day 1 |
+| **Portal split breaks pages** | MEDIUM | HIGH | Incremental migration - portals coexist with apps/web during transition |
+| **Auth/session issues across portals** | MEDIUM | HIGH | Shared session cookie (same domain), test SSO early |
+| **Performance regression** | LOW | MEDIUM | Separate bundles per portal = smaller than single app |
 | **Schema conflicts** | LOW | HIGH | Only nullable ALTER TABLE ADD COLUMN |
 | **Auth/permission gaps** | MEDIUM | MEDIUM | New modules use existing RBAC + new permissions |
-| **UI inconsistency** | MEDIUM | LOW | Port DataTable as unified component |
+| **UI inconsistency across portals** | MEDIUM | MEDIUM | Shared PortalShell + @repo/ui ensures consistency |
+| **API route duplication** | LOW | LOW | Thin route wrappers call shared @repo/ai-core functions |
 
 ---
 
-## 14. Migration Phases & Timeline
+## 15. Migration Phases & Timeline
 
-### Phase 1: Database Enhancements (Migrations 187-189)
-- [ ] Full database backup
-- [ ] Clone to test database
-- [ ] Run enhancement migrations (ALTER TABLE ADD COLUMN)
+### Phase 1: Portal Infrastructure (Foundation)
+- [ ] Create `packages/portal-config/` (portal-nav.ts, brands, ports)
+- [ ] Port `PortalShell`, `PortalSidebar`, `PortalHeader` from AutoERP → `packages/ui/src/platform/`
+- [ ] Create `packages/auth/` with `requirePortalAccess()`
+- [ ] Port `DataTable` component from AutoERP → `packages/ui/src/components/`
+- [ ] Adapt all ported components to Global ERP's theme system + RTL + FontAwesome
+
+### Phase 2: Database (Migrations 187-194)
+- [ ] Full database backup + clone to test DB
+- [ ] Run enhancement migrations 187-189 (ALTER TABLE ADD COLUMN)
+- [ ] Run new table migrations 190-194 (tow_trucks, rental, insurance, workflow, bookings, permissions)
 - [ ] Verify zero impact on existing data
 - [ ] Deploy to production
 
-### Phase 2: New Tables (Migrations 190-194)
-- [ ] Create tow_trucks table
-- [ ] Create rental & leasing tables
-- [ ] Create insurance & warranty tables
-- [ ] Create workflow engine tables
-- [ ] Create bookings table
-- [ ] Add permissions
-- [ ] Test on clone, deploy to production
+### Phase 3: Create Portal Apps (Scaffold + Move Pages)
+- [ ] Create `apps/admin/` - move pages from `apps/web/app/global/*`
+- [ ] Create `apps/company/` - move pages from `apps/web/app/company/[companyId]/*`
+- [ ] Create `apps/workshop/` - move pages from `apps/web/app/company/[companyId]/branches/[branchId]/*`
+- [ ] Create `apps/vendor/` - move pages from `apps/web/app/company/[companyId]/vendors/[vendorId]/*`
+- [ ] Create `apps/rsa/` - move RSA lead pages + RSA API routes
+- [ ] Create `apps/recovery/` - move recovery request pages + recovery API routes
+- [ ] Update Turborepo config for 6 portal apps
+- [ ] Test each portal independently
+- [ ] Keep `apps/web` running in parallel during transition
 
-### Phase 3: UI Enhancement
-- [ ] Port DataTable component from AutoERP
-- [ ] Enhance sidebar with collapsible pattern
-- [ ] Add staggered animations and accessibility improvements
-- [ ] Update sidebar config with new module entries
-
-### Phase 4: Backend Modules
-- [ ] Implement rental backend (queries, actions, API routes)
-- [ ] Implement insurance/warranty backend
-- [ ] Implement tow truck fleet management
+### Phase 4: New Business Modules
+- [ ] Implement rental backend + Company portal pages
+- [ ] Implement insurance/warranty backend + Company portal pages
+- [ ] Implement tow truck fleet management backend + Recovery portal pages
 - [ ] Port workflow engine from AutoERP (Prisma → raw SQL)
-- [ ] Implement centralized booking system
-- [ ] Create UI pages for all new modules
+- [ ] Implement centralized booking system (shared across portals)
 
-### Phase 5: Mobile App Integration
+### Phase 5: Shared Feature Modules
+- [ ] Move reusable page components to `packages/ui/src/modules/*`
+- [ ] Ensure each portal imports from shared modules (not duplicated)
+- [ ] Add portal switcher to Admin portal
+- [ ] Implement portal-aware breadcrumbs
+
+### Phase 6: Mobile App Integration
 - [ ] Port Expo mobile app from AutoERP
 - [ ] Adapt mobile API endpoints to Global ERP auth (JWT)
 - [ ] Test mobile flows end-to-end
 
-### Phase 6: Performance & Cleanup
+### Phase 7: Cleanup & Optimization
+- [ ] Deprecate and remove `apps/web`
 - [ ] Add materialized views for dashboards
-- [ ] Performance audit
+- [ ] Performance audit per portal (bundle size, load time)
 - [ ] Documentation update
 
 ---
 
-## 15. Rollback Strategy
+## 16. Rollback Strategy
 
 Each phase is independently reversible:
 
 | Phase | Rollback Method |
 |-------|----------------|
-| Phase 1 (ALTER TABLE) | `ALTER TABLE DROP COLUMN` for each added column |
-| Phase 2 (New Tables) | `DROP TABLE` for new tables only |
-| Phase 3 (UI) | Revert git commits |
-| Phase 4 (Backend) | Revert git commits, disable routes |
-| Phase 5 (Mobile) | Unpublish apps |
-| Phase 6 (Perf) | Drop materialized views |
+| Phase 1 (Portal infra) | Revert git commits, no production impact |
+| Phase 2 (Database) | `ALTER TABLE DROP COLUMN` + `DROP TABLE` for new tables only |
+| Phase 3 (Portal apps) | Keep `apps/web` running, disable new portal apps |
+| Phase 4 (New modules) | Disable routes, drop new tables if needed |
+| Phase 5 (Shared modules) | Revert to inline components per portal |
+| Phase 6 (Mobile) | Unpublish apps |
+| Phase 7 (Cleanup) | Restore `apps/web` from git if needed |
+
+**Safety net:** `apps/web` remains operational throughout Phases 1-6. It is only removed in Phase 7 after all portals are verified working.
 
 **No point of no return** - all existing data is untouched throughout.
 
@@ -1357,7 +1485,6 @@ Each phase is independently reversible:
 | **TowJob table** | `recovery_requests` already covers this with richer workflow |
 | **RsaJob table** | `leads` (type='rsa') + `rsa_inspections` already covers this |
 | **RsaCall table** | Global ERP's `call_sessions` + `calls` already handles call logging |
-| **8 Portal apps** | Global ERP's single unified app is simpler and more maintainable |
 | **7 Fastify microservices** | Next.js API routes are sufficient, fewer moving parts |
 | **Prisma ORM** | Raw SQL gives better performance and full PostgreSQL feature access |
 | **WorkNet marketplace** | Future feature, not core business need now |
@@ -1371,27 +1498,51 @@ Each phase is independently reversible:
 
 | AutoERP Source | Global ERP Target | Action |
 |---------------|-------------------|--------|
-| `packages/ui/src/components/DataTable.tsx` | `packages/ui/src/components/DataTable.tsx` | Port + adapt to theme system |
-| `packages/ui/src/platform/PortalSidebar.tsx` | Enhance `apps/web/components/layout/` | Extract collapsible pattern |
+| `packages/config/src/portal-nav.ts` | `packages/portal-config/src/portal-nav.ts` | Port + adapt to 6 portals |
+| `packages/config/src/index.ts` | `packages/portal-config/src/portal-ports.ts` | Port port assignments |
+| `packages/ui/src/components/PortalShell.tsx` | `packages/ui/src/platform/PortalShell.tsx` | Port + adapt to theme system |
+| `packages/ui/src/components/PortalSidebar.tsx` | `packages/ui/src/platform/PortalSidebar.tsx` | Port + RTL support |
+| `packages/ui/src/components/DataTable.tsx` | `packages/ui/src/components/DataTable.tsx` | Port + adapt to FontAwesome + RTL |
+| `packages/auth/src/session.ts` | `packages/auth/src/portal-access.ts` | Port `requirePortalAccess()` |
 | `packages/utils/src/workflow-engine.ts` | `packages/ai-core/src/workflow/engine.ts` | Rewrite Prisma → raw SQL |
 | `packages/utils/src/booking-to-job.ts` | `packages/ai-core/src/booking/actions.ts` | Rewrite Prisma → raw SQL |
 | `packages/utils/src/money.ts` | `packages/ai-core/src/utils/money.ts` | Direct port (fils conversion utility) |
-| `mobile/customer-app/` | New `apps/mobile/` or separate repo | Port with API adaptation |
-| `mobile/technician-app/` | New `apps/mobile-tech/` or separate repo | Port with API adaptation |
+| `packages/ui/src/modules/*` | `packages/ui/src/modules/*` | Port portal-agnostic feature modules |
+| `mobile/customer-app/` | `apps/mobile/` | Port with API adaptation |
+| `mobile/technician-app/` | `apps/mobile-tech/` | Port with API adaptation |
+| `apps/admin/src/app/(admin)/admin-shell.tsx` | `apps/admin/app/layout.tsx` | Reference pattern for portal shell |
+| `apps/workshop/src/app/(admin)/workshop-shell.tsx` | `apps/workshop/app/layout.tsx` | Reference pattern for portal shell |
+| `apps/rsa/src/app/(admin)/rsa-shell.tsx` | `apps/rsa/app/layout.tsx` | Reference pattern for portal shell |
 
-## Appendix C: Sidebar Config Update
+## Appendix C: Portal Page Migration Map (apps/web → Portal Apps)
 
-Add to `packages/ui/src/layout/sidebarConfig.ts`:
-
-```typescript
-// New module entries
-{ label: 'Tow Trucks', icon: 'truck-tow', href: '/tow-trucks', module: 'recovery' },
-{ label: 'Rental', icon: 'car-side', href: '/rental', module: 'rental' },
-{ label: 'Insurance', icon: 'shield-check', href: '/insurance', module: 'insurance' },
-{ label: 'Warranty', icon: 'certificate', href: '/warranty', module: 'warranty' },
-{ label: 'Bookings', icon: 'calendar-check', href: '/bookings', module: 'booking' },
-```
+| Current Location (`apps/web/app/`) | Target Portal | Target Location |
+|-------------------------------------|--------------|----------------|
+| `global/*` | Admin | `apps/admin/app/*` |
+| `global/companies/*` | Admin | `apps/admin/app/companies/*` |
+| `global/settings/security/*` | Admin | `apps/admin/app/settings/*` |
+| `company/[companyId]/page.tsx` | Company | `apps/company/app/page.tsx` |
+| `company/[companyId]/leads/*` | Company | `apps/company/app/leads/*` |
+| `company/[companyId]/call-center/*` | Company | `apps/company/app/call-center/*` |
+| `company/[companyId]/customers/*` | Company | `apps/company/app/customers/*` |
+| `company/[companyId]/marketing/*` | Company | `apps/company/app/marketing/*` |
+| `company/[companyId]/pis/*` | Company | `apps/company/app/pis/*` |
+| `company/[companyId]/revenue-command-center/*` | Company | `apps/company/app/revenue-command-center/*` |
+| `company/[companyId]/data-center/*` | Company | `apps/company/app/data-center/*` |
+| `company/[companyId]/accounting/*` | Company | `apps/company/app/accounting/*` |
+| `company/[companyId]/hr/*` | Company | `apps/company/app/hr/*` |
+| `company/[companyId]/branches/[branchId]/*` | Workshop | `apps/workshop/app/*` |
+| `company/[companyId]/branches/[branchId]/jobs/*` | Workshop | `apps/workshop/app/job-cards/*` |
+| `company/[companyId]/branches/[branchId]/accounting/*` | Workshop | `apps/workshop/app/accounting/*` |
+| `company/[companyId]/branches/[branchId]/inventory/*` | Workshop | `apps/workshop/app/inventory/*` |
+| `company/[companyId]/vendors/[vendorId]/*` | Vendor | `apps/vendor/app/*` |
+| `company/[companyId]/vendors/[vendorId]/procurement/*` | Vendor | `apps/vendor/app/procurement/*` |
+| `company/[companyId]/leads/rsa/*` | RSA | `apps/rsa/app/jobs/*` |
+| `api/v1/rsa/*` | RSA | `apps/rsa/app/api/*` |
+| `company/[companyId]/recovery-requests/*` | Recovery | `apps/recovery/app/requests/*` |
+| `company/[companyId]/recovery-cc/*` | Recovery | `apps/recovery/app/cc-dashboard/*` |
+| `api/company/[companyId]/recovery-requests/*` | Recovery | `apps/recovery/app/api/*` |
 
 ---
 
-*Document generated 2026-03-31. Revised after overlap analysis confirming Recovery Requests (towing) and RSA leads already exist in Global ERP. This is a living document - update as migration progresses.*
+*Document generated 2026-03-31. Revised with multi-portal architecture (Admin, Company, Workshop, Vendor, RSA, Recovery) and overlap analysis confirming Recovery Requests (towing) and RSA leads already exist in Global ERP. This is a living document - update as migration progresses.*
