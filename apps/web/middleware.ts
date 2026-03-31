@@ -38,6 +38,9 @@ function isPublicPath(pathname: string): boolean {
   if (/^\/company\/[^/]+\/recovery-requests\/[^/]+\/?$/.test(pathname)) {
     return true;
   }
+  if (/^\/api\/company\/[^/]+\/call-center\/history\/recording-proxy\/?$/.test(pathname)) {
+    return true;
+  }
   return false;
 }
 

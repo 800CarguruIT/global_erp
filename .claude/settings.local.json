@@ -46,7 +46,10 @@
       "Bash(ls -la \"/c/Users/ABC/Documents/Global ERP/apps/web/app/\\(components\\)/\")",
       "Bash(DATABASE_URL=\"postgres://autoguru:autoguru@localhost:5432/global_erp_dev\" pnpm -s ts-node --transpile-only --compiler-options '{\"\"module\"\":\"\"CommonJS\"\"}' packages/ai-core/scripts/query-rcc.ts)",
       "Bash(ls -la /c/Users/ABC/Documents/'Global ERP'/apps/web/app/'\\(components\\)'/shell/)",
-      "Bash(grep -E \"\\\\.\\(ts|js|sql\\)$\")"
+      "Bash(grep -E \"\\\\.\\(ts|js|sql\\)$\")",
+      "Bash(find '/c/Users/ABC/Documents/Global ERP' -name *dashboard* -o -name *callcenter* -o -name *call-center*)",
+      "Bash(grep -E \"\\\\.\\(tsx|ts\\)$\")",
+      "Bash(grep -r \"ai_intelligence_config\\\\|signal.*empty\\\\|no signals\\\\|allSignals.length\" '/c/Users/ABC/Documents/Global ERP' --include=*.ts --include=*.tsx)"
     ]
   }
 }

@@ -492,22 +492,39 @@ export async function PATCH(req: NextRequest, { params }: Params) {
           INNER JOIN part_quotes pq ON pq.line_item_id = li.id
         ) source
         GROUP BY source.line_item_id
+      ),
+      po_rank AS (
+        SELECT
+          li.id AS line_item_id,
+          COALESCE(SUM(poi.quantity), 0) AS po_qty,
+          COALESCE(SUM(poi.received_qty), 0) AS po_received_qty
+        FROM li
+        LEFT JOIN part_quotes pq
+          ON pq.company_id = ${companyId} AND pq.line_item_id = li.id
+        INNER JOIN purchase_order_items poi
+          ON poi.estimate_item_id = li.id
+          OR poi.quote_id = pq.id
+          OR (poi.estimate_item_id IS NOT NULL AND pq.estimate_item_id IS NOT NULL AND poi.estimate_item_id = pq.estimate_item_id)
+        GROUP BY li.id
       )
-      SELECT li.id, li.product_name, li.order_status, qr.status_rank
+      SELECT li.id, li.product_name, li.order_status, qr.status_rank, pr.po_qty, pr.po_received_qty
       FROM li
       LEFT JOIN quote_rank qr ON qr.line_item_id = li.id
-      WHERE LOWER(
-        COALESCE(
-          CASE
-            WHEN qr.status_rank >= 3 THEN 'received'
-            WHEN qr.status_rank = 2 THEN 'returned'
-            WHEN qr.status_rank = 1 THEN 'ordered'
-            ELSE NULL
-          END,
-          li.order_status,
-          'pending'
-        )
-      ) = 'received'
+      LEFT JOIN po_rank pr ON pr.line_item_id = li.id
+      WHERE
+        LOWER(
+          COALESCE(
+            CASE
+              WHEN qr.status_rank >= 3 THEN 'received'
+              WHEN qr.status_rank = 2 THEN 'returned'
+              WHEN qr.status_rank = 1 THEN 'ordered'
+              ELSE NULL
+            END,
+            li.order_status,
+            'pending'
+          )
+        ) IN ('received', 'partially received')
+        OR (pr.po_qty > 0 AND pr.po_received_qty >= pr.po_qty)
       LIMIT 1
     `;
     if (!receivedParts.length) {

@@ -27,8 +27,8 @@ type DashboardData = {
   byDay: { date: string; callCount: number; totalDurationSeconds: number }[];
 };
 
-export default function CompanyCallCenterDashboardPage({ params }: { params: { companyId: string } }) {
-  const { companyId } = params;
+export default function CompanyCallCenterDashboardPage({ params }: { params: Promise<{ companyId: string }> }) {
+  const { companyId } = React.use(params);
   const defaultRange = lastNDaysRange(7);
   const [from, setFrom] = useState<string>(formatDateInput(defaultRange.from));
   const [to, setTo] = useState<string>(formatDateInput(defaultRange.to));

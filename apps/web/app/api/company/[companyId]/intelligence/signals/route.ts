@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Users, Intelligence } from "@repo/ai-core";
 import type { EngineKey } from "@repo/ai-core";
+import { getCurrentUserIdFromRequest } from "../../../../../../lib/auth/current-user";
 
 type ParamsCtx = { params: Promise<{ companyId: string }> };
 
@@ -20,7 +21,7 @@ function parseEngineKeys(raw: string | null): EngineKey[] {
 export async function GET(req: NextRequest, ctx: ParamsCtx) {
   const { companyId } = await ctx.params;
 
-  const userId = req.headers.get("x-user-id");
+  const userId = req.headers.get("x-user-id") || await getCurrentUserIdFromRequest(req);
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

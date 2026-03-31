@@ -161,6 +161,10 @@ async function getYeastarTokenForPlayback(credentials: Record<string, any>): Pro
   if (!base) return null;
   const sslVerify = toBool(credentials.sslVerify, true);
   const userAgent = String(credentials.userAgent ?? "OpenAPI").trim() || "OpenAPI";
+  const accessId = String(credentials.accessId ?? credentials.linkusAccessId ?? "").trim();
+  const accessKey = String(credentials.accessKey ?? credentials.linkusAccessKey ?? "").trim();
+  const clientId = String(credentials.clientId ?? credentials.client_id ?? accessId ?? "").trim();
+  const clientSecret = String(credentials.clientSecret ?? credentials.client_secret ?? accessKey ?? "").trim();
   const candidates = [
     {
       mode: "userpass",
@@ -171,6 +175,19 @@ async function getYeastarTokenForPlayback(credentials: Record<string, any>): Pro
         password: String(credentials.password ?? credentials.apiPassword ?? "").trim(),
       },
     },
+    ...(clientId && clientSecret
+      ? [
+          {
+            mode: "client",
+            identifier: clientId,
+            payload: {
+              user_agent: userAgent,
+              client_id: clientId,
+              client_secret: clientSecret,
+            },
+          },
+        ]
+      : []),
     {
       mode: "access_userpass",
       identifier: String(credentials.accessId ?? credentials.linkusAccessId ?? "").trim(),
@@ -180,7 +197,11 @@ async function getYeastarTokenForPlayback(credentials: Record<string, any>): Pro
         password: String(credentials.accessKey ?? credentials.linkusAccessKey ?? "").trim(),
       },
     },
-  ].filter((c) => c.identifier && c.payload.username && c.payload.password);
+  ].filter((c) => {
+    if (!c.identifier) return false;
+    if (c.mode === "client") return !!(c.payload as any).client_id && !!(c.payload as any).client_secret;
+    return !!(c.payload as any).username && !!(c.payload as any).password;
+  });
 
   const now = Date.now();
   for (const candidate of candidates) {
