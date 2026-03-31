@@ -1900,7 +1900,7 @@ function mapYeastarWebhook(providerKey: string, payload: any): DialerWebhookUpda
     "billsec",
     "call_duration",
   ]);
-  const recordingUrl = findFirstDeep(source, ["recording_url", "record_url", "recordingUrl", "url"]);
+  const recordingUrl = findFirstDeep(source, ["recording_url", "record_url", "recordingUrl", "recording", "url"]);
   const recordingId = findFirstDeep(source, ["recording_id", "record_id", "recordingId"]);
   const recordingDurationRaw = findFirstDeep(source, [
     "recording_duration",
