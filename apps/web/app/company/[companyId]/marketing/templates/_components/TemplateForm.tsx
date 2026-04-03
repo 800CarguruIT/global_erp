@@ -435,7 +435,7 @@ export function TemplateForm({ companyId, type, initial, onSaved }: Props) {
               <div className="md:col-span-2">
                 <div className="text-xs text-muted-foreground">Action buttons</div>
                 <div className="grid gap-3 md:grid-cols-2">
-                  <div className="space-y-2 rounded-lg border border-white/10 p-3">
+                  <div className="space-y-2 rounded-lg border border-border p-3">
                     <div className="text-[11px] uppercase text-muted-foreground">Button 1</div>
                     <select
                       className={`${theme.input} mt-1 w-full`}
@@ -470,7 +470,7 @@ export function TemplateForm({ companyId, type, initial, onSaved }: Props) {
                       />
                     )}
                   </div>
-                  <div className="space-y-2 rounded-lg border border-white/10 p-3">
+                  <div className="space-y-2 rounded-lg border border-border p-3">
                     <div className="text-[11px] uppercase text-muted-foreground">Button 2</div>
                     <select
                       className={`${theme.input} mt-1 w-full`}
@@ -525,7 +525,7 @@ export function TemplateForm({ companyId, type, initial, onSaved }: Props) {
                     />
                     <button
                       type="button"
-                      className="rounded-full border border-white/10 px-4 py-2 text-xs hover:border-primary disabled:opacity-50"
+                      className="rounded-full border border-border px-4 py-2 text-xs hover:border-primary disabled:opacity-50"
                       onClick={handleWhatsAppTest}
                       disabled={testSending || !testNumber.trim()}
                     >
@@ -541,8 +541,8 @@ export function TemplateForm({ companyId, type, initial, onSaved }: Props) {
           </Card>
           <Card className={`space-y-3 md:col-span-3 ${isWhatsAppRtl ? "order-1" : "order-2"}`}>
             <div className="text-sm font-semibold">Preview</div>
-            <div className="rounded-2xl border border-white/10 bg-[#0b141a] p-4">
-              <div className="text-[11px] uppercase text-white/60">WhatsApp</div>
+            <div className="rounded-2xl border border-border bg-[#0b141a] p-4">
+              <div className="text-[11px] uppercase text-muted-foreground">WhatsApp</div>
               <div className={`mt-3 flex ${isWhatsAppRtl ? "justify-start" : "justify-end"}`}>
                 <div className="max-w-[80%] rounded-2xl rounded-br-sm bg-[#25d366] px-3 py-2 text-xs text-black">
                   {waForm.headerType === "text" && waForm.headerText.trim() && (
@@ -573,7 +573,7 @@ export function TemplateForm({ companyId, type, initial, onSaved }: Props) {
                     return (
                       <div
                         key={`btn-${idx}`}
-                        className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-center text-[11px] text-white"
+                        className="rounded-full border border-border bg-muted px-3 py-1 text-center text-[11px] text-foreground"
                       >
                         {label}
                       </div>
@@ -581,7 +581,7 @@ export function TemplateForm({ companyId, type, initial, onSaved }: Props) {
                   })}
                 </div>
               )}
-              <div className="mt-3 text-[11px] text-white/60">
+              <div className="mt-3 text-[11px] text-muted-foreground">
                 Provider: {waForm.providerKey || "meta"}
               </div>
             </div>
@@ -668,7 +668,7 @@ export function TemplateForm({ companyId, type, initial, onSaved }: Props) {
         </Card>
         <Card className="space-y-3 md:col-span-8">
           <div className="text-sm font-semibold">Email builder</div>
-          <div className="min-h-[70vh] rounded-lg border border-white/10 bg-white/5 p-2">
+          <div className="min-h-[70vh] rounded-lg border border-border bg-muted/40 p-2">
             <EmailEditor
               ref={emailEditorRef}
               onLoad={handleEmailEditorLoad}

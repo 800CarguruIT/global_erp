@@ -204,7 +204,7 @@ export default function CompanyMarketingTemplatesPage() {
             className={
               activeTab === "whatsapp"
                 ? "rounded-full border border-primary px-3 py-1 text-xs text-primary"
-                : "rounded-full border border-white/10 px-3 py-1 text-xs hover:border-primary"
+                : "rounded-full border border-border px-3 py-1 text-xs hover:border-primary"
             }
             onClick={() => updateTab("whatsapp")}
             type="button"
@@ -215,7 +215,7 @@ export default function CompanyMarketingTemplatesPage() {
             className={
               activeTab === "email"
                 ? "rounded-full border border-primary px-3 py-1 text-xs text-primary"
-                : "rounded-full border border-white/10 px-3 py-1 text-xs hover:border-primary"
+                : "rounded-full border border-border px-3 py-1 text-xs hover:border-primary"
             }
             onClick={() => updateTab("email")}
             type="button"
@@ -247,7 +247,7 @@ export default function CompanyMarketingTemplatesPage() {
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
                 <thead>
-                  <tr className="border-b border-white/10 text-left text-xs text-muted-foreground">
+                  <tr className="border-b border-border text-left text-xs text-muted-foreground">
                     <th className="px-3 py-2">Name</th>
                     <th className="px-3 py-2">Language</th>
                     <th className="px-3 py-2">Category</th>
@@ -261,7 +261,7 @@ export default function CompanyMarketingTemplatesPage() {
                 </thead>
                 <tbody>
                   {waRows.map((tpl) => (
-                    <tr key={tpl.id} className="border-b border-white/5">
+                    <tr key={tpl.id} className="border-b border-border/40">
                       <td className="px-3 py-2 font-medium">{tpl.name}</td>
                       <td className="px-3 py-2 text-muted-foreground">{tpl.language}</td>
                       <td className="px-3 py-2 text-muted-foreground">{tpl.category}</td>
@@ -276,14 +276,14 @@ export default function CompanyMarketingTemplatesPage() {
                       </td>
                       <td className="px-3 py-2 text-right">
                         <button
-                          className="rounded-full border border-white/10 px-2 py-1 text-xs hover:border-primary disabled:opacity-50"
+                          className="rounded-full border border-border px-2 py-1 text-xs hover:border-primary disabled:opacity-50"
                           disabled={!!tpl.published_at || publishingId === tpl.id || loading}
                           onClick={() => publishTemplate(tpl)}
                         >
                           {publishingId === tpl.id ? "Publishing..." : "Submit to Meta"}
                         </button>
                         <button
-                          className="ml-2 rounded-full border border-white/10 px-2 py-1 text-xs hover:border-primary"
+                          className="ml-2 rounded-full border border-border px-2 py-1 text-xs hover:border-primary"
                           onClick={() => {
                             setTestModal(tpl);
                             setTestNumber("");
@@ -293,7 +293,7 @@ export default function CompanyMarketingTemplatesPage() {
                           Send test
                         </button>
                         <button
-                          className="ml-2 rounded-full border border-white/10 px-2 py-1 text-xs hover:border-primary"
+                          className="ml-2 rounded-full border border-border px-2 py-1 text-xs hover:border-primary"
                           onClick={() =>
                             router.push(`/company/${companyId}/marketing/templates/${tpl.id}/edit`)
                           }
@@ -338,7 +338,7 @@ export default function CompanyMarketingTemplatesPage() {
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
                 <thead>
-                  <tr className="border-b border-white/10 text-left text-xs text-muted-foreground">
+                  <tr className="border-b border-border text-left text-xs text-muted-foreground">
                     <th className="px-3 py-2">Name</th>
                     <th className="px-3 py-2">From</th>
                     <th className="px-3 py-2">Subject</th>
@@ -352,7 +352,7 @@ export default function CompanyMarketingTemplatesPage() {
                 </thead>
                 <tbody>
                   {emailRows.map((tpl) => (
-                    <tr key={tpl.id} className="border-b border-white/5">
+                    <tr key={tpl.id} className="border-b border-border/40">
                       <td className="px-3 py-2 font-medium">{tpl.name}</td>
                       <td className="px-3 py-2 text-muted-foreground">{tpl.from}</td>
                       <td className="px-3 py-2 text-muted-foreground">{tpl.subject}</td>
@@ -367,14 +367,14 @@ export default function CompanyMarketingTemplatesPage() {
                       </td>
                       <td className="px-3 py-2 text-right">
                         <button
-                          className="rounded-full border border-white/10 px-2 py-1 text-xs hover:border-primary disabled:opacity-50"
+                          className="rounded-full border border-border px-2 py-1 text-xs hover:border-primary disabled:opacity-50"
                           disabled={!!tpl.published_at || publishingId === tpl.id || loading}
                           onClick={() => publishTemplate(tpl)}
                         >
                           {publishingId === tpl.id ? "Publishing..." : "Publish to AWS"}
                         </button>
                         <button
-                          className="ml-2 rounded-full border border-white/10 px-2 py-1 text-xs hover:border-primary"
+                          className="ml-2 rounded-full border border-border px-2 py-1 text-xs hover:border-primary"
                           onClick={() =>
                             router.push(`/company/${companyId}/marketing/templates/${tpl.id}/edit`)
                           }
@@ -406,7 +406,7 @@ export default function CompanyMarketingTemplatesPage() {
 
         {confirmDelete && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
-            <div className="w-full max-w-md rounded-2xl border border-white/10 bg-background p-5">
+            <div className="w-full max-w-md rounded-2xl border border-border bg-background p-5">
               <div className="text-lg font-semibold">Delete template?</div>
               <div className="mt-2 text-sm text-muted-foreground">
                 This will delete the template locally and trigger a provider delete for{" "}
@@ -414,7 +414,7 @@ export default function CompanyMarketingTemplatesPage() {
               </div>
               <div className="mt-4 flex justify-end gap-2">
                 <button
-                  className="rounded-full border border-white/10 px-4 py-2 text-sm"
+                  className="rounded-full border border-border px-4 py-2 text-sm"
                   onClick={() => setConfirmDelete(null)}
                   disabled={deletingId === confirmDelete.id}
                 >
@@ -433,14 +433,14 @@ export default function CompanyMarketingTemplatesPage() {
         )}
         {testModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
-            <div className="w-full max-w-md rounded-2xl border border-white/10 bg-background p-5">
+            <div className="w-full max-w-md rounded-2xl border border-border bg-background p-5">
               <div className="text-lg font-semibold">Send test message</div>
               <div className="mt-2 text-sm text-muted-foreground">
                 Enter a WhatsApp number (with country code) to send a test message.
               </div>
               <div className="mt-4 space-y-2">
                 <input
-                  className="w-full rounded-lg border border-white/10 bg-transparent px-3 py-2 text-sm"
+                  className="w-full rounded-lg border border-border bg-transparent px-3 py-2 text-sm"
                   value={testNumber}
                   onChange={(e) => setTestNumber(e.target.value)}
                   placeholder="+971500000000"
@@ -449,14 +449,14 @@ export default function CompanyMarketingTemplatesPage() {
               </div>
               <div className="mt-4 flex justify-end gap-2">
                 <button
-                  className="rounded-full border border-white/10 px-4 py-2 text-sm"
+                  className="rounded-full border border-border px-4 py-2 text-sm"
                   onClick={() => setTestModal(null)}
                   disabled={testSending}
                 >
                   Close
                 </button>
                 <button
-                  className="rounded-full border border-white/10 px-4 py-2 text-sm hover:border-primary disabled:opacity-50"
+                  className="rounded-full border border-border px-4 py-2 text-sm hover:border-primary disabled:opacity-50"
                   onClick={sendTestMessage}
                   disabled={testSending || !testNumber.trim()}
                 >

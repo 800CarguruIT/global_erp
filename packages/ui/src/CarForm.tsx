@@ -121,7 +121,7 @@ export function CarForm({ mode = "create", initialValues, onSubmit }: CarFormPro
       <label className="text-sm space-y-1">
         <span className="text-xs uppercase opacity-70">Notes</span>
         <textarea
-          className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm min-h-[80px]"
+          className="w-full rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm min-h-[80px]"
           value={values.notes ?? ""}
           onChange={(e) => setValues((v) => ({ ...v, notes: e.target.value }))}
         />
@@ -149,7 +149,7 @@ function Input(
     <label className="text-sm space-y-1">
       <span className="text-xs uppercase opacity-70">{label}</span>
       <input
-        className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm"
+        className="w-full rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm"
         {...rest}
       />
     </label>

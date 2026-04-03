@@ -335,7 +335,7 @@ export default function CarDetailPage({ params }: Params) {
 
         {statusModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-            <div className="w-full max-w-md rounded-2xl border border-white/30 bg-slate-950 p-5 shadow-[0_24px_60px_-24px_rgba(0,0,0,0.9)]">
+            <div className="w-full max-w-md rounded-2xl border border-border bg-slate-950 p-5 shadow-[0_24px_60px_-24px_rgba(0,0,0,0.9)]">
               <div className="flex items-start gap-3">
                 <div
                   className={`mt-0.5 inline-flex h-8 w-8 items-center justify-center rounded-full ${

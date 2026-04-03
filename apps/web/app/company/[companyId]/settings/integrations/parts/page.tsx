@@ -137,7 +137,7 @@ export default function CompanyPartsIntegrationsPage({ params }: Params) {
                 value={baseUrl}
                 onChange={(e) => setBaseUrl(e.target.value)}
                 placeholder="e.g. http://api.17vin.com:8080"
-                className="w-full rounded-md border border-white/20 bg-slate-950/70 px-3 py-2 text-sm text-white placeholder:text-slate-400 focus:border-cyan-400 focus:outline-none"
+                className="w-full rounded-md border border-border bg-slate-950/70 px-3 py-2 text-sm text-foreground placeholder:text-slate-400 focus:border-cyan-400 focus:outline-none"
               />
             </div>
             <div className="space-y-1">
@@ -146,7 +146,7 @@ export default function CompanyPartsIntegrationsPage({ params }: Params) {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="17VIN username"
-                className="w-full rounded-md border border-white/20 bg-slate-950/70 px-3 py-2 text-sm text-white placeholder:text-slate-400 focus:border-cyan-400 focus:outline-none"
+                className="w-full rounded-md border border-border bg-slate-950/70 px-3 py-2 text-sm text-foreground placeholder:text-slate-400 focus:border-cyan-400 focus:outline-none"
               />
             </div>
             <div className="space-y-1">
@@ -156,7 +156,7 @@ export default function CompanyPartsIntegrationsPage({ params }: Params) {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder={hasSavedPassword ? "Leave empty to keep current password" : "17VIN password"}
-                className="w-full rounded-md border border-white/20 bg-slate-950/70 px-3 py-2 text-sm text-white placeholder:text-slate-400 focus:border-cyan-400 focus:outline-none"
+                className="w-full rounded-md border border-border bg-slate-950/70 px-3 py-2 text-sm text-foreground placeholder:text-slate-400 focus:border-cyan-400 focus:outline-none"
               />
             </div>
 
@@ -167,7 +167,7 @@ export default function CompanyPartsIntegrationsPage({ params }: Params) {
                   value={usernameParam}
                   onChange={(e) => setUsernameParam(e.target.value)}
                   placeholder="default: user"
-                  className="w-full rounded-md border border-white/20 bg-slate-950/70 px-3 py-2 text-sm text-white placeholder:text-slate-400 focus:border-cyan-400 focus:outline-none"
+                  className="w-full rounded-md border border-border bg-slate-950/70 px-3 py-2 text-sm text-foreground placeholder:text-slate-400 focus:border-cyan-400 focus:outline-none"
                 />
               </div>
               <div className="space-y-1">
@@ -176,7 +176,7 @@ export default function CompanyPartsIntegrationsPage({ params }: Params) {
                   value={signatureParam}
                   onChange={(e) => setSignatureParam(e.target.value)}
                   placeholder="default: token"
-                  className="w-full rounded-md border border-white/20 bg-slate-950/70 px-3 py-2 text-sm text-white placeholder:text-slate-400 focus:border-cyan-400 focus:outline-none"
+                  className="w-full rounded-md border border-border bg-slate-950/70 px-3 py-2 text-sm text-foreground placeholder:text-slate-400 focus:border-cyan-400 focus:outline-none"
                 />
               </div>
             </div>

@@ -567,8 +567,8 @@ function ChannelManagerContent({ config }: { config: ChannelConfig }) {
     const label = t(node.labelKey);
     const description = node.descriptionKey ? t(node.descriptionKey) : "";
     const nodeClass = `rounded-xl ${theme.cardBg} ${theme.cardBorder} p-3 text-sm text-foreground shadow-sm`;
-    const labelClass = "font-semibold text-white";
-    const descriptionClass = "mt-1 text-xs text-white/70";
+    const labelClass = "font-semibold text-foreground";
+    const descriptionClass = "mt-1 text-xs text-foreground/70";
     return `<div class="${nodeClass}"><div class="${labelClass}">${label}</div>${
       description ? `<div class="${descriptionClass}">${description}</div>` : ""
     }</div>`;
@@ -1016,7 +1016,7 @@ function ChannelManagerContent({ config }: { config: ChannelConfig }) {
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                className="rounded-full border border-white/10 px-3 py-1 text-xs font-semibold text-foreground hover:border-white/40"
+                className="rounded-full border border-border px-3 py-1 text-xs font-semibold text-foreground hover:border-border"
                 onClick={handleSave}
               >
                 {t("marketing.campaigns.builder.save")}
@@ -1024,7 +1024,7 @@ function ChannelManagerContent({ config }: { config: ChannelConfig }) {
               {config.itemsApi === "campaigns" && companyId && (
                 <button
                   type="button"
-                  className="rounded-full border border-white/10 px-3 py-1 text-xs font-semibold text-foreground hover:border-white/40"
+                  className="rounded-full border border-border px-3 py-1 text-xs font-semibold text-foreground hover:border-border"
                   onClick={() => {
                     setTestOpen((prev) => !prev);
                     setTestStatus("idle");
@@ -1036,7 +1036,7 @@ function ChannelManagerContent({ config }: { config: ChannelConfig }) {
               )}
               <button
                 type="button"
-                className="rounded-full border border-white/10 px-3 py-1 text-xs font-semibold text-foreground hover:border-white/40"
+                className="rounded-full border border-border px-3 py-1 text-xs font-semibold text-foreground hover:border-border"
                 onClick={handleLoad}
               >
                 {t("marketing.campaigns.builder.load")}
@@ -1051,7 +1051,7 @@ function ChannelManagerContent({ config }: { config: ChannelConfig }) {
             </div>
           </div>
           {testOpen && config.itemsApi === "campaigns" && (
-            <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-xs">
+            <div className="rounded-xl border border-border bg-muted/40 p-3 text-xs">
               <div className="font-semibold text-foreground">{t("marketing.campaigns.test.title")}</div>
               <div className="mt-2 grid gap-3 md:grid-cols-2">
                 <div>
@@ -1090,7 +1090,7 @@ function ChannelManagerContent({ config }: { config: ChannelConfig }) {
                 </button>
                 <button
                   type="button"
-                  className="rounded-full border border-white/10 px-3 py-1 text-xs font-semibold text-foreground hover:border-white/40"
+                  className="rounded-full border border-border px-3 py-1 text-xs font-semibold text-foreground hover:border-border"
                   onClick={() => setTestOpen(false)}
                 >
                   {t("marketing.campaigns.test.close")}
@@ -1108,7 +1108,7 @@ function ChannelManagerContent({ config }: { config: ChannelConfig }) {
             </div>
           )}
           <div className="grid gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
-            <div className="rounded-xl border border-white/10 bg-white/5 p-4 shadow-sm">
+            <div className="rounded-xl border border-border bg-muted/40 p-4 shadow-sm">
               <div className="text-xs font-semibold text-muted-foreground">
                 {t("marketing.campaigns.builder.palette")}
               </div>
@@ -1120,7 +1120,7 @@ function ChannelManagerContent({ config }: { config: ChannelConfig }) {
                     onDragStart={(event) => {
                       event.dataTransfer.setData("application/x-node-key", node.key);
                     }}
-                    className="rounded-lg border border-white/10 bg-white/5 p-3 text-xs text-foreground shadow-sm hover:border-white/40"
+                    className="rounded-lg border border-border bg-muted/40 p-3 text-xs text-foreground shadow-sm hover:border-border"
                   >
                     <div className="font-semibold">{t(node.labelKey)}</div>
                     {node.descriptionKey && (
@@ -1128,7 +1128,7 @@ function ChannelManagerContent({ config }: { config: ChannelConfig }) {
                     )}
                     <button
                       type="button"
-                      className="mt-2 rounded-full border border-white/10 px-2 py-1 text-[11px] font-semibold text-foreground hover:border-white/40"
+                      className="mt-2 rounded-full border border-border px-2 py-1 text-[11px] font-semibold text-foreground hover:border-border"
                       onClick={() => addTemplateNode(node, 120, 120)}
                     >
                       {t("marketing.campaigns.builder.add")}
@@ -1137,7 +1137,7 @@ function ChannelManagerContent({ config }: { config: ChannelConfig }) {
                 ))}
               </div>
             </div>
-            <div className="relative h-[900px] w-full overflow-hidden rounded-xl border border-white/10 bg-white/5 shadow-sm">
+            <div className="relative h-[900px] w-full overflow-hidden rounded-xl border border-border bg-muted/40 shadow-sm">
               <div
                 ref={builderRef}
                 className="drawflow h-full w-full"
@@ -1155,16 +1155,16 @@ function ChannelManagerContent({ config }: { config: ChannelConfig }) {
               />
               {selectedNodeId != null && nodeModalPos && (
                 <div
-                  className="absolute z-20 w-64 rounded-xl border border-white/10 bg-slate-950/95 p-3 shadow-xl backdrop-blur"
+                  className="absolute z-20 w-64 rounded-xl border border-border bg-background/95 p-3 shadow-xl backdrop-blur"
                   style={{ left: nodeModalPos.x, top: nodeModalPos.y }}
                 >
                   <div className="flex items-center justify-between">
-                    <div className="text-sm font-semibold text-white">
+                    <div className="text-sm font-semibold text-foreground">
                       {selectedNodeKey ? t(`marketing.campaigns.builder.node.${selectedNodeKey}`) : "-"}
                     </div>
                     <button
                       type="button"
-                      className="text-xs text-muted-foreground hover:text-white"
+                      className="text-xs text-muted-foreground hover:text-foreground"
                       onClick={() => {
                         setSelectedNodeId(null);
                         setSelectedNodeKey(null);
@@ -1774,7 +1774,7 @@ function ChannelManagerContent({ config }: { config: ChannelConfig }) {
                 {config.itemsApi === "campaigns" && companyId && (
                   <button
                     type="button"
-                    className="rounded-full border border-white/10 px-3 py-1 text-xs font-semibold text-foreground hover:border-white/40"
+                    className="rounded-full border border-border px-3 py-1 text-xs font-semibold text-foreground hover:border-border"
                     onClick={handleNewCampaign}
                   >
                     {t("marketing.campaigns.manager.new")}
@@ -1785,7 +1785,7 @@ function ChannelManagerContent({ config }: { config: ChannelConfig }) {
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
                 <thead>
-                  <tr className="border-b border-white/10 text-left text-xs text-muted-foreground">
+                  <tr className="border-b border-border text-left text-xs text-muted-foreground">
                     <th className="px-3 py-2">{t("marketing.manager.name")}</th>
                     {config.fields.map((f) => (
                       <th key={f.key} className="px-3 py-2 capitalize">
@@ -1799,7 +1799,7 @@ function ChannelManagerContent({ config }: { config: ChannelConfig }) {
                 </thead>
                 <tbody>
                   {filtered.map((item) => (
-                    <tr key={item.id} className="border-b border-white/5">
+                    <tr key={item.id} className="border-b border-border/40">
                       <td className="px-3 py-2 font-medium">{item.name}</td>
                       {config.fields.map((f) => {
                         if (f.key === "startsAt") {
@@ -1822,7 +1822,7 @@ function ChannelManagerContent({ config }: { config: ChannelConfig }) {
                         );
                       })}
                       <td className="px-3 py-2">
-                        <span className="rounded-full bg-white/10 px-2 py-1 text-xs">
+                        <span className="rounded-full bg-muted px-2 py-1 text-xs">
                           {t(item.status) ?? item.status}
                         </span>
                       </td>
@@ -1833,7 +1833,7 @@ function ChannelManagerContent({ config }: { config: ChannelConfig }) {
                         <div className="flex justify-end gap-2">
                           {config.itemsApi === "campaigns" && (
                             <button
-                              className="rounded-full border border-white/10 px-2 py-1 text-xs hover:border-white/40"
+                              className="rounded-full border border-border px-2 py-1 text-xs hover:border-border"
                               onClick={() => handleEditCampaign(item)}
                             >
                               {t("marketing.campaigns.manager.edit")}
@@ -1841,7 +1841,7 @@ function ChannelManagerContent({ config }: { config: ChannelConfig }) {
                           )}
                           {config.itemsApi === "campaigns" && (
                             <button
-                              className="rounded-full border border-white/10 px-2 py-1 text-xs hover:border-white/40"
+                              className="rounded-full border border-border px-2 py-1 text-xs hover:border-border"
                               onClick={() => handleViewPerformance(item)}
                             >
                               {t("marketing.campaigns.manager.performance")}
@@ -1853,7 +1853,7 @@ function ChannelManagerContent({ config }: { config: ChannelConfig }) {
                             .map((s) => (
                               <button
                                 key={s.key}
-                                className="rounded-full border border-white/10 px-2 py-1 text-xs hover:border-white/40 disabled:opacity-50"
+                                className="rounded-full border border-border px-2 py-1 text-xs hover:border-border disabled:opacity-50"
                                 onClick={() => void setItemStatus(item.id, s.key)}
                                 disabled={savingId === item.id}
                               >
@@ -1913,7 +1913,7 @@ function ChannelManagerContent({ config }: { config: ChannelConfig }) {
             <div className="mt-4 flex justify-end gap-2">
               <button
                 type="button"
-                className="rounded-full border border-white/10 px-3 py-1 text-xs font-semibold text-foreground hover:border-white/40"
+                className="rounded-full border border-border px-3 py-1 text-xs font-semibold text-foreground hover:border-border"
                 onClick={() => setScheduleModal(null)}
                 disabled={savingId === scheduleModal.id}
               >

@@ -217,7 +217,7 @@ export default function DocEditWindowPage() {
   return (
     <AppLayout>
       <div className="mx-auto w-full max-w-[1400px] space-y-4 py-4 lg:py-6">
-        <header className="rounded-2xl border border-white/10 bg-background/80 p-4">
+        <header className="rounded-2xl border border-border bg-background/80 p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground/90">Documentation</p>
@@ -226,14 +226,14 @@ export default function DocEditWindowPage() {
             <div className="flex items-center gap-2">
               <Link
                 href="/global/docs"
-                className="rounded-lg border border-white/20 bg-white/[0.03] px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-white/90"
+                className="rounded-lg border border-border bg-card/40 px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-foreground/90"
               >
                 Back to docs
               </Link>
               <button
                 type="button"
                 onClick={() => window.close()}
-                className="rounded-lg border border-white/20 bg-white/[0.03] px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-white/90"
+                className="rounded-lg border border-border bg-card/40 px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-foreground/90"
               >
                 Close window
               </button>
@@ -241,18 +241,18 @@ export default function DocEditWindowPage() {
           </div>
         </header>
 
-        {loading && <div className="rounded-xl border border-white/10 bg-background/80 p-4 text-sm text-muted-foreground">Loading document...</div>}
+        {loading && <div className="rounded-xl border border-border bg-background/80 p-4 text-sm text-muted-foreground">Loading document...</div>}
         {error && <div className="rounded-xl border border-red-400/30 bg-red-950/20 p-4 text-sm text-red-200">{error}</div>}
 
         {!loading && doc && (
-          <section className="rounded-2xl border border-white/10 bg-background/80 p-4">
+          <section className="rounded-2xl border border-border bg-background/80 p-4">
             <div className="mb-4 flex items-center justify-between">
               <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground/80">{doc.relativePath}</p>
               <div className="flex items-center gap-2">
                 <span className="rounded-full border border-emerald-300/40 px-2.5 py-1 text-[10px] uppercase text-emerald-100">
                   Current {doc.currentVersionLabel ? `v${doc.currentVersionLabel}` : "version"}
                 </span>
-                <span className="rounded-full border border-white/20 px-2.5 py-1 text-[10px] uppercase text-white/80">Step {step} / 2</span>
+                <span className="rounded-full border border-border px-2.5 py-1 text-[10px] uppercase text-foreground/80">Step {step} / 2</span>
               </div>
             </div>
 
@@ -261,13 +261,13 @@ export default function DocEditWindowPage() {
                 <input
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="h-10 w-full rounded-lg border border-white/15 bg-black/20 px-3 text-sm text-foreground outline-none focus:border-primary/60"
+                  className="h-10 w-full rounded-lg border border-border bg-black/20 px-3 text-sm text-foreground outline-none focus:border-primary/60"
                   placeholder="Document title"
                 />
                 <input
                   value={section}
                   onChange={(e) => setSection(e.target.value)}
-                  className="h-10 w-full rounded-lg border border-white/15 bg-black/20 px-3 text-sm text-foreground outline-none focus:border-primary/60"
+                  className="h-10 w-full rounded-lg border border-border bg-black/20 px-3 text-sm text-foreground outline-none focus:border-primary/60"
                   placeholder="root, global, company, vendors, workshop"
                 />
                 <div className="flex gap-2">
@@ -293,7 +293,7 @@ export default function DocEditWindowPage() {
                   <select
                     value={stylePreset}
                     onChange={(e) => setStylePreset(e.target.value as StylePreset)}
-                    className="h-9 rounded-lg border border-white/15 bg-black/20 px-3 text-xs font-semibold uppercase tracking-[0.1em] text-white/90"
+                    className="h-9 rounded-lg border border-border bg-black/20 px-3 text-xs font-semibold uppercase tracking-[0.1em] text-foreground/90"
                   >
                     <option value="readable">Readable</option>
                     <option value="step-by-step">Step-by-step</option>
@@ -302,7 +302,7 @@ export default function DocEditWindowPage() {
                   <button
                     type="button"
                     onClick={() => setContent((prev) => applyStylePreset(prev, stylePreset))}
-                    className="rounded-lg border border-white/20 bg-white/[0.03] px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-white/90"
+                    className="rounded-lg border border-border bg-card/40 px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-foreground/90"
                   >
                     Apply style
                   </button>
@@ -313,7 +313,7 @@ export default function DocEditWindowPage() {
                     <select
                       value={changeType}
                       onChange={(e) => setChangeType(e.target.value as "major" | "minor" | "patch")}
-                      className="h-10 w-full rounded-lg border border-white/15 bg-black/20 px-3 text-sm text-foreground outline-none focus:border-primary/60"
+                      className="h-10 w-full rounded-lg border border-border bg-black/20 px-3 text-sm text-foreground outline-none focus:border-primary/60"
                     >
                       <option value="patch">Patch</option>
                       <option value="minor">Minor</option>
@@ -326,7 +326,7 @@ export default function DocEditWindowPage() {
                       value={changelog}
                       onChange={(e) => setChangelog(e.target.value)}
                       placeholder="Short summary of changes"
-                      className="h-10 w-full rounded-lg border border-white/15 bg-black/20 px-3 text-sm text-foreground outline-none focus:border-primary/60"
+                      className="h-10 w-full rounded-lg border border-border bg-black/20 px-3 text-sm text-foreground outline-none focus:border-primary/60"
                     />
                   </div>
                 </div>
@@ -334,9 +334,9 @@ export default function DocEditWindowPage() {
                   <textarea
                     value={content}
                     onChange={(e) => setContent(e.target.value)}
-                    className="min-h-96 w-full rounded-lg border border-white/15 bg-black/20 p-3 text-sm text-foreground outline-none focus:border-primary/60"
+                    className="min-h-96 w-full rounded-lg border border-border bg-black/20 p-3 text-sm text-foreground outline-none focus:border-primary/60"
                   />
-                  <div className="min-h-96 rounded-lg border border-white/15 bg-black/20 p-3">
+                  <div className="min-h-96 rounded-lg border border-border bg-black/20 p-3">
                     <MarkdownRenderer text={content} />
                   </div>
                 </div>
@@ -344,7 +344,7 @@ export default function DocEditWindowPage() {
                   <button
                     type="button"
                     onClick={() => setStep(1)}
-                    className="rounded-lg border border-white/20 px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-white/90"
+                    className="rounded-lg border border-border px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-foreground/90"
                   >
                     Back
                   </button>
@@ -365,11 +365,11 @@ export default function DocEditWindowPage() {
                     {saving ? "Publishing..." : "Publish"}
                   </button>
                 </div>
-                <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+                <div className="rounded-xl border border-border bg-black/20 p-3">
                   <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground/90">Version history</p>
                   <div className="max-h-56 space-y-2 overflow-auto pr-1">
                     {versions.map((v) => (
-                      <div key={v.id} className="rounded-lg border border-white/10 bg-white/[0.02] p-2">
+                      <div key={v.id} className="rounded-lg border border-border bg-card/30 p-2">
                         <div className="flex items-center justify-between gap-2">
                           <p className="text-sm font-semibold text-foreground">
                             v{v.versionLabel} <span className="text-xs font-normal text-muted-foreground">({v.changeType})</span>
@@ -391,7 +391,7 @@ export default function DocEditWindowPage() {
                               <button
                                 type="button"
                                 onClick={() => void handleRevertVersion(v.id)}
-                                className="rounded border border-white/30 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-white/90"
+                                className="rounded border border-border bg-muted/40 px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-foreground/90"
                               >
                                 Revert
                               </button>

@@ -297,7 +297,7 @@ function LeadContent({
           </button>
           <Link
             href="/global/leads"
-            className="rounded-full border border-white/20 px-4 py-2 text-sm hover:border-white/40"
+            className="rounded-full border border-border px-4 py-2 text-sm hover:border-border"
           >
             {t("lead.create.cancel")}
           </Link>

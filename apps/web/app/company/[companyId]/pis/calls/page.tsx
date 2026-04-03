@@ -74,14 +74,14 @@ export default function PisCallsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-bold text-white">Service Center — Calls History</h2>
+          <h2 className="text-lg font-bold text-foreground">Service Center — Calls History</h2>
           <p className="text-xs text-slate-500">All call activity across service center agents</p>
         </div>
         <div className="flex items-center gap-3">
-          <button onClick={() => setShowAi(!showAi)} className={`rounded-lg px-3 py-1.5 text-[10px] font-semibold ${showAi ? "bg-purple-500/20 text-purple-400" : "bg-slate-800 text-slate-400 hover:text-white"}`}>
+          <button onClick={() => setShowAi(!showAi)} className={`rounded-lg px-3 py-1.5 text-[10px] font-semibold ${showAi ? "bg-purple-500/20 text-purple-400" : "bg-slate-800 text-slate-400 hover:text-foreground"}`}>
             {showAi ? "Hide AI" : "AI Signals"}
           </button>
-          <button onClick={loadCalls} className="rounded-lg bg-slate-800 px-3 py-1.5 text-[10px] font-semibold text-slate-400 hover:text-white">
+          <button onClick={loadCalls} className="rounded-lg bg-slate-800 px-3 py-1.5 text-[10px] font-semibold text-slate-400 hover:text-foreground">
             Refresh
           </button>
         </div>
@@ -90,7 +90,7 @@ export default function PisCallsPage() {
       {/* KPI Bar */}
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
         {[
-          { l: "Total Calls", v: total, c: "text-white" },
+          { l: "Total Calls", v: total, c: "text-foreground" },
           { l: "Inbound", v: inbound, c: "text-cyan-400" },
           { l: "Outbound", v: outbound, c: "text-blue-400" },
           { l: "Completed", v: completed, c: "text-emerald-400" },
@@ -98,7 +98,7 @@ export default function PisCallsPage() {
           { l: "Avg Duration", v: formatDuration(avgDuration), c: "text-amber-400" },
           { l: "Answer Rate", v: `${answerRate}%`, c: answerRate >= 80 ? "text-emerald-400" : "text-red-400" },
         ].map(k => (
-          <div key={k.l} className="rounded-xl border border-white/10 bg-gradient-to-br from-slate-900/80 to-black/90 p-3">
+          <div key={k.l} className="rounded-xl border border-border bg-gradient-to-br from-slate-900/80 to-black/90 p-3">
             <div className="text-[10px] uppercase tracking-widest text-slate-400 mb-1">{k.l}</div>
             <div className={`text-lg font-bold ${k.c}`}>{k.v}</div>
           </div>
@@ -109,7 +109,7 @@ export default function PisCallsPage() {
       <div className="flex gap-2">
         {["all", "inbound", "outbound"].map(d => (
           <button key={d} onClick={() => setDirection(d)}
-            className={`px-3 py-1.5 rounded text-[10px] font-bold uppercase ${direction === d ? "bg-amber-500/20 text-amber-400" : "bg-slate-800 text-slate-400 hover:text-white"}`}>
+            className={`px-3 py-1.5 rounded text-[10px] font-bold uppercase ${direction === d ? "bg-amber-500/20 text-amber-400" : "bg-slate-800 text-slate-400 hover:text-foreground"}`}>
             {d}
           </button>
         ))}
@@ -117,11 +117,11 @@ export default function PisCallsPage() {
 
       <div className={`${showAi ? "grid grid-cols-1 lg:grid-cols-3 gap-6" : ""}`}>
         {/* Calls Table */}
-        <div className={`${showAi ? "lg:col-span-2" : ""} rounded-xl border border-white/10 bg-gradient-to-br from-slate-900/80 to-black/90 overflow-hidden`}>
+        <div className={`${showAi ? "lg:col-span-2" : ""} rounded-xl border border-border bg-gradient-to-br from-slate-900/80 to-black/90 overflow-hidden`}>
           {loading ? <div className="text-slate-400 p-4">Loading calls...</div> : (
             <table className="w-full text-xs">
               <thead>
-                <tr className="border-b border-white/10 text-left">
+                <tr className="border-b border-border text-left">
                   {["Time", "Direction", "Agent", "From", "To", "Customer", "Status", "Duration"].map(h => (
                     <th key={h} className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{h}</th>
                   ))}
@@ -129,14 +129,14 @@ export default function PisCallsPage() {
               </thead>
               <tbody>
                 {calls.slice(0, 100).map(c => (
-                  <tr key={c.id} className="border-b border-white/5 hover:bg-white/5">
+                  <tr key={c.id} className="border-b border-border/40 hover:bg-muted/40">
                     <td className="px-3 py-2 text-slate-500">{timeAgo(c.created_at)}</td>
                     <td className="px-3 py-2">
                       <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${c.direction === "inbound" ? "bg-cyan-500/20 text-cyan-400" : "bg-blue-500/20 text-blue-400"}`}>
                         {c.direction === "inbound" ? "IN" : "OUT"}
                       </span>
                     </td>
-                    <td className="px-3 py-2 text-white">{c.agent_name ?? "—"}</td>
+                    <td className="px-3 py-2 text-foreground">{c.agent_name ?? "—"}</td>
                     <td className="px-3 py-2 text-slate-300 font-mono">{c.from_number}</td>
                     <td className="px-3 py-2 text-slate-300 font-mono">{c.to_number}</td>
                     <td className="px-3 py-2 text-slate-300">{c.customer_name ?? "—"}</td>

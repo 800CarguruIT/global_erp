@@ -147,7 +147,7 @@ export default function IntelligenceSettingsPage({ params }: Params) {
             const status = saveStatus[key] ?? "idle";
 
             return (
-              <div key={key} className="rounded-xl border border-white/10 bg-slate-900/80 p-5 space-y-4">
+              <div key={key} className="rounded-xl border border-border bg-popover/80 p-5 space-y-4">
                 {/* Header row */}
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="flex items-center gap-3">
@@ -182,7 +182,7 @@ export default function IntelligenceSettingsPage({ params }: Params) {
                       max={60}
                       value={local.refresh_interval_min ?? 5}
                       onChange={(e) => updateLocal(key, { refresh_interval_min: parseInt(e.target.value) || 5 })}
-                      className="w-full rounded-md bg-slate-800 border border-white/10 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                      className="w-full rounded-md bg-slate-800 border border-border px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-purple-500"
                     />
                   </label>
                 </div>
@@ -206,7 +206,7 @@ export default function IntelligenceSettingsPage({ params }: Params) {
                         value={local.prompt_override ?? ""}
                         onChange={(e) => updateLocal(key, { prompt_override: e.target.value })}
                         placeholder="Leave empty to use built-in prompt for this engine…"
-                        className="w-full rounded-md bg-slate-800 border border-white/10 px-3 py-2 text-sm text-slate-100 font-mono focus:outline-none focus:ring-1 focus:ring-purple-500 placeholder:text-slate-600"
+                        className="w-full rounded-md bg-slate-800 border border-border px-3 py-2 text-sm text-slate-100 font-mono focus:outline-none focus:ring-1 focus:ring-purple-500 placeholder:text-slate-600"
                       />
                     </div>
                   )}
@@ -231,12 +231,12 @@ export default function IntelligenceSettingsPage({ params }: Params) {
 
         {/* Recent signal logs */}
         {logs.length > 0 && (
-          <div className="rounded-xl border border-white/10 bg-slate-900/80 p-5 space-y-3">
+          <div className="rounded-xl border border-border bg-popover/80 p-5 space-y-3">
             <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wide">Recent Signal Runs</h2>
             <div className="overflow-x-auto">
               <table className="min-w-full text-xs text-slate-400">
                 <thead>
-                  <tr className="border-b border-white/10 text-left">
+                  <tr className="border-b border-border text-left">
                     <th className="pb-2 pr-4 font-medium">Engine</th>
                     <th className="pb-2 pr-4 font-medium">Triggered</th>
                     <th className="pb-2 pr-4 font-medium">Signals</th>
@@ -247,7 +247,7 @@ export default function IntelligenceSettingsPage({ params }: Params) {
                 </thead>
                 <tbody>
                   {logs.map((log) => (
-                    <tr key={log.id} className="border-b border-white/5">
+                    <tr key={log.id} className="border-b border-border/40">
                       <td className="py-1.5 pr-4">
                         <span className="rounded-full bg-purple-500/10 px-2 py-0.5 text-purple-300 text-[10px]">
                           {log.engine_key.toUpperCase()}

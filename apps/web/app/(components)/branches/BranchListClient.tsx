@@ -332,7 +332,7 @@ export default function BranchListClient({
           {canCreate ? (
             <Link
               href={`/company/${companyId}/branches/new`}
-              className="inline-flex items-center rounded-md border border-white/30 bg-primary px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-primary-foreground shadow-md transition hover:opacity-90 hover:shadow-lg"
+              className="inline-flex items-center rounded-md border border-border bg-primary px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-primary-foreground shadow-md transition hover:opacity-90 hover:shadow-lg"
             >
               <svg viewBox="0 0 24 24" className="-ml-1 mr-2 h-4 w-4" aria-hidden="true">
                 <path
@@ -551,7 +551,7 @@ export default function BranchListClient({
                       {canEdit ? (
                         <Link
                           href={`/company/${companyId}/branches/${branch.id}/edit`}
-                          className="inline-flex items-center rounded-md border border-white/30 bg-primary px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary-foreground shadow-sm transition hover:opacity-90 hover:shadow-md"
+                          className="inline-flex items-center rounded-md border border-border bg-primary px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary-foreground shadow-sm transition hover:opacity-90 hover:shadow-md"
                         >
                           <svg viewBox="0 0 24 24" className="-ml-1 mr-2 h-4 w-4" aria-hidden="true">
                             <path

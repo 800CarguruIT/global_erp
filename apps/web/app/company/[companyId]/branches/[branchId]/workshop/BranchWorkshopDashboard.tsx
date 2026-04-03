@@ -744,7 +744,7 @@ export function BranchWorkshopDashboard({
         <div className="space-y-3">
           <div className="rounded-2xl bg-background/70 shadow-sm backdrop-blur">
             <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-              <div className="w-full overflow-x-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/20">
+              <div className="w-full overflow-x-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted/80">
                 <div className="inline-flex min-w-max flex-nowrap gap-2 text-xs">
                 {WORKSHOP_TABS.map((tab) => {
                   const isActive = activeTab === tab.id;
@@ -756,13 +756,13 @@ export function BranchWorkshopDashboard({
                       className={`min-w-[96px] shrink-0 inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-[11px] font-medium transition ${
                         isActive
                           ? "bg-gradient-to-b from-emerald-500/30 to-emerald-500/10 text-emerald-100 shadow-[0_0_8px_rgba(16,185,129,0.35)] border border-emerald-400/40"
-                          : "bg-white/5 text-white/70 border border-white/10 hover:text-white hover:border-white/30"
+                          : "bg-muted/40 text-foreground/70 border border-border hover:text-foreground hover:border-border"
                       }`}
                     >
                       {tab.label}
                       <span
                         className={`inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
-                          isActive ? "bg-emerald-200/20 text-emerald-100" : "bg-white/15 text-white/90"
+                          isActive ? "bg-emerald-200/20 text-emerald-100" : "bg-muted text-foreground/90"
                         }`}
                       >
                         {tabCounts[tab.id]}
@@ -787,7 +787,7 @@ export function BranchWorkshopDashboard({
                     void loadTabData(activeTab as WorkshopTabId, true);
                   }}
                   disabled={refreshing}
-                  className="rounded-md bg-white/10 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-white shadow-sm transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-md bg-muted px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-foreground shadow-sm transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {refreshing ? "Refreshing..." : "Refresh"}
                 </button>
@@ -795,7 +795,7 @@ export function BranchWorkshopDashboard({
                 <select
                   value={entriesPerPage}
                   onChange={(event) => setEntriesPerPage(Number(event.target.value))}
-                  className="rounded-md bg-white/10 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  className="rounded-md bg-muted px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                 >
                   {ENTRY_OPTIONS.map((option) => (
                     <option key={option} value={option}>
@@ -810,7 +810,7 @@ export function BranchWorkshopDashboard({
                   <button
                     type="button"
                     onClick={() => setShowCompletedDatePicker((prev) => !prev)}
-                    className="rounded-md bg-white/10 px-2 py-1 text-white transition hover:bg-white/15"
+                    className="rounded-md bg-muted px-2 py-1 text-foreground transition hover:bg-muted"
                   >
                     {completedDateFilterEnabled
                       ? `${completedDateRange.startDate.toLocaleDateString()} - ${completedDateRange.endDate.toLocaleDateString()}`
@@ -823,13 +823,13 @@ export function BranchWorkshopDashboard({
                         setCompletedDateFilterEnabled(false);
                         setShowCompletedDatePicker(false);
                       }}
-                      className="rounded-md bg-white/10 px-2 py-1 text-white transition hover:bg-white/15"
+                      className="rounded-md bg-muted px-2 py-1 text-foreground transition hover:bg-muted"
                     >
                       Clear
                     </button>
                   )}
                   {showCompletedDatePicker && (
-                    <div className="absolute left-0 top-8 z-30 overflow-hidden rounded-lg border border-white/10 bg-slate-950 shadow-xl">
+                    <div className="absolute left-0 top-8 z-30 overflow-hidden rounded-lg border border-border bg-background shadow-xl">
                       <DateRange
                         onChange={(ranges: any) => {
                           const selection = ranges?.selection;
@@ -857,9 +857,9 @@ export function BranchWorkshopDashboard({
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   placeholder={searchPlaceholder}
-                  className="w-full rounded-lg bg-white/10 px-3 py-2 pr-9 text-sm text-white placeholder:text-white/60 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  className="w-full rounded-lg bg-muted px-3 py-2 pr-9 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
-                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-white/60">
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
                   <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
                     <path
                       d="M15.5 15.5L21 21M10.5 18a7.5 7.5 0 1 1 0-15a7.5 7.5 0 0 1 0 15Z"
@@ -877,11 +877,11 @@ export function BranchWorkshopDashboard({
 
             <div className="space-y-3 px-3 pb-3 pt-2 md:hidden">
               {loading ? (
-                <div className="rounded-xl bg-white/5 px-3 py-4 text-center text-sm text-foreground/80">
+                <div className="rounded-xl bg-muted/40 px-3 py-4 text-center text-sm text-foreground/80">
                   Loading workshop data...
                 </div>
               ) : displayRows.length === 0 ? (
-                <div className="rounded-xl bg-white/5 px-3 py-4 text-center text-sm text-foreground/80">
+                <div className="rounded-xl bg-muted/40 px-3 py-4 text-center text-sm text-foreground/80">
                   {isInspectionTab ? "No inspections found." : "No job cards found."}
                 </div>
               ) : isInspectionTab ? (
@@ -906,7 +906,7 @@ export function BranchWorkshopDashboard({
                             ? `/company/${companyId}/branches/${branchId}/workshop/inspections/${row.id}`
                             : `/company/${companyId}/inspections/${row.id}?view=workshop`
                         }
-                        className="inline-flex items-center rounded-md border border-white/25 bg-transparent px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-white shadow-sm transition hover:bg-white/10"
+                        className="inline-flex items-center rounded-md border border-border bg-transparent px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-foreground shadow-sm transition hover:bg-muted"
                       >
                         Open Inspection
                       </a>
@@ -940,7 +940,7 @@ export function BranchWorkshopDashboard({
                     </div>
 
                     {activeTab === "quotes" && quote ? (
-                      <div className="mt-2 rounded-md border border-white/10 bg-white/5 p-2 text-xs text-foreground/80">
+                      <div className="mt-2 rounded-md border border-border bg-muted/40 p-2 text-xs text-foreground/80">
                         <div>Quote: {quote.id.slice(0, 8)}...</div>
                         <div>
                           Amount: {(quote.currency ?? "AED")} {Number(quote.totalAmount ?? 0).toFixed(2)}
@@ -970,7 +970,7 @@ export function BranchWorkshopDashboard({
                           type="button"
                           onClick={() => openQuoteModal(row)}
                           disabled={inquiryQuoteState.isLocked}
-                          className="inline-flex items-center rounded-md border border-primary/50 bg-transparent px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary shadow-sm transition hover:bg-primary/10 disabled:cursor-not-allowed disabled:border-white/20 disabled:text-white/55 disabled:hover:bg-transparent"
+                          className="inline-flex items-center rounded-md border border-primary/50 bg-transparent px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary shadow-sm transition hover:bg-primary/10 disabled:cursor-not-allowed disabled:border-border disabled:text-muted-foreground disabled:hover:bg-transparent"
                         >
                           {inquiryQuoteState.label}
                         </button>
@@ -1022,20 +1022,20 @@ export function BranchWorkshopDashboard({
               {isInspectionTab ? (
                 <table className="min-w-full text-sm">
                   <thead>
-                    <tr className="text-left bg-white/5">
-                      <th className="px-4 py-3 sticky top-0 bg-white/5 backdrop-blur text-xs font-semibold text-foreground/85">
+                    <tr className="text-left bg-muted/40">
+                      <th className="px-4 py-3 sticky top-0 bg-muted/40 backdrop-blur text-xs font-semibold text-foreground/85">
                         Inspection ID
                       </th>
-                      <th className="px-4 py-3 sticky top-0 bg-white/5 backdrop-blur text-xs font-semibold text-foreground/85">
+                      <th className="px-4 py-3 sticky top-0 bg-muted/40 backdrop-blur text-xs font-semibold text-foreground/85">
                         Vehicle
                       </th>
-                      <th className="px-4 py-3 sticky top-0 bg-white/5 backdrop-blur text-xs font-semibold text-foreground/85">
+                      <th className="px-4 py-3 sticky top-0 bg-muted/40 backdrop-blur text-xs font-semibold text-foreground/85">
                         Status
                       </th>
-                      <th className="px-4 py-3 sticky top-0 bg-white/5 backdrop-blur text-xs font-semibold text-foreground/85">
+                      <th className="px-4 py-3 sticky top-0 bg-muted/40 backdrop-blur text-xs font-semibold text-foreground/85">
                         Updated
                       </th>
-                      <th className="px-4 py-3 sticky top-0 bg-white/5 backdrop-blur text-xs font-semibold text-foreground/85 text-right">
+                      <th className="px-4 py-3 sticky top-0 bg-muted/40 backdrop-blur text-xs font-semibold text-foreground/85 text-right">
                         Action
                       </th>
                     </tr>
@@ -1073,7 +1073,7 @@ export function BranchWorkshopDashboard({
                                   ? `/company/${companyId}/branches/${branchId}/workshop/inspections/${row.id}`
                                   : `/company/${companyId}/inspections/${row.id}?view=workshop`
                               }
-                              className="inline-flex items-center rounded-md border border-white/25 bg-transparent px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-white shadow-sm transition hover:bg-white/10"
+                              className="inline-flex items-center rounded-md border border-border bg-transparent px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-foreground shadow-sm transition hover:bg-muted"
                             >
                               Open
                             </a>
@@ -1086,23 +1086,23 @@ export function BranchWorkshopDashboard({
               ) : (
                 <table className="min-w-full text-sm">
                   <thead>
-                    <tr className="text-left bg-white/5">
-                      <th className="px-4 py-3 sticky top-0 bg-white/5 backdrop-blur text-xs font-semibold text-foreground/85">
+                    <tr className="text-left bg-muted/40">
+                      <th className="px-4 py-3 sticky top-0 bg-muted/40 backdrop-blur text-xs font-semibold text-foreground/85">
                         Job ID
                       </th>
-                      <th className="px-4 py-3 sticky top-0 bg-white/5 backdrop-blur text-xs font-semibold text-foreground/85">
+                      <th className="px-4 py-3 sticky top-0 bg-muted/40 backdrop-blur text-xs font-semibold text-foreground/85">
                         {activeTab === "quotes" ? "Quote" : "Make"}
                       </th>
-                      <th className="px-4 py-3 sticky top-0 bg-white/5 backdrop-blur text-xs font-semibold text-foreground/85">
+                      <th className="px-4 py-3 sticky top-0 bg-muted/40 backdrop-blur text-xs font-semibold text-foreground/85">
                         Job Card
                       </th>
-                      <th className="px-4 py-3 sticky top-0 bg-white/5 backdrop-blur text-xs font-semibold text-foreground/85">
+                      <th className="px-4 py-3 sticky top-0 bg-muted/40 backdrop-blur text-xs font-semibold text-foreground/85">
                         Status
                       </th>
-                      <th className="px-4 py-3 sticky top-0 bg-white/5 backdrop-blur text-xs font-semibold text-foreground/85">
+                      <th className="px-4 py-3 sticky top-0 bg-muted/40 backdrop-blur text-xs font-semibold text-foreground/85">
                         Date
                       </th>
-                      <th className="px-4 py-3 sticky top-0 bg-white/5 backdrop-blur text-xs font-semibold text-foreground/85 text-right">
+                      <th className="px-4 py-3 sticky top-0 bg-muted/40 backdrop-blur text-xs font-semibold text-foreground/85 text-right">
                         Action
                       </th>
                     </tr>
@@ -1177,7 +1177,7 @@ export function BranchWorkshopDashboard({
                                 type="button"
                                 onClick={() => openQuoteModal(row)}
                                 disabled={inquiryQuoteState.isLocked}
-                                className="inline-flex items-center rounded-md border border-primary/50 bg-transparent px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary shadow-sm transition hover:bg-primary/10 disabled:cursor-not-allowed disabled:border-white/20 disabled:text-white/55 disabled:hover:bg-transparent"
+                                className="inline-flex items-center rounded-md border border-primary/50 bg-transparent px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary shadow-sm transition hover:bg-primary/10 disabled:cursor-not-allowed disabled:border-border disabled:text-muted-foreground disabled:hover:bg-transparent"
                               >
                                 {inquiryQuoteState.label}
                               </button>
@@ -1242,7 +1242,7 @@ export function BranchWorkshopDashboard({
                     type="button"
                     onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
                     disabled={!canPrevious}
-                    className="rounded-md bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-white shadow-sm transition disabled:cursor-not-allowed disabled:opacity-70 disabled:text-white/55 disabled:shadow-none"
+                    className="rounded-md bg-muted px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-foreground shadow-sm transition disabled:cursor-not-allowed disabled:opacity-70 disabled:text-muted-foreground disabled:shadow-none"
                   >
                     Previous
                   </button>
@@ -1251,7 +1251,7 @@ export function BranchWorkshopDashboard({
                     type="button"
                     onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
                     disabled={!canNext}
-                    className="rounded-md bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-white shadow-sm transition disabled:cursor-not-allowed disabled:opacity-70 disabled:text-white/55 disabled:shadow-none"
+                    className="rounded-md bg-muted px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-foreground shadow-sm transition disabled:cursor-not-allowed disabled:opacity-70 disabled:text-muted-foreground disabled:shadow-none"
                   >
                     Next
                   </button>
@@ -1273,14 +1273,14 @@ export function BranchWorkshopDashboard({
                 type="button"
                 onClick={closeQuoteModal}
                 disabled={isSubmittingQuote}
-                className="rounded-md border border-white/20 px-2 py-1 text-xs text-white/80 hover:bg-white/10"
+                className="rounded-md border border-border px-2 py-1 text-xs text-foreground/80 hover:bg-muted"
               >
                 Close
               </button>
             </div>
             <div className="space-y-3">
               <label className="block">
-                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-white/80">
+                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-foreground/80">
                   Quoted Amount
                 </span>
                 <input
@@ -1289,30 +1289,30 @@ export function BranchWorkshopDashboard({
                   step="0.01"
                   value={quoteAmount}
                   onChange={(event) => setQuoteAmount(event.target.value)}
-                  className="w-full rounded-md border border-white/20 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-primary"
+                  className="w-full rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
                   placeholder="Enter amount"
                 />
               </label>
               <label className="block">
-                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-white/80">
+                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-foreground/80">
                   Remarks (optional)
                 </span>
                 <textarea
                   value={quoteRemarks}
                   onChange={(event) => setQuoteRemarks(event.target.value)}
                   rows={3}
-                  className="w-full rounded-md border border-white/20 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-primary"
+                  className="w-full rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
                   placeholder="Any quote notes"
                 />
               </label>
               <label className="block">
-                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-white/80">
+                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-foreground/80">
                   Estimated Time
                 </span>
                 <select
                   value={quoteEtaPreset}
                   onChange={(event) => setQuoteEtaPreset(event.target.value)}
-                  className="w-full rounded-md border border-white/20 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-primary"
+                  className="w-full rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
                 >
                   <option className="bg-white text-slate-900" value="">
                     Select estimated time
@@ -1327,13 +1327,13 @@ export function BranchWorkshopDashboard({
               </label>
               {quoteEtaPreset === "same_day" && (
                 <label className="block">
-                  <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-white/80">
+                  <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-foreground/80">
                     Estimated Hours
                   </span>
                   <select
                     value={quoteEtaHours}
                     onChange={(event) => setQuoteEtaHours(event.target.value)}
-                    className="w-full rounded-md border border-white/20 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-primary"
+                    className="w-full rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
                   >
                     <option className="bg-white text-slate-900" value="">
                       Select hours
@@ -1355,7 +1355,7 @@ export function BranchWorkshopDashboard({
                   type="button"
                   onClick={closeQuoteModal}
                   disabled={isSubmittingQuote}
-                  className="rounded-md border border-white/20 px-3 py-1.5 text-xs font-semibold text-white/85 hover:bg-white/10 disabled:opacity-60"
+                  className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold text-foreground/85 hover:bg-muted disabled:opacity-60"
                 >
                   Cancel
                 </button>

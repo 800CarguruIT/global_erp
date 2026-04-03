@@ -56,7 +56,7 @@ function HomePageSelect({
     <div ref={ref} className="relative w-full">
       <button
         type="button"
-        className="w-full flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-left"
+        className="w-full flex items-center justify-between rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-left"
         onClick={() => setOpen((o) => !o)}
       >
         <span className={selected ? "" : "opacity-50"}>
@@ -67,9 +67,9 @@ function HomePageSelect({
         </svg>
       </button>
       {open && (
-        <ul className="absolute z-50 mt-1 w-full rounded-lg border border-white/10 bg-neutral-900 shadow-xl overflow-auto max-h-60 text-sm">
+        <ul className="absolute z-50 mt-1 w-full rounded-lg border border-border bg-neutral-900 shadow-xl overflow-auto max-h-60 text-sm">
           <li
-            className="px-3 py-2 cursor-pointer opacity-60 hover:opacity-100 hover:bg-white/10"
+            className="px-3 py-2 cursor-pointer opacity-60 hover:opacity-100 hover:bg-muted"
             onClick={() => { onChange(""); setOpen(false); }}
           >
             — Use permission-based default —
@@ -77,7 +77,7 @@ function HomePageSelect({
           {options.map((opt) => (
             <li
               key={opt.href}
-              className={`px-3 py-2 cursor-pointer hover:bg-white/10 ${value === opt.href ? "bg-white/15 font-medium" : ""}`}
+              className={`px-3 py-2 cursor-pointer hover:bg-muted ${value === opt.href ? "bg-muted font-medium" : ""}`}
               onClick={() => { onChange(opt.href); setOpen(false); }}
             >
               {opt.label}
@@ -172,10 +172,37 @@ export function RoleForm({ mode = "create", initial, availablePermissions, scope
     }
   }
 
+  // Only show permission groups relevant to current sidebar features
+  // Permission groups matching current sidebar structure
+  const VISIBLE_PERMISSION_GROUPS = new Set([
+    "sales",    // Call History, Inquiry, Leads, Booking, RSA Leads, Estimates
+    "service",  // Advisor Portal, Car In Dashboard
+    "ops",      // Operations Dashboard
+    "parts",    // Parts Quotes
+    "tech",     // My RSA Jobs
+    "people",   // Employees, Users, Roles & Permissions
+    "company",  // Company Admin
+  ]);
+
+  // Friendly group labels for the UI
+  const GROUP_LABELS: Record<string, string> = {
+    sales: "Sales",
+    service: "Service Center",
+    ops: "Operations",
+    parts: "Parts",
+    tech: "Technician",
+    people: "People & Access",
+    company: "Company Admin",
+  };
+
   const normalizedSearch = search.trim().toLowerCase();
   const filteredPermissions = useMemo(() => {
-    if (!normalizedSearch) return availablePermissions;
-    return availablePermissions.filter((perm) => {
+    const relevant = availablePermissions.filter((perm) => {
+      const group = perm.key.includes(".") ? perm.key.split(".")[0] : "other";
+      return VISIBLE_PERMISSION_GROUPS.has(group);
+    });
+    if (!normalizedSearch) return relevant;
+    return relevant.filter((perm) => {
       const text = `${perm.key} ${perm.description ?? ""}`.toLowerCase();
       return text.includes(normalizedSearch);
     });
@@ -220,10 +247,10 @@ export function RoleForm({ mode = "create", initial, availablePermissions, scope
       className="space-y-4"
     >
       <div className="flex items-center gap-3 text-xs uppercase tracking-wide">
-        <span className={`rounded-full px-3 py-1 ${step === 1 ? "bg-white/15" : "bg-white/5 opacity-60"}`}>
+        <span className={`rounded-full px-3 py-1 ${step === 1 ? "bg-muted" : "bg-muted/40 opacity-60"}`}>
           {t("settings.roles.form.step.role")}
         </span>
-        <span className={`rounded-full px-3 py-1 ${step === 2 ? "bg-white/15" : "bg-white/5 opacity-60"}`}>
+        <span className={`rounded-full px-3 py-1 ${step === 2 ? "bg-muted" : "bg-muted/40 opacity-60"}`}>
           {t("settings.roles.form.step.permissions")}
         </span>
       </div>
@@ -234,7 +261,7 @@ export function RoleForm({ mode = "create", initial, availablePermissions, scope
             <div>
               <label className="text-xs uppercase opacity-70">{t("settings.roles.form.field.name")}</label>
               <input
-                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2"
+                className="w-full rounded-lg border border-border bg-muted/40 px-3 py-2"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
@@ -243,7 +270,7 @@ export function RoleForm({ mode = "create", initial, availablePermissions, scope
             <div>
               <label className="text-xs uppercase opacity-70">{t("settings.roles.form.field.key")}</label>
               <input
-                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2"
+                className="w-full rounded-lg border border-border bg-muted/40 px-3 py-2"
                 value={key}
                 required
                 readOnly
@@ -253,7 +280,7 @@ export function RoleForm({ mode = "create", initial, availablePermissions, scope
             <div className="sm:col-span-2">
               <label className="text-xs uppercase opacity-70">{t("settings.roles.form.field.description")}</label>
               <textarea
-                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 min-h-[80px]"
+                className="w-full rounded-lg border border-border bg-muted/40 px-3 py-2 min-h-[80px]"
                 value={description ?? ""}
                 onChange={(e) => setDescription(e.target.value)}
               />
@@ -273,7 +300,7 @@ export function RoleForm({ mode = "create", initial, availablePermissions, scope
           <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <input
-                className="w-full sm:max-w-sm rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm"
+                className="w-full sm:max-w-sm rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm"
                 placeholder={t("settings.roles.form.search.placeholder")}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -284,14 +311,14 @@ export function RoleForm({ mode = "create", initial, availablePermissions, scope
                 </span>
                 <button
                   type="button"
-                  className="rounded-md border border-white/10 px-2 py-1 text-xs"
+                  className="rounded-md border border-border px-2 py-1 text-xs"
                   onClick={() => toggleGroup(filteredPermissions.map((p) => p.key), true)}
                 >
                   {t("settings.roles.form.selectFiltered")}
                 </button>
                 <button
                   type="button"
-                  className="rounded-md border border-white/10 px-2 py-1 text-xs"
+                  className="rounded-md border border-border px-2 py-1 text-xs"
                   onClick={() => toggleGroup(filteredPermissions.map((p) => p.key), false)}
                 >
                   {t("settings.roles.form.clearFiltered")}
@@ -304,16 +331,16 @@ export function RoleForm({ mode = "create", initial, availablePermissions, scope
                 const selectedCount = keys.filter((k) => selectedPerms.includes(k)).length;
                 const allSelected = selectedCount === keys.length && keys.length > 0;
                 return (
-                  <div key={group} className="rounded-lg border border-white/10 bg-white/5 p-2">
+                  <div key={group} className="rounded-lg border border-border bg-muted/40 p-2">
                     <div className="flex items-center justify-between px-1 pb-2 text-xs uppercase tracking-wide opacity-70">
-                      <span>{group}</span>
+                      <span>{GROUP_LABELS[group] ?? group}</span>
                       <div className="flex items-center gap-2">
                         <span>
                           {selectedCount}/{keys.length}
                         </span>
                       <button
                         type="button"
-                        className="rounded-md border border-white/10 px-2 py-0.5 text-[10px]"
+                        className="rounded-md border border-border px-2 py-0.5 text-[10px]"
                         onClick={() => toggleGroup(keys, !allSelected)}
                       >
                         {allSelected ? t("settings.roles.form.clearAll") : t("settings.roles.form.selectAll")}
@@ -343,14 +370,14 @@ export function RoleForm({ mode = "create", initial, availablePermissions, scope
       </Card>
       )}
 
-      {error && <div className="text-red-400 text-sm">{error}</div>}
+      {error && <div className="text-destructive text-sm">{error}</div>}
       {success && <div className="text-green-400 text-sm">{success}</div>}
 
       <div className="flex items-center gap-2">
         {step === 2 ? (
           <button
             type="button"
-            className="px-3 py-2 rounded-xl border border-white/10 text-white/80"
+            className="px-3 py-2 rounded-xl border border-border text-foreground/80"
             onClick={() => setStep(1)}
           >
             {t("settings.roles.form.back")}
@@ -360,7 +387,7 @@ export function RoleForm({ mode = "create", initial, availablePermissions, scope
           <button
             type="button"
             disabled={!canProceed}
-            className="px-4 py-2 rounded-xl bg-white/10 text-white shadow disabled:opacity-50"
+            className="px-4 py-2 rounded-xl bg-muted text-foreground shadow disabled:opacity-50"
             onClick={() => setStep(2)}
           >
             {t("settings.roles.form.next")}

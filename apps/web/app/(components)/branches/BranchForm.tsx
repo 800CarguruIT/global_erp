@@ -1001,7 +1001,7 @@ export function BranchForm({
         <button
           type="submit"
           disabled={loading}
-          className="inline-flex items-center rounded-md border border-white/30 bg-primary px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-primary-foreground shadow-md transition hover:opacity-90 hover:shadow-lg disabled:opacity-50"
+          className="inline-flex items-center rounded-md border border-border bg-primary px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-primary-foreground shadow-md transition hover:opacity-90 hover:shadow-lg disabled:opacity-50"
         >
           {loading ? "Saving..." : "Save"}
         </button>

@@ -36,7 +36,7 @@ export function UserLogsTable({ logs, title, limitMessage }: Props) {
           </thead>
           <tbody>
             {logs.map((log) => (
-              <tr key={log.id} className="border-b border-white/5">
+              <tr key={log.id} className="border-b border-border/40">
                 <td className="px-3 py-2">{new Date(log.timestamp).toLocaleString()}</td>
                 <td className="px-3 py-2">{log.action_key}</td>
                 <td className="px-3 py-2">{log.summary ?? "—"}</td>

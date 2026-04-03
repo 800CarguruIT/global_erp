@@ -88,7 +88,7 @@ export function UserListTable({
             <button
               type="button"
               onClick={onCreate}
-              className="inline-flex items-center rounded-md border border-white/30 bg-primary px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-primary-foreground shadow-md transition hover:opacity-90 hover:shadow-lg"
+              className="inline-flex items-center rounded-md border border-border bg-primary px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-primary-foreground shadow-md transition hover:opacity-90 hover:shadow-lg"
             >
               <svg viewBox="0 0 24 24" className="-ml-1 mr-2 h-4 w-4" aria-hidden="true">
                 <path
@@ -269,7 +269,7 @@ export function UserListTable({
                           {u.roles.map((r) => (
                             <span
                               key={r.id}
-                              className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white/70"
+                              className="inline-flex items-center rounded-full border border-border bg-muted/40 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-foreground/70"
                             >
                               {r.name || r.id}
                             </span>
@@ -334,7 +334,7 @@ export function UserListTable({
                           {onEdit && (
                             <button
                               type="button"
-                              className="inline-flex items-center rounded-md border border-white/30 bg-primary px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary-foreground shadow-sm transition hover:opacity-90 hover:shadow-md"
+                              className="inline-flex items-center rounded-md border border-border bg-primary px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary-foreground shadow-sm transition hover:opacity-90 hover:shadow-md"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 onEdit(u.id);
@@ -346,7 +346,7 @@ export function UserListTable({
                           {onResetPassword && (
                             <button
                               type="button"
-                              className="inline-flex items-center rounded-md border border-white/30 bg-muted/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground shadow-sm transition hover:opacity-90 hover:shadow-md"
+                              className="inline-flex items-center rounded-md border border-border bg-muted/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground shadow-sm transition hover:opacity-90 hover:shadow-md"
                               disabled={resettingPasswordId === u.id}
                               onClick={(e) => {
                                 e.stopPropagation();

@@ -47,7 +47,7 @@ export default function FunnelIntelligencePage({
         </div>
 
         {/* Funnel Signal Reference */}
-        <div className="rounded-xl border border-white/10 bg-slate-900/40 p-4">
+        <div className="rounded-xl border border-border bg-slate-900/40 p-4">
           <div className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">Key Funnel Signals</div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {[
@@ -58,7 +58,7 @@ export default function FunnelIntelligencePage({
               { signal: "Booking Cold Streak", trigger: "Agent: 0 bookings for >3h during shift", sev: "MED", sevColor: "text-yellow-400" },
               { signal: "Funnel Reversal", trigger: "More cancellations than bookings in 2h window", sev: "CRITICAL", sevColor: "text-red-500" },
             ].map((s) => (
-              <div key={s.signal} className="rounded-lg border border-white/5 bg-slate-800/40 p-3">
+              <div key={s.signal} className="rounded-lg border border-border bg-slate-800/40 p-3">
                 <div className="flex items-center justify-between mb-1">
                   <div className="text-xs font-medium text-slate-300">{s.signal}</div>
                   <span className={`text-[10px] font-bold ${s.sevColor}`}>{s.sev}</span>

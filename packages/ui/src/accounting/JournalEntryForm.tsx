@@ -203,7 +203,7 @@ export function JournalEntryForm({ accounts, initialValues, mode, onSubmit, onCa
           <button
             type="button"
             onClick={addLine}
-            className="rounded-md border px-3 py-1 text-sm font-medium hover:bg-white/10"
+            className="rounded-md border px-3 py-1 text-sm font-medium hover:bg-muted"
           >
             Add line
           </button>
@@ -227,7 +227,7 @@ export function JournalEntryForm({ accounts, initialValues, mode, onSubmit, onCa
         <div className="flex items-center gap-2">
           <button
             type="submit"
-            className="rounded-md border px-4 py-2 text-sm font-semibold hover:bg-white/10"
+            className="rounded-md border px-4 py-2 text-sm font-semibold hover:bg-muted"
             disabled={saving}
           >
             {saving ? "Saving..." : "Save Journal Entry"}
@@ -236,7 +236,7 @@ export function JournalEntryForm({ accounts, initialValues, mode, onSubmit, onCa
             <button
               type="button"
               onClick={onCancel}
-              className="rounded-md border px-3 py-2 text-sm hover:bg-white/10"
+              className="rounded-md border px-3 py-2 text-sm hover:bg-muted"
               disabled={saving}
             >
               Cancel

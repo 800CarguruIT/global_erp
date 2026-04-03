@@ -40,7 +40,7 @@ export default async function ProcurementGrnPage({ params }: Props) {
   return (
     <AppLayout>
       <div className="mx-auto max-w-6xl space-y-4 p-4">
-        <div className="rounded-xl border border-white/10 bg-slate-950/60 p-4">
+        <div className="rounded-xl border border-border bg-slate-950/60 p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <div className="text-xs uppercase tracking-[0.2em] text-slate-400">GRN View</div>
@@ -75,7 +75,7 @@ export default async function ProcurementGrnPage({ params }: Props) {
           </div>
         </div>
 
-        <div className="overflow-x-auto rounded-xl border border-white/10 bg-slate-950/60">
+        <div className="overflow-x-auto rounded-xl border border-border bg-slate-950/60">
           <table className="min-w-full text-xs">
             <thead>
               <tr className="bg-slate-900/70 text-[11px] uppercase tracking-wide text-slate-300">
@@ -95,7 +95,7 @@ export default async function ProcurementGrnPage({ params }: Props) {
                 </tr>
               ) : (
                 (data.grns ?? []).map((grn) => (
-                  <tr key={grn.id} className="border-t border-white/5">
+                  <tr key={grn.id} className="border-t border-border">
                     <td className="py-2 pl-3 pr-4 font-semibold text-emerald-300">{grn.grnNumber}</td>
                     <td className="px-4 py-2 text-slate-100">
                       {grn.partName}

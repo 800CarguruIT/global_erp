@@ -1219,7 +1219,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
               <span className="text-base leading-none">-</span>
             </div>
             <div className="space-y-4 p-4 text-sm">
-              <div className="rounded-md border border-white/10 bg-white/[0.02] px-3 py-3">
+              <div className="rounded-md border border-border bg-card/30 px-3 py-3">
                 <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                   Job Progress
                 </div>
@@ -1236,7 +1236,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                           ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-200"
                           : idx === currentProgressIndex
                           ? "border-amber-400/40 bg-amber-500/10 text-amber-200"
-                          : "border-white/10 bg-white/[0.02] text-white/70"
+                          : "border-border bg-card/30 text-foreground/70"
                       } text-left transition hover:border-cyan-400/50 hover:text-cyan-100`}
                     >
                       <div className="font-semibold">{step.label}</div>
@@ -1288,13 +1288,13 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
               <div className="space-y-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-3">
                 <div className="text-xs font-semibold uppercase tracking-wide text-amber-200">Collect Car</div>
                 {carMediaCounts.total > 0 && (
-                  <div className="rounded-md border border-white/10 bg-black/20 p-2">
+                  <div className="rounded-md border border-border bg-black/20 p-2">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="text-[11px] font-semibold text-white/80">
+                      <div className="text-[11px] font-semibold text-foreground/80">
                         Car Media Verification (Front/Rear/Right/Left + 360 Video)
                       </div>
                       <div className="flex flex-wrap items-center gap-2 text-[11px]">
-                        <span className="rounded-full border border-white/15 px-2 py-0.5 text-white/70">
+                        <span className="rounded-full border border-border px-2 py-0.5 text-foreground/70">
                           {carMediaCounts.verified}/{carMediaCounts.total} verified
                         </span>
                         <span className="rounded-full border border-amber-500/40 px-2 py-0.5 text-amber-300">
@@ -1321,11 +1321,11 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                                   ? "border-emerald-500/30 bg-emerald-500/5"
                                   : reviewStatus === "rejected"
                                   ? "border-rose-500/30 bg-rose-500/5"
-                                  : "border-white/10"
+                                  : "border-border"
                               }`}
                             >
                               <div className="flex items-center justify-between gap-2">
-                                <div className="text-[11px] text-white/70">{label}</div>
+                                <div className="text-[11px] text-foreground/70">{label}</div>
                                 <span
                                   className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${
                                     reviewStatus === "verified"
@@ -1340,14 +1340,14 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                               </div>
                               {key === "video" ? (
                                 <video
-                                  className="mt-2 h-32 w-full rounded border border-white/10 object-cover"
+                                  className="mt-2 h-32 w-full rounded border border-border object-cover"
                                   controls
                                   preload="metadata"
                                   src={`/api/files/${fileId}`}
                                 />
                               ) : (
                                 <img
-                                  className="mt-2 h-32 w-full rounded border border-white/10 object-cover"
+                                  className="mt-2 h-32 w-full rounded border border-border object-cover"
                                   src={`/api/files/${fileId}`}
                                   alt={label}
                                 />
@@ -1365,7 +1365,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                                   {reviewStatus === "verified" ? (
                                     <button
                                       type="button"
-                                      className="rounded-md border border-white/20 px-2.5 py-1 text-[11px] font-semibold text-white/80 hover:bg-white/10"
+                                      className="rounded-md border border-border px-2.5 py-1 text-[11px] font-semibold text-foreground/80 hover:bg-muted"
                                       onClick={() => setCarMediaReview((prev) => ({ ...prev, [key]: "pending" }))}
                                     >
                                       Reopen
@@ -1428,18 +1428,18 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                                   </div>
                                   {replacementId && (
                                     <div className="mt-2 grid gap-2 lg:grid-cols-2">
-                                      <div className="rounded border border-white/10 bg-black/20 p-2">
-                                        <div className="text-[10px] text-white/60">Current</div>
+                                      <div className="rounded border border-border bg-black/20 p-2">
+                                        <div className="text-[10px] text-muted-foreground">Current</div>
                                         {key === "video" ? (
                                           <video
-                                            className="mt-1 h-24 w-full rounded border border-white/10 object-cover"
+                                            className="mt-1 h-24 w-full rounded border border-border object-cover"
                                             controls
                                             preload="metadata"
                                             src={`/api/files/${fileId}`}
                                           />
                                         ) : (
                                           <img
-                                            className="mt-1 h-24 w-full rounded border border-white/10 object-cover"
+                                            className="mt-1 h-24 w-full rounded border border-border object-cover"
                                             src={`/api/files/${fileId}`}
                                             alt={`Current ${label}`}
                                           />
@@ -1489,7 +1489,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                   </div>
                 )}
                 <div className="flex items-center justify-between">
-                  <div className="text-[11px] text-white/70">
+                  <div className="text-[11px] text-foreground/70">
                     {isCollectCarDone
                       ? "Collect Car completed."
                       : "Verify/reject all car media and upload replacements for rejected items."}
@@ -1510,7 +1510,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                   <div className="text-xs font-semibold uppercase tracking-wide text-cyan-200">
                     Required Parts Receiving
                   </div>
-                  <div className="overflow-x-auto rounded-md border border-white/10">
+                  <div className="overflow-x-auto rounded-md border border-border">
                     <table className="min-w-full text-xs">
                       <thead className={`${theme.surfaceSubtle} ${theme.appText}`}>
                         <tr>
@@ -1583,11 +1583,11 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
               {isPreWorkStep && (
               <div className="space-y-2 rounded-md border border-cyan-500/30 bg-cyan-500/5 p-3">
                 <div className="text-xs font-semibold uppercase tracking-wide text-cyan-200">Pre-Work Check</div>
-                <div className="rounded-md border border-white/10 bg-black/20 p-2">
-                  <div className="mb-2 text-[11px] font-semibold text-white/80">Car VIN Section (Fetched data)</div>
+                <div className="rounded-md border border-border bg-black/20 p-2">
+                  <div className="mb-2 text-[11px] font-semibold text-foreground/80">Car VIN Section (Fetched data)</div>
                   <div className="grid gap-2 md:grid-cols-2">
                     <div className="space-y-1">
-                      <div className="text-[11px] text-white/70">VIN</div>
+                      <div className="text-[11px] text-foreground/70">VIN</div>
                       <input
                         className={`${theme.input} h-9`}
                         value={preCheckVin}
@@ -1596,7 +1596,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                       />
                     </div>
                     <div className="space-y-1">
-                      <div className="text-[11px] text-white/70">Plate</div>
+                      <div className="text-[11px] text-foreground/70">Plate</div>
                       <input
                         className={`${theme.input} h-9`}
                         value={preCheckPlate}
@@ -1605,7 +1605,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                       />
                     </div>
                     <div className="space-y-1">
-                      <div className="text-[11px] text-white/70">Year</div>
+                      <div className="text-[11px] text-foreground/70">Year</div>
                       <input
                         type="number"
                         min="1900"
@@ -1617,7 +1617,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                       />
                     </div>
                     <div className="space-y-1">
-                      <div className="text-[11px] text-white/70">Make</div>
+                      <div className="text-[11px] text-foreground/70">Make</div>
                       <input
                         className={`${theme.input} h-9`}
                         value={preCheckMake}
@@ -1626,7 +1626,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                       />
                     </div>
                     <div className="space-y-1">
-                      <div className="text-[11px] text-white/70">Model</div>
+                      <div className="text-[11px] text-foreground/70">Model</div>
                       <input
                         className={`${theme.input} h-9`}
                         value={preCheckModel}
@@ -1637,7 +1637,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <div className="text-[11px] font-semibold text-white/80">Car Mileage</div>
+                  <div className="text-[11px] font-semibold text-foreground/80">Car Mileage</div>
                   <input
                     type="number"
                     min="0"
@@ -1655,7 +1655,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                   placeholder="Optional pre-work note (parts checklist, risk notes, etc.)"
                 />
                 <div className="flex items-center justify-between">
-                  <div className="text-[11px] text-white/70">
+                  <div className="text-[11px] text-foreground/70">
                     {isPreWorkDone
                       ? `Completed at ${new Date(jobCard?.pre_work_checked_at).toLocaleString()}`
                       : "Requires Collect Car completed and all parts received."}
@@ -1674,11 +1674,11 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
               {isPartsReceiveStep && (
                 <div className="space-y-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-3">
                   <div className="text-xs font-semibold uppercase tracking-wide text-amber-200">Parts Receive</div>
-                  <div className="text-[11px] text-white/70">
+                  <div className="text-[11px] text-foreground/70">
                     Confirm receiving status for required parts from delivery notes before starting the job.
                   </div>
-                  <div className="text-[11px] text-white/70">
-                    Minimum requirement to proceed: <span className="font-semibold text-white">at least one part received</span>.
+                  <div className="text-[11px] text-foreground/70">
+                    Minimum requirement to proceed: <span className="font-semibold text-foreground">at least one part received</span>.
                   </div>
                 </div>
               )}
@@ -1699,7 +1699,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                     </div>
                     <div className="grid gap-3 md:grid-cols-2">
                       <div>
-                        <div className="mb-1 text-[11px] text-white/70">Engine Image</div>
+                        <div className="mb-1 text-[11px] text-foreground/70">Engine Image</div>
                         <FileUploader
                           label=""
                           kind="image"
@@ -1715,7 +1715,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                         />
                       </div>
                       <div>
-                        <div className="mb-1 text-[11px] text-white/70">Bottom Image</div>
+                        <div className="mb-1 text-[11px] text-foreground/70">Bottom Image</div>
                         <FileUploader
                           label=""
                           kind="image"
@@ -1732,7 +1732,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                       </div>
                     </div>
                     <div className="flex items-center justify-between">
-                      <div className="text-[11px] text-white/70">
+                      <div className="text-[11px] text-foreground/70">
                         Save engine and bottom images before completion.
                       </div>
                       <button
@@ -1750,7 +1750,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
               {isFinalInspectionStep && (
                 <div className="space-y-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3">
                   <div className="text-xs font-semibold uppercase tracking-wide text-emerald-200">Final Inspection</div>
-                  <div className="rounded-md border border-white/10 bg-black/20 px-2.5 py-2 text-[11px] text-white/75">
+                  <div className="rounded-md border border-border bg-black/20 px-2.5 py-2 text-[11px] text-foreground/75">
                     1) Verify all approved parts are finalized. 2) Upload final car photos and notes.
                     3) Complete checklist. 4) If rework is needed, reopen job card.
                   </div>
@@ -1817,7 +1817,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                   </div>
                   <div className="grid gap-3 md:grid-cols-2">
                     <div>
-                      <div className="mb-1 text-[11px] text-white/70">Front Photo</div>
+                      <div className="mb-1 text-[11px] text-foreground/70">Front Photo</div>
                       <FileUploader
                         label=""
                         kind="image"
@@ -1835,7 +1835,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                       />
                     </div>
                     <div>
-                      <div className="mb-1 text-[11px] text-white/70">Rear Photo</div>
+                      <div className="mb-1 text-[11px] text-foreground/70">Rear Photo</div>
                       <FileUploader
                         label=""
                         kind="image"
@@ -1853,7 +1853,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                       />
                     </div>
                     <div>
-                      <div className="mb-1 text-[11px] text-white/70">Right Photo</div>
+                      <div className="mb-1 text-[11px] text-foreground/70">Right Photo</div>
                       <FileUploader
                         label=""
                         kind="image"
@@ -1871,7 +1871,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                       />
                     </div>
                     <div>
-                      <div className="mb-1 text-[11px] text-white/70">Left Photo</div>
+                      <div className="mb-1 text-[11px] text-foreground/70">Left Photo</div>
                       <FileUploader
                         label=""
                         kind="image"
@@ -1890,7 +1890,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <div className="text-[11px] font-semibold text-white/80">Final Notes (optional)</div>
+                    <div className="text-[11px] font-semibold text-foreground/80">Final Notes (optional)</div>
                     <textarea
                       className={`${theme.input} h-20 resize-none`}
                       value={finalInspectionRemarks}
@@ -1913,7 +1913,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                     ) : null}
                   </div>
                   <div className="flex items-center justify-between">
-                    <div className="text-[11px] text-white/70">
+                    <div className="text-[11px] text-foreground/70">
                       {isFinalInspectionDone
                         ? `Completed at ${new Date(jobCard?.final_inspection_at).toLocaleString()}`
                         : "All checklist items and final car photos are required."}
@@ -1924,17 +1924,17 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
               {isCarWashStep && (
                 <div className="space-y-3 rounded-md border border-cyan-500/30 bg-cyan-500/5 p-3">
                   <div className="text-xs font-semibold uppercase tracking-wide text-cyan-200">Car Wash</div>
-                  <div className="rounded-md border border-white/10 bg-black/20 px-2.5 py-2 text-[11px] text-white/75">
+                  <div className="rounded-md border border-border bg-black/20 px-2.5 py-2 text-[11px] text-foreground/75">
                     Upload post-wash car images and video. This stage is mandatory to finish workshop flow.
                   </div>
-                  <div className="space-y-2 rounded-md border border-white/10 bg-black/20 p-2.5">
-                    <div className="text-[11px] font-semibold text-white/80">Reference Car Media</div>
+                  <div className="space-y-2 rounded-md border border-border bg-black/20 p-2.5">
+                    <div className="text-[11px] font-semibold text-foreground/80">Reference Car Media</div>
                     <div className="grid gap-2 md:grid-cols-5">
                       {(["front", "rear", "right", "left"] as const).map((key) => {
                         const fileId = finalInspectionCarPhotos[key] || collectCarSourceMedia[key];
                         return (
-                          <div key={`reference-${key}`} className="rounded border border-white/10 p-1">
-                            <div className="mb-1 text-[10px] uppercase text-white/60">{key}</div>
+                          <div key={`reference-${key}`} className="rounded border border-border p-1">
+                            <div className="mb-1 text-[10px] uppercase text-muted-foreground">{key}</div>
                             {fileId ? (
                               <img
                                 className="h-20 w-full rounded object-cover"
@@ -1942,13 +1942,13 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                                 alt={`Reference ${key}`}
                               />
                             ) : (
-                              <div className="h-20 rounded border border-dashed border-white/10 bg-white/[0.02]" />
+                              <div className="h-20 rounded border border-dashed border-border bg-card/30" />
                             )}
                           </div>
                         );
                       })}
-                      <div className="rounded border border-white/10 p-1 md:col-span-1">
-                        <div className="mb-1 text-[10px] uppercase text-white/60">video</div>
+                      <div className="rounded border border-border p-1 md:col-span-1">
+                        <div className="mb-1 text-[10px] uppercase text-muted-foreground">video</div>
                         {collectCarSourceMedia.video ? (
                           <video
                             className="h-20 w-full rounded object-cover"
@@ -1957,14 +1957,14 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                             preload="metadata"
                           />
                         ) : (
-                          <div className="h-20 rounded border border-dashed border-white/10 bg-white/[0.02]" />
+                          <div className="h-20 rounded border border-dashed border-border bg-card/30" />
                         )}
                       </div>
                     </div>
                   </div>
                   <div className="grid gap-3 md:grid-cols-2">
                     <div>
-                      <div className="mb-1 text-[11px] text-white/70">Wash Front Image</div>
+                      <div className="mb-1 text-[11px] text-foreground/70">Wash Front Image</div>
                       <FileUploader
                         label=""
                         kind="image"
@@ -1980,7 +1980,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                       />
                     </div>
                     <div>
-                      <div className="mb-1 text-[11px] text-white/70">Wash Rear Image</div>
+                      <div className="mb-1 text-[11px] text-foreground/70">Wash Rear Image</div>
                       <FileUploader
                         label=""
                         kind="image"
@@ -1996,7 +1996,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                       />
                     </div>
                     <div>
-                      <div className="mb-1 text-[11px] text-white/70">Wash Right Image</div>
+                      <div className="mb-1 text-[11px] text-foreground/70">Wash Right Image</div>
                       <FileUploader
                         label=""
                         kind="image"
@@ -2012,7 +2012,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                       />
                     </div>
                     <div>
-                      <div className="mb-1 text-[11px] text-white/70">Wash Left Image</div>
+                      <div className="mb-1 text-[11px] text-foreground/70">Wash Left Image</div>
                       <FileUploader
                         label=""
                         kind="image"
@@ -2029,7 +2029,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <div className="text-[11px] font-semibold text-white/80">Car Wash Video</div>
+                    <div className="text-[11px] font-semibold text-foreground/80">Car Wash Video</div>
                     <FileUploader
                       label=""
                       kind="video"
@@ -2045,7 +2045,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                     />
                   </div>
                   <div className="space-y-1">
-                    <div className="text-[11px] font-semibold text-white/80">Car Wash Notes (optional)</div>
+                    <div className="text-[11px] font-semibold text-foreground/80">Car Wash Notes (optional)</div>
                     <textarea
                       className={`${theme.input} h-20 resize-none`}
                       value={carWashNotes}
@@ -2054,7 +2054,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                     />
                   </div>
                   <div className="flex items-center justify-between">
-                    <div className="text-[11px] text-white/70">
+                    <div className="text-[11px] text-foreground/70">
                       {isCarWashDone ? "Car wash stage completed." : "All images + video are mandatory."}
                     </div>
                   </div>
@@ -2233,7 +2233,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                                         className={`h-8 rounded-md border px-2 text-[10px] font-semibold transition ${
                                           isActive
                                             ? status.activeClass
-                                            : "border-white/15 bg-white/[0.03] text-white/70 hover:bg-white/[0.08]"
+                                            : "border-border bg-card/40 text-foreground/70 hover:bg-muted/40"
                                         }`}
                                         onClick={() =>
                                           handleReceiveStatusClick(
@@ -2277,14 +2277,14 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                                   <div className="text-[10px] text-cyan-300">Saving status...</div>
                                 ) : null}
                                 <div className="grid grid-cols-3 gap-1 text-[10px]">
-                                  <div className="rounded border border-white/10 bg-white/[0.03] px-2 py-1">
-                                    <div className="text-white/50">GRN</div>
-                                    <div className="truncate text-white/90">
+                                  <div className="rounded border border-border bg-card/40 px-2 py-1">
+                                    <div className="text-muted-foreground">GRN</div>
+                                    <div className="truncate text-foreground/90">
                                       {String(item.procurement_latest_grn_number ?? "-")}
                                     </div>
                                   </div>
-                                  <div className="rounded border border-white/10 bg-white/[0.03] px-2 py-1">
-                                    <div className="text-white/50">Inventory</div>
+                                  <div className="rounded border border-border bg-card/40 px-2 py-1">
+                                    <div className="text-muted-foreground">Inventory</div>
                                     <div
                                       className={
                                         item.procurement_inventory_moved
@@ -2295,8 +2295,8 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                                       {item.procurement_inventory_moved ? "Moved" : "Pending"}
                                     </div>
                                   </div>
-                                  <div className="rounded border border-white/10 bg-white/[0.03] px-2 py-1">
-                                    <div className="text-white/50">Accounting</div>
+                                  <div className="rounded border border-border bg-card/40 px-2 py-1">
+                                    <div className="text-muted-foreground">Accounting</div>
                                     <div
                                       className={
                                         item.procurement_accounting_posted
@@ -2310,7 +2310,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                                 </div>
                               </div>
                             ) : (
-                              <span className="text-[10px] text-white/70">{currentStatus}</span>
+                              <span className="text-[10px] text-foreground/70">{currentStatus}</span>
                             )}
                           </td>
                           {isFinalInspectionStep ? (
@@ -2323,7 +2323,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                                       className={`h-8 rounded-md border px-2 text-[10px] font-semibold transition ${
                                         finalInspectionPartStatusByItemId[itemId] === "verified"
                                           ? "border-emerald-400/60 bg-emerald-500/20 text-emerald-200"
-                                          : "border-white/15 bg-white/[0.03] text-white/70 hover:bg-white/[0.08]"
+                                          : "border-border bg-card/40 text-foreground/70 hover:bg-muted/40"
                                       }`}
                                       onClick={() =>
                                         setFinalInspectionPartStatusByItemId((prev) => ({
@@ -2340,7 +2340,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                                       className={`h-8 rounded-md border px-2 text-[10px] font-semibold transition ${
                                         finalInspectionPartStatusByItemId[itemId] === "rework"
                                           ? "border-amber-400/60 bg-amber-500/20 text-amber-200"
-                                          : "border-white/15 bg-white/[0.03] text-white/70 hover:bg-white/[0.08]"
+                                          : "border-border bg-card/40 text-foreground/70 hover:bg-muted/40"
                                       }`}
                                       onClick={() =>
                                         setFinalInspectionPartStatusByItemId((prev) => ({
@@ -2358,7 +2358,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                                   ) : null}
                                 </div>
                               ) : (
-                                <span className="text-[10px] text-white/45">-</span>
+                                <span className="text-[10px] text-muted-foreground">-</span>
                               )}
                             </td>
                           ) : null}
@@ -2369,12 +2369,12 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                   </tbody>
                   {primaryItems.length > 0 ? (
                     <tfoot>
-                      <tr className="border-t border-border/70 bg-white/[0.02] text-[10px]">
-                        <td colSpan={3} className="px-2 py-2 font-semibold text-white/85">
+                      <tr className="border-t border-border/70 bg-card/30 text-[10px]">
+                        <td colSpan={3} className="px-2 py-2 font-semibold text-foreground/85">
                           Totals
                         </td>
-                        <td className="px-2 py-2 text-white/80">Items: {primaryItems.length}</td>
-                        <td className="px-2 py-2 text-white/80">
+                        <td className="px-2 py-2 text-foreground/80">Items: {primaryItems.length}</td>
+                        <td className="px-2 py-2 text-foreground/80">
                           Qty: {primaryItems.reduce((sum, item) => sum + Number(item.quantity ?? 0), 0)}
                         </td>
                         <td className="px-2 py-2 text-amber-300">Pending Uploads: {requiredUploadsPending}</td>
@@ -2382,7 +2382,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                         {isCompleteStep ? (
                           <td className="px-2 py-2 text-amber-300">Scrap Missing: {scrapPicMissingCount}</td>
                         ) : null}
-                        <td className="px-2 py-2 text-white/60">Receive status per line item</td>
+                        <td className="px-2 py-2 text-muted-foreground">Receive status per line item</td>
                         {isFinalInspectionStep ? (
                           <td className="px-2 py-2 text-amber-300">
                             Pending decision:{" "}
@@ -2400,7 +2400,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                 </table>
                 <div className="space-y-2 p-2 md:hidden">
                   {primaryItems.length === 0 ? (
-                    <div className="rounded-md border border-white/10 bg-white/[0.02] px-3 py-3 text-xs text-muted-foreground">
+                    <div className="rounded-md border border-border bg-card/30 px-3 py-3 text-xs text-muted-foreground">
                       No parts assigned yet.
                     </div>
                   ) : (
@@ -2417,7 +2417,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                           ? statusActionMeta.filter((status) => status.value !== "Partially Received")
                           : statusActionMeta;
                       return (
-                      <div key={item.id ?? idx} className="rounded-md border border-white/10 bg-white/[0.02] p-3 text-xs">
+                      <div key={item.id ?? idx} className="rounded-md border border-border bg-card/30 p-3 text-xs">
                         <div className="mb-2 flex items-center justify-between gap-2">
                           <div className="font-semibold">{item.product_name ?? item.productName ?? "-"}</div>
                           <span
@@ -2445,22 +2445,22 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                         </div>
                         <div className="grid grid-cols-2 gap-2 text-[11px]">
                           <div>
-                            <div className="text-white/60">Qty</div>
+                            <div className="text-muted-foreground">Qty</div>
                             <div>{item.quantity ?? 0}</div>
                           </div>
                           <div>
-                            <div className="text-white/60">Type</div>
+                            <div className="text-muted-foreground">Type</div>
                             <div>{item.type ?? item.product_type ?? "-"}</div>
                           </div>
                           <div className="col-span-2">
-                            <div className="text-white/60">Description</div>
+                            <div className="text-muted-foreground">Description</div>
                             <div>{item.description ?? "-"}</div>
                           </div>
                         </div>
                         <div className="mt-3 grid gap-3">
                           {isPartsReceiveStep && Number(item.is_add ?? 0) !== 1 && (
                             <div>
-                              <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-white/70">
+                              <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-foreground/70">
                                 Receive Status
                               </div>
                               <div className={`grid gap-1 ${visibleStatusActions.length === 2 ? "grid-cols-2" : "grid-cols-3"}`}>
@@ -2473,7 +2473,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                                       className={`h-9 rounded-md border px-2 text-[10px] font-semibold transition ${
                                         isActive
                                           ? status.activeClass
-                                          : "border-white/15 bg-white/[0.03] text-white/70 hover:bg-white/[0.08]"
+                                          : "border-border bg-card/40 text-foreground/70 hover:bg-muted/40"
                                       }`}
                                       onClick={() =>
                                         handleReceiveStatusClick(
@@ -2517,14 +2517,14 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                                 <div className="mt-1 text-[10px] text-cyan-300">Saving status...</div>
                               ) : null}
                               <div className="mt-2 grid grid-cols-3 gap-1 text-[10px]">
-                                <div className="rounded border border-white/10 bg-white/[0.03] px-2 py-1">
-                                  <div className="text-white/50">GRN</div>
-                                  <div className="truncate text-white/90">
+                                <div className="rounded border border-border bg-card/40 px-2 py-1">
+                                  <div className="text-muted-foreground">GRN</div>
+                                  <div className="truncate text-foreground/90">
                                     {String(item.procurement_latest_grn_number ?? "-")}
                                   </div>
                                 </div>
-                                <div className="rounded border border-white/10 bg-white/[0.03] px-2 py-1">
-                                  <div className="text-white/50">Inventory</div>
+                                <div className="rounded border border-border bg-card/40 px-2 py-1">
+                                  <div className="text-muted-foreground">Inventory</div>
                                   <div
                                     className={
                                       item.procurement_inventory_moved
@@ -2535,8 +2535,8 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                                     {item.procurement_inventory_moved ? "Moved" : "Pending"}
                                   </div>
                                 </div>
-                                <div className="rounded border border-white/10 bg-white/[0.03] px-2 py-1">
-                                  <div className="text-white/50">Accounting</div>
+                                <div className="rounded border border-border bg-card/40 px-2 py-1">
+                                  <div className="text-muted-foreground">Accounting</div>
                                   <div
                                     className={
                                       item.procurement_accounting_posted
@@ -2552,7 +2552,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                           )}
                           {isFinalInspectionStep && finalInspectionRequiredItemIds.includes(itemId) && (
                             <div>
-                              <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-white/70">
+                              <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-foreground/70">
                                 Verify / Re-Work
                               </div>
                               <div className="grid grid-cols-2 gap-1">
@@ -2561,7 +2561,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                                   className={`h-9 rounded-md border px-2 text-[10px] font-semibold transition ${
                                     finalInspectionPartStatusByItemId[itemId] === "verified"
                                       ? "border-emerald-400/60 bg-emerald-500/20 text-emerald-200"
-                                      : "border-white/15 bg-white/[0.03] text-white/70 hover:bg-white/[0.08]"
+                                      : "border-border bg-card/40 text-foreground/70 hover:bg-muted/40"
                                   }`}
                                   onClick={() =>
                                     setFinalInspectionPartStatusByItemId((prev) => ({
@@ -2577,7 +2577,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                                   className={`h-9 rounded-md border px-2 text-[10px] font-semibold transition ${
                                     finalInspectionPartStatusByItemId[itemId] === "rework"
                                       ? "border-amber-400/60 bg-amber-500/20 text-amber-200"
-                                      : "border-white/15 bg-white/[0.03] text-white/70 hover:bg-white/[0.08]"
+                                      : "border-border bg-card/40 text-foreground/70 hover:bg-muted/40"
                                   }`}
                                   onClick={() =>
                                     setFinalInspectionPartStatusByItemId((prev) => ({
@@ -2595,7 +2595,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                             </div>
                           )}
                           <div>
-                            <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-white/70">Part Pic</div>
+                            <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-foreground/70">Part Pic</div>
                             <FileUploader
                               label=""
                               kind="image"
@@ -2619,7 +2619,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                           </div>
                           {isCompleteStep ? (
                             <div>
-                              <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-white/70">Scrap Pic</div>
+                              <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-foreground/70">Scrap Pic</div>
                               <FileUploader
                                 label=""
                                 kind="image"
@@ -2648,7 +2648,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                     })
                   )}
                   {primaryItems.length > 0 ? (
-                    <div className="rounded-md border border-white/10 bg-white/[0.02] px-3 py-2 text-[11px]">
+                    <div className="rounded-md border border-border bg-card/30 px-3 py-2 text-[11px]">
                       <div className="flex items-center justify-between">
                         <span>Items</span>
                         <span>{primaryItems.length}</span>
@@ -2666,8 +2666,8 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                 </div>
               </div>
               )}
-              <div className="sticky bottom-0 z-10 flex flex-col gap-2 rounded-md border border-white/10 bg-slate-950/90 px-3 py-2 backdrop-blur md:flex-row md:items-center md:justify-between">
-                <div className="text-[11px] text-white/80 md:text-left">
+              <div className="sticky bottom-0 z-10 flex flex-col gap-2 rounded-md border border-border bg-background/90 px-3 py-2 backdrop-blur md:flex-row md:items-center md:justify-between">
+                <div className="text-[11px] text-foreground/80 md:text-left">
                   {unmetRequirementCount > 0
                     ? `${unmetRequirementCount} stage requirement${unmetRequirementCount > 1 ? "s" : ""} pending`
                     : isCarWashStep
@@ -2826,13 +2826,13 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
               </div>
               <div className="p-3 text-xs">
                 <div className="grid grid-cols-2 gap-2">
-                  <div className="text-white/70">Customer ID</div>
+                  <div className="text-foreground/70">Customer ID</div>
                   <div className="font-semibold text-sky-300">{jobCard?.customer_code ?? jobCard?.customer_id ?? "N/A"}</div>
-                  <div className="text-white/70">Customer Name</div>
+                  <div className="text-foreground/70">Customer Name</div>
                   <div className="font-semibold">{jobCard?.customer_name ?? "N/A"}</div>
-                  <div className="text-white/70">Customer Phone</div>
+                  <div className="text-foreground/70">Customer Phone</div>
                   <div className="font-semibold">{jobCard?.customer_phone ?? "N/A"}</div>
-                  <div className="text-white/70">Customer Type</div>
+                  <div className="text-foreground/70">Customer Type</div>
                   <div className="font-semibold">{jobCard?.customer_type ?? "Regular"}</div>
                 </div>
               </div>
@@ -2845,11 +2845,11 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
               </div>
               <div className="p-3 text-xs">
                 <div className="grid grid-cols-2 gap-2">
-                  <div className="text-white/70">Plate #</div>
+                  <div className="text-foreground/70">Plate #</div>
                   <div className="font-semibold">{jobCard?.plate_number ?? "N/A"}</div>
-                  <div className="text-white/70">Car</div>
+                  <div className="text-foreground/70">Car</div>
                   <div className="font-semibold">{carLabel || "N/A"}</div>
-                  <div className="text-white/70">Type</div>
+                  <div className="text-foreground/70">Type</div>
                   <div className="font-semibold">{jobCard?.body_type ?? "Regular"}</div>
                 </div>
                 <div className="mt-3 rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold text-white">
@@ -2889,7 +2889,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                     <option value="recommended">Recommended</option>
                   </select>
                   <div>
-                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-white/70">
+                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-foreground/70">
                       Item Image
                     </div>
                     <FileUploader
@@ -2917,7 +2917,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                 </div>
                 <div className="space-y-2">
                   {additionalItems.length === 0 ? (
-                    <div className="rounded-md border border-white/10 bg-white/[0.02] px-2 py-2 text-muted-foreground">
+                    <div className="rounded-md border border-border bg-card/30 px-2 py-2 text-muted-foreground">
                       No additional items.
                     </div>
                   ) : (
@@ -2926,7 +2926,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                       const mode = String(item.additional_item_mode ?? "recommended");
                       const imageId = String(item.additional_item_image_id ?? "").trim();
                       return (
-                        <div key={item.id} className="rounded-md border border-white/10 bg-white/[0.02] p-2">
+                        <div key={item.id} className="rounded-md border border-border bg-card/30 p-2">
                           <div className="font-semibold">{item.product_name ?? "-"}</div>
                           <div className="mt-1 flex flex-wrap items-center gap-1">
                             <span className="rounded-full bg-cyan-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase text-cyan-200">
@@ -2949,7 +2949,7 @@ export function JobCardDetailMain({ companyId, jobCardId, workshopBranchId = nul
                               href={`/api/files/${imageId}`}
                               target="_blank"
                               rel="noreferrer"
-                              className="mt-2 inline-flex rounded-md border border-white/15 bg-white/[0.04] p-1 hover:bg-white/[0.08]"
+                              className="mt-2 inline-flex rounded-md border border-border bg-card/50 p-1 hover:bg-muted/40"
                             >
                               <img
                                 src={`/api/files/${imageId}`}

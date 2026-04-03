@@ -174,21 +174,21 @@ export default function ProductsMain({ companyId }: { companyId: string }) {
           <button
             type="button"
             onClick={handleExpandAll}
-            className="text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-white"
+            className="text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
           >
             Expand all
           </button>
           <button
             type="button"
             onClick={handleCollapseAll}
-            className="text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-white"
+            className="text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
           >
             Collapse all
           </button>
           <button
             type="button"
             onClick={() => setRefreshKey((key) => key + 1)}
-            className="text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-white"
+            className="text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
           >
             Refresh
           </button>
@@ -199,9 +199,9 @@ export default function ProductsMain({ companyId }: { companyId: string }) {
       <div className="space-y-3">
         {loading && <p className="text-sm text-muted-foreground">Loading catalog...</p>}
         {error && <p className="text-sm text-destructive">{error}</p>}
-        <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-4 shadow-[0_30px_80px_rgba(2,6,23,0.8)]">
+        <div className="rounded-2xl border border-border bg-background/60 p-4 shadow-[0_30px_80px_rgba(2,6,23,0.8)]">
           <div className="mb-4 flex flex-wrap items-center gap-3">
-            <label className="text-xs uppercase tracking-wide text-white/70">Filter</label>
+            <label className="text-xs uppercase tracking-wide text-foreground/70">Filter</label>
             <select
               value={selectedMake}
               onChange={(event) => {
@@ -209,7 +209,7 @@ export default function ProductsMain({ companyId }: { companyId: string }) {
                 setSelectedModel("");
                 setSelectedYear("");
               }}
-              className="rounded-full border border-white/20 bg-black/20 px-3 py-1 text-sm text-white outline-none backdrop-blur transition hover:border-white/40"
+              className="rounded-full border border-border bg-black/20 px-3 py-1 text-sm text-foreground outline-none backdrop-blur transition hover:border-border"
             >
               <option value="">All makes</option>
               {makeOptions.map((make) => (
@@ -224,7 +224,7 @@ export default function ProductsMain({ companyId }: { companyId: string }) {
                 setSelectedModel(event.target.value);
                 setSelectedYear("");
               }}
-              className="rounded-full border border-white/20 bg-black/20 px-3 py-1 text-sm text-white outline-none backdrop-blur transition hover:border-white/40"
+              className="rounded-full border border-border bg-black/20 px-3 py-1 text-sm text-foreground outline-none backdrop-blur transition hover:border-border"
             >
               <option value="">All models</option>
               {modelOptions.map((model) => (
@@ -236,7 +236,7 @@ export default function ProductsMain({ companyId }: { companyId: string }) {
             <select
               value={selectedYear}
               onChange={(event) => setSelectedYear(event.target.value)}
-              className="rounded-full border border-white/20 bg-black/20 px-3 py-1 text-sm text-white outline-none backdrop-blur transition hover:border-white/40"
+              className="rounded-full border border-border bg-black/20 px-3 py-1 text-sm text-foreground outline-none backdrop-blur transition hover:border-border"
             >
               <option value="">All years</option>
               {yearOptions.map((year) => (
@@ -247,10 +247,10 @@ export default function ProductsMain({ companyId }: { companyId: string }) {
             </select>
           </div>
           {!loading && !error && treeData.length === 0 && (
-            <div className="px-4 py-3 text-sm text-white/80">No products configured yet.</div>
+            <div className="px-4 py-3 text-sm text-foreground/80">No products configured yet.</div>
           )}
           {!loading && !error && treeData.length > 0 && (
-            <div className="w-full text-white">
+            <div className="w-full text-foreground">
               <Tree<TreeNode>
                 ref={treeRef}
                 data={treeData}
@@ -266,17 +266,17 @@ export default function ProductsMain({ companyId }: { companyId: string }) {
                     {node.isInternal ? (
                       <button
                         type="button"
-                        className="text-xs text-white/60"
+                        className="text-xs text-muted-foreground"
                         onClick={() => node.isInternal && node.toggle()}
                       >
                         {node.isOpen ? "▾" : "▸"}
                       </button>
                     ) : (
-                      <span className="text-[10px] text-white/60">•</span>
+                      <span className="text-[10px] text-muted-foreground">•</span>
                     )}
                     <div className="flex flex-col">
                       <span
-                        className={`font-medium ${node.data.kind === "year" ? "text-white" : "text-white/90"}`}
+                        className={`font-medium ${node.data.kind === "year" ? "text-foreground" : "text-foreground/90"}`}
                       >
                         {node.data.label}
                       </span>

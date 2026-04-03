@@ -1,0 +1,1198 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>AWS-Failover-Execution-Plan.md</title>
+<meta http-equiv="Content-type" content="text/html;charset=UTF-8">
+
+<style>
+/* https://github.com/microsoft/vscode/blob/master/extensions/markdown-language-features/media/markdown.css */
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+body {
+	font-family: var(--vscode-markdown-font-family, -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif);
+	font-size: var(--vscode-markdown-font-size, 14px);
+	padding: 0 26px;
+	line-height: var(--vscode-markdown-line-height, 22px);
+	word-wrap: break-word;
+}
+
+#code-csp-warning {
+	position: fixed;
+	top: 0;
+	right: 0;
+	color: white;
+	margin: 16px;
+	text-align: center;
+	font-size: 12px;
+	font-family: sans-serif;
+	background-color:#444444;
+	cursor: pointer;
+	padding: 6px;
+	box-shadow: 1px 1px 1px rgba(0,0,0,.25);
+}
+
+#code-csp-warning:hover {
+	text-decoration: none;
+	background-color:#007acc;
+	box-shadow: 2px 2px 2px rgba(0,0,0,.25);
+}
+
+body.scrollBeyondLastLine {
+	margin-bottom: calc(100vh - 22px);
+}
+
+body.showEditorSelection .code-line {
+	position: relative;
+}
+
+body.showEditorSelection .code-active-line:before,
+body.showEditorSelection .code-line:hover:before {
+	content: "";
+	display: block;
+	position: absolute;
+	top: 0;
+	left: -12px;
+	height: 100%;
+}
+
+body.showEditorSelection li.code-active-line:before,
+body.showEditorSelection li.code-line:hover:before {
+	left: -30px;
+}
+
+.vscode-light.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(0, 0, 0, 0.15);
+}
+
+.vscode-light.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(0, 0, 0, 0.40);
+}
+
+.vscode-light.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+.vscode-dark.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(255, 255, 255, 0.4);
+}
+
+.vscode-dark.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(255, 255, 255, 0.60);
+}
+
+.vscode-dark.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+.vscode-high-contrast.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(255, 160, 0, 0.7);
+}
+
+.vscode-high-contrast.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(255, 160, 0, 1);
+}
+
+.vscode-high-contrast.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+img {
+	max-width: 100%;
+	max-height: 100%;
+}
+
+a {
+	text-decoration: none;
+}
+
+a:hover {
+	text-decoration: underline;
+}
+
+a:focus,
+input:focus,
+select:focus,
+textarea:focus {
+	outline: 1px solid -webkit-focus-ring-color;
+	outline-offset: -1px;
+}
+
+hr {
+	border: 0;
+	height: 2px;
+	border-bottom: 2px solid;
+}
+
+h1 {
+	padding-bottom: 0.3em;
+	line-height: 1.2;
+	border-bottom-width: 1px;
+	border-bottom-style: solid;
+}
+
+h1, h2, h3 {
+	font-weight: normal;
+}
+
+table {
+	border-collapse: collapse;
+}
+
+table > thead > tr > th {
+	text-align: left;
+	border-bottom: 1px solid;
+}
+
+table > thead > tr > th,
+table > thead > tr > td,
+table > tbody > tr > th,
+table > tbody > tr > td {
+	padding: 5px 10px;
+}
+
+table > tbody > tr + tr > td {
+	border-top: 1px solid;
+}
+
+blockquote {
+	margin: 0 7px 0 5px;
+	padding: 0 16px 0 10px;
+	border-left-width: 5px;
+	border-left-style: solid;
+}
+
+code {
+	font-family: Menlo, Monaco, Consolas, "Droid Sans Mono", "Courier New", monospace, "Droid Sans Fallback";
+	font-size: 1em;
+	line-height: 1.357em;
+}
+
+body.wordWrap pre {
+	white-space: pre-wrap;
+}
+
+pre:not(.hljs),
+pre.hljs code > div {
+	padding: 16px;
+	border-radius: 3px;
+	overflow: auto;
+}
+
+pre code {
+	color: var(--vscode-editor-foreground);
+	tab-size: 4;
+}
+
+/** Theming */
+
+.vscode-light pre {
+	background-color: rgba(220, 220, 220, 0.4);
+}
+
+.vscode-dark pre {
+	background-color: rgba(10, 10, 10, 0.4);
+}
+
+.vscode-high-contrast pre {
+	background-color: rgb(0, 0, 0);
+}
+
+.vscode-high-contrast h1 {
+	border-color: rgb(0, 0, 0);
+}
+
+.vscode-light table > thead > tr > th {
+	border-color: rgba(0, 0, 0, 0.69);
+}
+
+.vscode-dark table > thead > tr > th {
+	border-color: rgba(255, 255, 255, 0.69);
+}
+
+.vscode-light h1,
+.vscode-light hr,
+.vscode-light table > tbody > tr + tr > td {
+	border-color: rgba(0, 0, 0, 0.18);
+}
+
+.vscode-dark h1,
+.vscode-dark hr,
+.vscode-dark table > tbody > tr + tr > td {
+	border-color: rgba(255, 255, 255, 0.18);
+}
+
+</style>
+
+<style>
+/* Tomorrow Theme */
+/* http://jmblog.github.com/color-themes-for-google-code-highlightjs */
+/* Original theme - https://github.com/chriskempson/tomorrow-theme */
+
+/* Tomorrow Comment */
+.hljs-comment,
+.hljs-quote {
+	color: #8e908c;
+}
+
+/* Tomorrow Red */
+.hljs-variable,
+.hljs-template-variable,
+.hljs-tag,
+.hljs-name,
+.hljs-selector-id,
+.hljs-selector-class,
+.hljs-regexp,
+.hljs-deletion {
+	color: #c82829;
+}
+
+/* Tomorrow Orange */
+.hljs-number,
+.hljs-built_in,
+.hljs-builtin-name,
+.hljs-literal,
+.hljs-type,
+.hljs-params,
+.hljs-meta,
+.hljs-link {
+	color: #f5871f;
+}
+
+/* Tomorrow Yellow */
+.hljs-attribute {
+	color: #eab700;
+}
+
+/* Tomorrow Green */
+.hljs-string,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-addition {
+	color: #718c00;
+}
+
+/* Tomorrow Blue */
+.hljs-title,
+.hljs-section {
+	color: #4271ae;
+}
+
+/* Tomorrow Purple */
+.hljs-keyword,
+.hljs-selector-tag {
+	color: #8959a8;
+}
+
+.hljs {
+	display: block;
+	overflow-x: auto;
+	color: #4d4d4c;
+	padding: 0.5em;
+}
+
+.hljs-emphasis {
+	font-style: italic;
+}
+
+.hljs-strong {
+	font-weight: bold;
+}
+</style>
+
+<style>
+/*
+ * Markdown PDF CSS
+ */
+
+ body {
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif, "Meiryo";
+	padding: 0 12px;
+}
+
+pre {
+	background-color: #f8f8f8;
+	border: 1px solid #cccccc;
+	border-radius: 3px;
+	overflow-x: auto;
+	white-space: pre-wrap;
+	overflow-wrap: break-word;
+}
+
+pre:not(.hljs) {
+	padding: 23px;
+	line-height: 19px;
+}
+
+blockquote {
+	background: rgba(127, 127, 127, 0.1);
+	border-color: rgba(0, 122, 204, 0.5);
+}
+
+.emoji {
+	height: 1.4em;
+}
+
+code {
+	font-size: 14px;
+	line-height: 19px;
+}
+
+/* for inline code */
+:not(pre):not(.hljs) > code {
+	color: #C9AE75; /* Change the old color so it seems less like an error */
+	font-size: inherit;
+}
+
+/* Page Break : use <div class="page"/> to insert page break
+-------------------------------------------------------- */
+.page {
+	page-break-after: always;
+}
+
+</style>
+
+<script src="https://unpkg.com/mermaid/dist/mermaid.min.js"></script>
+</head>
+<body>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: document.body.classList.contains('vscode-dark') || document.body.classList.contains('vscode-high-contrast')
+          ? 'dark'
+          : 'default'
+    });
+  </script>
+<h1 id="aws-failover-execution-plan">AWS Failover Execution Plan</h1>
+<h2 id="800-carguru--active-passive-high-availability-setup">800 CarGuru — Active-Passive High Availability Setup</h2>
+<p><strong>Start Date:</strong> April 2026
+<strong>Estimated Duration:</strong> 3 Days
+<strong>Executed By:</strong> IT Department</p>
+<hr>
+<h2 id="phase-1-secure-the-main-server-day-1--morning">Phase 1: Secure the Main Server (Day 1 — Morning)</h2>
+<blockquote>
+<p>Goal: Ensure the current production server is properly protected before building the backup.</p>
+</blockquote>
+<h3 id="step-11-assign-elastic-ip-to-main-instance">Step 1.1: Assign Elastic IP to Main Instance</h3>
+<ul>
+<li><input type="checkbox" id="checkbox0"><label for="checkbox0">Go to EC2 → </label><strong>Elastic IPs</strong> → <strong>Allocate Elastic IP address</strong></li>
+<li><input type="checkbox" id="checkbox1"><label for="checkbox1">Click </label><strong>Allocate</strong></li>
+<li><input type="checkbox" id="checkbox2"><label for="checkbox2">Select the new IP → </label><strong>Actions</strong> → <strong>Associate Elastic IP address</strong></li>
+<li><input type="checkbox" id="checkbox3"><label for="checkbox3">Choose main instance </label><code>SMF_NEW_CG</code> → <strong>Associate</strong></li>
+<li><input type="checkbox" id="checkbox4"><label for="checkbox4">Note down:</label>
+<ul>
+<li>Elastic IP: <code>_______________</code></li>
+<li>Allocation ID: <code>_______________</code></li>
+</ul>
+</li>
+</ul>
+<h3 id="step-12-update-dns-to-elastic-ip">Step 1.2: Update DNS to Elastic IP</h3>
+<ul>
+<li><input type="checkbox" id="checkbox5"><label for="checkbox5">Login to </label><strong>GoDaddy</strong> → DNS for <code>800carguru.me</code></li>
+<li><input type="checkbox" id="checkbox6"><label for="checkbox6">Update </label><strong>A record</strong> (<code>@</code>) to the new Elastic IP</li>
+<li><input type="checkbox" id="checkbox7"><label for="checkbox7">Update </label><strong>A record</strong> (<code>www</code>) to the new Elastic IP</li>
+<li><input type="checkbox" id="checkbox8"><label for="checkbox8">Set TTL to </label><strong>600</strong></li>
+<li><input type="checkbox" id="checkbox9"><label for="checkbox9">Verify: </label><code>ping 800carguru.me</code> resolves to Elastic IP</li>
+</ul>
+<h3 id="step-13-verify-main-server-protections">Step 1.3: Verify Main Server Protections</h3>
+<ul>
+<li><input type="checkbox" id="checkbox10"><label for="checkbox10">Confirm </label><strong>Stop Protection</strong> is enabled</li>
+<li><input type="checkbox" id="checkbox11"><label for="checkbox11">Confirm </label><strong>Termination Protection</strong> is enabled</li>
+<li><input type="checkbox" id="checkbox12"><label for="checkbox12">Confirm </label><strong>IMDSv2</strong> is set to required</li>
+<li><input type="checkbox" id="checkbox13"><label for="checkbox13">Note down:</label>
+<ul>
+<li>Main Instance ID: <code>_______________</code></li>
+<li>Main Private IP: <code>_______________</code></li>
+</ul>
+</li>
+</ul>
+<h3 id="step-14-install-aws-cli-on-main-server">Step 1.4: Install AWS CLI on Main Server</h3>
+<pre class="hljs"><code><div>sudo apt install -y awscli
+</div></code></pre>
+<h3 id="step-15-create-ami-of-main-server">Step 1.5: Create AMI of Main Server</h3>
+<ul>
+<li><input type="checkbox" id="checkbox14"><label for="checkbox14">EC2 Console → Select main instance</label></li>
+<li><input type="checkbox" id="checkbox15"><label for="checkbox15"></label><strong>Actions</strong> → <strong>Image and templates</strong> → <strong>Create image</strong></li>
+<li><input type="checkbox" id="checkbox16"><label for="checkbox16">Image name: </label><code>CG-failover-base-YYYYMMDD</code></li>
+<li><input type="checkbox" id="checkbox17"><label for="checkbox17">Enable </label><strong>No reboot</strong></li>
+<li><input type="checkbox" id="checkbox18"><label for="checkbox18">Click </label><strong>Create image</strong></li>
+<li><input type="checkbox" id="checkbox19"><label for="checkbox19">Wait for AMI status: </label><code>available</code> (10-20 minutes)</li>
+<li><input type="checkbox" id="checkbox20"><label for="checkbox20">Note down AMI ID: </label><code>_______________</code></li>
+</ul>
+<p><strong>Phase 1 Checklist:</strong></p>
+<ul>
+<li><input type="checkbox" id="checkbox21"><label for="checkbox21">Elastic IP assigned and DNS updated</label></li>
+<li><input type="checkbox" id="checkbox22"><label for="checkbox22">Protections verified</label></li>
+<li><input type="checkbox" id="checkbox23"><label for="checkbox23">AMI created successfully</label></li>
+<li><input type="checkbox" id="checkbox24"><label for="checkbox24">All IDs documented</label></li>
+</ul>
+<hr>
+<h2 id="phase-2-launch-backup-server-day-1--afternoon">Phase 2: Launch Backup Server (Day 1 — Afternoon)</h2>
+<blockquote>
+<p>Goal: Create an identical standby server from the AMI.</p>
+</blockquote>
+<h3 id="step-21-launch-backup-instance-from-ami">Step 2.1: Launch Backup Instance from AMI</h3>
+<ul>
+<li><input type="checkbox" id="checkbox25"><label for="checkbox25">Go to </label><strong>AMIs</strong> → Select <code>CG-failover-base-YYYYMMDD</code></li>
+<li><input type="checkbox" id="checkbox26"><label for="checkbox26">Click </label><strong>Launch instance from AMI</strong></li>
+<li><input type="checkbox" id="checkbox27"><label for="checkbox27">Configure:</label></li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Name</td>
+<td><code>SMF_BACKUP_CG</code></td>
+</tr>
+<tr>
+<td>Instance type</td>
+<td><code>t3.large</code> (cost-saving) or <code>t3.2xlarge</code> (full mirror)</td>
+</tr>
+<tr>
+<td>Key pair</td>
+<td>Same as main instance</td>
+</tr>
+<tr>
+<td>VPC</td>
+<td><code>vpc-0423103401dfdca5f</code></td>
+</tr>
+<tr>
+<td>Subnet</td>
+<td>us-east-1f (same AZ)</td>
+</tr>
+<tr>
+<td>Auto-assign Public IP</td>
+<td>Enable</td>
+</tr>
+<tr>
+<td>Security group</td>
+<td>Same as main instance</td>
+</tr>
+<tr>
+<td>Storage</td>
+<td>500 GiB gp3, encrypted</td>
+</tr>
+</tbody>
+</table>
+<h3 id="step-22-enable-protections-on-backup">Step 2.2: Enable Protections on Backup</h3>
+<ul>
+<li><input type="checkbox" id="checkbox28"><label for="checkbox28"></label><strong>Advanced Details</strong> during launch:
+<ul>
+<li>Termination protection: <strong>Enable</strong></li>
+<li>Stop protection: <strong>Enable</strong></li>
+<li>IMDSv2: <strong>Required</strong></li>
+</ul>
+</li>
+</ul>
+<h3 id="step-23-launch-and-verify">Step 2.3: Launch and Verify</h3>
+<ul>
+<li><input type="checkbox" id="checkbox29"><label for="checkbox29">Click </label><strong>Launch instance</strong></li>
+<li><input type="checkbox" id="checkbox30"><label for="checkbox30">Wait for status: </label><strong>Running</strong>, <strong>2/2 checks passed</strong></li>
+<li><input type="checkbox" id="checkbox31"><label for="checkbox31">SSH into backup: </label><code>ssh -i key.pem ubuntu@&lt;backup-public-ip&gt;</code></li>
+<li><input type="checkbox" id="checkbox32"><label for="checkbox32">Verify Apache is running: </label><code>sudo systemctl status apache2</code></li>
+<li><input type="checkbox" id="checkbox33"><label for="checkbox33">Verify MariaDB is running: </label><code>sudo systemctl status mariadb</code></li>
+<li><input type="checkbox" id="checkbox34"><label for="checkbox34">Note down:</label>
+<ul>
+<li>Backup Instance ID: <code>_______________</code></li>
+<li>Backup Private IP: <code>_______________</code></li>
+<li>Backup Public IP: <code>_______________</code></li>
+</ul>
+</li>
+</ul>
+<h3 id="step-24-update-security-group-for-replication">Step 2.4: Update Security Group for Replication</h3>
+<ul>
+<li><input type="checkbox" id="checkbox35"><label for="checkbox35">EC2 → </label><strong>Security Groups</strong> → Select the security group</li>
+<li><input type="checkbox" id="checkbox36"><label for="checkbox36">Add </label><strong>Inbound Rule</strong>:</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Port</th>
+<th>Source</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MySQL/Aurora</td>
+<td>3306</td>
+<td>Main Private IP/32</td>
+<td>DB replication from main</td>
+</tr>
+<tr>
+<td>MySQL/Aurora</td>
+<td>3306</td>
+<td>Backup Private IP/32</td>
+<td>DB replication from backup</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Phase 2 Checklist:</strong></p>
+<ul>
+<li><input type="checkbox" id="checkbox37"><label for="checkbox37">Backup instance launched and running</label></li>
+<li><input type="checkbox" id="checkbox38"><label for="checkbox38">SSH access verified</label></li>
+<li><input type="checkbox" id="checkbox39"><label for="checkbox39">Apache and MariaDB running</label></li>
+<li><input type="checkbox" id="checkbox40"><label for="checkbox40">Security group updated for replication</label></li>
+<li><input type="checkbox" id="checkbox41"><label for="checkbox41">All IDs documented</label></li>
+</ul>
+<hr>
+<h2 id="phase-3-database-replication-day-2--morning">Phase 3: Database Replication (Day 2 — Morning)</h2>
+<blockquote>
+<p>Goal: Set up real-time database sync from Main (Master) to Backup (Slave).</p>
+</blockquote>
+<h3 id="step-31-configure-main-server-as-master">Step 3.1: Configure Main Server as Master</h3>
+<p>SSH into <strong>main</strong> server:</p>
+<pre class="hljs"><code><div>sudo nano /etc/mysql/mariadb.conf.d/50-server.cnf
+</div></code></pre>
+<ul>
+<li><input type="checkbox" id="checkbox42"><label for="checkbox42">Add under </label><code>[mysqld]</code>:</li>
+</ul>
+<pre class="hljs"><code><div><span class="hljs-attr">server-id</span> = <span class="hljs-number">1</span>
+<span class="hljs-attr">log_bin</span> = /var/log/mysql/mysql-bin.log
+<span class="hljs-attr">binlog_do_db</span> = carguru2
+<span class="hljs-attr">bind-address</span> = <span class="hljs-number">0.0</span>.<span class="hljs-number">0.0</span>
+</div></code></pre>
+<ul>
+<li><input type="checkbox" id="checkbox43"><label for="checkbox43">Restart MariaDB:</label></li>
+</ul>
+<pre class="hljs"><code><div>sudo systemctl restart mariadb
+</div></code></pre>
+<h3 id="step-32-create-replication-user-on-main">Step 3.2: Create Replication User on Main</h3>
+<pre class="hljs"><code><div>sudo mysql -e <span class="hljs-string">"
+CREATE USER 'replicator'@'%' IDENTIFIED BY '&lt;STRONG_PASSWORD&gt;';
+GRANT REPLICATION SLAVE ON *.* TO 'replicator'@'%';
+FLUSH PRIVILEGES;
+"</span>
+</div></code></pre>
+<ul>
+<li><input type="checkbox" id="checkbox44"><label for="checkbox44">Choose a strong password: </label><code>_______________</code></li>
+</ul>
+<h3 id="step-33-get-master-status">Step 3.3: Get Master Status</h3>
+<pre class="hljs"><code><div>sudo mysql -e <span class="hljs-string">"SHOW MASTER STATUS;"</span>
+</div></code></pre>
+<ul>
+<li><input type="checkbox" id="checkbox45"><label for="checkbox45">Note down:</label>
+<ul>
+<li>File: <code>_______________</code></li>
+<li>Position: <code>_______________</code></li>
+</ul>
+</li>
+</ul>
+<h3 id="step-34-configure-backup-server-as-slave">Step 3.4: Configure Backup Server as Slave</h3>
+<p>SSH into <strong>backup</strong> server:</p>
+<pre class="hljs"><code><div>sudo nano /etc/mysql/mariadb.conf.d/50-server.cnf
+</div></code></pre>
+<ul>
+<li><input type="checkbox" id="checkbox46"><label for="checkbox46">Add under </label><code>[mysqld]</code>:</li>
+</ul>
+<pre class="hljs"><code><div><span class="hljs-attr">server-id</span> = <span class="hljs-number">2</span>
+<span class="hljs-attr">relay-log</span> = /var/log/mysql/mysql-relay-bin.log
+<span class="hljs-attr">read_only</span> = <span class="hljs-number">1</span>
+</div></code></pre>
+<ul>
+<li><input type="checkbox" id="checkbox47"><label for="checkbox47">Restart MariaDB:</label></li>
+</ul>
+<pre class="hljs"><code><div>sudo systemctl restart mariadb
+</div></code></pre>
+<h3 id="step-35-start-replication-on-backup">Step 3.5: Start Replication on Backup</h3>
+<pre class="hljs"><code><div>sudo mysql -e <span class="hljs-string">"
+CHANGE MASTER TO
+  MASTER_HOST='&lt;MAIN_PRIVATE_IP&gt;',
+  MASTER_USER='replicator',
+  MASTER_PASSWORD='&lt;STRONG_PASSWORD&gt;',
+  MASTER_LOG_FILE='&lt;FILE_FROM_STEP_3.3&gt;',
+  MASTER_LOG_POS=&lt;POSITION_FROM_STEP_3.3&gt;;
+START SLAVE;
+"</span>
+</div></code></pre>
+<h3 id="step-36-verify-replication">Step 3.6: Verify Replication</h3>
+<pre class="hljs"><code><div>sudo mysql -e <span class="hljs-string">"SHOW SLAVE STATUS\G"</span> | grep -E <span class="hljs-string">"Slave_IO|Slave_SQL|Seconds_Behind"</span>
+</div></code></pre>
+<ul>
+<li><input type="checkbox" id="checkbox48"><label for="checkbox48">Confirm:</label>
+<ul>
+<li><code>Slave_IO_Running: Yes</code></li>
+<li><code>Slave_SQL_Running: Yes</code></li>
+<li><code>Seconds_Behind_Master: 0</code></li>
+</ul>
+</li>
+</ul>
+<h3 id="step-37-test-replication">Step 3.7: Test Replication</h3>
+<p>On <strong>main</strong> server:</p>
+<pre class="hljs"><code><div>sudo mysql carguru2 -e <span class="hljs-string">"CREATE TABLE repl_test (id INT, msg VARCHAR(50)); INSERT INTO repl_test VALUES (1, 'replication works');"</span>
+</div></code></pre>
+<p>On <strong>backup</strong> server:</p>
+<pre class="hljs"><code><div>sudo mysql carguru2 -e <span class="hljs-string">"SELECT * FROM repl_test;"</span>
+</div></code></pre>
+<ul>
+<li><input type="checkbox" id="checkbox49"><label for="checkbox49">Verify result shows: </label><code>1 | replication works</code></li>
+</ul>
+<p>Cleanup on <strong>main</strong>:</p>
+<pre class="hljs"><code><div>sudo mysql carguru2 -e <span class="hljs-string">"DROP TABLE repl_test;"</span>
+</div></code></pre>
+<ul>
+<li><input type="checkbox" id="checkbox50"><label for="checkbox50">Verify table is also removed from backup</label></li>
+</ul>
+<p><strong>Phase 3 Checklist:</strong></p>
+<ul>
+<li><input type="checkbox" id="checkbox51"><label for="checkbox51">Main configured as Master</label></li>
+<li><input type="checkbox" id="checkbox52"><label for="checkbox52">Replication user created</label></li>
+<li><input type="checkbox" id="checkbox53"><label for="checkbox53">Backup configured as Slave</label></li>
+<li><input type="checkbox" id="checkbox54"><label for="checkbox54">Replication running (IO + SQL = Yes)</label></li>
+<li><input type="checkbox" id="checkbox55"><label for="checkbox55">Test data replicated successfully</label></li>
+<li><input type="checkbox" id="checkbox56"><label for="checkbox56">Test data cleanup replicated</label></li>
+</ul>
+<hr>
+<h2 id="phase-4-auto-failover-script-day-2--afternoon">Phase 4: Auto-Failover Script (Day 2 — Afternoon)</h2>
+<blockquote>
+<p>Goal: Automate detection of main server failure and switch traffic to backup.</p>
+</blockquote>
+<h3 id="step-41-install-and-configure-aws-cli-on-backup">Step 4.1: Install and Configure AWS CLI on Backup</h3>
+<pre class="hljs"><code><div>sudo apt install -y awscli
+aws configure
+</div></code></pre>
+<ul>
+<li><input type="checkbox" id="checkbox57"><label for="checkbox57">Enter:</label>
+<ul>
+<li>AWS Access Key ID: <code>_______________</code></li>
+<li>AWS Secret Access Key: <code>_______________</code></li>
+<li>Default region: <code>us-east-1</code></li>
+<li>Output format: <code>json</code></li>
+</ul>
+</li>
+</ul>
+<h3 id="step-42-create-iam-user-for-failover-least-privilege">Step 4.2: Create IAM User for Failover (Least Privilege)</h3>
+<p>In <strong>AWS Console</strong> → <strong>IAM</strong> → <strong>Users</strong> → <strong>Create user</strong>:</p>
+<ul>
+<li><input type="checkbox" id="checkbox58"><label for="checkbox58">Username: </label><code>failover-agent</code></li>
+<li><input type="checkbox" id="checkbox59"><label for="checkbox59">Attach policy — create custom policy:</label></li>
+</ul>
+<pre class="hljs"><code><div>{
+    <span class="hljs-attr">"Version"</span>: <span class="hljs-string">"2012-10-17"</span>,
+    <span class="hljs-attr">"Statement"</span>: [
+        {
+            <span class="hljs-attr">"Effect"</span>: <span class="hljs-string">"Allow"</span>,
+            <span class="hljs-attr">"Action"</span>: [
+                <span class="hljs-string">"ec2:AssociateAddress"</span>,
+                <span class="hljs-string">"ec2:DescribeAddresses"</span>,
+                <span class="hljs-string">"ec2:DescribeInstances"</span>
+            ],
+            <span class="hljs-attr">"Resource"</span>: <span class="hljs-string">"*"</span>
+        }
+    ]
+}
+</div></code></pre>
+<ul>
+<li><input type="checkbox" id="checkbox60"><label for="checkbox60">Create </label><strong>Access Keys</strong> for this user</li>
+<li><input type="checkbox" id="checkbox61"><label for="checkbox61">Use these keys in </label><code>aws configure</code> on backup server</li>
+</ul>
+<h3 id="step-43-create-failover-script">Step 4.3: Create Failover Script</h3>
+<pre class="hljs"><code><div>sudo nano /home/ubuntu/failover.sh
+</div></code></pre>
+<ul>
+<li><input type="checkbox" id="checkbox62"><label for="checkbox62">Paste the script (replace all placeholders):</label></li>
+</ul>
+<pre class="hljs"><code><div><span class="hljs-meta">#!/bin/bash
+</span>
+<span class="hljs-comment"># ============================================</span>
+<span class="hljs-comment"># AUTO-FAILOVER SCRIPT</span>
+<span class="hljs-comment"># Runs every minute via cron on BACKUP server</span>
+<span class="hljs-comment"># ============================================</span>
+
+MAIN_IP=<span class="hljs-string">"&lt;MAIN_PRIVATE_IP&gt;"</span>
+ELASTIC_IP=<span class="hljs-string">"&lt;YOUR_ELASTIC_IP&gt;"</span>
+INSTANCE_ID=<span class="hljs-string">"&lt;BACKUP_INSTANCE_ID&gt;"</span>
+ALLOCATION_ID=<span class="hljs-string">"&lt;ELASTIC_IP_ALLOCATION_ID&gt;"</span>
+FAILOVER_FLAG=<span class="hljs-string">"/tmp/failover_active"</span>
+LOG_FILE=<span class="hljs-string">"/var/log/failover.log"</span>
+
+<span class="hljs-comment"># If failover already active, skip</span>
+<span class="hljs-keyword">if</span> [ -f <span class="hljs-string">"<span class="hljs-variable">$FAILOVER_FLAG</span>"</span> ]; <span class="hljs-keyword">then</span>
+    <span class="hljs-built_in">exit</span> 0
+<span class="hljs-keyword">fi</span>
+
+<span class="hljs-comment"># Check 1: Ping</span>
+<span class="hljs-keyword">if</span> ping -c 3 -W 2 <span class="hljs-variable">$MAIN_IP</span> &gt; /dev/null 2&gt;&amp;1; <span class="hljs-keyword">then</span>
+    <span class="hljs-built_in">exit</span> 0
+<span class="hljs-keyword">fi</span>
+
+<span class="hljs-comment"># Check 2: Wait and retry (avoid false positive)</span>
+sleep 30
+
+<span class="hljs-keyword">if</span> ping -c 3 -W 2 <span class="hljs-variable">$MAIN_IP</span> &gt; /dev/null 2&gt;&amp;1; <span class="hljs-keyword">then</span>
+    <span class="hljs-built_in">exit</span> 0
+<span class="hljs-keyword">fi</span>
+
+<span class="hljs-comment"># Check 3: HTTP check</span>
+<span class="hljs-keyword">if</span> curl -s --max-time 5 http://<span class="hljs-variable">$MAIN_IP</span> &gt; /dev/null 2&gt;&amp;1; <span class="hljs-keyword">then</span>
+    <span class="hljs-built_in">exit</span> 0
+<span class="hljs-keyword">fi</span>
+
+<span class="hljs-comment"># === FAILOVER ===</span>
+<span class="hljs-built_in">echo</span> <span class="hljs-string">"<span class="hljs-variable">$(date)</span> - FAILOVER TRIGGERED - Main server DOWN"</span> &gt;&gt; <span class="hljs-variable">$LOG_FILE</span>
+
+aws ec2 associate-address \
+    --instance-id <span class="hljs-variable">$INSTANCE_ID</span> \
+    --allocation-id <span class="hljs-variable">$ALLOCATION_ID</span> \
+    --allow-reassociation \
+    --region us-east-1
+
+<span class="hljs-keyword">if</span> [ $? -eq 0 ]; <span class="hljs-keyword">then</span>
+    <span class="hljs-built_in">echo</span> <span class="hljs-string">"<span class="hljs-variable">$(date)</span> - Elastic IP moved to backup"</span> &gt;&gt; <span class="hljs-variable">$LOG_FILE</span>
+    sudo mysql -e <span class="hljs-string">"STOP SLAVE; SET GLOBAL read_only = 0;"</span>
+    <span class="hljs-built_in">echo</span> <span class="hljs-string">"<span class="hljs-variable">$(date)</span> - Database writable"</span> &gt;&gt; <span class="hljs-variable">$LOG_FILE</span>
+    touch <span class="hljs-variable">$FAILOVER_FLAG</span>
+    <span class="hljs-built_in">echo</span> <span class="hljs-string">"<span class="hljs-variable">$(date)</span> - FAILOVER COMPLETE"</span> &gt;&gt; <span class="hljs-variable">$LOG_FILE</span>
+<span class="hljs-keyword">else</span>
+    <span class="hljs-built_in">echo</span> <span class="hljs-string">"<span class="hljs-variable">$(date)</span> - ERROR: Failed to move Elastic IP"</span> &gt;&gt; <span class="hljs-variable">$LOG_FILE</span>
+<span class="hljs-keyword">fi</span>
+</div></code></pre>
+<h3 id="step-44-set-permissions-and-schedule">Step 4.4: Set Permissions and Schedule</h3>
+<pre class="hljs"><code><div>sudo chmod +x /home/ubuntu/failover.sh
+sudo crontab -e
+</div></code></pre>
+<ul>
+<li><input type="checkbox" id="checkbox63"><label for="checkbox63">Add:</label></li>
+</ul>
+<pre class="hljs"><code><div>* * * * * /home/ubuntu/failover.sh
+</div></code></pre>
+<h3 id="step-45-create-failover-log">Step 4.5: Create Failover Log</h3>
+<pre class="hljs"><code><div>sudo touch /var/<span class="hljs-built_in">log</span>/failover.log
+sudo chmod 666 /var/<span class="hljs-built_in">log</span>/failover.log
+</div></code></pre>
+<p><strong>Phase 4 Checklist:</strong></p>
+<ul>
+<li><input type="checkbox" id="checkbox64"><label for="checkbox64">AWS CLI configured on backup</label></li>
+<li><input type="checkbox" id="checkbox65"><label for="checkbox65">IAM user created with minimal permissions</label></li>
+<li><input type="checkbox" id="checkbox66"><label for="checkbox66">Failover script created with correct values</label></li>
+<li><input type="checkbox" id="checkbox67"><label for="checkbox67">Cron job scheduled (every minute)</label></li>
+<li><input type="checkbox" id="checkbox68"><label for="checkbox68">Log file created</label></li>
+</ul>
+<hr>
+<h2 id="phase-5-daily-backups-day-2--evening">Phase 5: Daily Backups (Day 2 — Evening)</h2>
+<blockquote>
+<p>Goal: Set up automated daily database backups with local download.</p>
+</blockquote>
+<h3 id="step-51-create-backup-script-on-main-server">Step 5.1: Create Backup Script on Main Server</h3>
+<pre class="hljs"><code><div>sudo nano /home/ubuntu/db_backup.sh
+</div></code></pre>
+<ul>
+<li><input type="checkbox" id="checkbox69"><label for="checkbox69">Paste:</label></li>
+</ul>
+<pre class="hljs"><code><div><span class="hljs-meta">#!/bin/bash</span>
+BACKUP_DIR=<span class="hljs-string">"/home/ubuntu/db_backups"</span>
+DATE=$(date +%Y-%m-%d_%H-%M-%S)
+mkdir -p <span class="hljs-variable">$BACKUP_DIR</span>
+
+mysqldump -u root carguru2 | gzip &gt; <span class="hljs-string">"<span class="hljs-variable">$BACKUP_DIR</span>/carguru2_<span class="hljs-variable">$DATE</span>.sql.gz"</span>
+
+<span class="hljs-comment"># Keep only last 7 days</span>
+find <span class="hljs-variable">$BACKUP_DIR</span> -name <span class="hljs-string">"*.sql.gz"</span> -mtime +7 -delete
+
+<span class="hljs-built_in">echo</span> <span class="hljs-string">"<span class="hljs-variable">$(date)</span> - Backup completed: carguru2_<span class="hljs-variable">$DATE</span>.sql.gz"</span> &gt;&gt; /var/<span class="hljs-built_in">log</span>/db_backup.log
+</div></code></pre>
+<pre class="hljs"><code><div>sudo chmod +x /home/ubuntu/db_backup.sh
+</div></code></pre>
+<h3 id="step-52-schedule-daily-backup-2-am">Step 5.2: Schedule Daily Backup (2 AM)</h3>
+<pre class="hljs"><code><div>sudo crontab -e
+</div></code></pre>
+<ul>
+<li><input type="checkbox" id="checkbox70"><label for="checkbox70">Add:</label></li>
+</ul>
+<pre class="hljs"><code><div>0 2 * * * /home/ubuntu/db_backup.sh
+</div></code></pre>
+<h3 id="step-53-create-auto-download-script-on-windows-pc">Step 5.3: Create Auto-Download Script on Windows PC</h3>
+<p>Create <code>D:\DB_BKP\auto_backup.bat</code>:</p>
+<pre class="hljs"><code><div>@<span class="hljs-built_in">echo</span> off
+<span class="hljs-built_in">set</span> KEY="C:\<span class="hljs-built_in">path</span>\to\your-key.pem"
+<span class="hljs-built_in">set</span> SERVER=ubuntu@&lt;ELASTIC_IP&gt;
+<span class="hljs-built_in">set</span> DEST=D:\DB_BKP\
+
+<span class="hljs-built_in">echo</span> Downloading latest backups...
+scp -i <span class="hljs-variable">%KEY%</span> <span class="hljs-variable">%SERVER%</span>:/home/ubuntu/db_backups/*.sql.gz <span class="hljs-variable">%DEST%</span>
+<span class="hljs-built_in">echo</span> Download complete: <span class="hljs-variable">%date%</span> <span class="hljs-variable">%time%</span> &gt;&gt; <span class="hljs-variable">%DEST%</span>download_log.txt
+</div></code></pre>
+<h3 id="step-54-schedule-on-windows-task-scheduler">Step 5.4: Schedule on Windows Task Scheduler</h3>
+<ul>
+<li><input type="checkbox" id="checkbox71"><label for="checkbox71">Open </label><strong>Task Scheduler</strong></li>
+<li><input type="checkbox" id="checkbox72"><label for="checkbox72"></label><strong>Create Basic Task</strong>
+<ul>
+<li>Name: <code>CG2 Database Backup Download</code></li>
+<li>Trigger: <strong>Daily</strong> at <strong>3:00 AM</strong></li>
+<li>Action: <strong>Start a program</strong> → <code>D:\DB_BKP\auto_backup.bat</code></li>
+</ul>
+</li>
+<li><input type="checkbox" id="checkbox73"><label for="checkbox73">Enable: </label><strong>Run whether user is logged on or not</strong></li>
+</ul>
+<h3 id="step-55-test-backup-pipeline">Step 5.5: Test Backup Pipeline</h3>
+<pre class="hljs"><code><div><span class="hljs-comment"># On main server — run manual backup</span>
+sudo /home/ubuntu/db_backup.sh
+
+<span class="hljs-comment"># Verify backup created</span>
+ls -la /home/ubuntu/db_backups/
+</div></code></pre>
+<ul>
+<li><input type="checkbox" id="checkbox74"><label for="checkbox74">On Windows — run </label><code>auto_backup.bat</code> manually, verify file appears in <code>D:\DB_BKP\</code></li>
+</ul>
+<p><strong>Phase 5 Checklist:</strong></p>
+<ul>
+<li><input type="checkbox" id="checkbox75"><label for="checkbox75">Backup script created on main server</label></li>
+<li><input type="checkbox" id="checkbox76"><label for="checkbox76">Cron job scheduled (daily 2 AM)</label></li>
+<li><input type="checkbox" id="checkbox77"><label for="checkbox77">Windows download script created</label></li>
+<li><input type="checkbox" id="checkbox78"><label for="checkbox78">Windows Task Scheduler configured</label></li>
+<li><input type="checkbox" id="checkbox79"><label for="checkbox79">Manual test successful</label></li>
+</ul>
+<hr>
+<h2 id="phase-6-testing--validation-day-3">Phase 6: Testing &amp; Validation (Day 3)</h2>
+<blockquote>
+<p>Goal: Verify the entire failover system works end-to-end.</p>
+</blockquote>
+<h3 id="step-61-pre-test-checks">Step 6.1: Pre-Test Checks</h3>
+<ul>
+<li><input type="checkbox" id="checkbox80"><label for="checkbox80">Main server is running and serving traffic</label></li>
+<li><input type="checkbox" id="checkbox81"><label for="checkbox81">Backup server is running</label></li>
+<li><input type="checkbox" id="checkbox82"><label for="checkbox82">Replication status: </label><code>Slave_IO_Running: Yes</code>, <code>Slave_SQL_Running: Yes</code></li>
+<li><input type="checkbox" id="checkbox83"><label for="checkbox83">Failover cron is active on backup</label></li>
+<li><input type="checkbox" id="checkbox84"><label for="checkbox84">Inform team about planned test downtime (5 minutes)</label></li>
+</ul>
+<h3 id="step-62-test-failover-simulate-main-failure">Step 6.2: Test Failover (Simulate Main Failure)</h3>
+<p><strong>Option A — Stop Main Instance:</strong></p>
+<ol>
+<li><input type="checkbox" id="checkbox85"><label for="checkbox85">Disable stop protection on main temporarily</label></li>
+<li><input type="checkbox" id="checkbox86"><label for="checkbox86">Stop the main instance from EC2 console</label></li>
+<li><input type="checkbox" id="checkbox87"><label for="checkbox87">Start timer</label></li>
+</ol>
+<p><strong>Expected Result:</strong></p>
+<ul>
+<li><input type="checkbox" id="checkbox88"><label for="checkbox88">Within 1-2 minutes, failover script activates</label></li>
+<li><input type="checkbox" id="checkbox89"><label for="checkbox89">Elastic IP moves to backup</label></li>
+<li><input type="checkbox" id="checkbox90"><label for="checkbox90">Website </label><code>800carguru.me</code> loads from backup server</li>
+<li><input type="checkbox" id="checkbox91"><label for="checkbox91">Database is writable on backup</label></li>
+<li><input type="checkbox" id="checkbox92"><label for="checkbox92">Check </label><code>/var/log/failover.log</code> on backup for entries</li>
+</ul>
+<h3 id="step-63-verify-failover-success">Step 6.3: Verify Failover Success</h3>
+<pre class="hljs"><code><div><span class="hljs-comment"># On backup server</span>
+cat /var/<span class="hljs-built_in">log</span>/failover.log
+ls /tmp/failover_active
+sudo mysql -e <span class="hljs-string">"SHOW VARIABLES LIKE 'read_only';"</span>
+</div></code></pre>
+<ul>
+<li><input type="checkbox" id="checkbox93"><label for="checkbox93">Log shows failover triggered</label></li>
+<li><input type="checkbox" id="checkbox94"><label for="checkbox94">Flag file exists</label></li>
+<li><input type="checkbox" id="checkbox95"><label for="checkbox95"></label><code>read_only: OFF</code></li>
+</ul>
+<h3 id="step-64-test-application-during-failover">Step 6.4: Test Application During Failover</h3>
+<ul>
+<li><input type="checkbox" id="checkbox96"><label for="checkbox96">Login to </label><code>800carguru.me</code></li>
+<li><input type="checkbox" id="checkbox97"><label for="checkbox97">Dashboard loads correctly</label></li>
+<li><input type="checkbox" id="checkbox98"><label for="checkbox98">Can create/edit a test record</label></li>
+<li><input type="checkbox" id="checkbox99"><label for="checkbox99">WhatsApp section accessible</label></li>
+</ul>
+<h3 id="step-65-test-failback">Step 6.5: Test Failback</h3>
+<ol>
+<li><input type="checkbox" id="checkbox100"><label for="checkbox100">Start the main instance</label></li>
+<li><input type="checkbox" id="checkbox101"><label for="checkbox101">Wait for it to be fully running</label></li>
+<li><input type="checkbox" id="checkbox102"><label for="checkbox102">Perform failback (see Phase 7 below)</label></li>
+<li><input type="checkbox" id="checkbox103"><label for="checkbox103">Verify website serves from main again</label></li>
+<li><input type="checkbox" id="checkbox104"><label for="checkbox104">Verify replication resumes on backup</label></li>
+</ol>
+<h3 id="step-66-record-test-results">Step 6.6: Record Test Results</h3>
+<table>
+<thead>
+<tr>
+<th>Test</th>
+<th>Result</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Failover triggered</td>
+<td>Pass / Fail</td>
+<td></td>
+</tr>
+<tr>
+<td>Elastic IP moved</td>
+<td>Pass / Fail</td>
+<td></td>
+</tr>
+<tr>
+<td>Website accessible</td>
+<td>Pass / Fail</td>
+<td></td>
+</tr>
+<tr>
+<td>Database writable</td>
+<td>Pass / Fail</td>
+<td></td>
+</tr>
+<tr>
+<td>Application functional</td>
+<td>Pass / Fail</td>
+<td></td>
+</tr>
+<tr>
+<td>Failback successful</td>
+<td>Pass / Fail</td>
+<td></td>
+</tr>
+<tr>
+<td>Replication resumed</td>
+<td>Pass / Fail</td>
+<td></td>
+</tr>
+<tr>
+<td>Total downtime</td>
+<td>___ minutes</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Phase 6 Checklist:</strong></p>
+<ul>
+<li><input type="checkbox" id="checkbox105"><label for="checkbox105">Failover test completed successfully</label></li>
+<li><input type="checkbox" id="checkbox106"><label for="checkbox106">Failback test completed successfully</label></li>
+<li><input type="checkbox" id="checkbox107"><label for="checkbox107">All test results documented</label></li>
+<li><input type="checkbox" id="checkbox108"><label for="checkbox108">Re-enable stop protection on main</label></li>
+</ul>
+<hr>
+<h2 id="phase-7-failback-procedure-reference">Phase 7: Failback Procedure Reference</h2>
+<blockquote>
+<p>This is not a setup phase — keep this as a reference for when failback is needed.</p>
+</blockquote>
+<h3 id="step-71-ensure-main-server-is-healthy">Step 7.1: Ensure Main Server is Healthy</h3>
+<pre class="hljs"><code><div><span class="hljs-comment"># SSH into main</span>
+sudo systemctl status apache2
+sudo systemctl status mariadb
+</div></code></pre>
+<h3 id="step-72-sync-data-from-backup-to-main">Step 7.2: Sync Data from Backup to Main</h3>
+<p>On <strong>backup</strong> server:</p>
+<pre class="hljs"><code><div>sudo mysql -e <span class="hljs-string">"SHOW MASTER STATUS;"</span>
+</div></code></pre>
+<p>Note: File = <code>___</code>, Position = <code>___</code></p>
+<p>On <strong>main</strong> server:</p>
+<pre class="hljs"><code><div>sudo mysql -e <span class="hljs-string">"
+CHANGE MASTER TO
+  MASTER_HOST='&lt;BACKUP_PRIVATE_IP&gt;',
+  MASTER_USER='replicator',
+  MASTER_PASSWORD='&lt;STRONG_PASSWORD&gt;',
+  MASTER_LOG_FILE='&lt;FILE&gt;',
+  MASTER_LOG_POS=&lt;POSITION&gt;;
+START SLAVE;
+"</span>
+</div></code></pre>
+<p>Wait for sync:</p>
+<pre class="hljs"><code><div>sudo mysql -e <span class="hljs-string">"SHOW SLAVE STATUS\G"</span> | grep <span class="hljs-string">"Seconds_Behind_Master"</span>
+</div></code></pre>
+<p>Wait until: <code>Seconds_Behind_Master: 0</code></p>
+<h3 id="step-73-switch-elastic-ip-back-to-main">Step 7.3: Switch Elastic IP Back to Main</h3>
+<pre class="hljs"><code><div>aws ec2 associate-address \
+    --instance-id &lt;MAIN_INSTANCE_ID&gt; \
+    --allocation-id &lt;ELASTIC_IP_ALLOCATION_ID&gt; \
+    --allow-reassociation \
+    --region us-east-1
+</div></code></pre>
+<h3 id="step-74-restore-replication-direction">Step 7.4: Restore Replication Direction</h3>
+<p>On <strong>main</strong>:</p>
+<pre class="hljs"><code><div>sudo mysql -e <span class="hljs-string">"STOP SLAVE; RESET SLAVE ALL;"</span>
+sudo mysql -e <span class="hljs-string">"SHOW MASTER STATUS;"</span>
+</div></code></pre>
+<p>Note: File = <code>___</code>, Position = <code>___</code></p>
+<p>On <strong>backup</strong>:</p>
+<pre class="hljs"><code><div>sudo mysql -e <span class="hljs-string">"
+SET GLOBAL read_only = 1;
+CHANGE MASTER TO
+  MASTER_HOST='&lt;MAIN_PRIVATE_IP&gt;',
+  MASTER_USER='replicator',
+  MASTER_PASSWORD='&lt;STRONG_PASSWORD&gt;',
+  MASTER_LOG_FILE='&lt;FILE&gt;',
+  MASTER_LOG_POS=&lt;POSITION&gt;;
+START SLAVE;
+"</span>
+</div></code></pre>
+<h3 id="step-75-remove-failover-flag">Step 7.5: Remove Failover Flag</h3>
+<p>On <strong>backup</strong>:</p>
+<pre class="hljs"><code><div>rm /tmp/failover_active
+</div></code></pre>
+<h3 id="step-76-verify-everything">Step 7.6: Verify Everything</h3>
+<ul>
+<li><input type="checkbox" id="checkbox109"><label for="checkbox109">Website serves from main</label></li>
+<li><input type="checkbox" id="checkbox110"><label for="checkbox110">Replication running on backup (</label><code>Slave_IO: Yes</code>, <code>Slave_SQL: Yes</code>)</li>
+<li><input type="checkbox" id="checkbox111"><label for="checkbox111">Failover cron still active on backup</label></li>
+<li><input type="checkbox" id="checkbox112"><label for="checkbox112"></label><code>/tmp/failover_active</code> removed</li>
+</ul>
+<hr>
+<h2 id="post-setup-monthly-maintenance">Post-Setup: Monthly Maintenance</h2>
+<table>
+<thead>
+<tr>
+<th>Task</th>
+<th>Frequency</th>
+<th>Command / Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Check replication status</td>
+<td>Weekly</td>
+<td><code>SHOW SLAVE STATUS\G</code> on backup</td>
+</tr>
+<tr>
+<td>Failover drill</td>
+<td>Monthly</td>
+<td>Stop main, verify auto-switch</td>
+</tr>
+<tr>
+<td>Review failover logs</td>
+<td>Weekly</td>
+<td><code>cat /var/log/failover.log</code></td>
+</tr>
+<tr>
+<td>Verify backups exist</td>
+<td>Weekly</td>
+<td><code>ls /home/ubuntu/db_backups/</code></td>
+</tr>
+<tr>
+<td>Verify local downloads</td>
+<td>Weekly</td>
+<td>Check <code>D:\DB_BKP\</code></td>
+</tr>
+<tr>
+<td>Update AMI snapshot</td>
+<td>Monthly</td>
+<td>Create new AMI from main</td>
+</tr>
+<tr>
+<td>Review security groups</td>
+<td>Monthly</td>
+<td>Ensure no unnecessary open ports</td>
+</tr>
+<tr>
+<td>Check disk space</td>
+<td>Weekly</td>
+<td><code>df -h</code> on both servers</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="quick-reference-card">Quick Reference Card</h2>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Main Instance ID</td>
+<td><code>________________</code></td>
+</tr>
+<tr>
+<td>Backup Instance ID</td>
+<td><code>________________</code></td>
+</tr>
+<tr>
+<td>Elastic IP</td>
+<td><code>________________</code></td>
+</tr>
+<tr>
+<td>Elastic IP Allocation ID</td>
+<td><code>________________</code></td>
+</tr>
+<tr>
+<td>Main Private IP</td>
+<td><code>________________</code></td>
+</tr>
+<tr>
+<td>Backup Private IP</td>
+<td><code>________________</code></td>
+</tr>
+<tr>
+<td>Replication User</td>
+<td><code>replicator</code></td>
+</tr>
+<tr>
+<td>Replication Password</td>
+<td><code>________________</code></td>
+</tr>
+<tr>
+<td>Domain</td>
+<td><code>800carguru.me</code></td>
+</tr>
+<tr>
+<td>Database</td>
+<td><code>carguru2</code></td>
+</tr>
+<tr>
+<td>VPC</td>
+<td><code>vpc-0423103401dfdca5f</code></td>
+</tr>
+<tr>
+<td>Region / AZ</td>
+<td><code>us-east-1f</code></td>
+</tr>
+<tr>
+<td>Key Pair</td>
+<td><code>________________</code></td>
+</tr>
+<tr>
+<td>Failover Log</td>
+<td><code>/var/log/failover.log</code></td>
+</tr>
+<tr>
+<td>Backup Directory</td>
+<td><code>/home/ubuntu/db_backups/</code></td>
+</tr>
+<tr>
+<td>Local Backup</td>
+<td><code>D:\DB_BKP\</code></td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="emergency-contacts">Emergency Contacts</h2>
+<table>
+<thead>
+<tr>
+<th>Role</th>
+<th>Name</th>
+<th>Phone</th>
+<th>Email</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>IT Lead</td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>AWS Account Owner</td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Domain Manager</td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<hr>
+<p><strong>Document Version:</strong> 1.0
+<strong>Last Updated:</strong> April 1, 2026</p>
+
+</body>
+</html>

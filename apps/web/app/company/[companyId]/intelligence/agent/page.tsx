@@ -47,7 +47,7 @@ export default function AgentIntelligencePage({
         </div>
 
         {/* Coaching Steps Reference */}
-        <div className="rounded-xl border border-white/10 bg-slate-900/40 p-4">
+        <div className="rounded-xl border border-border bg-slate-900/40 p-4">
           <div className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">Coaching Intelligence Process</div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {[
@@ -56,7 +56,7 @@ export default function AgentIntelligencePage({
               { step: "3", label: "Gap Identification", desc: "Statistically significant & persistent underperformance" },
               { step: "4", label: "Coaching Plan", desc: "Focus area, method, duration, checkpoint, expected improvement" },
             ].map((s) => (
-              <div key={s.step} className="rounded-lg border border-white/5 bg-slate-800/40 p-3">
+              <div key={s.step} className="rounded-lg border border-border bg-slate-800/40 p-3">
                 <div className="text-purple-400 text-xs font-bold mb-1">Step {s.step} — {s.label}</div>
                 <div className="text-[11px] text-slate-400">{s.desc}</div>
               </div>

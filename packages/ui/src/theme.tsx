@@ -153,6 +153,13 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
   const themeId = mounted ? globalUi?.theme ?? fallbackThemeId : fallbackThemeId;
   const setTheme = globalUi?.setTheme ?? setFallbackThemeId;
 
+  // Sync data-theme attribute for CSS variable theming (fallback if GlobalUiProvider is absent)
+  React.useEffect(() => {
+    if (mounted && typeof document !== "undefined") {
+      document.documentElement.dataset.theme = themeId;
+    }
+  }, [mounted, themeId]);
+
   const value = useMemo<ThemeContextValue>(
     () => ({
       theme: THEMES[themeId],

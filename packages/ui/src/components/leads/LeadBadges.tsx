@@ -8,9 +8,14 @@ function cx(...classes: Array<string | false | null | undefined>) {
 }
 
 export function LeadTypeBadge({ type }: { type: LeadType }) {
-  const label = type === "rsa" ? "RSA" : type === "recovery" ? "Recovery" : "Workshop";
+  const config: Record<string, { label: string; cls: string }> = {
+    rsa: { label: "RSA", cls: "border-sky-500/30 bg-sky-500/10 text-sky-400" },
+    recovery: { label: "Recovery", cls: "border-orange-500/30 bg-orange-500/10 text-orange-400" },
+    workshop: { label: "Workshop", cls: "border-violet-500/30 bg-violet-500/10 text-violet-400" },
+  };
+  const { label, cls } = config[type] ?? { label: type, cls: "border-border bg-muted/40 text-muted-foreground" };
   return (
-    <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs bg-muted/40 border-border/60">
+    <span className={cx("inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold", cls)}>
       {label}
     </span>
   );
@@ -27,21 +32,31 @@ export function LeadStatusBadge({ status }: { status: LeadStatus }) {
     closed_won: "Closed / Won",
   };
   const colorMap: Record<LeadStatus, string> = {
-    open: "bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-200",
-    accepted: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200",
-    car_in: "bg-indigo-100 text-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200",
-    closed: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200",
-    lost: "bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-200",
-    processing: "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200",
-    closed_won: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200",
+    open: "border-emerald-500/30 bg-emerald-500/10 text-emerald-400",
+    accepted: "border-sky-500/30 bg-sky-500/10 text-sky-400",
+    car_in: "border-indigo-500/30 bg-indigo-500/10 text-indigo-400",
+    closed: "border-zinc-500/30 bg-zinc-500/10 text-zinc-400",
+    lost: "border-red-500/30 bg-red-500/10 text-red-400",
+    processing: "border-amber-500/30 bg-amber-500/10 text-amber-400",
+    closed_won: "border-emerald-500/30 bg-emerald-500/10 text-emerald-400",
+  };
+  const dotColor: Record<LeadStatus, string> = {
+    open: "bg-emerald-500",
+    accepted: "bg-sky-500",
+    car_in: "bg-indigo-500",
+    closed: "bg-zinc-500",
+    lost: "bg-red-500",
+    processing: "bg-amber-500",
+    closed_won: "bg-emerald-500",
   };
   return (
     <span
       className={cx(
-        "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
+        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[10px] font-semibold",
         colorMap[status]
       )}
     >
+      <span className={cx("h-1.5 w-1.5 rounded-full", dotColor[status])} />
       {labelMap[status]}
     </span>
   );
@@ -52,16 +67,16 @@ export function LeadHealthBadge({ score }: { score: number | null }) {
     return <span className="text-xs text-muted-foreground">Unknown</span>;
   }
   let label = "Healthy";
-  let cls = "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200";
+  let cls = "border-emerald-500/30 bg-emerald-500/10 text-emerald-400";
   if (score < 40) {
     label = "At Risk";
-    cls = "bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-200";
+    cls = "border-red-500/30 bg-red-500/10 text-red-400";
   } else if (score < 70) {
     label = "Attention";
-    cls = "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200";
+    cls = "border-amber-500/30 bg-amber-500/10 text-amber-400";
   }
   return (
-    <span className={cx("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium", cls)}>
+    <span className={cx("inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold", cls)}>
       {label} ({score})
     </span>
   );

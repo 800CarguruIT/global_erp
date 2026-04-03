@@ -644,7 +644,7 @@ export function CompanyForm({ mode, initialValues, onSubmit }: CompanyFormProps)
             <div className="flex justify-end">
               <button
                 type="button"
-                className="text-xs px-3 py-2 rounded-md bg-white/10 hover:bg-white/20"
+                className="text-xs px-3 py-2 rounded-md bg-muted hover:bg-muted/80"
                 onClick={() =>
                   setValues((prev) => ({
                     ...prev,

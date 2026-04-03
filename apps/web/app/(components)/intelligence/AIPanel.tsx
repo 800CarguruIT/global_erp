@@ -96,7 +96,7 @@ export function AIPanel({ companyId, branchId, engines, from, to, refreshInterva
       />
 
       {/* Tab bar */}
-      <div className="flex gap-1 border-b border-white/10">
+      <div className="flex gap-1 border-b border-border">
         {TABS.map((tab) => {
           const count = allSignals.filter((s) => s.type === tab.key).length;
           return (
@@ -126,7 +126,7 @@ export function AIPanel({ companyId, branchId, engines, from, to, refreshInterva
           {[1, 2].map((i) => (
             <div
               key={i}
-              className="rounded-xl border border-white/5 bg-slate-900/40 p-4 h-32 animate-pulse"
+              className="rounded-xl border border-border bg-slate-900/40 p-4 h-32 animate-pulse"
             />
           ))}
         </div>
@@ -137,7 +137,7 @@ export function AIPanel({ companyId, branchId, engines, from, to, refreshInterva
           ))}
         </div>
       ) : lastUpdated ? (
-        <div className="rounded-xl border border-white/5 bg-slate-900/40 px-4 py-6 text-center text-sm text-slate-500">
+        <div className="rounded-xl border border-border bg-slate-900/40 px-4 py-6 text-center text-sm text-slate-500">
           No {activeTab} signals detected for this period.
         </div>
       ) : null}

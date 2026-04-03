@@ -58,14 +58,14 @@ export default function RccPipelinePage() {
         <DateFilter from={from} to={to} onChange={(f, t) => { setFrom(f); setTo(t); }} />
       </div>
 
-      <div className="rounded-xl bg-white/[0.03] p-5">
+      <div className="rounded-xl bg-card/40 p-5">
         <div className="space-y-1.5">
           {(data.pipeline as PipelineStage[]).map((s, i) => {
             const max = (data.pipeline as PipelineStage[])[0]?.count || 1;
             return (
               <div key={i} className="flex items-center gap-3 text-sm">
                 <span className="w-28 text-right opacity-40 text-xs">{s.label}</span>
-                <div className="flex-1 relative h-6 rounded bg-white/[0.03]">
+                <div className="flex-1 relative h-6 rounded bg-card/40">
                   <div className="absolute inset-y-0 left-0 rounded bg-gradient-to-r from-emerald-500/80 to-emerald-500/60" style={{ width: `${Math.max((s.count / max) * 100, s.count > 0 ? 2 : 0)}%` }}>
                     <span className="absolute left-1.5 top-0 text-[11px] font-semibold text-white leading-6">{s.count.toLocaleString()}</span>
                   </div>
@@ -82,7 +82,7 @@ export default function RccPipelinePage() {
 
       <div className="grid grid-cols-4 gap-3">
         {(data.pipeline as PipelineStage[]).map((s, i) => (
-          <div key={i} className="rounded-xl bg-white/[0.03] p-4">
+          <div key={i} className="rounded-xl bg-card/40 p-4">
             <p className="text-[10px] opacity-30 uppercase tracking-wider">{s.label}</p>
             <p className="text-2xl font-bold text-emerald-400 mt-1">{s.count.toLocaleString()}</p>
             {s.aedValue > 0 && <p className="text-xs text-emerald-400/60">{fmtAed(s.aedValue)}</p>}
@@ -92,17 +92,17 @@ export default function RccPipelinePage() {
                 <span className="opacity-30">{s.leadsLost.toLocaleString()} lost</span>
               </div>
             )}
-            {i === 0 && <p className="text-[10px] opacity-30 mt-2 rounded px-2 py-1 bg-white/[0.04]">Entry point — all sources</p>}
+            {i === 0 && <p className="text-[10px] opacity-30 mt-2 rounded px-2 py-1 bg-card/50">Entry point — all sources</p>}
           </div>
         ))}
       </div>
 
-      <div className="rounded-xl bg-white/[0.03] p-5">
+      <div className="rounded-xl bg-card/40 p-5">
         <h3 className="font-semibold mb-0.5">SOURCE → STAGE CONVERSION MATRIX</h3>
         <p className="text-xs opacity-40 mb-4">Conversion rate at each stage by source</p>
         <table className="w-full text-sm">
           <thead>
-            <tr className="opacity-40 text-[11px] uppercase border-b border-white/[0.06]">
+            <tr className="opacity-40 text-[11px] uppercase border-b border-border/60">
               <th className="text-left py-2 px-2 font-medium">Source</th>
               <th className="text-center py-2 px-2 font-medium">Lead→Qual</th>
               <th className="text-center py-2 px-2 font-medium">Qual→Book</th>
@@ -113,7 +113,7 @@ export default function RccPipelinePage() {
           </thead>
           <tbody>
             {(data.conversionMatrix as ConvRow[]).map((r, i) => (
-              <tr key={i} className="border-b border-white/[0.03]">
+              <tr key={i} className="border-b border-border/40">
                 <td className="py-2.5 px-2 flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: SOURCE_COLORS[r.source] || "#6b7280" }} />
                   <span>{fmtSource(r.source)}</span>

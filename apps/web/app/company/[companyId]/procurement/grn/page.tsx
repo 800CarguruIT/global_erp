@@ -117,16 +117,16 @@ export default async function ProcurementGrnListPage({ params }: Props) {
   return (
     <AppLayout>
       <div className="mx-auto max-w-7xl space-y-4 p-4">
-        <div className="rounded-xl border border-white/10 bg-slate-950/60 p-4">
+        <div className="rounded-xl border border-border bg-background/60 p-4">
           <div className="text-xs uppercase tracking-[0.2em] text-slate-400">Procurement</div>
           <h1 className="text-lg font-semibold text-slate-100">All GRN</h1>
           <p className="text-xs text-slate-300">Latest goods receipt notes for this company.</p>
         </div>
 
-        <div className="overflow-x-auto rounded-xl border border-white/10 bg-slate-950/60">
+        <div className="overflow-x-auto rounded-xl border border-border bg-background/60">
           <table className="min-w-full text-xs">
             <thead>
-              <tr className="bg-slate-900/70 text-[11px] uppercase tracking-wide text-slate-300">
+              <tr className="bg-popover/70 text-[11px] uppercase tracking-wide text-muted-foreground">
                 <th className="py-2 pl-3 pr-4 text-left">GRN Number</th>
                 <th className="px-4 py-2 text-left">Part</th>
                 <th className="px-4 py-2 text-left">Qty</th>
@@ -145,7 +145,7 @@ export default async function ProcurementGrnListPage({ params }: Props) {
                 </tr>
               ) : (
                 rows.map((row) => (
-                  <tr key={row.id} className="border-t border-white/5">
+                  <tr key={row.id} className="border-t border-border/40">
                     <td className="py-2 pl-3 pr-4 font-semibold text-emerald-300">{row.grn_number}</td>
                     <td className="px-4 py-2 text-slate-100">
                       {row.part_name || "-"}
@@ -162,7 +162,7 @@ export default async function ProcurementGrnListPage({ params }: Props) {
                           <>
                             <Link
                               href={`/company/${companyId}/workshop/procurement/${row.po_id}`}
-                              className="rounded border border-white/15 px-2 py-0.5 text-[11px] text-slate-200 hover:bg-white/10"
+                              className="rounded border border-border px-2 py-0.5 text-[11px] text-foreground/80 hover:bg-muted"
                             >
                               Open PO
                             </Link>

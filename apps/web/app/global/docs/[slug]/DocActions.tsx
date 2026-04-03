@@ -33,7 +33,7 @@ export function DocActions({ slug, title }: { slug: string; title: string }) {
         <button
           type="button"
           onClick={() => window.open(`/global/docs/edit/${slug}`, "_blank", "noopener,noreferrer")}
-          className="inline-flex rounded-full border border-white/20 bg-white/5 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white transition hover:border-white/40"
+          className="inline-flex rounded-full border border-border bg-muted/40 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-foreground transition hover:border-border"
         >
           Edit
         </button>
@@ -47,7 +47,7 @@ export function DocActions({ slug, title }: { slug: string; title: string }) {
         </button>
         <Link
           href="/global/docs"
-          className="inline-flex rounded-full border border-white/20 bg-white/5 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white transition hover:border-white/40"
+          className="inline-flex rounded-full border border-border bg-muted/40 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-foreground transition hover:border-border"
         >
           Back to docs
         </Link>

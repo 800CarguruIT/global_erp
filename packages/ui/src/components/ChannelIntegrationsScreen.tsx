@@ -299,7 +299,7 @@ export function ChannelIntegrationsScreen({ scope, companyId }: Props) {
         : "text-slate-300";
     return (
       <div className="flex items-center gap-3">
-        <span className={`px-2 py-1 rounded bg-white/10 text-[11px] ${color}`}>{h.status}</span>
+        <span className={`px-2 py-1 rounded bg-muted text-[11px] ${color}`}>{h.status}</span>
         {h.lastCheckedAt && (
           <span className="text-[11px] opacity-70">
             Last checked: {new Date(h.lastCheckedAt).toLocaleString()}
@@ -316,13 +316,13 @@ export function ChannelIntegrationsScreen({ scope, companyId }: Props) {
         <div className="text-xs sm:text-sm opacity-70">{headerText}</div>
         <div className="flex gap-2">
           <button
-            className="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-xs sm:text-sm transition"
+            className="px-3 py-2 rounded-lg bg-muted hover:bg-muted/80 text-xs sm:text-sm transition"
             onClick={() => (window.location.href = backHref)}
           >
             ← Back
           </button>
           <button
-            className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-xs sm:text-sm transition"
+            className="px-4 py-2 rounded-lg bg-muted hover:bg-muted/80 text-xs sm:text-sm transition"
             onClick={() => (window.location.href = createHref)}
           >
             + Create Channel Integration
@@ -374,10 +374,10 @@ export function ChannelIntegrationsScreen({ scope, companyId }: Props) {
       )}
 
       {!loading && items.length > 0 && (
-        <div className="overflow-x-auto rounded-lg border border-white/10">
+        <div className="overflow-x-auto rounded-lg border border-border">
           <table className="w-full text-left text-xs sm:text-sm">
             <thead>
-              <tr className="border-b border-white/10 bg-white/5">
+              <tr className="border-b border-border bg-muted/40">
                 <th className="px-4 py-2 text-left font-medium">Name</th>
                 <th className="px-4 py-2 text-left font-medium">Channel</th>
                 <th className="px-4 py-2 text-left font-medium">Provider</th>
@@ -387,12 +387,12 @@ export function ChannelIntegrationsScreen({ scope, companyId }: Props) {
                 <th className="px-4 py-2 text-right font-medium">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/10">
+            <tbody className="divide-y divide-border">
               {filteredItems.map((row) => {
                 const test = testStates[row.id];
                 return (
                   <React.Fragment key={row.id}>
-                    <tr className="hover:bg-white/5 transition">
+                    <tr className="hover:bg-muted/40 transition">
                       <td className="px-4 py-3">{row.name}</td>
                       <td className="px-4 py-3 uppercase text-[11px]">{row.channel_type}</td>
                       <td className="px-4 py-3">{providerLabel(row.provider_key)}</td>
@@ -411,7 +411,7 @@ export function ChannelIntegrationsScreen({ scope, companyId }: Props) {
                       <td className="px-4 py-3">{row.updated_at ? new Date(row.updated_at).toLocaleString() : "—"}</td>
                       <td className="px-4 py-3 text-right space-x-2">
                         <button
-                          className="px-3 py-1 text-xs rounded bg-white/10 hover:bg-white/20 transition"
+                          className="px-3 py-1 text-xs rounded bg-muted hover:bg-muted/80 transition"
                           onClick={() => gotoEdit(row.id)}
                         >
                           Edit
@@ -439,7 +439,7 @@ export function ChannelIntegrationsScreen({ scope, companyId }: Props) {
                         </button>
                       </td>
                     </tr>
-                    <tr className="bg-white/5">
+                    <tr className="bg-muted/40">
                       <td colSpan={7} className="px-4 pb-3 text-[11px]">
                         {renderHealthRow(row.id)}
                       </td>
@@ -453,12 +453,12 @@ export function ChannelIntegrationsScreen({ scope, companyId }: Props) {
       )}
 
       {!loading && !error && items.length === 0 && (
-        <div className="border border-dashed border-white/10 rounded-lg px-4 py-6 text-xs sm:text-sm opacity-80 flex flex-col items-start gap-3">
+        <div className="border border-dashed border-border rounded-lg px-4 py-6 text-xs sm:text-sm opacity-80 flex flex-col items-start gap-3">
           <div>
             You don&apos;t have any channel integrations yet. Configure one to enable outbound messaging.
           </div>
           <button
-            className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-xs sm:text-sm transition"
+            className="px-4 py-2 rounded-lg bg-muted hover:bg-muted/80 text-xs sm:text-sm transition"
             onClick={() => (window.location.href = createHref)}
           >
             + Create your first integration
@@ -470,11 +470,11 @@ export function ChannelIntegrationsScreen({ scope, companyId }: Props) {
         const row = items.find((r) => r.id === id);
         if (!row || !SEND_CAPABLE_TYPES.has(row.channel_type)) return null;
         return (
-          <div key={id} className={`rounded-lg border border-white/10 p-3 ${theme.surfaceSubtle}`}>
+          <div key={id} className={`rounded-lg border border-border p-3 ${theme.surfaceSubtle}`}>
             <div className="flex items-center justify-between mb-2">
               <div className="text-xs sm:text-sm font-semibold">Test send: {row.name}</div>
               <button
-                className="text-[11px] px-2 py-1 rounded bg-white/10 hover:bg-white/20"
+                className="text-[11px] px-2 py-1 rounded bg-muted hover:bg-muted/80"
                 onClick={() => toggleTest(id)}
               >
                 Close

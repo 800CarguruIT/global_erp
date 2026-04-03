@@ -21,7 +21,7 @@ export default function CompanyDialerIntegrationsPage({ params }: Params) {
           {companyId ? (
             <Link
               href={`/company/${companyId}/integrations/dialer/extensions`}
-              className="rounded-full border border-white/25 px-3 py-1 text-xs hover:border-white/60"
+              className="rounded-full border border-border px-3 py-1 text-xs hover:border-border"
             >
               Assign Extensions
             </Link>

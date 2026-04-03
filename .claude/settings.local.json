@@ -50,7 +50,18 @@
       "Bash(find '/c/Users/ABC/Documents/Global ERP' -name *dashboard* -o -name *callcenter* -o -name *call-center*)",
       "Bash(grep -E \"\\\\.\\(tsx|ts\\)$\")",
       "Bash(grep -r \"ai_intelligence_config\\\\|signal.*empty\\\\|no signals\\\\|allSignals.length\" '/c/Users/ABC/Documents/Global ERP' --include=*.ts --include=*.tsx)",
-      "Bash(npx tsx:*)"
+      "Bash(npx tsx:*)",
+      "Bash(xargs ls:*)",
+      "Bash(npx tsx@latest tmp/check_perms.ts)",
+      "Bash(node tmp/check_perms.mjs)",
+      "Bash(curl -s \"http://localhost:3000/api/public/lead/7af38ded6eca14828e1ed18dbe3d56ff\")",
+      "Bash(npm run:*)",
+      "Bash(ls -la apps/web/app/\\\\\\(components\\\\\\)/)",
+      "Bash(ls -1 packages/ai-core/migrations/*.sql)",
+      "Bash(tasklist)",
+      "Bash(cmd //c \"wmic logicaldisk where DeviceID='C:' get Size,FreeSpace\")",
+      "Bash(rm -f \"c:/Users/ABC/Documents/Global ERP/.git/objects/pack/tmp_pack_RQKneJ\")",
+      "Bash(rm -f \"c:/Users/ABC/Documents/Global ERP/.git/index.lock\")"
     ]
   }
 }

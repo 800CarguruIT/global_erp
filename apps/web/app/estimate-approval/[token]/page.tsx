@@ -289,9 +289,9 @@ export default function EstimateApprovalPage({ params }: Params) {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-100">
+    <main className="min-h-screen bg-background text-slate-100">
       <div className="mx-auto max-w-5xl px-4 py-8">
-        <div className="rounded-2xl border border-white/10 bg-slate-900/70 p-5">
+        <div className="rounded-2xl border border-border bg-popover/70 p-5">
           <h1 className="text-2xl font-semibold">Estimate Approval</h1>
           <p className="mt-1 text-sm text-slate-300">Please review and approve selected line items.</p>
         </div>
@@ -301,7 +301,7 @@ export default function EstimateApprovalPage({ params }: Params) {
         {success ? <div className="mt-4 rounded-xl border border-emerald-400/40 bg-emerald-500/10 p-3 text-sm text-emerald-200">{success}</div> : null}
 
         {!loading && payload ? (
-          <form onSubmit={submitApproval} className="mt-4 space-y-4 rounded-2xl border border-white/10 bg-slate-900/70 p-5">
+          <form onSubmit={submitApproval} className="mt-4 space-y-4 rounded-2xl border border-border bg-popover/70 p-5">
             <div className="grid gap-2 text-sm text-slate-300 sm:grid-cols-2">
               <div><span className="text-slate-400">Estimate:</span> {payload.estimate.id}</div>
               <div><span className="text-slate-400">Created:</span> {formatDate(payload.estimate.createdAt)}</div>
@@ -319,9 +319,9 @@ export default function EstimateApprovalPage({ params }: Params) {
               </div>
             ) : null}
 
-            <div className="overflow-x-auto rounded-lg border border-white/10">
+            <div className="overflow-x-auto rounded-lg border border-border">
               <table className="min-w-full text-sm">
-                <thead className="bg-slate-800/80 text-left text-xs uppercase tracking-wide text-slate-300">
+                <thead className="bg-card/80 text-left text-xs uppercase tracking-wide text-slate-300">
                   <tr>
                     <th className="px-3 py-2">Line</th>
                     <th className="px-3 py-2">Part</th>
@@ -341,7 +341,7 @@ export default function EstimateApprovalPage({ params }: Params) {
                   ) : (
                     items.map((item) => {
                       return (
-                        <tr key={item.id} className="border-t border-white/10">
+                        <tr key={item.id} className="border-t border-border">
                           <td className="px-3 py-2">{item.lineNo}</td>
                           <td className="px-3 py-2">{item.partName}</td>
                           <td className="px-3 py-2 text-slate-300">{item.description || "-"}</td>
@@ -359,7 +359,7 @@ export default function EstimateApprovalPage({ params }: Params) {
                                     className={`rounded-md border px-2 py-1 text-[11px] ${
                                       active
                                         ? "border-cyan-300/70 bg-cyan-500/20 text-cyan-100"
-                                        : "border-white/15 bg-slate-950/40 text-slate-300"
+                                        : "border-border bg-background/40 text-slate-300"
                                     } disabled:opacity-40`}
                                     onClick={() =>
                                       setSelectedTypeByItemId((prev) => {
@@ -389,22 +389,22 @@ export default function EstimateApprovalPage({ params }: Params) {
               </table>
             </div>
 
-            <div className="rounded-xl border border-white/10 bg-slate-950/40 p-4 text-sm">
+            <div className="rounded-xl border border-border bg-background/40 p-4 text-sm">
               <div className="mb-1 font-semibold">Summary</div>
               <div className="flex items-center justify-between"><span className="text-slate-400">Subtotal</span><span>AED {money(subtotal)}</span></div>
               <div className="flex items-center justify-between"><span className="text-slate-400">VAT ({vatRate.toFixed(2)}%)</span><span>AED {money(vat)}</span></div>
-              <div className="mt-1 flex items-center justify-between border-t border-white/10 pt-1 font-semibold"><span>Grand Total</span><span>AED {money(grandTotal)}</span></div>
-              <div className="mt-2 flex items-center justify-between border-t border-white/10 pt-2">
+              <div className="mt-1 flex items-center justify-between border-t border-border pt-1 font-semibold"><span>Grand Total</span><span>AED {money(grandTotal)}</span></div>
+              <div className="mt-2 flex items-center justify-between border-t border-border pt-2">
                 <span className="text-slate-400">Estimated Completion</span>
                 <span>{estimatedCompletionAt ? estimatedCompletionAt.toLocaleString() : "-"}</span>
               </div>
             </div>
 
-            <div className="rounded-xl border border-white/10 p-4">
+            <div className="rounded-xl border border-border p-4">
               <div className="mb-2 text-sm font-semibold">Customer Confirmation</div>
               <input
                 type="text"
-                className="mb-3 w-full rounded-xl border border-white/15 bg-slate-950/60 p-3 text-sm outline-none"
+                className="mb-3 w-full rounded-xl border border-border bg-background/60 p-3 text-sm outline-none"
                 placeholder="Customer name"
                 disabled={isAlreadyApproved || isExpired}
                 value={customerName}
@@ -426,7 +426,7 @@ export default function EstimateApprovalPage({ params }: Params) {
             <button
               type="submit"
               disabled={submitting || isAlreadyApproved || isExpired}
-              className="inline-flex rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold disabled:opacity-60"
+              className="inline-flex rounded-xl border border-border bg-muted px-4 py-2 text-sm font-semibold disabled:opacity-60"
             >
               {isAlreadyApproved ? "Already Approved" : isExpired ? "Expired - Request New Estimate" : submitting ? "Submitting..." : "Approve Estimate"}
             </button>
@@ -504,14 +504,14 @@ function SignaturePad({
   }
 
   return (
-    <div className="rounded-xl border border-white/10 p-3">
+    <div className="rounded-xl border border-border p-3">
       <div className="mb-2 text-sm font-semibold">Signature</div>
       {disabled && value ? (
         <div className="mb-3 rounded-lg border border-emerald-400/30 bg-emerald-500/10 p-2 text-xs text-emerald-200">
           Customer signature saved.
         </div>
       ) : null}
-      <div className="overflow-hidden rounded-lg border border-white/15 bg-slate-950/60">
+      <div className="overflow-hidden rounded-lg border border-border bg-background/60">
         {disabled && value ? (
           <img src={value} alt="Customer signature" className="h-44 w-full object-contain" />
         ) : (
@@ -533,7 +533,7 @@ function SignaturePad({
       <div className="mt-2 flex items-center gap-2">
         <button
           type="button"
-          className="rounded-md border border-white/20 px-3 py-1.5 text-xs disabled:opacity-60"
+          className="rounded-md border border-border px-3 py-1.5 text-xs disabled:opacity-60"
           disabled={disabled}
           onClick={() => {
             if (!canvasRef.current) return;

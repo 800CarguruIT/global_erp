@@ -522,7 +522,7 @@ export default function CompanyAiConfigPage({ params }: Params) {
             )}
 
             {!companyId || loading ? null : (
-              <form onSubmit={onSaveSdkSettings} className="mt-6 space-y-4 border-t border-white/10 pt-4">
+              <form onSubmit={onSaveSdkSettings} className="mt-6 space-y-4 border-t border-border pt-4">
                 <div className="text-sm font-semibold">Linkus SDK Credentials</div>
                 <div className="space-y-1">
                   <label className="text-sm font-medium">PBX Server URL</label>
@@ -726,7 +726,7 @@ export default function CompanyAiConfigPage({ params }: Params) {
                     placeholder="lawyer,complaint,refund"
                   />
                 </div>
-                <div className="space-y-2 rounded-xl border border-white/10 p-3">
+                <div className="space-y-2 rounded-xl border border-border p-3">
                   <div className="text-sm font-semibold">AI Workflow Automation</div>
                   <label className="flex items-center gap-2 text-sm">
                     <input

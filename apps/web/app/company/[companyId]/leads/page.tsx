@@ -10,8 +10,6 @@ export default function CompanyLeadsPage({
   params: { companyId: string } | Promise<{ companyId: string }>;
 }) {
   const [companyId, setCompanyId] = useState<string | null>(null);
-  const [aiOpen, setAiOpen] = useState(true);
-
   useEffect(() => {
     Promise.resolve(params).then((p) => setCompanyId(p?.companyId ?? null));
   }, [params]);
@@ -19,29 +17,7 @@ export default function CompanyLeadsPage({
   return (
     <AppLayout>
       {companyId ? (
-        <div className="flex gap-4">
-          {/* Main content */}
-          <div className="flex-1 min-w-0">
-            <LeadsMain companyId={companyId} />
-          </div>
-          {/* AI Right Panel - same style as master dashboard */}
-          {aiOpen && (
-            <div className="w-[300px] shrink-0 hidden xl:block">
-              <div className="sticky top-4">
-                <AISidebar companyId={companyId} onClose={() => setAiOpen(false)} />
-              </div>
-            </div>
-          )}
-          {!aiOpen && (
-            <button
-              onClick={() => setAiOpen(true)}
-              className="fixed right-3 top-[68px] z-30 flex items-center gap-1.5 rounded-lg border border-purple-500/30 bg-purple-500/10 px-2.5 py-1.5 text-[11px] font-semibold text-purple-400 hover:bg-purple-500/20 transition-all shadow-lg"
-            >
-              <span className="h-1.5 w-1.5 rounded-full bg-purple-400 animate-pulse" />
-              AI Intelligence
-            </button>
-          )}
-        </div>
+        <LeadsMain companyId={companyId} />
       ) : (
         <div className="py-4 text-sm text-muted-foreground">Loading...</div>
       )}
@@ -82,19 +58,19 @@ function AISidebar({ companyId, onClose }: AISidebarProps) {
   const urgColor = (u: string) => u === "HIGH" ? "bg-red-500/15 text-red-400" : u === "MED" ? "bg-amber-500/15 text-amber-400" : "bg-emerald-500/15 text-emerald-400";
 
   return (
-    <div className="rounded-lg border border-white/[0.06] bg-slate-900/60 overflow-hidden">
+    <div className="rounded-lg border border-border/60 bg-popover/60 overflow-hidden">
       {/* Header */}
-      <div className="px-3 py-2.5 border-b border-white/[0.06] flex items-center justify-between">
+      <div className="px-3 py-2.5 border-b border-border/60 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="h-1.5 w-1.5 rounded-full bg-purple-400 animate-pulse" />
-          <span className="text-[11px] font-bold text-white uppercase tracking-wider">AI Intelligence</span>
+          <span className="text-[11px] font-bold text-foreground uppercase tracking-wider">AI Intelligence</span>
           {highCount > 0 && <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-500/15 text-red-400">{highCount} HIGH</span>}
         </div>
-        <button onClick={onClose} className="text-slate-600 hover:text-white text-[11px]">&#10005;</button>
+        <button onClick={onClose} className="text-slate-600 hover:text-foreground text-[11px]">&#10005;</button>
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-white/[0.06]">
+      <div className="flex border-b border-border/60">
         {(["diagnostic", "predictive", "prescriptive"] as const).map(t => {
           const count = signals.filter(s => s.type === t).length;
           return (
@@ -118,13 +94,13 @@ function AISidebar({ companyId, onClose }: AISidebarProps) {
         ) : (
           <div className="p-2 space-y-2">
             {filtered.map((s, i) => (
-              <div key={i} className="rounded-lg border border-white/[0.04] bg-slate-950/40 p-2.5 space-y-1.5">
+              <div key={i} className="rounded-lg border border-border/40 bg-background/40 p-2.5 space-y-1.5">
                 <div className="flex items-center gap-1.5">
                   <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${urgColor(s.urgency)}`}>{s.urgency}</span>
                   <span className="text-[8px] text-slate-600 uppercase">{s.engine_key}</span>
                   <span className="ml-auto text-[8px] text-slate-700">{Math.round(s.confidence * 100)}%</span>
                 </div>
-                <div className="text-[10px] font-medium text-white leading-snug">{s.observation}</div>
+                <div className="text-[10px] font-medium text-foreground leading-snug">{s.observation}</div>
                 {s.diagnosis && <div className="text-[9px] text-slate-500 leading-snug">{s.diagnosis}</div>}
                 {s.action && (
                   <div className="rounded bg-purple-500/10 px-2 py-1.5">
@@ -142,7 +118,7 @@ function AISidebar({ companyId, onClose }: AISidebarProps) {
       </div>
 
       {/* Footer */}
-      <div className="px-3 py-2 border-t border-white/[0.06] text-[9px] text-slate-700 text-center">
+      <div className="px-3 py-2 border-t border-border/60 text-[9px] text-slate-700 text-center">
         {signals.length} signals · {loading ? "Analysing..." : "Updated just now"}
       </div>
     </div>

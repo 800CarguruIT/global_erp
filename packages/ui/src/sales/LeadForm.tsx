@@ -129,7 +129,7 @@ export function LeadForm({ mode, initialValues, owners = [], onSubmit, onCancel 
         <button
           type="submit"
           disabled={saving}
-          className="rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-white/10"
+          className="rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-muted"
         >
           {saving ? "Saving..." : mode === "create" ? "Create Lead" : "Save Changes"}
         </button>
@@ -137,7 +137,7 @@ export function LeadForm({ mode, initialValues, owners = [], onSubmit, onCancel 
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-md border px-3 py-1.5 text-sm hover:bg-white/5"
+            className="rounded-md border px-3 py-1.5 text-sm hover:bg-muted/40"
           >
             Cancel
           </button>

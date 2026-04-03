@@ -255,13 +255,13 @@ export default function CompanyWorkshopEarningsPage({
   return (
     <AppLayout>
       <div className="space-y-4 py-4">
-        <div className="rounded-2xl border border-cyan-500/20 bg-slate-950/45 p-4">
+        <div className="rounded-2xl border border-cyan-500/20 bg-background/45 p-4">
           <p className="text-[11px] uppercase tracking-[0.18em] text-cyan-300/80">Workshops / Vendors</p>
-          <h1 className="mt-1 text-2xl font-semibold text-white">Workshop Earnings</h1>
+          <h1 className="mt-1 text-2xl font-semibold text-foreground">Workshop Earnings</h1>
           <p className="mt-1 text-sm text-slate-300">Verified earnings for third-party workshops (inspections and job cards).</p>
         </div>
 
-        <div className="rounded-2xl border border-white/10 bg-slate-950/45 p-4">
+        <div className="rounded-2xl border border-border bg-background/45 p-4">
           <div className="mb-4 grid gap-3 lg:grid-cols-[240px_220px_1fr_auto]">
             <div className="space-y-1">
               <label className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-300">Workshop</label>
@@ -302,7 +302,7 @@ export default function CompanyWorkshopEarningsPage({
                 {dateRange.startDate.toLocaleDateString()} - {dateRange.endDate.toLocaleDateString()}
               </button>
               {showDatePicker && (
-                <div className="absolute left-0 top-14 z-30 rounded-lg border border-white/10 bg-slate-950 p-3 shadow-xl">
+                <div className="absolute left-0 top-14 z-30 rounded-lg border border-border bg-background p-3 shadow-xl">
                   <div className="flex flex-col gap-3 md:flex-row">
                     <div className="grid grid-cols-2 gap-1 md:w-44 md:grid-cols-1">
                       {PRESETS.map((preset) => (
@@ -375,7 +375,7 @@ export default function CompanyWorkshopEarningsPage({
               <div className="overflow-x-auto">
                 <table className="min-w-full text-sm">
                   <thead>
-                    <tr className="bg-white/5 text-left text-xs uppercase tracking-wide text-slate-300">
+                    <tr className="bg-muted/40 text-left text-xs uppercase tracking-wide text-slate-300">
                       <th className="px-3 py-2">Source</th>
                       <th className="px-3 py-2">Reference</th>
                       <th className="px-3 py-2">Car</th>
@@ -396,7 +396,7 @@ export default function CompanyWorkshopEarningsPage({
                       const sourceLabel = row.earning_source === "job_card" ? "Job Card" : "Inspection";
                       const referenceId = row.earning_source === "job_card" ? row.job_card_id : row.inspection_id;
                       return (
-                        <tr key={row.id} className="border-t border-white/10">
+                        <tr key={row.id} className="border-t border-border">
                           <td className="px-3 py-2">
                             <span className="rounded-full border border-cyan-400/30 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-cyan-200">
                               {sourceLabel}
@@ -441,25 +441,25 @@ export default function CompanyWorkshopEarningsPage({
                 <div className="rounded-xl border border-cyan-500/20 bg-cyan-950/20 p-3">
                   <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-300/80">Total Summary</div>
                   <div className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
-                    <div className="rounded-md bg-white/5 px-3 py-2">
+                    <div className="rounded-md bg-muted/40 px-3 py-2">
                       <div className="text-xs text-slate-400">Gross Amount</div>
                       <div className="font-semibold text-slate-100">
                         {displayCurrency} {toMoney(totals.gross)}
                       </div>
                     </div>
-                    <div className="rounded-md bg-white/5 px-3 py-2">
+                    <div className="rounded-md bg-muted/40 px-3 py-2">
                       <div className="text-xs text-slate-400">VAT Total</div>
                       <div className="font-semibold text-slate-100">
                         {displayCurrency} {toMoney(totals.vat)}
                       </div>
                     </div>
-                    <div className="rounded-md bg-white/5 px-3 py-2">
+                    <div className="rounded-md bg-muted/40 px-3 py-2">
                       <div className="text-xs text-slate-400">Fines Total</div>
                       <div className="font-semibold text-rose-300">
                         {displayCurrency} {toMoney(totals.fines)}
                       </div>
                     </div>
-                    <div className="rounded-md bg-white/5 px-3 py-2">
+                    <div className="rounded-md bg-muted/40 px-3 py-2">
                       <div className="text-xs text-slate-400">Net Payable Total</div>
                       <div className="font-semibold text-emerald-300">
                         {displayCurrency} {toMoney(totals.net)}

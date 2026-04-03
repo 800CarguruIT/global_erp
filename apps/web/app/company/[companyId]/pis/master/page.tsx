@@ -67,17 +67,17 @@ export default function PisMasterPage() {
           <div className="flex items-center gap-1.5">
             {PRESETS.map(p => (
               <button key={p.label} onClick={() => applyPreset(p.label, p.days)}
-                className={`px-2.5 py-1 rounded text-[10px] font-bold ${activePreset === p.label ? "bg-amber-500/20 text-amber-400" : "bg-slate-800/60 text-slate-500 hover:text-white"}`}>
+                className={`px-2.5 py-1 rounded text-[10px] font-bold ${activePreset === p.label ? "bg-amber-500/20 text-amber-400" : "bg-slate-800/60 text-slate-500 hover:text-foreground"}`}>
                 {p.label}
               </button>
             ))}
           </div>
           <div className="flex items-center gap-2">
             <input type="date" value={from} onChange={e => { setFrom(e.target.value); setActivePreset(""); }}
-              className="rounded bg-slate-800/60 border border-white/10 px-2 py-1 text-[11px] text-white focus:border-amber-500/50 focus:outline-none" />
+              className="rounded bg-slate-800/60 border border-border px-2 py-1 text-[11px] text-foreground focus:border-amber-500/50 focus:outline-none" />
             <span className="text-slate-600 text-[10px]">—</span>
             <input type="date" value={to} onChange={e => { setTo(e.target.value); setActivePreset(""); }}
-              className="rounded bg-slate-800/60 border border-white/10 px-2 py-1 text-[11px] text-white focus:border-amber-500/50 focus:outline-none" />
+              className="rounded bg-slate-800/60 border border-border px-2 py-1 text-[11px] text-foreground focus:border-amber-500/50 focus:outline-none" />
             <button onClick={() => setShowAi(!showAi)}
               className={`ml-1 rounded px-2.5 py-1 text-[10px] font-bold ${showAi ? "bg-purple-500/20 text-purple-400" : "bg-slate-800/60 text-slate-500 hover:text-purple-400"}`}>
               AI
@@ -100,7 +100,7 @@ export default function PisMasterPage() {
           {/* 8 KPI Cards */}
           <div className="grid grid-cols-4 xl:grid-cols-8 gap-2.5">
             {data.kpis.map(kpi => (
-              <div key={kpi.key} className="rounded-lg border border-white/[0.06] bg-slate-900/60 p-3">
+              <div key={kpi.key} className="rounded-lg border border-border/60 bg-card/60 p-3">
                 <div className="flex items-center justify-between mb-0.5">
                   <span className="text-[9px] font-semibold uppercase tracking-widest text-slate-500">{kpi.label}</span>
                   <span className={`text-[9px] ${trendColor(kpi.trend)}`}>{trendIcon(kpi.trend)}</span>
@@ -114,14 +114,14 @@ export default function PisMasterPage() {
           {/* Funnel + Leaderboard */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* 9-Stage Funnel */}
-            <div className="rounded-lg border border-white/[0.06] bg-slate-900/60 p-4">
-              <h2 className="text-xs font-bold text-white mb-3 uppercase tracking-wider">9-Stage Funnel</h2>
+            <div className="rounded-lg border border-border/60 bg-card/60 p-4">
+              <h2 className="text-xs font-bold text-foreground mb-3 uppercase tracking-wider">9-Stage Funnel</h2>
               <div className="space-y-2">
                 {data.funnel.map(s => (
                   <div key={s.stage} className="flex items-center gap-2.5">
                     <span className="w-4 h-4 rounded-full bg-slate-800 text-[8px] font-bold text-amber-400 flex items-center justify-center shrink-0">{s.stage}</span>
                     <div className="flex-1 min-w-0">
-                      <div className="text-[11px] font-medium text-white leading-tight">{s.label}</div>
+                      <div className="text-[11px] font-medium text-foreground leading-tight">{s.label}</div>
                     </div>
                     <div className="w-20 shrink-0">
                       <div className="h-1.5 rounded-full bg-slate-800 overflow-hidden">
@@ -136,16 +136,16 @@ export default function PisMasterPage() {
             </div>
 
             {/* Advisor Leaderboard */}
-            <div className="rounded-lg border border-white/[0.06] bg-slate-900/60 p-4">
-              <h2 className="text-xs font-bold text-white mb-3 uppercase tracking-wider">
+            <div className="rounded-lg border border-border/60 bg-card/60 p-4">
+              <h2 className="text-xs font-bold text-foreground mb-3 uppercase tracking-wider">
                 Advisor Leaderboard <span className="text-slate-600 font-normal ml-1">{data.leaderboard.length}</span>
               </h2>
               <div className="space-y-1 max-h-[340px] overflow-y-auto pr-1">
                 {data.leaderboard.map((adv, i) => (
-                  <div key={adv.advisorUserId} className="flex items-center gap-2 py-1 hover:bg-white/[0.02] rounded px-1 -mx-1">
+                  <div key={adv.advisorUserId} className="flex items-center gap-2 py-1 hover:bg-card/30 rounded px-1 -mx-1">
                     <span className="w-4 text-[10px] font-bold text-slate-600 shrink-0">{i + 1}</span>
                     <div className="flex-1 min-w-0">
-                      <div className="text-[11px] font-medium text-white truncate leading-tight">{adv.advisorName}</div>
+                      <div className="text-[11px] font-medium text-foreground truncate leading-tight">{adv.advisorName}</div>
                       <div className="text-[9px] text-slate-600">{adv.paidPct.toFixed(0)}% paid · {adv.focPct.toFixed(1)}% FOC</div>
                     </div>
                     <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded shrink-0 ${adv.tier === "ELITE" ? "bg-amber-500/20 text-amber-400" : "bg-slate-800 text-slate-500"}`}>{adv.tier}</span>
@@ -157,17 +157,17 @@ export default function PisMasterPage() {
           </div>
 
           {/* SLA Compliance */}
-          <div className="rounded-lg border border-white/[0.06] bg-slate-900/60 p-4">
-            <h2 className="text-xs font-bold text-white mb-3 uppercase tracking-wider">
+          <div className="rounded-lg border border-border/60 bg-card/60 p-4">
+            <h2 className="text-xs font-bold text-foreground mb-3 uppercase tracking-wider">
               SLA Compliance <span className="ml-1.5 px-1.5 py-0.5 rounded bg-slate-800 text-[9px] text-slate-500 font-normal">{data.slaItems.length}</span>
             </h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-2">
               {data.slaItems.map(sla => (
-                <div key={sla.key} className="rounded border border-white/[0.04] bg-slate-950/40 p-2.5">
+                <div key={sla.key} className="rounded border border-border bg-background/40 p-2.5">
                   <span className={`inline-block px-1.5 py-0.5 rounded text-[8px] font-bold mb-1.5 ${sla.status === "ON_TRACK" ? "bg-emerald-500/15 text-emerald-400" : sla.status === "WARNING" ? "bg-amber-500/15 text-amber-400" : "bg-red-500/15 text-red-400"}`}>
                     {sla.status === "ON_TRACK" ? "OK" : sla.status}
                   </span>
-                  <div className="text-[10px] font-medium text-white leading-tight mb-0.5">{sla.label}</div>
+                  <div className="text-[10px] font-medium text-foreground leading-tight mb-0.5">{sla.label}</div>
                   <div className="text-[9px] text-slate-600">{sla.target}{sla.actual !== "N/A" ? ` · ${sla.actual}` : ""}</div>
                 </div>
               ))}
@@ -222,19 +222,19 @@ function AISidebar({ companyId, onClose }: AISidebarProps) {
   const urgColor = (u: string) => u === "HIGH" ? "bg-red-500/15 text-red-400" : u === "MED" ? "bg-amber-500/15 text-amber-400" : "bg-emerald-500/15 text-emerald-400";
 
   return (
-    <div className="rounded-lg border border-white/[0.06] bg-slate-900/60 overflow-hidden">
+    <div className="rounded-lg border border-border/60 bg-card/60 overflow-hidden">
       {/* Header */}
-      <div className="px-3 py-2.5 border-b border-white/[0.06] flex items-center justify-between">
+      <div className="px-3 py-2.5 border-b border-border/60 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="h-1.5 w-1.5 rounded-full bg-purple-400 animate-pulse" />
-          <span className="text-[11px] font-bold text-white uppercase tracking-wider">AI Intelligence</span>
+          <span className="text-[11px] font-bold text-foreground uppercase tracking-wider">AI Intelligence</span>
           {highCount > 0 && <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-500/15 text-red-400">{highCount} HIGH</span>}
         </div>
-        <button onClick={onClose} className="text-slate-600 hover:text-white text-[11px]">✕</button>
+        <button onClick={onClose} className="text-slate-600 hover:text-foreground text-[11px]">✕</button>
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-white/[0.06]">
+      <div className="flex border-b border-border/60">
         {(["diagnostic", "predictive", "prescriptive"] as const).map(t => {
           const count = signals.filter(s => s.type === t).length;
           return (
@@ -258,13 +258,13 @@ function AISidebar({ companyId, onClose }: AISidebarProps) {
         ) : (
           <div className="p-2 space-y-2">
             {filtered.map((s, i) => (
-              <div key={i} className="rounded-lg border border-white/[0.04] bg-slate-950/40 p-2.5 space-y-1.5">
+              <div key={i} className="rounded-lg border border-border bg-background/40 p-2.5 space-y-1.5">
                 <div className="flex items-center gap-1.5">
                   <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${urgColor(s.urgency)}`}>{s.urgency}</span>
                   <span className="text-[8px] text-slate-600 uppercase">{s.engine_key}</span>
                   <span className="ml-auto text-[8px] text-slate-700">{Math.round(s.confidence * 100)}%</span>
                 </div>
-                <div className="text-[10px] font-medium text-white leading-snug">{s.observation}</div>
+                <div className="text-[10px] font-medium text-foreground leading-snug">{s.observation}</div>
                 {s.diagnosis && <div className="text-[9px] text-slate-500 leading-snug">{s.diagnosis}</div>}
                 {s.action && (
                   <div className="rounded bg-purple-500/10 px-2 py-1.5">
@@ -282,7 +282,7 @@ function AISidebar({ companyId, onClose }: AISidebarProps) {
       </div>
 
       {/* Footer */}
-      <div className="px-3 py-2 border-t border-white/[0.06] text-[9px] text-slate-700 text-center">
+      <div className="px-3 py-2 border-t border-border/60 text-[9px] text-slate-700 text-center">
         {signals.length} signals · {loading ? "Analysing..." : "Updated just now"}
       </div>
     </div>

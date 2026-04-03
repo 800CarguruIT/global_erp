@@ -97,7 +97,7 @@ function DialPad({ value, onChange }: { value: string; onChange: (v: string) => 
           key={k}
           type="button"
           onClick={() => onChange(value + k)}
-          className="rounded-xl bg-slate-700/60 border border-white/10 py-3 text-base font-semibold text-slate-200 hover:bg-slate-600/80 active:scale-95 transition-all"
+          className="rounded-xl bg-slate-700/60 border border-border py-3 text-base font-semibold text-slate-200 hover:bg-slate-600/80 active:scale-95 transition-all"
         >
           {k}
         </button>
@@ -291,7 +291,7 @@ function DialerContent({ companyId }: { companyId: string }) {
       {/* ── Header ── */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-white flex items-center gap-2">
+          <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
             <span>📤</span> Outbound Dialer
           </h1>
           <p className="text-xs text-slate-400 mt-0.5">Make outbound calls via Yeastar PBX</p>
@@ -324,7 +324,7 @@ function DialerContent({ companyId }: { companyId: string }) {
               activeCall.status === "failed" ? "bg-red-400" : "bg-blue-400"
             }`} />
             <div>
-              <div className="text-sm font-semibold text-white">
+              <div className="text-sm font-semibold text-foreground">
                 {activeCall.customerName ?? activeCall.toNumber}
               </div>
               {activeCall.customerName && (
@@ -354,12 +354,12 @@ function DialerContent({ companyId }: { companyId: string }) {
 
           {/* Dialer selector */}
           {dialers.length > 0 && (
-            <div className="rounded-xl border border-white/10 bg-slate-900/60 p-4">
+            <div className="rounded-xl border border-border bg-popover/60 p-4">
               <div className="text-[10px] uppercase tracking-widest text-slate-400 mb-2">Active Dialer</div>
               <select
                 value={selectedDialerId}
                 onChange={(e) => setSelectedDialerId(e.target.value)}
-                className="w-full rounded-lg border border-white/10 bg-slate-800 text-sm text-slate-200 px-3 py-2 focus:outline-none focus:border-blue-500"
+                className="w-full rounded-lg border border-border bg-slate-800 text-sm text-slate-200 px-3 py-2 focus:outline-none focus:border-blue-500"
               >
                 {dialers.map((d) => (
                   <option key={d.id} value={d.id}>{d.label} ({d.provider})</option>
@@ -382,7 +382,7 @@ function DialerContent({ companyId }: { companyId: string }) {
           )}
 
           {/* Manual dial */}
-          <div className="rounded-xl border border-white/10 bg-slate-900/60 p-4 space-y-3">
+          <div className="rounded-xl border border-border bg-popover/60 p-4 space-y-3">
             <div className="text-[10px] uppercase tracking-widest text-slate-400">Manual Dial</div>
             <div className="relative">
               <input
@@ -391,7 +391,7 @@ function DialerContent({ companyId }: { companyId: string }) {
                 onChange={(e) => setDialNumber(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && placeCall(dialNumber)}
                 placeholder="+971XXXXXXXXX"
-                className="w-full rounded-xl border border-white/10 bg-slate-800 text-center text-xl font-mono tracking-widest text-white px-4 py-3 focus:outline-none focus:border-blue-500 placeholder:text-slate-600"
+                className="w-full rounded-xl border border-border bg-slate-800 text-center text-xl font-mono tracking-widest text-white px-4 py-3 focus:outline-none focus:border-blue-500 placeholder:text-slate-600"
               />
               {dialNumber && (
                 <button
@@ -443,7 +443,7 @@ function DialerContent({ companyId }: { companyId: string }) {
         <div className="lg:col-span-2 space-y-4">
 
           {/* Customer search */}
-          <div className="rounded-xl border border-white/10 bg-slate-900/60 p-4">
+          <div className="rounded-xl border border-border bg-popover/60 p-4">
             <div className="text-[10px] uppercase tracking-widest text-slate-400 mb-3">Search Customer</div>
             <div className="flex gap-2">
               <input
@@ -452,7 +452,7 @@ function DialerContent({ companyId }: { companyId: string }) {
                 onChange={(e) => setLookupTerm(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleLookup()}
                 placeholder="Name, phone, or plate number…"
-                className="flex-1 rounded-lg border border-white/10 bg-slate-800 text-sm text-slate-200 px-3 py-2 focus:outline-none focus:border-blue-500 placeholder:text-slate-600"
+                className="flex-1 rounded-lg border border-border bg-slate-800 text-sm text-slate-200 px-3 py-2 focus:outline-none focus:border-blue-500 placeholder:text-slate-600"
               />
               <button
                 type="button"
@@ -471,7 +471,7 @@ function DialerContent({ companyId }: { companyId: string }) {
                   return (
                     <div
                       key={r.id}
-                      className="rounded-lg border border-white/5 bg-slate-800/60 px-3 py-2 flex items-center justify-between gap-3"
+                      className="rounded-lg border border-border/40 bg-slate-800/60 px-3 py-2 flex items-center justify-between gap-3"
                     >
                       <div>
                         <div className="text-sm font-medium text-slate-200">{r.name ?? phone}</div>
@@ -515,7 +515,7 @@ function DialerContent({ companyId }: { companyId: string }) {
           </div>
 
           {/* Outbound History */}
-          <div className="rounded-xl border border-white/10 bg-slate-900/60 p-4">
+          <div className="rounded-xl border border-border bg-popover/60 p-4">
             <div className="flex items-center justify-between mb-3">
               <div className="text-[10px] uppercase tracking-widest text-slate-400">Recent Outbound Calls</div>
               <button
@@ -536,7 +536,7 @@ function DialerContent({ companyId }: { companyId: string }) {
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="text-[10px] text-slate-500 border-b border-white/5 uppercase">
+                    <tr className="text-[10px] text-slate-500 border-b border-border/40 uppercase">
                       <th className="text-left py-2">Customer / Number</th>
                       <th className="text-left py-2">To</th>
                       <th className="text-right py-2">Status</th>
@@ -547,7 +547,7 @@ function DialerContent({ companyId }: { companyId: string }) {
                   </thead>
                   <tbody>
                     {history.map((row) => (
-                      <tr key={row.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                      <tr key={row.id} className="border-b border-border/40 hover:bg-muted/40 transition-colors">
                         <td className="py-2 pr-2">
                           <div className="font-medium text-slate-200">
                             {row.customer?.name ?? row.to}

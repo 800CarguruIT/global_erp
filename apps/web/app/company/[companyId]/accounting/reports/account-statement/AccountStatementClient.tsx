@@ -221,7 +221,7 @@ export default function AccountStatementClient({
           <select
             value={rangePreset}
             onChange={(e) => setRangePreset(e.target.value)}
-            className="rounded-md border border-white/15 bg-black/30 px-3 py-2 text-sm text-white/90"
+            className="rounded-md border border-border bg-black/30 px-3 py-2 text-sm text-foreground/90"
           >
             <option value="today">Today</option>
             <option value="yesterday">Yesterday</option>
@@ -237,17 +237,17 @@ export default function AccountStatementClient({
                 type="date"
                 value={from ?? ""}
                 onChange={(e) => setFrom(e.target.value)}
-                className="rounded-md border border-white/15 bg-black/30 px-3 py-2 text-sm text-white/90"
+                className="rounded-md border border-border bg-black/30 px-3 py-2 text-sm text-foreground/90"
               />
               <input
                 type="date"
                 value={to ?? ""}
                 onChange={(e) => setTo(e.target.value)}
-                className="rounded-md border border-white/15 bg-black/30 px-3 py-2 text-sm text-white/90"
+                className="rounded-md border border-border bg-black/30 px-3 py-2 text-sm text-foreground/90"
               />
             </>
           ) : (
-            <div className="rounded-md border border-white/15 bg-black/20 px-3 py-2 text-sm text-white/80">
+            <div className="rounded-md border border-border bg-black/20 px-3 py-2 text-sm text-foreground/80">
               {from} → {to}
             </div>
           )}
@@ -265,13 +265,13 @@ export default function AccountStatementClient({
         <div className="text-sm text-muted-foreground">Loading...</div>
       ) : (
         <Card>
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 p-3 text-xs">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-3 text-xs">
             <div className="flex items-center gap-2">
-              <label className="text-white/70">Show</label>
+              <label className="text-foreground/70">Show</label>
               <select
                 value={pageSize}
                 onChange={(e) => setPageSize(Number(e.target.value))}
-                className="rounded-md border border-white/15 bg-black/30 px-2 py-1 text-xs text-white/90"
+                className="rounded-md border border-border bg-black/30 px-2 py-1 text-xs text-foreground/90"
               >
                 {[10, 25, 50, 100].map((n) => (
                   <option key={n} value={n}>
@@ -279,21 +279,21 @@ export default function AccountStatementClient({
                   </option>
                 ))}
               </select>
-              <span className="text-white/60">rows</span>
+              <span className="text-muted-foreground">rows</span>
             </div>
             <div className="flex items-center gap-2">
-              <label className="text-white/70">Search:</label>
+              <label className="text-foreground/70">Search:</label>
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="rounded-md border border-white/15 bg-black/30 px-2 py-1 text-xs text-white/90"
+                className="rounded-md border border-border bg-black/30 px-2 py-1 text-xs text-foreground/90"
               />
             </div>
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead>
-                <tr className="border-b border-white/10 text-left text-xs text-muted-foreground">
+                <tr className="border-b border-border text-left text-xs text-muted-foreground">
                   <th className="px-3 py-2">ID</th>
                   <th className="px-3 py-2">Type</th>
                   <th className="px-3 py-2">Description</th>
@@ -314,7 +314,7 @@ export default function AccountStatementClient({
                   <td className="px-3 py-2">Previous</td>
                 </tr>
                 {pagedRows.map((r) => (
-                  <tr key={r.id} className="border-b border-white/5">
+                  <tr key={r.id} className="border-b border-border/40">
                     <td className="px-3 py-2">{r.id}</td>
                     <td className="px-3 py-2">{r.type}</td>
                     <td className="px-3 py-2">{r.description}</td>

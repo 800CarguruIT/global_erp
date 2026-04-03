@@ -80,16 +80,16 @@ export default function PisExtensionsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-bold text-white">Advisor Dialer Extensions</h2>
+          <h2 className="text-lg font-bold text-foreground">Advisor Dialer Extensions</h2>
           <p className="text-xs text-slate-500">Assign dialer extensions and location (inhouse/remote) for service center advisors</p>
         </div>
         <span className="text-xs text-slate-500">{advisors.length} advisors</span>
       </div>
 
-      <div className="rounded-xl border border-white/10 bg-gradient-to-br from-slate-900/80 to-black/90 overflow-hidden">
+      <div className="rounded-xl border border-border bg-gradient-to-br from-slate-900/80 to-black/90 overflow-hidden">
         <table className="w-full text-xs">
           <thead>
-            <tr className="border-b border-white/10 text-left">
+            <tr className="border-b border-border text-left">
               <th className="px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400">#</th>
               <th className="px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Advisor</th>
               <th className="px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Email</th>
@@ -100,9 +100,9 @@ export default function PisExtensionsPage() {
           </thead>
           <tbody>
             {advisors.map((adv, i) => (
-              <tr key={adv.id} className="border-b border-white/5 hover:bg-white/5">
+              <tr key={adv.id} className="border-b border-border/40 hover:bg-muted/40">
                 <td className="px-4 py-3 text-slate-500">{i + 1}</td>
-                <td className="px-4 py-3 font-medium text-white">{adv.fullName}</td>
+                <td className="px-4 py-3 font-medium text-foreground">{adv.fullName}</td>
                 <td className="px-4 py-3 text-slate-400">{adv.email}</td>
                 <td className="px-4 py-3">
                   <input
@@ -110,14 +110,14 @@ export default function PisExtensionsPage() {
                     value={draft[adv.id] ?? ""}
                     onChange={e => setDraft(p => ({ ...p, [adv.id]: e.target.value }))}
                     placeholder="e.g. 1001"
-                    className="w-28 rounded-lg bg-slate-800 border border-white/20 px-3 py-1.5 text-xs text-white placeholder:text-slate-600 focus:border-amber-500/50 focus:outline-none"
+                    className="w-28 rounded-lg bg-slate-800 border border-border px-3 py-1.5 text-xs text-foreground placeholder:text-slate-600 focus:border-amber-500/50 focus:outline-none"
                   />
                 </td>
                 <td className="px-4 py-3">
                   <select
                     value={locationDraft[adv.id] ?? "inhouse"}
                     onChange={e => setLocationDraft(p => ({ ...p, [adv.id]: e.target.value }))}
-                    className="rounded-lg bg-slate-800 border border-white/20 px-3 py-1.5 text-xs text-white focus:border-amber-500/50 focus:outline-none"
+                    className="rounded-lg bg-slate-800 border border-border px-3 py-1.5 text-xs text-foreground focus:border-amber-500/50 focus:outline-none"
                   >
                     <option value="inhouse">Inhouse</option>
                     <option value="remote">Remote</option>

@@ -1,3 +1,0 @@
-ALTER TABLE customers
-  ADD COLUMN IF NOT EXISTS country text NULL,
-  ADD COLUMN IF NOT EXISTS city text NULL;

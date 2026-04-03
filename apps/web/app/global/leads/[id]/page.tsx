@@ -32,7 +32,7 @@ function Timeline({ items, formatDate }: { items: TimelineEntry[]; formatDate: (
       {items.map((t, idx) => (
         <div key={`${t.at}-${idx}`} className="flex gap-3">
           <div className="w-32 text-xs text-muted-foreground">{formatDate(t.at)}</div>
-          <div className="flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm">
+          <div className="flex-1 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm">
             <div className="font-semibold">{t.summary}</div>
             {t.author && <div className="text-xs text-muted-foreground">{t.author}</div>}
           </div>
@@ -62,7 +62,7 @@ function RemarksThread({
         <div key={`${r.at}-${idx}`} className={`flex ${r.role === "agent" ? "justify-end" : "justify-start"}`}>
           <div
             className={`max-w-xl rounded-2xl px-3 py-2 text-sm ${
-              r.role === "agent" ? "bg-primary text-primary-foreground" : "border border-white/10 bg-white/10"
+              r.role === "agent" ? "bg-primary text-primary-foreground" : "border border-border bg-muted"
             }`}
           >
             <div className="text-[11px] opacity-80">

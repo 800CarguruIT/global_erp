@@ -48,7 +48,7 @@ export default async function DocDetailPage({ params }: { params: Promise<{ slug
   return (
     <AppLayout>
       <div className="space-y-5 py-4 lg:py-6">
-        <header className="rounded-2xl border border-white/10 bg-background/80 p-4 shadow-lg">
+        <header className="rounded-2xl border border-border bg-background/80 p-4 shadow-lg">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="space-y-2">
               <p className="text-xs font-semibold uppercase tracking-[0.25em] text-muted-foreground">Documentation</p>
@@ -70,8 +70,8 @@ export default async function DocDetailPage({ params }: { params: Promise<{ slug
         </header>
 
         <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
-          <Card className="rounded-2xl border border-white/10 bg-background/80 p-0 shadow-lg">
-            <div className="border-b border-white/10 px-6 py-4">
+          <Card className="rounded-2xl border border-border bg-background/80 p-0 shadow-lg">
+            <div className="border-b border-border px-6 py-4">
               <h2 className="text-xl font-semibold text-foreground">Overview</h2>
               <p className="mt-1 text-xs uppercase tracking-[0.2em] text-muted-foreground">{doc.relativePath}</p>
             </div>
@@ -81,8 +81,8 @@ export default async function DocDetailPage({ params }: { params: Promise<{ slug
           </Card>
 
           <aside className="xl:sticky xl:top-6">
-            <Card className="rounded-2xl border border-white/10 bg-background/80 p-4 shadow-lg">
-              <div className="mb-3 border-b border-white/10 pb-3">
+            <Card className="rounded-2xl border border-border bg-background/80 p-4 shadow-lg">
+              <div className="mb-3 border-b border-border pb-3">
                 <h3 className="text-xl font-semibold text-foreground">Topics</h3>
               </div>
               {visibleTopics.length > 0 ? (
@@ -91,7 +91,7 @@ export default async function DocDetailPage({ params }: { params: Promise<{ slug
                     <a
                       key={topic.id}
                       href={`#${topic.id}`}
-                      className="block rounded-xl border border-white/10 bg-white/[0.02] px-3 py-2 text-sm font-semibold text-foreground transition hover:border-primary/60 hover:text-primary"
+                      className="block rounded-xl border border-border bg-card/30 px-3 py-2 text-sm font-semibold text-foreground transition hover:border-primary/60 hover:text-primary"
                     >
                       {topic.text}
                     </a>

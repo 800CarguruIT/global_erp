@@ -119,7 +119,7 @@ function InventoryTransfersPanel({ companyId }: { companyId: string }) {
         <select
           value={filter}
           onChange={(event) => setFilter(event.target.value)}
-          className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-100"
+          className="rounded-md border border-border bg-popover px-3 py-2 text-xs text-foreground"
         >
           {STATUS_FILTERS.map((option) => (
             <option key={option.value} value={option.value}>
@@ -130,7 +130,7 @@ function InventoryTransfersPanel({ companyId }: { companyId: string }) {
       }
     >
       <div className="space-y-6">
-        <section className="rounded-2xl border border-white/5 bg-slate-950/80 p-5 shadow-xl">
+        <section className="rounded-2xl border border-border/40 bg-background/80 p-5 shadow-xl">
           <div className="flex items-center justify-between">
             <div>
               <div className="text-xs uppercase tracking-[0.2em] text-slate-400">Transfer playbook</div>
@@ -147,14 +147,14 @@ function InventoryTransfersPanel({ companyId }: { companyId: string }) {
             </Link>
           </div>
           <ul className="mt-4 grid gap-2 text-[11px] text-slate-300 sm:grid-cols-2">
-            <li className="rounded-lg border border-white/5 bg-slate-950/60 px-3 py-2">Step 1: Stock is available at the source location.</li>
-            <li className="rounded-lg border border-white/5 bg-slate-950/60 px-3 py-2">Step 2: Create a transfer order that lists SKUs and quantities.</li>
-            <li className="rounded-lg border border-white/5 bg-slate-950/60 px-3 py-2">Step 3: Dispatch (stock out) and mark the order in transit.</li>
-            <li className="rounded-lg border border-white/5 bg-slate-950/60 px-3 py-2">Step 4: Receive goods at the destination and close the transfer.</li>
+            <li className="rounded-lg border border-border/40 bg-background/60 px-3 py-2">Step 1: Stock is available at the source location.</li>
+            <li className="rounded-lg border border-border/40 bg-background/60 px-3 py-2">Step 2: Create a transfer order that lists SKUs and quantities.</li>
+            <li className="rounded-lg border border-border/40 bg-background/60 px-3 py-2">Step 3: Dispatch (stock out) and mark the order in transit.</li>
+            <li className="rounded-lg border border-border/40 bg-background/60 px-3 py-2">Step 4: Receive goods at the destination and close the transfer.</li>
           </ul>
         </section>
 
-        <section className="rounded-2xl border border-white/5 bg-slate-950/80 p-5 shadow-xl">
+        <section className="rounded-2xl border border-border/40 bg-background/80 p-5 shadow-xl">
           {transferState.status === "loading" ? (
             <p className="text-sm text-slate-300">Loading transfers…</p>
           ) : transferState.status === "error" ? (
@@ -162,10 +162,10 @@ function InventoryTransfersPanel({ companyId }: { companyId: string }) {
           ) : transfers.length === 0 ? (
             <p className="text-sm text-slate-300">No transfers recorded yet.</p>
           ) : (
-            <div className="overflow-x-auto rounded-xl border border-white/5 bg-slate-950/70">
+            <div className="overflow-x-auto rounded-xl border border-border/40 bg-background/70">
               <table className="min-w-full text-xs">
                 <thead>
-                  <tr className="bg-slate-900/70 text-[11px] uppercase tracking-wide text-slate-300">
+                  <tr className="bg-popover/70 text-[11px] uppercase tracking-wide text-muted-foreground">
                     <th className="py-2 px-3 text-left">Transfer</th>
                     <th className="py-2 px-3 text-left">From</th>
                     <th className="py-2 px-3 text-left">To</th>
@@ -178,7 +178,7 @@ function InventoryTransfersPanel({ companyId }: { companyId: string }) {
                     const from = locationMap.get(transfer.fromLocationId);
                     const to = locationMap.get(transfer.toLocationId);
                     return (
-                      <tr key={transfer.id} className="border-t border-white/5 hover:bg-white/[0.03]">
+                      <tr key={transfer.id} className="border-t border-border/40 hover:bg-card/40">
                         <td className="py-3 px-3">
                           <Link
                             href={`/company/${companyId}/inventory/transfers/${transfer.id}`}
@@ -194,7 +194,7 @@ function InventoryTransfersPanel({ companyId }: { companyId: string }) {
                           {to ? `${to.code} — ${to.name}` : transfer.toLocationId.slice(0, 8)}
                         </td>
                         <td className="py-3 px-3 text-xs capitalize">
-                          <span className="rounded-full bg-white/5 px-2 py-0.5 text-[11px] text-slate-200">
+                          <span className="rounded-full bg-muted/40 px-2 py-0.5 text-[11px] text-foreground/80">
                             {transfer.status.replace("_", " ")}
                           </span>
                         </td>

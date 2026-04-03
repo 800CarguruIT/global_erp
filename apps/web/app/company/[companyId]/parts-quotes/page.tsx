@@ -463,7 +463,7 @@ export default function PartsQuotesPage() {
       const orderedOn = row.updatedAt ? new Date(row.updatedAt).toLocaleDateString() : "-";
       const showGrn = activeTab === "received" && row.grnNumber;
       return (
-        <tr key={row.id} className="border-t border-white/5">
+        <tr key={row.id} className="border-t border-border/40">
           <td className="px-3 py-3 text-xs text-slate-300/80">{index + 1}</td>
           <td className="px-3 py-3 text-xs text-slate-200">{row.vendorName ?? "Unknown vendor"}</td>
           <td className="px-3 py-3 text-xs">{carLabel}</td>
@@ -484,7 +484,7 @@ export default function PartsQuotesPage() {
                   { label: "USED", amount: row.used, qty: row.usedQty, etd: row.usedEtd, time: row.usedTime, brand: row.usedBrand },
                 ] as const
               ).map((q) => (
-                <div key={`${row.id}-${q.label}`} className="rounded border border-slate-700/60 bg-slate-900/50 p-1.5">
+                <div key={`${row.id}-${q.label}`} className="rounded border border-slate-700/60 bg-popover/50 p-1.5">
                   <div className="text-[10px] font-semibold text-slate-300">{q.label}</div>
                   <div className="text-[11px] font-semibold">{q.amount != null ? `${q.amount.toFixed(2)} AED` : "-"}</div>
                   <div className="text-[10px] text-slate-400">Brand: {q.brand ?? row.partBrand ?? "-"}</div>
@@ -550,7 +550,7 @@ export default function PartsQuotesPage() {
                 type="checkbox"
                 checked={selectedOrderedIds.includes(row.id)}
                 onChange={() => toggleSelection(row.id)}
-                className="h-4 w-4 rounded border border-slate-600 bg-slate-900/70 text-emerald-500"
+                className="h-4 w-4 rounded border border-slate-600 bg-popover/70 text-emerald-500"
                 aria-label="Select ordered part"
               />
             </td>
@@ -574,10 +574,10 @@ export default function PartsQuotesPage() {
     <AppLayout>
       {quotesModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-6xl overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-slate-950/98 via-slate-950/95 to-slate-900/95 shadow-[0_30px_80px_-40px_rgba(15,23,42,0.9)]">
-            <div className="flex items-center justify-between border-b border-white/10 bg-slate-950/90 px-6 py-4">
+          <div className="w-full max-w-6xl overflow-hidden rounded-2xl border border-border bg-gradient-to-b from-background/98 via-background/95 to-popover/95 shadow-[0_30px_80px_-40px_rgba(15,23,42,0.9)]">
+            <div className="flex items-center justify-between border-b border-border bg-background/90 px-6 py-4">
               <div>
-                <div className="text-xs uppercase tracking-[0.2em] text-white/50">Quotes</div>
+                <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Quotes</div>
                 <div className="text-base font-semibold text-slate-100">{quotesModalTitle}</div>
                 <div className="text-[11px] text-slate-400">
                   Compare vendor pricing and submit the exact quantities to order.
@@ -623,14 +623,14 @@ export default function PartsQuotesPage() {
               <button
                 type="button"
                 onClick={() => setQuotesModalOpen(false)}
-                className="rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-white/80 transition hover:bg-white/20"
+                className="rounded-full border border-border bg-muted px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-foreground/80 transition hover:bg-muted/80"
               >
                 Close
               </button>
             </div>
             <div className="max-h-[70vh] overflow-auto px-6 py-4">
               <table className="min-w-full text-xs text-slate-100">
-                <thead className="sticky top-0 z-10 bg-slate-900/90 text-[11px] uppercase tracking-wide text-slate-300 backdrop-blur">
+                <thead className="sticky top-0 z-10 bg-popover/90 text-[11px] uppercase tracking-wide text-slate-300 backdrop-blur">
                   <tr>
                     <th className="px-3 py-2 text-left">Vendor</th>
                     <th className="px-3 py-2 text-left">OEM</th>
@@ -651,7 +651,7 @@ export default function PartsQuotesPage() {
                     </tr>
                   ) : (
                     quotesModalRows.map((r) => (
-                      <tr key={r.id} className="border-t border-white/5">
+                      <tr key={r.id} className="border-t border-border/40">
                         <td className="px-3 py-3">
                           <div className="text-sm font-semibold text-slate-100">{r.vendorName ?? "—"}</div>
                           <div className="text-[10px] text-slate-500">{r.updatedAt ? new Date(r.updatedAt).toLocaleDateString() : "—"}</div>
@@ -796,7 +796,7 @@ export default function PartsQuotesPage() {
           <p className="text-sm text-muted-foreground">List of vendor quotes across cars and statuses.</p>
         </div>
 
-        <div className="rounded-2xl bg-slate-950/80 p-2">
+        <div className="rounded-2xl bg-background/80 p-2">
           <div className="flex flex-wrap gap-2">
             {TABS.map((tab) => {
               const isActive = tab.id === activeTab;
@@ -808,7 +808,7 @@ export default function PartsQuotesPage() {
                   className={`rounded-full px-4 py-2 text-sm font-medium transition ${
                     isActive
                       ? "bg-emerald-500 text-white"
-                      : "bg-slate-900/60 text-slate-200 hover:bg-slate-900/80"
+                      : "bg-popover/60 text-foreground/80 hover:bg-popover/80"
                   }`}
                 >
                   {tab.label}
@@ -818,7 +818,7 @@ export default function PartsQuotesPage() {
           </div>
         </div>
 
-        <div className="rounded-2xl bg-slate-950/80 shadow-[0_20px_50px_-30px_rgba(15,23,42,0.9)]">
+        <div className="rounded-2xl bg-background/80 shadow-[0_20px_50px_-30px_rgba(15,23,42,0.9)]">
           <div className="flex items-center justify-between px-4 py-3">
             <div className="text-sm font-semibold text-slate-100">
               {TABS.find((t) => t.id === activeTab)?.label}
@@ -831,7 +831,7 @@ export default function PartsQuotesPage() {
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
               placeholder="Search by plate, part, part no, or brand"
-              className="flex-1 min-w-[220px] rounded-md border border-slate-800 bg-slate-900/70 px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/70"
+              className="flex-1 min-w-[220px] rounded-md border border-slate-800 bg-popover/70 px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/70"
             />
             {isOrderedTab && selectedOrderedIds.length > 0 && (
               <div className="space-y-2">
@@ -861,7 +861,7 @@ export default function PartsQuotesPage() {
           </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[1400px] text-sm text-slate-100">
-              <thead className="bg-slate-900 text-xs uppercase tracking-wide text-slate-300">
+              <thead className="bg-popover text-xs uppercase tracking-wide text-slate-300">
                 <tr>
                   <th className="px-3 py-2 text-left">#</th>
                   <th className="px-3 py-2 text-left">Vendor</th>

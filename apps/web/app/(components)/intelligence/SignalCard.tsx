@@ -22,7 +22,7 @@ export function SignalCard({ signal }: Props) {
   const confidencePct = Math.round(signal.confidence * 100);
 
   return (
-    <div className="rounded-xl border border-white/10 bg-slate-900/80 p-4 space-y-3">
+    <div className="rounded-xl border border-border bg-slate-900/80 p-4 space-y-3">
       {/* Header */}
       <div className="flex flex-wrap items-center gap-2">
         <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${URGENCY_STYLES[signal.urgency]}`}>
@@ -56,7 +56,7 @@ export function SignalCard({ signal }: Props) {
       )}
 
       {/* Footer */}
-      <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 pt-1 border-t border-white/5">
+      <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 pt-1 border-t border-border">
         {signal.owner_role && (
           <span className="rounded-full bg-slate-800 px-2 py-0.5 text-slate-400">
             {signal.owner_role}

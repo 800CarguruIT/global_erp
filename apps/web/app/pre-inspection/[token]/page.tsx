@@ -691,9 +691,9 @@ export default function PreInspectionPublicPage({ params }: Params) {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-100">
+    <main className="min-h-screen bg-background text-slate-100">
       <div className="mx-auto max-w-3xl px-4 py-8">
-        <div className="rounded-2xl border border-white/10 bg-slate-900/70 p-5">
+        <div className="rounded-2xl border border-border bg-popover/70 p-5">
           <h1 className="flex items-center gap-2 text-2xl font-semibold">
             <TinyIcon kind="question" className="h-5 w-5 text-cyan-300" />
             {title}
@@ -713,7 +713,7 @@ export default function PreInspectionPublicPage({ params }: Params) {
         {success ? <div className="mt-4 rounded-xl border border-emerald-400/40 bg-emerald-500/10 p-3 text-sm text-emerald-200">{success}</div> : null}
 
         {!loading && formData ? (
-          <form onSubmit={onSubmit} className="mt-4 space-y-4 rounded-2xl border border-white/10 bg-slate-900/70 p-5">
+          <form onSubmit={onSubmit} className="mt-4 space-y-4 rounded-2xl border border-border bg-popover/70 p-5">
             <div className="grid gap-2 text-sm text-slate-300 sm:grid-cols-2">
               <div><span className="text-slate-400">Customer:</span> {formData.customerName ?? "-"}</div>
               <div><span className="text-slate-400">Phone:</span> {formData.customerPhone ?? "-"}</div>
@@ -724,7 +724,7 @@ export default function PreInspectionPublicPage({ params }: Params) {
             </div>
 
             {(Object.keys(QUESTION_LABELS) as Array<keyof Answers>).map((key) => (
-              <div key={key} className="rounded-xl border border-white/10 bg-slate-950/40 p-4">
+              <div key={key} className="rounded-xl border border-border bg-background/40 p-4">
                 <div className="flex items-center gap-2 text-base font-semibold">
                   <TinyIcon kind="question" className="h-5 w-5 text-cyan-300" />
                   {QUESTION_LABELS[key]}
@@ -739,7 +739,7 @@ export default function PreInspectionPublicPage({ params }: Params) {
                       className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 ${
                         answers[key].choice === "yes"
                           ? "border-emerald-300/70 bg-emerald-500/15 text-emerald-100"
-                          : "border-white/20 text-slate-200"
+                          : "border-border text-slate-200"
                       }`}
                     >
                       <TinyIcon kind="yes" className="h-4 w-4 text-emerald-300" />
@@ -752,7 +752,7 @@ export default function PreInspectionPublicPage({ params }: Params) {
                       className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 ${
                         answers[key].choice === "no"
                           ? "border-rose-300/70 bg-rose-500/15 text-rose-100"
-                          : "border-white/20 text-slate-200"
+                          : "border-border text-slate-200"
                       }`}
                     >
                       <TinyIcon kind="no" className="h-4 w-4 text-rose-300" />
@@ -783,7 +783,7 @@ export default function PreInspectionPublicPage({ params }: Params) {
                                 className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${
                                   String(followUps[key]?.[fq.id] ?? "") === opt
                                     ? "border-cyan-300/70 bg-cyan-500/15 text-cyan-100"
-                                    : "border-white/20 text-slate-200"
+                                    : "border-border text-slate-200"
                                 }`}
                                 disabled={isSubmitted}
                               >
@@ -816,7 +816,7 @@ export default function PreInspectionPublicPage({ params }: Params) {
                                   className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${
                                     checked
                                       ? "border-cyan-300/70 bg-cyan-500/15 text-cyan-100"
-                                      : "border-white/20 text-slate-200"
+                                      : "border-border text-slate-200"
                                   }`}
                                   disabled={isSubmitted}
                                 >
@@ -831,7 +831,7 @@ export default function PreInspectionPublicPage({ params }: Params) {
                           <div className="space-y-2">
                             <input
                               type={fq.type === "date" ? "date" : "text"}
-                              className="w-full rounded-xl border border-white/15 bg-slate-950/60 p-3 text-sm outline-none"
+                              className="w-full rounded-xl border border-border bg-background/60 p-3 text-sm outline-none"
                               placeholder={fq.type === "date" ? undefined : "Enter details"}
                               value={String(followUps[key]?.[fq.id] ?? "")}
                               onChange={(e) => setFollowUpValue(key, fq.id, e.target.value)}
@@ -840,7 +840,7 @@ export default function PreInspectionPublicPage({ params }: Params) {
                             {OTHER_DETAIL_REQUIRED_FIELDS.has(fq.id) && isOtherSelected(key, fq.id) ? (
                               <input
                                 type="text"
-                                className="w-full rounded-xl border border-white/15 bg-slate-950/60 p-3 text-sm outline-none"
+                                className="w-full rounded-xl border border-border bg-background/60 p-3 text-sm outline-none"
                                 placeholder="Specify other"
                                 value={String(followUps[key]?.[`${fq.id}_other`] ?? "")}
                                 onChange={(e) => setFollowUpValue(key, `${fq.id}_other`, e.target.value)}
@@ -852,7 +852,7 @@ export default function PreInspectionPublicPage({ params }: Params) {
                         {fq.type !== "text" && OTHER_DETAIL_REQUIRED_FIELDS.has(fq.id) && isOtherSelected(key, fq.id) ? (
                           <input
                             type="text"
-                            className="mt-2 w-full rounded-xl border border-white/15 bg-slate-950/60 p-3 text-sm outline-none"
+                            className="mt-2 w-full rounded-xl border border-border bg-background/60 p-3 text-sm outline-none"
                             placeholder="Specify other"
                             value={String(followUps[key]?.[`${fq.id}_other`] ?? "")}
                             onChange={(e) => setFollowUpValue(key, `${fq.id}_other`, e.target.value)}
@@ -865,7 +865,7 @@ export default function PreInspectionPublicPage({ params }: Params) {
                     <div>
                       <div className="mb-1 text-sm font-medium text-slate-200">Additional notes (optional)</div>
                       <textarea
-                        className="w-full rounded-xl border border-white/15 bg-slate-950/60 p-3 text-sm outline-none"
+                        className="w-full rounded-xl border border-border bg-background/60 p-3 text-sm outline-none"
                         rows={3}
                         placeholder="Any extra information for advisor"
                         value={String(followUps[key]?.__note ?? "")}
@@ -907,7 +907,7 @@ export default function PreInspectionPublicPage({ params }: Params) {
               <button
                 type="submit"
                 disabled={submitting || isSubmitted}
-                className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold disabled:opacity-60"
+                className="inline-flex items-center gap-2 rounded-xl border border-border bg-muted px-4 py-2 text-sm font-semibold disabled:opacity-60"
               >
                 <TinyIcon kind="submit" className="h-4 w-4 text-emerald-300" />
                 {isSubmitted ? "Already Submitted" : submitting ? "Submitting..." : "Submit Form"}
@@ -1017,12 +1017,12 @@ function SignaturePad({
   }
 
   return (
-    <div className="rounded-xl border border-white/10 p-3">
+    <div className="rounded-xl border border-border p-3">
       <div className="mb-2 flex items-center gap-2 text-sm font-medium">
         <TinyIcon kind="sign" className="h-4 w-4 text-cyan-300" />
         Signature
       </div>
-      <div className="overflow-hidden rounded-lg border border-white/15 bg-slate-950/60">
+      <div className="overflow-hidden rounded-lg border border-border bg-background/60">
         <canvas
           ref={canvasRef}
           width={700}
@@ -1052,7 +1052,7 @@ function SignaturePad({
       <div className="mt-2 flex items-center gap-2">
         <button
           type="button"
-          className="rounded-md border border-white/20 px-2 py-1 text-xs"
+          className="rounded-md border border-border px-2 py-1 text-xs"
           onClick={() => {
             const canvas = canvasRef.current;
             if (canvas) clear(canvas);

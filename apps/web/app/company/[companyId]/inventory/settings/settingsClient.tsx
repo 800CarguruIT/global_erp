@@ -27,14 +27,14 @@ const TABS: Array<{ id: TabKey; label: string }> = [
 
 const toggleClass = (active: boolean) =>
   `rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition ${
-    active ? "bg-white/15 text-white" : "border border-white/15 text-white/70 hover:border-white/40"
+    active ? "bg-muted text-foreground" : "border border-border text-foreground/70 hover:border-border"
   }`;
 
 const inputClass =
-  "w-full rounded-2xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm text-white placeholder:text-slate-400 focus:border-primary focus:ring-2 focus:ring-primary/40";
+  "w-full rounded-2xl border border-border bg-card/60 px-3 py-2 text-sm text-foreground placeholder:text-slate-400 focus:border-primary focus:ring-2 focus:ring-primary/40";
 
 const selectClass =
-  "w-full rounded-2xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm text-white focus:border-primary focus:ring-2 focus:ring-primary/40";
+  "w-full rounded-2xl border border-border bg-card/60 px-3 py-2 text-sm text-foreground focus:border-primary focus:ring-2 focus:ring-primary/40";
 
 const badgeClass = (active: boolean) =>
   `inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
@@ -881,7 +881,7 @@ export default function InventorySettingsClient({ companyId }: Props) {
       title="Inventory Settings"
       subtitle="Manage inventory taxonomy for parts classification."
       scopeLabel={`Company ${companyId}`}
-      contentClassName="space-y-6 rounded-2xl border-none bg-slate-950/70 p-4"
+      contentClassName="space-y-6 rounded-2xl border-none bg-background/70 p-4"
     >
       <div className="flex flex-wrap items-center gap-2">
         {TABS.map((tab) => (
@@ -897,14 +897,14 @@ export default function InventorySettingsClient({ companyId }: Props) {
       </div>
 
       {loading ? (
-        <div className="rounded-2xl bg-slate-950/80 p-4 text-sm text-muted-foreground">Loading taxonomy...</div>
+        <div className="rounded-2xl bg-background/80 p-4 text-sm text-muted-foreground">Loading taxonomy...</div>
       ) : error ? (
-        <div className="rounded-2xl bg-slate-950/80 p-4 text-sm text-destructive">{error}</div>
+        <div className="rounded-2xl bg-background/80 p-4 text-sm text-destructive">{error}</div>
       ) : null}
 
       {activeTab === "types" && (
         <section className="grid gap-4 lg:grid-cols-[1.2fr,1fr]">
-          <article className="rounded-2xl bg-slate-950/80 p-4 shadow-xl">
+          <article className="rounded-2xl bg-background/80 p-4 shadow-xl">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-semibold">Inventory types</h2>
@@ -988,7 +988,7 @@ export default function InventorySettingsClient({ companyId }: Props) {
                                   </button>
                                   <button
                                     type="button"
-                                    className="rounded-full border border-white/15 px-3 py-1 text-[11px] text-white/70"
+                                    className="rounded-full border border-border px-3 py-1 text-[11px] text-foreground/70"
                                     onClick={() => setEditingTypeId(null)}
                                   >
                                     Cancel
@@ -998,14 +998,14 @@ export default function InventorySettingsClient({ companyId }: Props) {
                                 <>
                                   <button
                                     type="button"
-                                    className="rounded-full border border-white/15 px-3 py-1 text-[11px] text-white/70"
+                                    className="rounded-full border border-border px-3 py-1 text-[11px] text-foreground/70"
                                     onClick={() => startEditType(row)}
                                   >
                                     Edit
                                   </button>
                                   <button
                                     type="button"
-                                    className="rounded-full border border-white/15 px-3 py-1 text-[11px] text-white/70"
+                                    className="rounded-full border border-border px-3 py-1 text-[11px] text-foreground/70"
                                     onClick={() => toggleTypeStatus(row)}
                                     disabled={typeSaving}
                                   >
@@ -1032,7 +1032,7 @@ export default function InventorySettingsClient({ companyId }: Props) {
             </div>
           </article>
 
-          <article className="rounded-2xl bg-slate-950/80 p-4 shadow-xl">
+          <article className="rounded-2xl bg-background/80 p-4 shadow-xl">
             <h2 className="text-lg font-semibold">Create inventory type</h2>
             <p className="text-xs text-muted-foreground">
               Types act as the top-level grouping for your inventory taxonomy.
@@ -1080,7 +1080,7 @@ export default function InventorySettingsClient({ companyId }: Props) {
 
       {activeTab === "categories" && (
         <section className="grid gap-4 lg:grid-cols-[1.2fr,1fr]">
-          <article className="rounded-2xl bg-slate-950/80 p-4 shadow-xl">
+          <article className="rounded-2xl bg-background/80 p-4 shadow-xl">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <h2 className="text-lg font-semibold">Categories</h2>
@@ -1089,7 +1089,7 @@ export default function InventorySettingsClient({ companyId }: Props) {
               <select
                 value={categoryFilterTypeId}
                 onChange={(e) => setCategoryFilterTypeId(e.target.value)}
-                className="rounded-full border border-white/15 bg-black/20 px-3 py-1.5 text-xs text-white"
+                className="rounded-full border border-border bg-black/20 px-3 py-1.5 text-xs text-foreground"
               >
                 <option value="">All types</option>
                 {types.map((type) => (
@@ -1166,7 +1166,7 @@ export default function InventorySettingsClient({ companyId }: Props) {
                                   </button>
                                   <button
                                     type="button"
-                                    className="rounded-full border border-white/15 px-3 py-1 text-[11px] text-white/70"
+                                    className="rounded-full border border-border px-3 py-1 text-[11px] text-foreground/70"
                                     onClick={() => setEditingCategoryId(null)}
                                   >
                                     Cancel
@@ -1176,14 +1176,14 @@ export default function InventorySettingsClient({ companyId }: Props) {
                                 <>
                                   <button
                                     type="button"
-                                    className="rounded-full border border-white/15 px-3 py-1 text-[11px] text-white/70"
+                                    className="rounded-full border border-border px-3 py-1 text-[11px] text-foreground/70"
                                     onClick={() => startEditCategory(row)}
                                   >
                                     Edit
                                   </button>
                                   <button
                                     type="button"
-                                    className="rounded-full border border-white/15 px-3 py-1 text-[11px] text-white/70"
+                                    className="rounded-full border border-border px-3 py-1 text-[11px] text-foreground/70"
                                     onClick={() => toggleCategoryStatus(row)}
                                     disabled={categorySaving}
                                   >
@@ -1210,7 +1210,7 @@ export default function InventorySettingsClient({ companyId }: Props) {
             </div>
           </article>
 
-          <article className="rounded-2xl bg-slate-950/80 p-4 shadow-xl">
+          <article className="rounded-2xl bg-background/80 p-4 shadow-xl">
             <h2 className="text-lg font-semibold">Create category</h2>
             <p className="text-xs text-muted-foreground">Categories sit under inventory types.</p>
             <form className="mt-4 space-y-3 text-sm" onSubmit={createCategory}>
@@ -1271,7 +1271,7 @@ export default function InventorySettingsClient({ companyId }: Props) {
 
       {activeTab === "subcategories" && (
         <section className="grid gap-4 lg:grid-cols-[1.2fr,1fr]">
-          <article className="rounded-2xl bg-slate-950/80 p-4 shadow-xl">
+          <article className="rounded-2xl bg-background/80 p-4 shadow-xl">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <h2 className="text-lg font-semibold">Sub categories</h2>
@@ -1280,7 +1280,7 @@ export default function InventorySettingsClient({ companyId }: Props) {
               <select
                 value={subcategoryFilterCategoryId}
                 onChange={(e) => setSubcategoryFilterCategoryId(e.target.value)}
-                className="rounded-full border border-white/15 bg-black/20 px-3 py-1.5 text-xs text-white"
+                className="rounded-full border border-border bg-black/20 px-3 py-1.5 text-xs text-foreground"
               >
                 <option value="">All categories</option>
                 {categories.map((category) => (
@@ -1361,7 +1361,7 @@ export default function InventorySettingsClient({ companyId }: Props) {
                                   </button>
                                   <button
                                     type="button"
-                                    className="rounded-full border border-white/15 px-3 py-1 text-[11px] text-white/70"
+                                    className="rounded-full border border-border px-3 py-1 text-[11px] text-foreground/70"
                                     onClick={() => setEditingSubcategoryId(null)}
                                   >
                                     Cancel
@@ -1371,14 +1371,14 @@ export default function InventorySettingsClient({ companyId }: Props) {
                                 <>
                                   <button
                                     type="button"
-                                    className="rounded-full border border-white/15 px-3 py-1 text-[11px] text-white/70"
+                                    className="rounded-full border border-border px-3 py-1 text-[11px] text-foreground/70"
                                     onClick={() => startEditSubcategory(row)}
                                   >
                                     Edit
                                   </button>
                                   <button
                                     type="button"
-                                    className="rounded-full border border-white/15 px-3 py-1 text-[11px] text-white/70"
+                                    className="rounded-full border border-border px-3 py-1 text-[11px] text-foreground/70"
                                     onClick={() => toggleSubcategoryStatus(row)}
                                     disabled={subcategorySaving}
                                   >
@@ -1405,7 +1405,7 @@ export default function InventorySettingsClient({ companyId }: Props) {
             </div>
           </article>
 
-          <article className="rounded-2xl bg-slate-950/80 p-4 shadow-xl">
+          <article className="rounded-2xl bg-background/80 p-4 shadow-xl">
             <h2 className="text-lg font-semibold">Create sub category</h2>
             <p className="text-xs text-muted-foreground">Sub categories sit under categories.</p>
             <form className="mt-4 space-y-3 text-sm" onSubmit={createSubcategory}>
@@ -1466,7 +1466,7 @@ export default function InventorySettingsClient({ companyId }: Props) {
 
       {activeTab === "makes" && (
         <section className="grid gap-4 lg:grid-cols-[1.2fr,1fr]">
-          <article className="rounded-2xl bg-slate-950/80 p-4 shadow-xl">
+          <article className="rounded-2xl bg-background/80 p-4 shadow-xl">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <h2 className="text-lg font-semibold">Car makes</h2>
@@ -1475,7 +1475,7 @@ export default function InventorySettingsClient({ companyId }: Props) {
               <select
                 value={makeFilterSubcategoryId}
                 onChange={(e) => setMakeFilterSubcategoryId(e.target.value)}
-                className="rounded-full border border-white/15 bg-black/20 px-3 py-1.5 text-xs text-white"
+                className="rounded-full border border-border bg-black/20 px-3 py-1.5 text-xs text-foreground"
               >
                 <option value="">All sub categories</option>
                 {subcategories.map((sub) => (
@@ -1552,7 +1552,7 @@ export default function InventorySettingsClient({ companyId }: Props) {
                                   </button>
                                   <button
                                     type="button"
-                                    className="rounded-full border border-white/15 px-3 py-1 text-[11px] text-white/70"
+                                    className="rounded-full border border-border px-3 py-1 text-[11px] text-foreground/70"
                                     onClick={() => setEditingMakeId(null)}
                                   >
                                     Cancel
@@ -1562,14 +1562,14 @@ export default function InventorySettingsClient({ companyId }: Props) {
                                 <>
                                   <button
                                     type="button"
-                                    className="rounded-full border border-white/15 px-3 py-1 text-[11px] text-white/70"
+                                    className="rounded-full border border-border px-3 py-1 text-[11px] text-foreground/70"
                                     onClick={() => startEditMake(row)}
                                   >
                                     Edit
                                   </button>
                                   <button
                                     type="button"
-                                    className="rounded-full border border-white/15 px-3 py-1 text-[11px] text-white/70"
+                                    className="rounded-full border border-border px-3 py-1 text-[11px] text-foreground/70"
                                     onClick={() => toggleMakeStatus(row)}
                                     disabled={makeSaving}
                                   >
@@ -1602,7 +1602,7 @@ export default function InventorySettingsClient({ companyId }: Props) {
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    className="rounded-full border border-white/15 px-3 py-1 text-xs text-white/70 disabled:opacity-50"
+                    className="rounded-full border border-border px-3 py-1 text-xs text-foreground/70 disabled:opacity-50"
                     disabled={makePage <= 1}
                     onClick={() => setMakePage((prev) => Math.max(prev - 1, 1))}
                   >
@@ -1610,7 +1610,7 @@ export default function InventorySettingsClient({ companyId }: Props) {
                   </button>
                   <button
                     type="button"
-                    className="rounded-full border border-white/15 px-3 py-1 text-xs text-white/70 disabled:opacity-50"
+                    className="rounded-full border border-border px-3 py-1 text-xs text-foreground/70 disabled:opacity-50"
                     disabled={makePage >= makePageCount}
                     onClick={() => setMakePage((prev) => Math.min(prev + 1, makePageCount))}
                   >
@@ -1621,7 +1621,7 @@ export default function InventorySettingsClient({ companyId }: Props) {
             )}
           </article>
 
-          <article className="rounded-2xl bg-slate-950/80 p-4 shadow-xl">
+          <article className="rounded-2xl bg-background/80 p-4 shadow-xl">
             <h2 className="text-lg font-semibold">Create car make</h2>
             <p className="text-xs text-muted-foreground">Makes sit under sub categories.</p>
             <form className="mt-4 space-y-3 text-sm" onSubmit={createMake}>
@@ -1673,7 +1673,7 @@ export default function InventorySettingsClient({ companyId }: Props) {
 
       {activeTab === "models" && (
         <section className="grid gap-4 lg:grid-cols-[1.2fr,1fr]">
-          <article className="rounded-2xl bg-slate-950/80 p-4 shadow-xl space-y-6">
+          <article className="rounded-2xl bg-background/80 p-4 shadow-xl space-y-6">
             <div>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
@@ -1684,7 +1684,7 @@ export default function InventorySettingsClient({ companyId }: Props) {
                   <select
                     value={modelFilterMakeId}
                     onChange={(e) => setModelFilterMakeId(e.target.value)}
-                    className="rounded-full border border-white/15 bg-black/20 px-3 py-1.5 text-xs text-white"
+                    className="rounded-full border border-border bg-black/20 px-3 py-1.5 text-xs text-foreground"
                   >
                     <option value="">All makes</option>
                     {makes.map((make) => (
@@ -1696,7 +1696,7 @@ export default function InventorySettingsClient({ companyId }: Props) {
                   <select
                     value={yearFilter}
                     onChange={(e) => setYearFilter(e.target.value)}
-                    className="rounded-full border border-white/15 bg-black/20 px-3 py-1.5 text-xs text-white"
+                    className="rounded-full border border-border bg-black/20 px-3 py-1.5 text-xs text-foreground"
                   >
                     <option value="">All years</option>
                     {yearOptions.map((year) => (
@@ -1774,7 +1774,7 @@ export default function InventorySettingsClient({ companyId }: Props) {
                                     </button>
                                     <button
                                       type="button"
-                                      className="rounded-full border border-white/15 px-3 py-1 text-[11px] text-white/70"
+                                      className="rounded-full border border-border px-3 py-1 text-[11px] text-foreground/70"
                                       onClick={() => setEditingModelId(null)}
                                     >
                                       Cancel
@@ -1784,14 +1784,14 @@ export default function InventorySettingsClient({ companyId }: Props) {
                                   <>
                                     <button
                                       type="button"
-                                      className="rounded-full border border-white/15 px-3 py-1 text-[11px] text-white/70"
+                                      className="rounded-full border border-border px-3 py-1 text-[11px] text-foreground/70"
                                       onClick={() => startEditModel(row)}
                                     >
                                       Edit
                                     </button>
                                     <button
                                       type="button"
-                                      className="rounded-full border border-white/15 px-3 py-1 text-[11px] text-white/70"
+                                      className="rounded-full border border-border px-3 py-1 text-[11px] text-foreground/70"
                                       onClick={() => toggleModelStatus(row)}
                                       disabled={modelSaving}
                                     >
@@ -1824,7 +1824,7 @@ export default function InventorySettingsClient({ companyId }: Props) {
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      className="rounded-full border border-white/15 px-3 py-1 text-xs text-white/70 disabled:opacity-50"
+                      className="rounded-full border border-border px-3 py-1 text-xs text-foreground/70 disabled:opacity-50"
                       disabled={modelPage <= 1}
                       onClick={() => setModelPage((prev) => Math.max(prev - 1, 1))}
                     >
@@ -1832,7 +1832,7 @@ export default function InventorySettingsClient({ companyId }: Props) {
                     </button>
                     <button
                       type="button"
-                      className="rounded-full border border-white/15 px-3 py-1 text-xs text-white/70 disabled:opacity-50"
+                      className="rounded-full border border-border px-3 py-1 text-xs text-foreground/70 disabled:opacity-50"
                       disabled={modelPage >= modelPageCount}
                       onClick={() => setModelPage((prev) => Math.min(prev + 1, modelPageCount))}
                     >
@@ -1845,7 +1845,7 @@ export default function InventorySettingsClient({ companyId }: Props) {
 
           </article>
 
-          <article className="rounded-2xl bg-slate-950/80 p-4 shadow-xl space-y-6">
+          <article className="rounded-2xl bg-background/80 p-4 shadow-xl space-y-6">
             <div>
               <h2 className="text-lg font-semibold">Create car model</h2>
               <p className="text-xs text-muted-foreground">Models sit under makes.</p>
@@ -1899,7 +1899,7 @@ export default function InventorySettingsClient({ companyId }: Props) {
       )}
 
       {activeTab === "structure" && (
-        <section className="rounded-2xl bg-slate-950/80 p-4 shadow-xl space-y-4">
+        <section className="rounded-2xl bg-background/80 p-4 shadow-xl space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold">Inventory structure</h2>
@@ -1916,7 +1916,7 @@ export default function InventorySettingsClient({ companyId }: Props) {
           </div>
 
           {structureView === "tree" ? (
-            <div className="rounded-2xl border border-white/10 bg-black/20 p-2 overflow-visible">
+            <div className="rounded-2xl border border-border bg-black/20 p-2 overflow-visible">
               {treeNodes.length === 0 ? (
                 <div className="p-4 text-sm text-muted-foreground">No taxonomy items yet.</div>
               ) : (
@@ -1933,7 +1933,7 @@ export default function InventorySettingsClient({ companyId }: Props) {
                       <button
                         type="button"
                         className={`text-xs ${
-                          node.isInternal ? "text-white/60 hover:text-white" : "text-white/30"
+                          node.isInternal ? "text-muted-foreground hover:text-foreground" : "text-muted-foreground/50"
                         }`}
                         onClick={() => node.isInternal && node.toggle()}
                         aria-label={node.isOpen ? "Collapse" : "Expand"}
@@ -1943,10 +1943,10 @@ export default function InventorySettingsClient({ companyId }: Props) {
                       <div
                         className={`flex flex-1 items-center justify-between rounded-lg px-3 py-1 ${
                           node.data.kind === "type"
-                            ? "bg-white/5 text-white font-semibold"
+                            ? "bg-muted/40 text-foreground font-semibold"
                             : node.data.kind === "category"
-                            ? "text-white/85"
-                            : "text-white/75"
+                            ? "text-foreground/85"
+                            : "text-foreground/75"
                         }`}
                       >
                         <div className="flex items-center gap-2">

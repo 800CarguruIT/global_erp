@@ -53,15 +53,15 @@ function LoginContent() {
 
   const isLight = theme.id === "light";
   const panelBg = isLight ? "bg-white/85" : "bg-black/20";
-  const panelBorder = isLight ? "border border-slate-200" : "border border-white/10";
+  const panelBorder = isLight ? "border border-slate-200" : "border border-border";
   const panelShadow = isLight ? "shadow-[0_20px_60px_rgba(15,23,42,0.08)]" : "shadow-2xl";
-  const textPrimary = isLight ? "text-slate-900" : "text-white";
-  const textMuted = isLight ? "text-slate-600" : "text-white/70";
-  const chipBg = isLight ? "bg-slate-100" : "bg-white/5";
-  const chipBorder = isLight ? "border border-slate-200" : "border border-white/10";
-  const selectBg = isLight ? "bg-white" : "bg-white/5";
-  const selectBorder = isLight ? "border border-slate-200" : "border border-white/15";
-  const selectHover = isLight ? "hover:bg-slate-100" : "hover:bg-white/10";
+  const textPrimary = isLight ? "text-slate-900" : "text-foreground";
+  const textMuted = isLight ? "text-slate-600" : "text-foreground/70";
+  const chipBg = isLight ? "bg-slate-100" : "bg-muted/40";
+  const chipBorder = isLight ? "border border-slate-200" : "border border-border";
+  const selectBg = isLight ? "bg-white" : "bg-muted/40";
+  const selectBorder = isLight ? "border border-slate-200" : "border border-border";
+  const selectHover = isLight ? "hover:bg-slate-100" : "hover:bg-muted";
 
   function FancySelect({
     label,
@@ -120,10 +120,10 @@ function LoginContent() {
                     opt.value === value
                       ? isLight
                         ? "bg-slate-100 font-semibold text-slate-900"
-                        : "bg-white/10 font-semibold text-white"
+                        : "bg-muted font-semibold text-foreground"
                       : isLight
                       ? "text-slate-800"
-                      : "text-white/80"
+                      : "text-foreground/80"
                   } ${opt.disabled ? "opacity-40 cursor-not-allowed" : ""}`}
                 >
                   <span>{opt.label}</span>
@@ -262,7 +262,7 @@ function LoginContent() {
               <label className="inline-flex items-center gap-2">
                 <input
                   type="checkbox"
-                  className={`h-4 w-4 rounded ${isLight ? "border-slate-400" : "border-white/30"} bg-transparent`}
+                  className={`h-4 w-4 rounded ${isLight ? "border-slate-400" : "border-border"} bg-transparent`}
                   checked={rememberEmail}
                   onChange={(e) => setRememberEmail(e.target.checked)}
                 />
@@ -271,7 +271,7 @@ function LoginContent() {
               <label className="inline-flex items-center gap-2">
                 <input
                   type="checkbox"
-                  className={`h-4 w-4 rounded ${isLight ? "border-slate-400" : "border-white/30"} bg-transparent`}
+                  className={`h-4 w-4 rounded ${isLight ? "border-slate-400" : "border-border"} bg-transparent`}
                   checked={rememberPassword}
                   onChange={(e) => setRememberPassword(e.target.checked)}
                 />

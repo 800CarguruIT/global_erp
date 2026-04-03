@@ -646,10 +646,22 @@ export function LeadsMain({
     setAssignUserId(null);
     if (lt === "rsa") {
       try {
-        const res = await fetch(`/api/company/${companyId}/admin/users`);
+        const res = await fetch(`/api/company/${companyId}/admin/users?department=RSA+Operations&status=active`);
         if (!res.ok) throw new Error(t("leads.assign.loadUsers") ?? "Failed to load users");
         const data = await res.json();
-        setAssignUsers(data.data ?? data ?? []);
+        const users = data.data ?? data ?? [];
+        // Fallback: if no RSA department users found, load all active company users
+        if (users.length === 0) {
+          const fallback = await fetch(`/api/company/${companyId}/admin/users?status=active`);
+          if (fallback.ok) {
+            const fbData = await fallback.json();
+            setAssignUsers(fbData.data ?? fbData ?? []);
+          } else {
+            setAssignUsers([]);
+          }
+        } else {
+          setAssignUsers(users);
+        }
       } catch (err: any) {
         setAssignError(err?.message ?? t("leads.assign.loadUsers") ?? "Failed to load users");
       }
@@ -854,7 +866,7 @@ export function LeadsMain({
     }
     const workshopMode = bookingLeadType === "workshop" ? bookingWorkshopType : null;
     const requiresPickup = bookingLeadType === "rsa" || bookingLeadType === "recovery" || workshopMode === "recovery";
-    const requiresDropoff = bookingLeadType === "recovery" || workshopMode === "recovery";
+    const requiresDropoff = bookingLeadType === "recovery" && workshopMode !== "recovery";
     const scheduledAt = bookingScheduledAt.trim();
     const pickupLocation = bookingPickupLocation.trim();
     const dropoffLocation = bookingDropoffLocation.trim();
@@ -1106,21 +1118,101 @@ export function LeadsMain({
       {assignError && <p className="text-sm text-destructive">{assignError}</p>}
       {assignSuccess && <p className="text-sm text-emerald-500">{assignSuccess}</p>}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="grid gap-6">
         <div className="space-y-3">
+          {/* Summary stats */}
+          {(() => {
+            const openCount = leads.filter(l => String(l.leadStatus ?? "").toLowerCase() === "open").length;
+            const bookedCount = leads.filter(l => (l as any).bookingId).length;
+            const closedCount = leads.filter(l => ["closed", "closed_won", "lost", "done", "completed"].includes(String(l.leadStatus ?? "").toLowerCase())).length;
+            const assignedCount = leads.filter(l => l.assignedUserId).length;
+            const unassignedCount = leads.length - assignedCount;
+
+            const rsaLeads = leads.filter(l => String(l.leadType ?? "").toLowerCase() === "rsa");
+            const recoveryLeads = leads.filter(l => String(l.leadType ?? "").toLowerCase() === "recovery");
+            const workshopLeads = leads.filter(l => String(l.leadType ?? "").toLowerCase() === "workshop");
+
+            // RSA division breakdown
+            const rsaDivisions: Record<string, number> = {};
+            rsaLeads.forEach(l => {
+              const div = String((l as any).serviceType ?? "").trim() || "unspecified";
+              rsaDivisions[div] = (rsaDivisions[div] ?? 0) + 1;
+            });
+
+            // Recovery division breakdown
+            const recoveryDivisions: Record<string, number> = {};
+            recoveryLeads.forEach(l => {
+              const div = String((l as any).serviceType ?? "").trim() || "unspecified";
+              recoveryDivisions[div] = (recoveryDivisions[div] ?? 0) + 1;
+            });
+
+            const kpiCard = (value: number, label: string, dotColor: string, textColor: string) => (
+              <div className="flex flex-1 min-w-[100px] flex-col items-center gap-1.5 rounded-xl border border-border bg-card/30 px-4 py-4">
+                <span className={`text-3xl font-extrabold ${textColor}`}>{value}</span>
+                <div className="flex items-center gap-1.5">
+                  <span className={`h-2 w-2 rounded-full ${dotColor}`} />
+                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</span>
+                </div>
+              </div>
+            );
+
+            const typeCard = (value: number, label: string, dotColor: string, textColor: string, borderColor: string, divisions: Record<string, number>) => (
+              <div className={`flex flex-1 min-w-[140px] flex-col rounded-xl border p-4 ${borderColor} bg-card/30`}>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <span className={`h-2.5 w-2.5 rounded-full ${dotColor}`} />
+                    <span className="text-sm font-bold uppercase tracking-wider text-foreground/70">{label}</span>
+                  </div>
+                  <span className={`text-3xl font-extrabold ${textColor}`}>{value}</span>
+                </div>
+                {Object.keys(divisions).length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {Object.entries(divisions).sort((a, b) => b[1] - a[1]).map(([div, count]) => (
+                      <span key={div} className={`inline-flex items-center gap-1.5 rounded-lg border border-border/60 bg-card/50 px-2.5 py-1 text-xs`}>
+                        <span className={`font-bold ${textColor}`}>{count}</span>
+                        <span className="text-muted-foreground capitalize">{div.replace(/_/g, " ")}</span>
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            );
+
+            return (
+              <div className="space-y-3 pb-2">
+                {/* Row 1: Main KPIs — full width cards */}
+                <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
+                  {kpiCard(leads.length, "Total", "bg-foreground/40", "text-foreground")}
+                  {kpiCard(openCount, "Open", "bg-emerald-400", "text-emerald-400")}
+                  {kpiCard(bookedCount, "Booked", "bg-indigo-400", "text-indigo-400")}
+                  {kpiCard(assignedCount, "Assigned", "bg-sky-400", "text-sky-400")}
+                  {kpiCard(unassignedCount, "Unassigned", "bg-amber-400", "text-amber-400")}
+                  {kpiCard(closedCount, "Closed", "bg-foreground/30", "text-muted-foreground")}
+                </div>
+
+                {/* Row 2: By Lead Type with division breakdown */}
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  {typeCard(rsaLeads.length, "RSA", "bg-blue-400", "text-blue-400", "border-blue-500/25", rsaDivisions)}
+                  {typeCard(recoveryLeads.length, "Recovery", "bg-purple-400", "text-purple-400", "border-purple-500/25", {})}
+                  {typeCard(workshopLeads.length, "Workshop", "bg-orange-400", "text-orange-400", "border-orange-500/25", {})}
+                </div>
+              </div>
+            );
+          })()}
+
           <div className="flex flex-wrap items-center justify-between gap-3 pb-3">
             {selected.size > 0 ? (
               <div className="flex items-center gap-2 text-sm">
                 <span className="text-muted-foreground">{selected.size} selected</span>
                 <button
-                  className="inline-flex items-center rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition hover:bg-slate-50 hover:shadow-md disabled:opacity-50"
+                  className="inline-flex items-center rounded-md border border-border bg-muted/40 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-foreground shadow-sm transition hover:bg-muted disabled:opacity-50"
                   onClick={() => bulkAction("archive")}
                   disabled={bulkWorking}
                 >
                   {bulkWorking ? t("leads.working") ?? "Working..." : t("leads.bulk.archive") ?? "Archive selected"}
                 </button>
                 <button
-                  className="inline-flex items-center rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-destructive shadow-sm transition hover:bg-slate-50 hover:shadow-md disabled:opacity-50"
+                  className="inline-flex items-center rounded-md border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-destructive shadow-sm transition hover:bg-red-500/20 disabled:opacity-50"
                   onClick={() => bulkAction("delete")}
                   disabled={bulkWorking}
                 >
@@ -1133,9 +1225,9 @@ export function LeadsMain({
             )}
             <a
               href={`/company/${companyId}/leads/new`}
-              className="inline-flex items-center rounded-md border border-white/30 bg-primary px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-primary-foreground shadow-md transition hover:opacity-90 hover:shadow-lg"
+              className="inline-flex items-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary/90"
             >
-              <svg viewBox="0 0 24 24" className="-ml-1 mr-2 h-4 w-4" aria-hidden="true">
+              <svg viewBox="0 0 24 24" className="-ml-0.5 mr-1.5 h-4 w-4" aria-hidden="true">
                 <path
                   d="M12 5v14M5 12h14"
                   fill="none"
@@ -1151,8 +1243,8 @@ export function LeadsMain({
             <p className="text-sm text-muted-foreground">{t("leads.loading") ?? "Loading leads..."}</p>
           ) : (
             <>
-              <Card className="border-0 p-0 shadow-sm">
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/30 px-4 py-3">
+              <Card className="border border-border/60 p-0 shadow-none">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 px-4 py-3">
                   <div className="inline-flex rounded-lg bg-muted/40 p-1 text-xs">
                     {tabs.map((t) => (
                       <button
@@ -1161,8 +1253,8 @@ export function LeadsMain({
                         onClick={() => setTab(t.key)}
                         className={`rounded-md px-3 py-1.5 font-medium transition ${
                           tab === t.key
-                            ? "bg-background text-foreground shadow-sm border border-border/40"
-                            : "border border-transparent text-muted-foreground hover:bg-muted/50"
+                            ? "bg-muted text-foreground shadow-sm"
+                            : "text-muted-foreground hover:text-foreground"
                         }`}
                       >
                         {t.label}
@@ -1174,9 +1266,9 @@ export function LeadsMain({
                       value={query}
                       onChange={(e) => setQuery(e.target.value)}
                       placeholder="Search"
-                      className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 pr-9 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      className="w-full rounded-lg border border-border bg-muted/40 px-3 py-2 pr-9 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                     />
-                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
+                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
                       <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
                         <path
                           d="M15.5 15.5L21 21M10.5 18a7.5 7.5 0 1 1 0-15a7.5 7.5 0 0 1 0 15Z"
@@ -1213,11 +1305,11 @@ export function LeadsMain({
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    className="rounded-md border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
+                    className="inline-flex items-center rounded-md border border-border bg-muted/40 px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-30"
                     disabled={safePage <= 1}
                     onClick={() => setPage((prev) => Math.max(1, prev - 1))}
                   >
-                    <svg viewBox="0 0 24 24" className="-ml-1 mr-2 h-4 w-4" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" className="-ml-0.5 mr-1.5 h-3.5 w-3.5" aria-hidden="true">
                       <path
                         d="M15 6l-6 6 6 6"
                         fill="none"
@@ -1231,11 +1323,12 @@ export function LeadsMain({
                   </button>
                   <button
                     type="button"
-                    className="rounded-md border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
+                    className="inline-flex items-center rounded-md border border-border bg-muted/40 px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-30"
                     disabled={safePage >= totalPages}
                     onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
                   >
-                    <svg viewBox="0 0 24 24" className="-ml-1 mr-2 h-4 w-4" aria-hidden="true">
+                    Next
+                    <svg viewBox="0 0 24 24" className="-mr-0.5 ml-1.5 h-3.5 w-3.5" aria-hidden="true">
                       <path
                         d="M9 6l6 6-6 6"
                         fill="none"
@@ -1245,7 +1338,6 @@ export function LeadsMain({
                         strokeLinejoin="round"
                       />
                     </svg>
-                    Next
                   </button>
                 </div>
               </div>
@@ -1261,28 +1353,28 @@ export function LeadsMain({
                     ? "Workshop recovery booking"
                     : "Workshop walk-in booking";
                 const requiresPickup = leadType === "rsa" || leadType === "recovery" || workshopMode === "recovery";
-                const requiresDropoff = leadType === "recovery" || workshopMode === "recovery";
+                const requiresDropoff = leadType === "recovery" && workshopMode !== "recovery";
                 return (
                   <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-                    <Card className="w-full max-w-2xl space-y-4 rounded-2xl border border-white/10 bg-slate-950 text-white shadow-xl">
-                      <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                    <Card className="w-full max-w-2xl space-y-4 rounded-2xl border border-border bg-background text-foreground shadow-xl">
+                      <div className="flex items-center justify-between border-b border-border pb-3">
                         <div>
-                          <div className="text-sm font-semibold text-white">Book Lead</div>
-                          <div className="text-xs text-white/70">{scenarioLabel}</div>
+                          <div className="text-sm font-semibold text-foreground">Book Lead</div>
+                          <div className="text-xs text-foreground/70">{scenarioLabel}</div>
                         </div>
                         <button
                           type="button"
                           onClick={() => resetBooking()}
                           disabled={bookingSaving}
-                          className="inline-flex items-center rounded-md border border-white/20 bg-white/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-white shadow-sm transition hover:bg-white/20 hover:shadow-md disabled:opacity-60"
+                          className="inline-flex items-center rounded-md border border-border bg-muted px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-foreground shadow-sm transition hover:bg-muted/80 hover:shadow-md disabled:opacity-60"
                         >
                           Close
                         </button>
                       </div>
-                      {bookingError ? <p className="text-sm text-red-400">{bookingError}</p> : null}
+                      {bookingError ? <p className="text-sm text-destructive">{bookingError}</p> : null}
                       <div className="grid gap-3">
-                        <div className="rounded border border-white/20 bg-white/5 p-3">
-                          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-white/70">Lead Type Verification</div>
+                        <div className="rounded border border-border bg-muted/40 p-3">
+                          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground/70">Lead Type Verification</div>
                           <div className="flex flex-wrap items-center gap-2">
                             <select
                               value={bookingLeadType}
@@ -1296,7 +1388,7 @@ export function LeadsMain({
                                 setBookingLeadType(nextType);
                                 setBookingLeadTypeConfirmed(false);
                               }}
-                              className="rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white"
+                              className="rounded border border-border bg-muted px-3 py-2 text-sm text-foreground"
                             >
                               <option value="rsa" style={{ color: "#0f172a", backgroundColor: "#ffffff" }}>RSA</option>
                               <option value="recovery" style={{ color: "#0f172a", backgroundColor: "#ffffff" }}>Recovery</option>
@@ -1308,12 +1400,12 @@ export function LeadsMain({
                               className={`rounded px-3 py-2 text-xs font-semibold uppercase tracking-wide ${
                                 bookingLeadTypeConfirmed
                                   ? "bg-emerald-500/20 text-emerald-300"
-                                  : "bg-white/10 text-white hover:bg-white/20"
+                                  : "bg-muted text-foreground hover:bg-muted/80"
                               }`}
                             >
                               {bookingLeadTypeConfirmed ? "Confirmed" : "Confirm Type"}
                             </button>
-                            <span className="text-xs text-white/60">Default uses previous selected type (if found).</span>
+                            <span className="text-xs text-muted-foreground">Default uses previous selected type (if found).</span>
                           </div>
                         </div>
                         {!bookingLeadTypeConfirmed ? (
@@ -1323,13 +1415,13 @@ export function LeadsMain({
                         ) : null}
                         {leadType === "workshop" ? (
                           <div>
-                            <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-white/50">Booking Type</label>
+                            <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Booking Type</label>
                             <select
                               value={bookingWorkshopType}
                               onChange={(e) => {
                                 setBookingWorkshopType(e.target.value === "recovery" ? "recovery" : "walkin");
                               }}
-                              className="w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white"
+                              className="w-full rounded border border-border bg-muted px-3 py-2 text-sm text-foreground"
                               disabled={!bookingLeadTypeConfirmed}
                             >
                               <option value="walkin" style={{ color: "#0f172a", backgroundColor: "#ffffff" }}>
@@ -1342,7 +1434,7 @@ export function LeadsMain({
                           </div>
                         ) : null}
                         <div>
-                          <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-white/50">Priority</label>
+                          <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Priority</label>
                           <select
                             value={bookingPriority}
                             onChange={(e) =>
@@ -1350,7 +1442,7 @@ export function LeadsMain({
                                 e.target.value === "low" || e.target.value === "high" ? e.target.value : "medium"
                               )
                             }
-                            className="w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white"
+                            className="w-full rounded border border-border bg-muted px-3 py-2 text-sm text-foreground"
                             disabled={!bookingLeadTypeConfirmed}
                           >
                             <option value="low" style={{ color: "#0f172a", backgroundColor: "#ffffff" }}>
@@ -1365,70 +1457,62 @@ export function LeadsMain({
                           </select>
                         </div>
                         <div>
-                          <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-white/50">Scheduled Date & Time</label>
+                          <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Scheduled Date & Time</label>
                           <input
                             type="datetime-local"
                             value={bookingScheduledAt}
                             onChange={(e) => setBookingScheduledAt(e.target.value)}
-                            className="w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white"
+                            className="w-full rounded border border-border bg-muted px-3 py-2 text-sm text-foreground"
                             disabled={!bookingLeadTypeConfirmed}
                           />
                         </div>
                         {requiresPickup ? (
-                          <>
-                            <div>
-                              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-white/50">Pickup Location</label>
-                              <input
-                                value={bookingPickupLocation}
-                                onChange={(e) => setBookingPickupLocation(e.target.value)}
-                                placeholder="Enter pickup address"
-                                className="w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60"
-                                disabled={!bookingLeadTypeConfirmed}
-                              />
-                            </div>
-                            <div>
-                              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-white/50">Pickup Google Maps URL <span className="normal-case font-normal text-white/30">(optional)</span></label>
-                              <input
-                                value={bookingPickupGoogleLocation}
-                                onChange={(e) => setBookingPickupGoogleLocation(e.target.value)}
-                                placeholder="https://maps.google.com/..."
-                                className="w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60"
-                                disabled={!bookingLeadTypeConfirmed}
-                              />
-                            </div>
-                          </>
+                          <div>
+                            <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Pickup Location</label>
+                            <input
+                              value={bookingPickupLocation}
+                              onChange={(e) => setBookingPickupLocation(e.target.value)}
+                              placeholder="Enter pickup address"
+                              className="w-full rounded border border-border bg-muted px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
+                              disabled={!bookingLeadTypeConfirmed}
+                            />
+                            {bookingPickupGoogleLocation ? (
+                              <div className="mt-1 flex items-center gap-2">
+                                <a href={bookingPickupGoogleLocation} target="_blank" rel="noopener noreferrer" className="text-[11px] text-sky-400 hover:underline truncate">
+                                  Maps: {bookingPickupGoogleLocation.slice(0, 50)}...
+                                </a>
+                                <button type="button" onClick={() => setBookingPickupGoogleLocation("")} className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground">Clear</button>
+                              </div>
+                            ) : null}
+                          </div>
                         ) : null}
                         {requiresDropoff ? (
-                          <>
-                            <div>
-                              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-white/50">Dropoff Location</label>
-                              <input
-                                value={bookingDropoffLocation}
-                                onChange={(e) => setBookingDropoffLocation(e.target.value)}
-                                placeholder="Enter dropoff address"
-                                className="w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60"
-                                disabled={!bookingLeadTypeConfirmed}
-                              />
-                            </div>
-                            <div>
-                              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-white/50">Dropoff Google Maps URL <span className="normal-case font-normal text-white/30">(optional)</span></label>
-                              <input
-                                value={bookingDropoffGoogleLocation}
-                                onChange={(e) => setBookingDropoffGoogleLocation(e.target.value)}
-                                placeholder="https://maps.google.com/..."
-                                className="w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60"
-                                disabled={!bookingLeadTypeConfirmed}
-                              />
-                            </div>
-                          </>
+                          <div>
+                            <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Dropoff Location</label>
+                            <input
+                              value={bookingDropoffLocation}
+                              onChange={(e) => setBookingDropoffLocation(e.target.value)}
+                              placeholder="Enter dropoff address"
+                              className="w-full rounded border border-border bg-muted px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
+                              disabled={!bookingLeadTypeConfirmed}
+                            />
+                            {bookingDropoffGoogleLocation ? (
+                              <div className="mt-1 flex items-center gap-2">
+                                <a href={bookingDropoffGoogleLocation} target="_blank" rel="noopener noreferrer" className="text-[11px] text-sky-400 hover:underline truncate">
+                                  Maps: {bookingDropoffGoogleLocation.slice(0, 50)}...
+                                </a>
+                                <button type="button" onClick={() => setBookingDropoffGoogleLocation("")} className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground">Clear</button>
+                              </div>
+                            ) : null}
+                          </div>
                         ) : null}
                         <div>
-                          <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-white/50">Notes <span className="normal-case font-normal text-white/30">(optional)</span></label>
+                          <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Notes <span className="normal-case font-normal text-muted-foreground/50">(optional)</span></label>
                           <textarea
                             value={bookingNotes}
                             onChange={(e) => setBookingNotes(e.target.value)}
                             placeholder="Add any remarks or special instructions"
-                            className="h-20 w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60"
+                            className="h-20 w-full rounded border border-border bg-muted px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
                             disabled={!bookingLeadTypeConfirmed}
                           />
                         </div>
@@ -1438,7 +1522,7 @@ export function LeadsMain({
                           type="button"
                           onClick={() => resetBooking()}
                           disabled={bookingSaving}
-                          className="rounded border border-white/20 bg-white/10 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-white hover:bg-white/20 disabled:opacity-60"
+                          className="rounded border border-border bg-muted px-3 py-2 text-xs font-semibold uppercase tracking-wide text-foreground hover:bg-muted/80 disabled:opacity-60"
                         >
                           Cancel
                         </button>
@@ -1457,31 +1541,31 @@ export function LeadsMain({
               })()}
               {requestRecoveryLead && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-                  <Card className="w-full max-w-4xl space-y-4 rounded-2xl border border-white/10 bg-slate-950 text-white shadow-xl">
-                    <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                  <Card className="w-full max-w-4xl space-y-4 rounded-2xl border border-border bg-background text-foreground shadow-xl">
+                    <div className="flex items-center justify-between border-b border-border pb-3">
                       <div>
-                        <div className="text-sm font-semibold text-white">Request Recovery</div>
-                        <div className="text-xs text-white/70">
+                        <div className="text-sm font-semibold text-foreground">Request Recovery</div>
+                        <div className="text-xs text-foreground/70">
                           Add pickup/dropoff map locations, datetime, and remarks.
                         </div>
                       </div>
                       <button
-                        className="inline-flex items-center rounded-md border border-white/20 bg-white/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-white shadow-sm transition hover:bg-white/20 hover:shadow-md"
+                        className="inline-flex items-center rounded-md border border-border bg-muted px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-foreground shadow-sm transition hover:bg-muted/80 hover:shadow-md"
                         onClick={() => resetRecoveryRequest()}
                         disabled={requestRecoverySaving}
                       >
                         Close
                       </button>
                     </div>
-                    {requestRecoveryError ? <p className="text-sm text-red-400">{requestRecoveryError}</p> : null}
+                    {requestRecoveryError ? <p className="text-sm text-destructive">{requestRecoveryError}</p> : null}
                     <div className="grid gap-4 md:grid-cols-2">
-                      <div className="space-y-2 rounded-lg border border-white/15 bg-white/5 p-3">
-                        <div className="text-xs font-semibold uppercase tracking-wide text-white/80">Pickup Location (Google Map)</div>
+                      <div className="space-y-2 rounded-lg border border-border bg-muted/40 p-3">
+                        <div className="text-xs font-semibold uppercase tracking-wide text-foreground/80">Pickup Location (Google Map)</div>
                         <input
                           value={requestPickupLocationText}
                           onChange={(e) => setRequestPickupLocationText(e.target.value)}
                           placeholder="Pickup location label"
-                          className="w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60"
+                          className="w-full rounded border border-border bg-muted px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
                         />
                         <div className="flex gap-2">
                           <div ref={requestPickupDropdownRef} className="relative w-full">
@@ -1496,10 +1580,10 @@ export function LeadsMain({
                                 window.setTimeout(() => setRequestPickupSuggestionsOpen(false), 120);
                               }}
                               placeholder="Search pickup location"
-                              className="w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60"
+                              className="w-full rounded border border-border bg-muted px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
                             />
                             {requestPickupSuggestionsOpen && requestPickupSuggestions.length > 0 ? (
-                              <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-[120] max-h-44 overflow-auto rounded border border-white/20 bg-slate-900 shadow-xl">
+                              <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-[120] max-h-44 overflow-auto rounded border border-border bg-popover shadow-xl">
                                 {requestPickupSuggestions.map((s) => (
                                   <button
                                     key={s.placeId}
@@ -1518,7 +1602,7 @@ export function LeadsMain({
                                       setRequestPickupSuggestions([]);
                                       setRequestPickupSuggestionsOpen(false);
                                     }}
-                                    className="block w-full border-b border-white/10 px-3 py-2 text-left text-xs text-white hover:bg-white/10"
+                                    className="block w-full border-b border-border px-3 py-2 text-left text-xs text-foreground hover:bg-muted"
                                   >
                                     {s.label}
                                   </button>
@@ -1538,7 +1622,7 @@ export function LeadsMain({
                               setRequestPickupMapUrlInput(embedUrl);
                               if (!requestPickupLocationText.trim()) setRequestPickupLocationText(requestPickupLocationSearch.trim());
                             }}
-                            className="rounded border border-white/20 bg-white/10 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-white hover:bg-white/20"
+                            className="rounded border border-border bg-muted px-3 py-2 text-xs font-semibold uppercase tracking-wide text-foreground hover:bg-muted/80"
                           >
                             Search
                           </button>
@@ -1548,7 +1632,7 @@ export function LeadsMain({
                             value={requestPickupMapUrlInput}
                             onChange={(e) => setRequestPickupMapUrlInput(e.target.value)}
                             placeholder="Paste Google Maps URL (e.g. https://maps.app.goo.gl/...)"
-                            className="w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60"
+                            className="w-full rounded border border-border bg-muted px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
                           />
                           <button
                             type="button"
@@ -1601,7 +1685,7 @@ export function LeadsMain({
                               }
                             }}
                             disabled={requestPickupMapUrlParsing}
-                            className="rounded border border-white/20 bg-white/10 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-white hover:bg-white/20 disabled:opacity-60"
+                            className="rounded border border-border bg-muted px-3 py-2 text-xs font-semibold uppercase tracking-wide text-foreground hover:bg-muted/80 disabled:opacity-60"
                           >
                             {requestPickupMapUrlParsing ? "Parsing..." : "Use URL"}
                           </button>
@@ -1609,18 +1693,18 @@ export function LeadsMain({
                         <iframe
                           title="Recovery pickup map preview"
                           src={requestPickupMapPreviewSrc}
-                          className="h-44 w-full rounded border border-white/20"
+                          className="h-44 w-full rounded border border-border"
                           loading="lazy"
                         />
                       </div>
 
-                      <div className="space-y-2 rounded-lg border border-white/15 bg-white/5 p-3">
-                        <div className="text-xs font-semibold uppercase tracking-wide text-white/80">Dropoff Location (Google Map)</div>
+                      <div className="space-y-2 rounded-lg border border-border bg-muted/40 p-3">
+                        <div className="text-xs font-semibold uppercase tracking-wide text-foreground/80">Dropoff Location (Google Map)</div>
                         <input
                           value={requestDropoffLocationText}
                           onChange={(e) => setRequestDropoffLocationText(e.target.value)}
                           placeholder="Dropoff location label"
-                          className="w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60"
+                          className="w-full rounded border border-border bg-muted px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
                         />
                         <div className="flex gap-2">
                           <div ref={requestDropoffDropdownRef} className="relative w-full">
@@ -1635,10 +1719,10 @@ export function LeadsMain({
                                 window.setTimeout(() => setRequestDropoffSuggestionsOpen(false), 120);
                               }}
                               placeholder="Search dropoff location"
-                              className="w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60"
+                              className="w-full rounded border border-border bg-muted px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
                             />
                             {requestDropoffSuggestionsOpen && requestDropoffSuggestions.length > 0 ? (
-                              <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-[120] max-h-44 overflow-auto rounded border border-white/20 bg-slate-900 shadow-xl">
+                              <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-[120] max-h-44 overflow-auto rounded border border-border bg-popover shadow-xl">
                                 {requestDropoffSuggestions.map((s) => (
                                   <button
                                     key={s.placeId}
@@ -1657,7 +1741,7 @@ export function LeadsMain({
                                       setRequestDropoffSuggestions([]);
                                       setRequestDropoffSuggestionsOpen(false);
                                     }}
-                                    className="block w-full border-b border-white/10 px-3 py-2 text-left text-xs text-white hover:bg-white/10"
+                                    className="block w-full border-b border-border px-3 py-2 text-left text-xs text-foreground hover:bg-muted"
                                   >
                                     {s.label}
                                   </button>
@@ -1677,7 +1761,7 @@ export function LeadsMain({
                               setRequestDropoffMapUrlInput(embedUrl);
                               if (!requestDropoffLocationText.trim()) setRequestDropoffLocationText(requestDropoffLocationSearch.trim());
                             }}
-                            className="rounded border border-white/20 bg-white/10 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-white hover:bg-white/20"
+                            className="rounded border border-border bg-muted px-3 py-2 text-xs font-semibold uppercase tracking-wide text-foreground hover:bg-muted/80"
                           >
                             Search
                           </button>
@@ -1687,7 +1771,7 @@ export function LeadsMain({
                             value={requestDropoffMapUrlInput}
                             onChange={(e) => setRequestDropoffMapUrlInput(e.target.value)}
                             placeholder="Paste Google Maps URL (e.g. https://maps.app.goo.gl/...)"
-                            className="w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60"
+                            className="w-full rounded border border-border bg-muted px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
                           />
                           <button
                             type="button"
@@ -1740,7 +1824,7 @@ export function LeadsMain({
                               }
                             }}
                             disabled={requestDropoffMapUrlParsing}
-                            className="rounded border border-white/20 bg-white/10 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-white hover:bg-white/20 disabled:opacity-60"
+                            className="rounded border border-border bg-muted px-3 py-2 text-xs font-semibold uppercase tracking-wide text-foreground hover:bg-muted/80 disabled:opacity-60"
                           >
                             {requestDropoffMapUrlParsing ? "Parsing..." : "Use URL"}
                           </button>
@@ -1748,7 +1832,7 @@ export function LeadsMain({
                         <iframe
                           title="Recovery dropoff map preview"
                           src={requestDropoffMapPreviewSrc}
-                          className="h-44 w-full rounded border border-white/20"
+                          className="h-44 w-full rounded border border-border"
                           loading="lazy"
                         />
                       </div>
@@ -1758,13 +1842,13 @@ export function LeadsMain({
                         type="datetime-local"
                         value={requestRecoveryScheduledAt}
                         onChange={(e) => setRequestRecoveryScheduledAt(e.target.value)}
-                        className="w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white"
+                        className="w-full rounded border border-border bg-muted px-3 py-2 text-sm text-foreground"
                       />
                       <textarea
                         value={requestRecoveryRemarks}
                         onChange={(e) => setRequestRecoveryRemarks(e.target.value)}
                         placeholder="Remarks"
-                        className="h-20 w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60"
+                        className="h-20 w-full rounded border border-border bg-muted px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
                       />
                     </div>
                     <div className="flex items-center justify-end gap-2">
@@ -1772,7 +1856,7 @@ export function LeadsMain({
                         type="button"
                         onClick={() => resetRecoveryRequest()}
                         disabled={requestRecoverySaving}
-                        className="rounded border border-white/20 bg-white/10 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-white hover:bg-white/20 disabled:opacity-60"
+                        className="rounded border border-border bg-muted px-3 py-2 text-xs font-semibold uppercase tracking-wide text-foreground hover:bg-muted/80 disabled:opacity-60"
                       >
                         Cancel
                       </button>
@@ -1790,33 +1874,33 @@ export function LeadsMain({
               )}
               {assignLeadId && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-                  <Card className="w-full max-w-2xl space-y-4 rounded-2xl border border-white/10 bg-slate-950 text-white shadow-xl">
-                    <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                  <Card className="w-full max-w-2xl space-y-4 rounded-2xl border border-border bg-background text-foreground shadow-xl">
+                    <div className="flex items-center justify-between border-b border-border pb-3">
                       <div>
-                        <div className="text-sm font-semibold text-white">
+                        <div className="text-sm font-semibold text-foreground">
                           {assignLeadType === "recovery"
                             ? t("leads.assign.recovery")
                             : assignLeadType === "workshop"
                             ? t("leads.assign.workshop")
                             : t("leads.assign.rsa")}
                         </div>
-                        <div className="text-xs text-white/70">
+                        <div className="text-xs text-foreground/70">
                           {assignLeadType === "workshop"
                             ? t("leads.assign.workshop.helper")
                             : t("leads.assign.helper")}
                         </div>
                       </div>
                       <button
-                        className="inline-flex items-center rounded-md border border-white/20 bg-white/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-white shadow-sm transition hover:bg-white/20 hover:shadow-md"
+                        className="inline-flex items-center rounded-md border border-border bg-muted px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-foreground shadow-sm transition hover:bg-muted/80 hover:shadow-md"
                         onClick={() => resetAssign()}
                       >
                         {t("leads.assign.close")}
                       </button>
                     </div>
-                    <div className="flex flex-wrap items-center gap-2 text-white">
+                    <div className="flex flex-wrap items-center gap-2 text-foreground">
                       {assignLeadType !== "rsa" && (
                         <select
-                          className="rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60"
+                          className="rounded border border-border bg-popover px-3 py-2 text-sm text-foreground [&>option]:bg-popover [&>option]:text-foreground"
                           value={assignBranchId ?? ""}
                           onChange={(e) => {
                             const val = e.target.value || null;
@@ -1835,97 +1919,92 @@ export function LeadsMain({
                         </select>
                       )}
                       {assignLeadType !== "workshop" && (
-                        <select
-                          className="rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60"
-                          value={assignUserId ?? ""}
-                          onChange={(e) => setAssignUserId(e.target.value || null)}
-                          disabled={!assignUsers.length}
-                        >
-                          <option value="">{t("leads.assign.selectUser")}</option>
-                          {assignUsers.map((u) => (
-                            <option key={u.id} value={u.id}>
-                              {u.full_name || u.email} {u.last_login_at ? t("leads.assign.online") : ""}
-                            </option>
-                          ))}
-                        </select>
+                        <div className="w-full">
+                          <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            {assignLeadType === "rsa" ? "Select RSA Technician" : t("leads.assign.selectUser")}
+                          </div>
+                          <input
+                            type="text"
+                            placeholder="Search by name or email..."
+                            className="mb-1.5 w-full rounded-lg border border-border bg-popover/80 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-ring focus:outline-none"
+                            onChange={(e) => {
+                              const q = e.target.value.toLowerCase().trim();
+                              (e.target as any).dataset.filter = q;
+                              // Force re-render by toggling a data attribute on the list
+                              const list = e.target.nextElementSibling;
+                              if (list) list.setAttribute("data-filter", q);
+                              // Filter items visibility via DOM (avoids extra state)
+                              const items = list?.querySelectorAll("[data-user-item]");
+                              items?.forEach((item) => {
+                                const name = (item.getAttribute("data-user-item") ?? "").toLowerCase();
+                                (item as HTMLElement).style.display = !q || name.includes(q) ? "" : "none";
+                              });
+                            }}
+                          />
+                          <div className="max-h-48 overflow-y-auto rounded-lg border border-border bg-popover/80">
+                            {!assignUsers.length ? (
+                              <div className="px-3 py-4 text-center text-xs text-muted-foreground">No technicians found</div>
+                            ) : (
+                              assignUsers.map((u) => {
+                                const isSelected = assignUserId === u.id;
+                                return (
+                                  <button
+                                    key={u.id}
+                                    type="button"
+                                    data-user-item={`${u.full_name || ""} ${u.email || ""}`}
+                                    onClick={() => setAssignUserId(u.id)}
+                                    className={`flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition ${
+                                      isSelected
+                                        ? "bg-sky-500/20 text-sky-300"
+                                        : "text-foreground/80 hover:bg-muted/40"
+                                    }`}
+                                  >
+                                    <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+                                      isSelected ? "bg-sky-500/30 text-sky-200" : "bg-muted text-muted-foreground"
+                                    }`}>
+                                      {(u.full_name || u.email || "?").charAt(0).toUpperCase()}
+                                    </span>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="truncate font-medium">{u.full_name || u.email}</div>
+                                      {u.full_name && u.email && (
+                                        <div className="truncate text-xs text-muted-foreground">{u.email}</div>
+                                      )}
+                                    </div>
+                                    {u.last_login_at && (
+                                      <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400">
+                                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                                        Online
+                                      </span>
+                                    )}
+                                    {isSelected && (
+                                      <svg className="h-4 w-4 shrink-0 text-sky-400" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                      </svg>
+                                    )}
+                                  </button>
+                                );
+                              })
+                            )}
+                          </div>
+                        </div>
                       )}
                       {assignLeadType === "rsa" ? (
-                        <div className="w-full space-y-2 rounded-lg border border-white/15 bg-white/5 p-3">
-                          <div className="text-xs font-semibold uppercase tracking-wide text-white/80">Pickup Location (Google Map)</div>
+                        <div className="w-full space-y-2 rounded-lg border border-border bg-muted/40 p-3">
+                          <div className="text-xs font-semibold uppercase tracking-wide text-foreground/80">Pickup Location</div>
                           <input
                             value={assignLocationText}
                             onChange={(e) => setAssignLocationText(e.target.value)}
-                            placeholder="Location label (e.g. Mohammed Bin Zayed City)"
-                            className="w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60"
+                            placeholder="Location name (e.g. Al Barsha, Dubai)"
+                            className="w-full rounded border border-border bg-muted px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
                           />
-                          <div className="flex gap-2">
-                            <div className="relative w-full">
-                              <input
-                                ref={assignLocationSearchRef}
-                                value={assignLocationSearch}
-                                onChange={(e) => setAssignLocationSearch(e.target.value)}
-                                onFocus={() => {
-                                  if (assignLocationSuggestions.length > 0) setAssignLocationSuggestionsOpen(true);
-                                }}
-                                onBlur={() => {
-                                  window.setTimeout(() => setAssignLocationSuggestionsOpen(false), 120);
-                                }}
-                                placeholder="Search location for map URL"
-                                className="w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60"
-                              />
-                              {assignLocationSuggestionsOpen && assignLocationSuggestions.length > 0 ? (
-                                <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-[120] max-h-44 overflow-auto rounded border border-white/20 bg-slate-900 shadow-xl">
-                                  {assignLocationSuggestions.map((s) => (
-                                    <button
-                                      key={s.placeId}
-                                      type="button"
-                                      onMouseDown={(e) => e.preventDefault()}
-                                      onClick={() => {
-                                        setAssignLocationSearch(s.label);
-                                        if (!assignLocationText.trim()) setAssignLocationText(s.label);
-                                        const embedUrl = googleMapsApiKey
-                                          ? buildGoogleEmbedUrl(googleMapsApiKey, { placeId: s.placeId }) ?? buildSearchEmbedUrl(s.label)
-                                          : buildSearchEmbedUrl(s.label);
-                                        if (embedUrl) setAssignGoogleLocation(embedUrl);
-                                        setAssignLocationSuggestionsOpen(false);
-                                      }}
-                                      className="block w-full border-b border-white/10 px-3 py-2 text-left text-xs text-white hover:bg-white/10"
-                                    >
-                                      {s.label}
-                                    </button>
-                                  ))}
-                                </div>
-                              ) : null}
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const embedUrl = googleMapsApiKey
-                                  ? buildGoogleEmbedUrl(googleMapsApiKey, { query: assignLocationSearch }) ??
-                                    buildSearchEmbedUrl(assignLocationSearch)
-                                  : buildSearchEmbedUrl(assignLocationSearch);
-                                if (!embedUrl) return;
-                                setAssignGoogleLocation(embedUrl);
-                                if (!assignLocationText.trim()) setAssignLocationText(assignLocationSearch.trim());
-                              }}
-                              className="rounded border border-white/20 bg-white/10 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-white hover:bg-white/20"
-                            >
-                              Search
-                            </button>
-                          </div>
-                          <div className="text-[11px] text-white/60">
-                            {assignGoogleLocation
-                              ? "Location URL will be saved to this lead."
-                              : "Search and select location to save map URL."}
-                          </div>
-                          <div className="space-y-2">
-                            <div className="text-[11px] text-white/70">Google Map Preview</div>
-                            <iframe
-                              title="RSA pickup map live preview"
-                              src={assignMapPreviewSrc}
-                              className="h-44 w-full rounded border border-white/20"
-                              loading="lazy"
-                            />
+                          <input
+                            value={assignGoogleLocation}
+                            onChange={(e) => setAssignGoogleLocation(e.target.value)}
+                            placeholder="Paste Google Maps URL here"
+                            className="w-full rounded border border-border bg-muted px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
+                          />
+                          <div className="text-[11px] text-muted-foreground">
+                            Paste a Google Maps link (e.g. https://maps.google.com/...)
                           </div>
                         </div>
                       ) : null}

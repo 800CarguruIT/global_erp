@@ -1,0 +1,13 @@
+import { createRequire } from "module";
+import { readFileSync } from "fs";
+const require = createRequire(import.meta.url);
+const postgres = require("../node_modules/.pnpm/postgres@3.4.7/node_modules/postgres/src/index.js").default || require("../node_modules/.pnpm/postgres@3.4.7/node_modules/postgres/src/index.js");
+const sql = postgres("postgres://autoguru:autoguru@localhost:5432/global_erp_dev");
+const migration = readFileSync("packages/ai-core/migrations/189_sidebar_permissions_refactor.sql", "utf8");
+await sql.unsafe(migration);
+const perms = await sql`SELECT key, description FROM permissions WHERE key LIKE 'sales.%' OR key LIKE 'service.%' OR key LIKE 'ops.%' OR key LIKE 'parts.%' OR key LIKE 'tech.%' OR key LIKE 'people.%' ORDER BY key`;
+console.log("New permissions added:");
+for (const p of perms) console.log("  " + p.key + " — " + p.description);
+const total = await sql`SELECT count(*) as cnt FROM permissions`;
+console.log("\nTotal permissions now:", total[0].cnt);
+await sql.end();

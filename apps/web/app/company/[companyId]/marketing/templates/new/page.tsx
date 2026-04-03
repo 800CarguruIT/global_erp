@@ -41,7 +41,7 @@ export default function CompanyMarketingTemplatesNewPage() {
 
         <div className="flex gap-2">
           <button
-            className="rounded-full border border-white/10 px-3 py-1 text-xs hover:border-primary"
+            className="rounded-full border border-border px-3 py-1 text-xs hover:border-primary"
             onClick={() => router.push(backHref)}
           >
             Back to templates
@@ -50,7 +50,7 @@ export default function CompanyMarketingTemplatesNewPage() {
             className={
               type === "whatsapp"
                 ? "rounded-full border border-primary px-3 py-1 text-xs text-primary"
-                : "rounded-full border border-white/10 px-3 py-1 text-xs hover:border-primary"
+                : "rounded-full border border-border px-3 py-1 text-xs hover:border-primary"
             }
             onClick={() => switchType("whatsapp")}
           >
@@ -60,7 +60,7 @@ export default function CompanyMarketingTemplatesNewPage() {
             className={
               type === "email"
                 ? "rounded-full border border-primary px-3 py-1 text-xs text-primary"
-                : "rounded-full border border-white/10 px-3 py-1 text-xs hover:border-primary"
+                : "rounded-full border border-border px-3 py-1 text-xs hover:border-primary"
             }
             onClick={() => switchType("email")}
           >

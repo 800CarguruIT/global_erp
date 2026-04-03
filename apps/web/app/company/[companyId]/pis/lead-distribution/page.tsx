@@ -37,22 +37,22 @@ export default function PisLeadDistributionPage() {
     <div className="space-y-6">
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {[{l:"Tier 1 Window",v:"10 min"},{l:"Tier 2 Window",v:"7 min"},{l:"Tier 3 Window",v:"5 min"},{l:"Lock Duration",v:"120 min"},{l:"No-Call Penalty",v:"5 pts"},{l:"Max Cascades",v:"5"}].map(c => (
-          <div key={c.l} className="rounded-xl border border-white/10 bg-gradient-to-br from-slate-900/80 to-black/90 p-4">
+          <div key={c.l} className="rounded-xl border border-border bg-gradient-to-br from-slate-900/80 to-black/90 p-4">
             <div className="text-[10px] uppercase tracking-widest text-slate-400 mb-1">{c.l}</div>
-            <div className="text-lg font-bold text-white">{c.v}</div>
+            <div className="text-lg font-bold text-foreground">{c.v}</div>
           </div>
         ))}
       </div>
 
-      <div className="rounded-xl border border-white/10 bg-gradient-to-br from-slate-900/80 to-black/90 p-5">
-        <h2 className="text-sm font-bold text-white mb-4">LIVE LEAD QUEUE <span className="ml-2 h-2 w-2 rounded-full bg-emerald-400 inline-block animate-pulse" /></h2>
+      <div className="rounded-xl border border-border bg-gradient-to-br from-slate-900/80 to-black/90 p-5">
+        <h2 className="text-sm font-bold text-foreground mb-4">LIVE LEAD QUEUE <span className="ml-2 h-2 w-2 rounded-full bg-emerald-400 inline-block animate-pulse" /></h2>
         {queue.length === 0 ? <div className="text-slate-500 text-sm py-4">No leads in queue</div> : (
-          <table className="w-full text-xs"><thead><tr className="border-b border-white/10 text-left">
+          <table className="w-full text-xs"><thead><tr className="border-b border-border text-left">
             {["Lead","Status","Tier","Offered To","Cascades","Value"].map(h => <th key={h} className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{h}</th>)}
           </tr></thead><tbody>
             {queue.map((q:any) => (
-              <tr key={q.id} className="border-b border-white/5">
-                <td className="px-3 py-2 text-white font-mono">{q.leadId?.slice(0,8)}</td>
+              <tr key={q.id} className="border-b border-border/40">
+                <td className="px-3 py-2 text-foreground font-mono">{q.leadId?.slice(0,8)}</td>
                 <td className="px-3 py-2"><span className={`px-2 py-0.5 rounded text-[9px] font-bold ${statusColor(q.status)}`}>{q.status?.toUpperCase()}</span></td>
                 <td className="px-3 py-2 text-slate-300">T{q.currentTier}</td>
                 <td className="px-3 py-2 text-slate-300">{q.offeredToName ?? "—"}</td>
@@ -64,9 +64,9 @@ export default function PisLeadDistributionPage() {
         )}
       </div>
 
-      <div className="rounded-xl border border-white/10 bg-gradient-to-br from-slate-900/80 to-black/90 p-5">
+      <div className="rounded-xl border border-border bg-gradient-to-br from-slate-900/80 to-black/90 p-5">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-bold text-white">60-LEAD LIVE SIMULATION</h2>
+          <h2 className="text-sm font-bold text-foreground">60-LEAD LIVE SIMULATION</h2>
           <button onClick={runSimulation} disabled={simRunning} className="rounded-lg bg-gradient-to-r from-amber-500 to-orange-600 px-4 py-2 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50">
             {simRunning ? "Running..." : "Run Simulation"}
           </button>
@@ -77,7 +77,7 @@ export default function PisLeadDistributionPage() {
               {[{l:"Total Leads",v:simulation.totalLeads},{l:"Accepted",v:simulation.accepted,c:"text-emerald-400"},{l:"Cascaded",v:simulation.cascaded,c:"text-amber-400"},{l:"Manual Queue",v:simulation.manualQueue,c:"text-red-400"},{l:"Pipeline Value",v:`AED ${Math.round(simulation.totalPipelineValue/1000)}K`,c:"text-purple-400"}].map(s => (
                 <div key={s.l} className="rounded-lg bg-slate-800/50 p-3">
                   <div className="text-[10px] text-slate-400 uppercase">{s.l}</div>
-                  <div className={`text-lg font-bold ${s.c ?? "text-white"}`}>{s.v}</div>
+                  <div className={`text-lg font-bold ${s.c ?? "text-foreground"}`}>{s.v}</div>
                 </div>
               ))}
             </div>
@@ -86,7 +86,7 @@ export default function PisLeadDistributionPage() {
                 <div key={i} className={`flex items-center gap-3 px-3 py-1.5 rounded text-[11px] ${step.action==="accept"?"bg-emerald-500/10":step.action==="cascade"?"bg-amber-500/10":"bg-red-500/10"}`}>
                   <span className="text-slate-500 w-8">#{step.leadNumber}</span>
                   <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${step.action==="accept"?"bg-emerald-500/20 text-emerald-400":step.action==="cascade"?"bg-amber-500/20 text-amber-400":"bg-red-500/20 text-red-400"}`}>{step.action?.toUpperCase()}</span>
-                  <span className="text-white flex-1">{step.outcome}</span>
+                  <span className="text-foreground flex-1">{step.outcome}</span>
                 </div>
               ))}
             </div>
@@ -94,8 +94,8 @@ export default function PisLeadDistributionPage() {
         )}
       </div>
 
-      <div className="rounded-xl border border-white/10 bg-gradient-to-br from-slate-900/80 to-black/90 p-5">
-        <h2 className="text-sm font-bold text-white mb-4">QUEUE HISTORY</h2>
+      <div className="rounded-xl border border-border bg-gradient-to-br from-slate-900/80 to-black/90 p-5">
+        <h2 className="text-sm font-bold text-foreground mb-4">QUEUE HISTORY</h2>
         <div className="space-y-1 max-h-48 overflow-y-auto">
           {history.slice(0,50).map((h:any) => (
             <div key={h.id} className="flex items-center gap-3 text-[11px] py-1">

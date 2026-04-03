@@ -380,7 +380,7 @@ export default function GlobalAccountingPage() {
               <div className="overflow-x-auto">
                 <table className="min-w-full text-sm">
                   <thead>
-                    <tr className="border-b border-white/10 text-left text-xs text-muted-foreground">
+                    <tr className="border-b border-border text-left text-xs text-muted-foreground">
                       <th className="px-3 py-2">{t("accounting.entries.date")}</th>
                       <th className="px-3 py-2">{t("accounting.entries.description")}</th>
                       <th className="px-3 py-2 text-right">{t("accounting.entries.debit")}</th>
@@ -390,7 +390,7 @@ export default function GlobalAccountingPage() {
                   </thead>
                   <tbody>
                     {entries.map((entry) => (
-                      <tr key={entry.id} className="border-b border-white/5">
+                      <tr key={entry.id} className="border-b border-border">
                         <td className="px-3 py-2">
                           <div className="font-semibold">{formatDate(entry.date)}</div>
                           <div className="text-xs text-muted-foreground">{entry.id}</div>

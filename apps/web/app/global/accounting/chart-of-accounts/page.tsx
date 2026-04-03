@@ -163,7 +163,7 @@ export default function ChartOfAccountsPage() {
   }
 
   const inputClass =
-    "w-full rounded-md border border-white/10 bg-black/20 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-white/30";
+    "w-full rounded-md border border-border bg-black/20 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring/30";
   const labelClass = "text-xs font-semibold text-muted-foreground";
   const standardAccountOptions = standards.map((s) => ({
     id: s.id,
@@ -182,7 +182,7 @@ export default function ChartOfAccountsPage() {
         <button
           onClick={handleImport}
           disabled={importing}
-          className="rounded-full border border-white/10 px-3 py-2 text-sm hover:border-white/30 disabled:opacity-50"
+          className="rounded-full border border-border px-3 py-2 text-sm hover:border-border disabled:opacity-50"
         >
           {importing ? "Importing..." : "Import standard heads"}
         </button>
@@ -265,7 +265,7 @@ export default function ChartOfAccountsPage() {
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead>
-                <tr className="text-left text-xs text-muted-foreground border-b border-white/10">
+                <tr className="text-left text-xs text-muted-foreground border-b border-border">
                   <th className="px-3 py-2">Code</th>
                   <th className="px-3 py-2">Name</th>
                   <th className="px-3 py-2">Type</th>
@@ -275,7 +275,7 @@ export default function ChartOfAccountsPage() {
               </thead>
               <tbody>
                 {accounts.map((a) => (
-                  <tr key={a.id} className="border-b border-white/5">
+                  <tr key={a.id} className="border-b border-border">
                     <td className="px-3 py-2">{a.code}</td>
                     <td className="px-3 py-2">{a.name}</td>
                     <td className="px-3 py-2 uppercase">{a.type}</td>

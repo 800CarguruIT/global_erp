@@ -49,21 +49,21 @@ export default function RccLeakagePage() {
 
       <div className="grid grid-cols-4 gap-3">
         {(data.kpis as Kpi[]).map((k, i) => (
-          <div key={i} className={`rounded-xl p-4 ${i === 0 ? "bg-red-500/[0.06]" : i === 3 ? "bg-emerald-500/[0.06]" : "bg-white/[0.03]"}`}>
+          <div key={i} className={`rounded-xl p-4 ${i === 0 ? "bg-red-500/[0.06]" : i === 3 ? "bg-emerald-500/[0.06]" : "bg-card/40"}`}>
             <p className="text-[11px] opacity-40 uppercase tracking-wider">{k.label}</p>
             <p className={`text-2xl font-bold mt-1 ${i === 0 ? "text-red-400" : i === 3 ? "text-emerald-400" : ""}`}>{k.formatted}</p>
           </div>
         ))}
       </div>
 
-      <div className="rounded-xl bg-white/[0.03] p-5">
+      <div className="rounded-xl bg-card/40 p-5">
         <h3 className="font-semibold mb-0.5 flex items-center gap-2">
           REVENUE LEAKAGE — STAGE BY STAGE
           <span className="text-[10px] bg-red-500/15 text-red-400 rounded px-2 py-0.5 font-normal uppercase">Fix Priority Order</span>
         </h3>
         <div className="space-y-2 mt-4">
           {(data.leakageByStage as LeakageStage[]).map((l, i) => (
-            <div key={i} className="rounded-lg p-4 flex justify-between items-start bg-white/[0.02] border-l-[3px] border-amber-500/60">
+            <div key={i} className="rounded-lg p-4 flex justify-between items-start bg-card/30 border-l-[3px] border-amber-500/60">
               <div>
                 <h4 className="font-medium">{l.fromStage} → {l.toStage}</h4>
                 <p className="text-xs opacity-40 mt-0.5">Cause: {l.cause}</p>
@@ -86,7 +86,7 @@ export default function RccLeakagePage() {
         <p className="text-xs opacity-40 mb-4">Ordered by revenue impact. Execute top-down.</p>
         <div className="space-y-1">
           {(data.fixRoadmap as FixItem[]).map((f, i) => (
-            <div key={i} className="flex items-start gap-4 py-3 border-b border-white/[0.04] last:border-0">
+            <div key={i} className="flex items-start gap-4 py-3 border-b border-border/40 last:border-0">
               <span className="w-7 h-7 rounded-full bg-emerald-500/15 text-emerald-400 flex items-center justify-center font-bold text-sm shrink-0">{i + 1}</span>
               <div className="flex-1">
                 <h4 className="font-medium text-sm">{f.title}</h4>
@@ -94,7 +94,7 @@ export default function RccLeakagePage() {
               </div>
               <div className="flex gap-2 items-center shrink-0">
                 <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${f.effortLevel === "Low" ? "bg-emerald-500/15 text-emerald-400" : f.effortLevel === "Medium" ? "bg-amber-500/15 text-amber-400" : "bg-red-500/15 text-red-400"}`}>{f.effortLevel}</span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.06] opacity-60">{f.timeline}</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted/40 opacity-60">{f.timeline}</span>
                 <span className="text-emerald-400 font-semibold text-sm w-28 text-right tabular-nums">+{fmtAed(f.recoverableAed)}</span>
               </div>
             </div>

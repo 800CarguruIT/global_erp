@@ -476,10 +476,10 @@ function InventoryOrderRequestsPanel({ companyId }: { companyId: string }) {
       title="Inventory Order Requests"
       subtitle="Create and approve inventory requests before vendor inquiries."
       scopeLabel={`Company ${companyId}`}
-      contentClassName="space-y-6 rounded-2xl border-none bg-slate-950/70 p-0"
+      contentClassName="space-y-6 rounded-2xl border-none bg-background/70 p-0"
     >
       <div className="space-y-6">
-        <section className="rounded-2xl bg-slate-950/80 p-4 shadow-xl">
+        <section className="rounded-2xl bg-background/80 p-4 shadow-xl">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-lg font-semibold">Requests</h2>
@@ -500,7 +500,7 @@ function InventoryOrderRequestsPanel({ companyId }: { companyId: string }) {
           ) : requests.length === 0 ? (
             <p className="mt-3 text-xs text-muted-foreground">No requests yet.</p>
           ) : (
-            <div className="mt-3 overflow-x-auto rounded-xl border border-white/10 bg-card/80">
+            <div className="mt-3 overflow-x-auto rounded-xl border border-border bg-card/80">
               <table className="min-w-full text-xs divide-y divide-muted/30">
                 <thead className="bg-muted/10 text-[11px] text-muted-foreground">
                   <tr>
@@ -516,7 +516,7 @@ function InventoryOrderRequestsPanel({ companyId }: { companyId: string }) {
                 </thead>
                 <tbody>
                   {requests.map((req) => (
-                    <tr key={req.id} className="border-t border-white/5">
+                    <tr key={req.id} className="border-t border-border/40">
                       <td className="py-2 px-3 font-semibold">{req.requestNumber}</td>
                       <td className="py-2 px-3 capitalize">{req.requestType}</td>
                       <td className="py-2 px-3 capitalize">{req.status}</td>
@@ -546,7 +546,7 @@ function InventoryOrderRequestsPanel({ companyId }: { companyId: string }) {
                               <button
                                 type="button"
                                 onClick={() => editRequest(req)}
-                                className="rounded-md border border-white/10 px-2 py-1 text-xs text-white"
+                                className="rounded-md border border-border px-2 py-1 text-xs text-foreground"
                               >
                                 Edit
                               </button>
@@ -572,8 +572,8 @@ function InventoryOrderRequestsPanel({ companyId }: { companyId: string }) {
         </section>
       </div>
       {createOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-6xl rounded-2xl bg-slate-950 p-6 text-slate-100 shadow-[0_30px_80px_-40px_rgba(15,23,42,0.7)]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-card/40 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-6xl rounded-2xl bg-background p-6 text-slate-100 shadow-[0_30px_80px_-40px_rgba(15,23,42,0.7)]">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-semibold">{editingRequestId ? "Edit request" : "Create request"}</h2>
@@ -589,7 +589,7 @@ function InventoryOrderRequestsPanel({ companyId }: { companyId: string }) {
                 <label className="space-y-1">
                   <span className="text-[11px] text-muted-foreground">Request type</span>
                   <select
-                    className="w-full rounded-2xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm text-white"
+                    className="w-full rounded-2xl border border-border bg-card/60 px-3 py-2 text-sm text-foreground"
                     value={requestType}
                     onChange={(e) => setRequestType(e.target.value as InventoryOrderRequestType)}
                   >
@@ -601,7 +601,7 @@ function InventoryOrderRequestsPanel({ companyId }: { companyId: string }) {
                   <label className="space-y-1">
                     <span className="text-[11px] text-muted-foreground">Estimate ID</span>
                     <input
-                      className="w-full rounded-2xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm text-white"
+                      className="w-full rounded-2xl border border-border bg-card/60 px-3 py-2 text-sm text-foreground"
                       value={estimateId}
                       onChange={(e) => setEstimateId(e.target.value)}
                       placeholder="Estimate UUID"
@@ -611,7 +611,7 @@ function InventoryOrderRequestsPanel({ companyId }: { companyId: string }) {
                 <label className="space-y-1 md:col-span-2">
                   <span className="text-[11px] text-muted-foreground">Notes</span>
                   <input
-                    className="w-full rounded-2xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm text-white"
+                    className="w-full rounded-2xl border border-border bg-card/60 px-3 py-2 text-sm text-foreground"
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
                     placeholder="Optional notes"
@@ -621,13 +621,13 @@ function InventoryOrderRequestsPanel({ companyId }: { companyId: string }) {
 
               <div className="space-y-4">
                 {items.map((item, index) => (
-                  <div key={item.id} className="rounded-xl border border-white/10 bg-slate-950/60 p-3">
+                  <div key={item.id} className="rounded-xl border border-border bg-background/60 p-3">
                     <div className="grid gap-3 md:grid-cols-12">
                       <label className="md:col-span-4 space-y-1">
                         <span className="text-[11px] text-muted-foreground">Part</span>
                         <div className="relative z-20">
                           <input
-                            className="w-full rounded border border-white/10 bg-slate-900/60 px-2 py-1 text-xs text-white"
+                            className="w-full rounded border border-border bg-card/60 px-2 py-1 text-xs text-foreground"
                             value={item.partName}
                             onChange={(e) => updateItem(index, { partName: e.target.value })}
                             placeholder="Search products"
@@ -640,12 +640,12 @@ function InventoryOrderRequestsPanel({ companyId }: { companyId: string }) {
                             }}
                           />
                           {productOpenIndex === index && (
-                            <div className="absolute z-30 mt-1 max-h-48 w-full overflow-auto rounded-md border border-white/10 bg-slate-950 text-xs shadow-lg">
+                            <div className="absolute z-30 mt-1 max-h-48 w-full overflow-auto rounded-md border border-border bg-background text-xs shadow-lg">
                               {(productResults.length ? productResults : products).map((product) => (
                                 <button
                                   key={product.id}
                                   type="button"
-                                  className="flex w-full items-start gap-2 px-3 py-2 text-left text-white/80 hover:bg-white/10"
+                                  className="flex w-full items-start gap-2 px-3 py-2 text-left text-foreground/80 hover:bg-muted"
                                   onMouseDown={(e) => e.preventDefault()}
                                   onClick={() => {
                                     updateItem(index, {
@@ -657,12 +657,12 @@ function InventoryOrderRequestsPanel({ companyId }: { companyId: string }) {
                                 >
                                   <span className="font-semibold">{product.name}</span>
                                   {product.type ? (
-                                    <span className="text-[10px] text-white/50">{product.type}</span>
+                                    <span className="text-[10px] text-muted-foreground">{product.type}</span>
                                   ) : null}
                                 </button>
                               ))}
                               {productResults.length === 0 && products.length === 0 && (
-                                <div className="px-3 py-2 text-white/50">No products found.</div>
+                                <div className="px-3 py-2 text-muted-foreground">No products found.</div>
                               )}
                             </div>
                           )}
@@ -671,7 +671,7 @@ function InventoryOrderRequestsPanel({ companyId }: { companyId: string }) {
                       <label className="md:col-span-2 space-y-1">
                         <span className="text-[11px] text-muted-foreground">Part #</span>
                         <input
-                          className="w-full rounded border border-white/10 bg-slate-900/60 px-2 py-1 text-xs text-white"
+                          className="w-full rounded border border-border bg-card/60 px-2 py-1 text-xs text-foreground"
                           value={item.partNumber}
                           onChange={(e) => updateItem(index, { partNumber: e.target.value })}
                           placeholder="Part #"
@@ -680,7 +680,7 @@ function InventoryOrderRequestsPanel({ companyId }: { companyId: string }) {
                       <label className="md:col-span-2 space-y-1">
                         <span className="text-[11px] text-muted-foreground">Brand</span>
                         <input
-                          className="w-full rounded border border-white/10 bg-slate-900/60 px-2 py-1 text-xs text-white"
+                          className="w-full rounded border border-border bg-card/60 px-2 py-1 text-xs text-foreground"
                           value={item.partBrand}
                           onChange={(e) => updateItem(index, { partBrand: e.target.value })}
                           placeholder="Brand"
@@ -689,7 +689,7 @@ function InventoryOrderRequestsPanel({ companyId }: { companyId: string }) {
                       <label className="md:col-span-2 space-y-1">
                         <span className="text-[11px] text-muted-foreground">Part type</span>
                         <select
-                          className="w-full rounded border border-white/10 bg-slate-900/60 px-2 py-1 text-xs text-white"
+                          className="w-full rounded border border-border bg-card/60 px-2 py-1 text-xs text-foreground"
                           value={item.partType}
                           onChange={(e) => updateItem(index, { partType: e.target.value })}
                         >
@@ -705,7 +705,7 @@ function InventoryOrderRequestsPanel({ companyId }: { companyId: string }) {
                         <input
                           type="number"
                           min={0}
-                          className="w-full rounded border border-white/10 bg-slate-900/60 px-2 py-1 text-xs text-white"
+                          className="w-full rounded border border-border bg-card/60 px-2 py-1 text-xs text-foreground"
                           value={item.quantity}
                           onChange={(e) => updateItem(index, { quantity: Number(e.target.value) })}
                         />
@@ -713,7 +713,7 @@ function InventoryOrderRequestsPanel({ companyId }: { companyId: string }) {
                       <label className="md:col-span-2 space-y-1">
                         <span className="text-[11px] text-muted-foreground">Unit</span>
                         <input
-                          className="w-full rounded border border-white/10 bg-slate-900/60 px-2 py-1 text-xs text-white"
+                          className="w-full rounded border border-border bg-card/60 px-2 py-1 text-xs text-foreground"
                           value={item.unit}
                           onChange={(e) => updateItem(index, { unit: e.target.value })}
                         />
@@ -721,7 +721,7 @@ function InventoryOrderRequestsPanel({ companyId }: { companyId: string }) {
                       <label className="md:col-span-3 space-y-1">
                         <span className="text-[11px] text-muted-foreground">Type</span>
                         <select
-                          className="w-full rounded border border-white/10 bg-slate-900/60 px-2 py-1 text-xs text-white"
+                          className="w-full rounded border border-border bg-card/60 px-2 py-1 text-xs text-foreground"
                           value={item.inventoryTypeId}
                           onChange={(e) => {
                             const next = e.target.value;
@@ -746,7 +746,7 @@ function InventoryOrderRequestsPanel({ companyId }: { companyId: string }) {
                       <label className="md:col-span-3 space-y-1">
                         <span className="text-[11px] text-muted-foreground">Category</span>
                         <select
-                          className="w-full rounded border border-white/10 bg-slate-900/60 px-2 py-1 text-xs text-white"
+                          className="w-full rounded border border-border bg-card/60 px-2 py-1 text-xs text-foreground"
                           value={item.categoryId}
                           onChange={(e) => {
                             const next = e.target.value;
@@ -770,7 +770,7 @@ function InventoryOrderRequestsPanel({ companyId }: { companyId: string }) {
                       <label className="md:col-span-3 space-y-1">
                         <span className="text-[11px] text-muted-foreground">Subcategory</span>
                         <select
-                          className="w-full rounded border border-white/10 bg-slate-900/60 px-2 py-1 text-xs text-white"
+                          className="w-full rounded border border-border bg-card/60 px-2 py-1 text-xs text-foreground"
                           value={item.subcategoryId}
                           onChange={(e) => {
                             const next = e.target.value;
@@ -793,7 +793,7 @@ function InventoryOrderRequestsPanel({ companyId }: { companyId: string }) {
                       <label className="md:col-span-3 space-y-1">
                         <span className="text-[11px] text-muted-foreground">Make</span>
                         <select
-                          className="w-full rounded border border-white/10 bg-slate-900/60 px-2 py-1 text-xs text-white"
+                          className="w-full rounded border border-border bg-card/60 px-2 py-1 text-xs text-foreground"
                           value={item.makeId}
                           onChange={(e) => {
                             const next = e.target.value;
@@ -812,7 +812,7 @@ function InventoryOrderRequestsPanel({ companyId }: { companyId: string }) {
                       <label className="md:col-span-3 space-y-1">
                         <span className="text-[11px] text-muted-foreground">Model</span>
                         <select
-                          className="w-full rounded border border-white/10 bg-slate-900/60 px-2 py-1 text-xs text-white"
+                          className="w-full rounded border border-border bg-card/60 px-2 py-1 text-xs text-foreground"
                           value={item.modelId}
                           onChange={(e) => {
                             const next = e.target.value;
@@ -832,7 +832,7 @@ function InventoryOrderRequestsPanel({ companyId }: { companyId: string }) {
                       <label className="md:col-span-2 space-y-1">
                         <span className="text-[11px] text-muted-foreground">Year</span>
                         <select
-                          className="w-full rounded border border-white/10 bg-slate-900/60 px-2 py-1 text-xs text-white"
+                          className="w-full rounded border border-border bg-card/60 px-2 py-1 text-xs text-foreground"
                           value={item.yearId}
                           onChange={(e) => updateItem(index, { yearId: e.target.value })}
                           disabled={!item.modelId}
@@ -848,7 +848,7 @@ function InventoryOrderRequestsPanel({ companyId }: { companyId: string }) {
                       <label className="md:col-span-4 space-y-1">
                         <span className="text-[11px] text-muted-foreground">Notes</span>
                         <input
-                          className="w-full rounded border border-white/10 bg-slate-900/60 px-2 py-1 text-xs text-white"
+                          className="w-full rounded border border-border bg-card/60 px-2 py-1 text-xs text-foreground"
                           value={item.description}
                           onChange={(e) => updateItem(index, { description: e.target.value })}
                           placeholder="Notes"
@@ -871,7 +871,7 @@ function InventoryOrderRequestsPanel({ companyId }: { companyId: string }) {
                 <button
                   type="button"
                   onClick={() => setItems((prev) => [...prev, createEmptyItem()])}
-                  className="rounded-md border border-white/10 px-3 py-1 text-xs uppercase tracking-wide text-slate-200"
+                  className="rounded-md border border-border px-3 py-1 text-xs uppercase tracking-wide text-slate-200"
                 >
                   Add line
                 </button>
@@ -879,7 +879,7 @@ function InventoryOrderRequestsPanel({ companyId }: { companyId: string }) {
                   <button
                     type="button"
                     onClick={() => (editingRequestId ? cancelEdit() : setCreateOpen(false))}
-                    className="rounded-md border border-white/10 px-3 py-1 text-xs uppercase tracking-wide text-slate-200"
+                    className="rounded-md border border-border px-3 py-1 text-xs uppercase tracking-wide text-slate-200"
                   >
                     Close
                   </button>

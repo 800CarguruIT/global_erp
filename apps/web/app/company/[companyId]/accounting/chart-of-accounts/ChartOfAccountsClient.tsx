@@ -329,7 +329,7 @@ export default function ChartOfAccountsClient({ companyId }: { companyId: string
 
   const toggleClass = (active: boolean) =>
     `rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition ${
-      active ? "bg-white/15 text-white" : "border border-white/15 text-white/70 hover:border-white/40"
+      active ? "bg-muted text-foreground" : "border border-border text-foreground/70 hover:border-border"
     }`;
 
   const tableRows = useMemo(
@@ -587,7 +587,7 @@ export default function ChartOfAccountsClient({ companyId }: { companyId: string
         <div className="flex items-center gap-2">
           <button
             type="button"
-            className="rounded-full border border-white/15 px-3 py-1.5 text-xs uppercase tracking-wide text-white/70 hover:border-white/40"
+            className="rounded-full border border-border px-3 py-1.5 text-xs uppercase tracking-wide text-foreground/70 hover:border-border"
             onClick={handleExportPdf}
             disabled={exporting}
           >
@@ -606,12 +606,12 @@ export default function ChartOfAccountsClient({ companyId }: { companyId: string
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           placeholder="Search by account code or name"
-          className="w-full max-w-md rounded-full border border-white/15 bg-black/20 px-4 py-2 text-sm outline-none focus:ring-1 focus:ring-white/30"
+          className="w-full max-w-md rounded-full border border-border bg-black/20 px-4 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
         />
         {searchTerm ? (
           <button
             type="button"
-            className="rounded-full border border-white/15 px-3 py-1.5 text-xs uppercase tracking-wide text-white/70 hover:border-white/40"
+            className="rounded-full border border-border px-3 py-1.5 text-xs uppercase tracking-wide text-foreground/70 hover:border-border"
             onClick={() => setSearchTerm("")}
           >
             Clear
@@ -669,7 +669,7 @@ export default function ChartOfAccountsClient({ companyId }: { companyId: string
                 <div style={style} className="flex items-center" ref={node.data.kind === "account" ? dragHandle : null}>
                   <button
                     type="button"
-                    className={`mr-2 text-xs ${node.isInternal ? "text-white/60 hover:text-white" : "text-white/30"}`}
+                    className={`mr-2 text-xs ${node.isInternal ? "text-muted-foreground hover:text-foreground" : "text-muted-foreground/50"}`}
                     onClick={() => node.isInternal && node.toggle()}
                     aria-label={node.isOpen ? "Collapse" : "Expand"}
                   >
@@ -718,14 +718,14 @@ export default function ChartOfAccountsClient({ companyId }: { companyId: string
                     <div
                       className={`flex items-center justify-between rounded-lg px-3 py-1 text-base ${
                         node.data.kind === "heading"
-                          ? "bg-white/5 text-white font-semibold"
+                          ? "bg-muted/40 text-foreground font-semibold"
                           : node.data.kind === "subheading"
-                          ? "text-white/85"
+                          ? "text-foreground/85"
                           : node.data.kind === "group"
-                          ? "text-white/75"
+                          ? "text-foreground/75"
                           : node.data.kind === "account"
-                          ? "text-white/80"
-                          : "text-white/60"
+                          ? "text-foreground/80"
+                          : "text-muted-foreground"
                       }`}
                       onClick={() => node.isInternal && node.toggle()}
                     >
@@ -754,7 +754,7 @@ export default function ChartOfAccountsClient({ companyId }: { companyId: string
                             }
                           }}
                           placeholder="Type group name and press Enter"
-                          className="w-full max-w-md rounded-md border border-white/15 bg-black/20 px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-white/30"
+                          className="w-full max-w-md rounded-md border border-border bg-black/20 px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
                         />
                         {creating ? <span className="text-xs text-muted-foreground">Saving...</span> : null}
                       </div>
@@ -773,7 +773,7 @@ export default function ChartOfAccountsClient({ companyId }: { companyId: string
                             }
                           }}
                           placeholder="Code"
-                          className="w-28 rounded-md border border-white/15 bg-black/20 px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-white/30"
+                          className="w-28 rounded-md border border-border bg-black/20 px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
                         />
                         <input
                           value={newSubheadName}
@@ -792,7 +792,7 @@ export default function ChartOfAccountsClient({ companyId }: { companyId: string
                             }
                           }}
                           placeholder="Subheading name"
-                          className="w-full max-w-md rounded-md border border-white/15 bg-black/20 px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-white/30"
+                          className="w-full max-w-md rounded-md border border-border bg-black/20 px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
                         />
                         {creating ? <span className="text-xs text-muted-foreground">Saving...</span> : null}
                       </div>
@@ -811,7 +811,7 @@ export default function ChartOfAccountsClient({ companyId }: { companyId: string
                             }
                           }}
                           placeholder="Code"
-                          className="w-24 rounded-md border border-white/15 bg-black/20 px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-white/30"
+                          className="w-24 rounded-md border border-border bg-black/20 px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
                         />
                         <input
                           value={newHeadingName}
@@ -828,12 +828,12 @@ export default function ChartOfAccountsClient({ companyId }: { companyId: string
                             }
                           }}
                           placeholder="Heading name"
-                          className="w-full max-w-md rounded-md border border-white/15 bg-black/20 px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-white/30"
+                          className="w-full max-w-md rounded-md border border-border bg-black/20 px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
                         />
                         <select
                           value={newHeadingStmt}
                           onChange={(e) => setNewHeadingStmt(e.target.value)}
-                          className="rounded-md border border-white/15 bg-black/30 px-3 py-2 text-sm text-white/90 outline-none focus:ring-1 focus:ring-white/30"
+                          className="rounded-md border border-border bg-black/30 px-3 py-2 text-sm text-foreground/90 outline-none focus:ring-1 focus:ring-ring"
                         >
                           <option value="Balance Sheet">Balance Sheet</option>
                           <option value="Profit & Loss">Profit & Loss</option>
@@ -860,7 +860,7 @@ export default function ChartOfAccountsClient({ companyId }: { companyId: string
                             }
                           }}
                           placeholder="Type account name and press Enter"
-                          className="w-full max-w-md rounded-md border border-white/15 bg-black/20 px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-white/30"
+                          className="w-full max-w-md rounded-md border border-border bg-black/20 px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
                         />
                         {creating ? <span className="text-xs text-muted-foreground">Saving...</span> : null}
                       </div>
@@ -879,7 +879,7 @@ export default function ChartOfAccountsClient({ companyId }: { companyId: string
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
                 <thead>
-                  <tr className="text-left text-xs text-muted-foreground border-b border-white/10">
+                  <tr className="text-left text-xs text-muted-foreground border-b border-border">
                     <th className="px-3 py-2">Heading</th>
                     <th className="px-3 py-2">Subheading</th>
                     <th className="px-3 py-2">Group Code</th>
@@ -891,7 +891,7 @@ export default function ChartOfAccountsClient({ companyId }: { companyId: string
                 </thead>
                 <tbody>
                   {tableRows.map((row) => (
-                    <tr key={row.id} className="border-b border-white/5">
+                    <tr key={row.id} className="border-b border-border/40">
                       <td className="px-3 py-2">{highlightMatch(`${row.headingCode} - ${row.heading}`)}</td>
                       <td className="px-3 py-2">{highlightMatch(`${row.subheadCode} - ${row.subheading}`)}</td>
                       <td className="px-3 py-2">{highlightMatch(row.groupCode)}</td>

@@ -56,6 +56,19 @@ export default function CompanyUsersPage({
   const [departments, setDepartments]           = useState<FilterOption[]>([]);
   const [branches, setBranches]                 = useState<FilterOption[]>([]);
   const [roles, setRoles]                       = useState<FilterOption[]>([]);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportColumns, setExportColumns] = useState<Record<string, boolean>>({
+    employee_name: true,
+    auto_code: true,
+    department: true,
+    email: true,
+    mobile: true,
+    roles: true,
+    is_active: true,
+    last_login_at: true,
+    branch_name: false,
+  });
 
   useEffect(() => {
     Promise.resolve(params).then((p: any) => {
@@ -64,6 +77,9 @@ export default function CompanyUsersPage({
       if (!id) { setLoading(false); setError("Company is required"); }
     });
   }, [params]);
+
+  // This page is only accessible to admins, so always show admin features
+  useEffect(() => { setIsAdmin(true); }, []);
 
   // Load filter options (departments, branches, roles)
   useEffect(() => {
@@ -216,12 +232,23 @@ export default function CompanyUsersPage({
               {total > 0 ? `${total} employees found` : "No employees"}
             </p>
           </div>
-          <a
-            href={`/company/${companyId}/settings/security/users/new`}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary/90"
-          >
-            + New User
-          </a>
+          <div className="flex items-center gap-2">
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => setExportOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-muted/40 px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
+              >
+                Export
+              </button>
+            )}
+            <a
+              href={`/company/${companyId}/settings/security/users/new`}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary/90"
+            >
+              + New User
+            </a>
+          </div>
         </div>
 
         {error && (
@@ -238,24 +265,24 @@ export default function CompanyUsersPage({
             onChange={(e) => setInputQuery(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSearch()}
             placeholder="Search by name or email…"
-            className="h-9 w-full max-w-xs rounded-lg border border-white/10 bg-white/5 px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-white/20"
+            className="h-9 w-full max-w-xs rounded-lg border border-border bg-muted/40 px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
           />
           <button
             onClick={handleSearch}
-            className="h-9 rounded-lg border border-white/10 bg-white/5 px-4 text-sm font-medium text-foreground transition hover:bg-white/10"
+            className="h-9 rounded-lg border border-border bg-muted/40 px-4 text-sm font-medium text-foreground transition hover:bg-muted"
           >
             Search
           </button>
 
           {/* Status filter pills */}
-          <div className="ml-auto flex items-center gap-1 rounded-lg bg-white/5 p-1">
+          <div className="ml-auto flex items-center gap-1 rounded-lg bg-muted/40 p-1">
             {STATUS_OPTIONS.map((opt) => (
               <button
                 key={opt.value}
                 onClick={() => handleStatusChange(opt.value)}
                 className={`rounded-md px-3 py-1 text-xs font-medium transition ${
                   statusFilter === opt.value
-                    ? "bg-white/10 text-foreground shadow-sm"
+                    ? "bg-muted text-foreground shadow-sm"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
@@ -271,7 +298,7 @@ export default function CompanyUsersPage({
           <select
             value={departmentFilter}
             onChange={(e) => handleDepartmentChange(e.target.value)}
-            className="h-9 rounded-lg border border-white/10 bg-white/5 px-3 pr-8 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-white/20 [&>option]:bg-gray-900 [&>option]:text-foreground"
+            className="h-9 rounded-lg border border-border bg-muted/40 px-3 pr-8 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring [&>option]:bg-popover [&>option]:text-foreground"
           >
             <option value="">All Departments</option>
             {departments.map((d) => (
@@ -284,7 +311,7 @@ export default function CompanyUsersPage({
             <select
               value={branchFilter}
               onChange={(e) => handleBranchChange(e.target.value)}
-              className="h-9 rounded-lg border border-white/10 bg-white/5 px-3 pr-8 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-white/20 [&>option]:bg-gray-900 [&>option]:text-foreground"
+              className="h-9 rounded-lg border border-border bg-muted/40 px-3 pr-8 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring [&>option]:bg-popover [&>option]:text-foreground"
             >
               <option value="">All Branches</option>
               {branches.map((b) => (
@@ -298,7 +325,7 @@ export default function CompanyUsersPage({
             <select
               value={roleFilter}
               onChange={(e) => handleRoleChange(e.target.value)}
-              className="h-9 rounded-lg border border-white/10 bg-white/5 px-3 pr-8 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-white/20 [&>option]:bg-gray-900 [&>option]:text-foreground"
+              className="h-9 rounded-lg border border-border bg-muted/40 px-3 pr-8 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring [&>option]:bg-popover [&>option]:text-foreground"
             >
               <option value="">All Roles</option>
               {roles.map((r) => (
@@ -311,7 +338,7 @@ export default function CompanyUsersPage({
           {hasActiveFilters && (
             <button
               onClick={clearFilters}
-              className="h-9 rounded-lg border border-white/10 bg-white/5 px-3 text-sm text-muted-foreground transition hover:bg-white/10 hover:text-foreground"
+              className="h-9 rounded-lg border border-border bg-muted/40 px-3 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
             >
               Clear Filters
             </button>
@@ -325,10 +352,10 @@ export default function CompanyUsersPage({
             Loading…
           </div>
         ) : (
-          <div className="overflow-hidden rounded-xl bg-white/5">
+          <div className="overflow-hidden rounded-xl bg-muted/40">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-white/10 bg-white/[0.03]">
+                <tr className="border-b border-border bg-card/40">
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Employee</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Department</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Login Email</th>
@@ -338,7 +365,7 @@ export default function CompanyUsersPage({
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/[0.06]">
+              <tbody className="divide-y divide-border/60">
                 {rows.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="px-4 py-12 text-center text-sm text-muted-foreground">
@@ -347,7 +374,7 @@ export default function CompanyUsersPage({
                   </tr>
                 ) : (
                   rows.map((row) => (
-                    <tr key={row.employee_id} className="transition hover:bg-white/[0.04]">
+                    <tr key={row.employee_id} className="transition hover:bg-card/50">
 
                       {/* Employee */}
                       <td className="px-4 py-3">
@@ -372,7 +399,7 @@ export default function CompanyUsersPage({
                         {row.roles.length > 0 ? (
                           <div className="flex flex-wrap gap-1">
                             {row.roles.map((r) => (
-                              <span key={r.id} className="rounded-full bg-white/10 px-2 py-0.5 text-xs font-medium text-foreground">
+                              <span key={r.id} className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-foreground">
                                 {r.name}
                               </span>
                             ))}
@@ -414,7 +441,7 @@ export default function CompanyUsersPage({
                         {row.user_id ? (
                           <a
                             href={`/company/${companyId}/settings/security/users/${row.user_id}`}
-                            className="inline-flex items-center rounded-lg bg-white/10 px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-white/15"
+                            className="inline-flex items-center rounded-lg bg-muted px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted"
                           >
                             Edit
                           </a>
@@ -434,7 +461,7 @@ export default function CompanyUsersPage({
             </table>
 
             {/* Footer: range info + pagination */}
-            <div className="flex items-center justify-between border-t border-white/[0.06] bg-white/[0.02] px-4 py-3">
+            <div className="flex items-center justify-between border-t border-border/60 bg-card/30 px-4 py-3">
               <span className="text-xs text-muted-foreground">
                 {total === 0 ? "No results" : `${rangeStart}–${rangeEnd} of ${total}`}
               </span>
@@ -444,7 +471,7 @@ export default function CompanyUsersPage({
                 <button
                   disabled={page <= 1}
                   onClick={() => goToPage(page - 1)}
-                  className="rounded-md bg-white/5 px-2.5 py-1 text-xs font-medium text-foreground transition hover:bg-white/10 disabled:opacity-30"
+                  className="rounded-md bg-muted/40 px-2.5 py-1 text-xs font-medium text-foreground transition hover:bg-muted disabled:opacity-30"
                 >
                   ‹ Prev
                 </button>
@@ -464,7 +491,7 @@ export default function CompanyUsersPage({
                     className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
                       p === page
                         ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:bg-white/10 hover:text-foreground"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
                     }`}
                   >
                     {p}
@@ -483,7 +510,7 @@ export default function CompanyUsersPage({
                 <button
                   disabled={page >= totalPages}
                   onClick={() => goToPage(page + 1)}
-                  className="rounded-md bg-white/5 px-2.5 py-1 text-xs font-medium text-foreground transition hover:bg-white/10 disabled:opacity-30"
+                  className="rounded-md bg-muted/40 px-2.5 py-1 text-xs font-medium text-foreground transition hover:bg-muted disabled:opacity-30"
                 >
                   Next ›
                 </button>
@@ -492,6 +519,117 @@ export default function CompanyUsersPage({
           </div>
         )}
       </div>
+
+      {/* Export Modal */}
+      {exportOpen && (
+        <div className="fixed inset-0 z-[9998] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setExportOpen(false)} />
+          <div className="relative z-[9999] w-full max-w-md rounded-2xl border border-border bg-background p-5 shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-semibold">Export Users</h3>
+              <button type="button" onClick={() => setExportOpen(false)} className="rounded border border-border bg-muted/40 px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground">
+                Close
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground mb-3">Select columns to include in the CSV export.</p>
+
+            <div className="space-y-2 mb-4">
+              {([
+                { key: "employee_name", label: "Employee Name" },
+                { key: "auto_code", label: "Employee Code" },
+                { key: "department", label: "Department" },
+                { key: "email", label: "Login Email" },
+                { key: "mobile", label: "Mobile" },
+                { key: "roles", label: "Roles" },
+                { key: "is_active", label: "Status" },
+                { key: "last_login_at", label: "Last Login" },
+                { key: "branch_name", label: "Branch" },
+              ]).map((col) => (
+                <label key={col.key} className="flex items-center gap-3 rounded-lg bg-card/30 px-3 py-2.5 text-sm cursor-pointer hover:bg-card/50">
+                  <input
+                    type="checkbox"
+                    checked={exportColumns[col.key] ?? false}
+                    onChange={(e) => setExportColumns((prev) => ({ ...prev, [col.key]: e.target.checked }))}
+                    className="h-4 w-4 rounded"
+                  />
+                  <span className="text-foreground/80">{col.label}</span>
+                </label>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const all = Object.keys(exportColumns).reduce((acc, k) => ({ ...acc, [k]: true }), {} as Record<string, boolean>);
+                  setExportColumns(all);
+                }}
+                className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs font-medium text-foreground hover:bg-muted"
+              >
+                Select All
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const none = Object.keys(exportColumns).reduce((acc, k) => ({ ...acc, [k]: false }), {} as Record<string, boolean>);
+                  setExportColumns(none);
+                }}
+                className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs font-medium text-foreground hover:bg-muted"
+              >
+                Clear All
+              </button>
+              <button
+                type="button"
+                className="ml-auto rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90"
+                onClick={() => {
+                  const colDefs = [
+                    { key: "employee_name", label: "Employee Name" },
+                    { key: "auto_code", label: "Employee Code" },
+                    { key: "department", label: "Department" },
+                    { key: "email", label: "Login Email" },
+                    { key: "mobile", label: "Mobile" },
+                    { key: "roles", label: "Roles" },
+                    { key: "is_active", label: "Status" },
+                    { key: "last_login_at", label: "Last Login" },
+                    { key: "branch_name", label: "Branch" },
+                  ].filter((c) => exportColumns[c.key]);
+
+                  if (!colDefs.length) return;
+
+                  const escape = (v: string) => {
+                    if (v.includes(",") || v.includes('"') || v.includes("\n")) return `"${v.replace(/"/g, '""')}"`;
+                    return v;
+                  };
+
+                  const header = colDefs.map((c) => escape(c.label)).join(",");
+                  const csvRows = rows.map((row) =>
+                    colDefs.map((c) => {
+                      const val =
+                        c.key === "roles" ? (row.roles ?? []).map((r) => r.name).join("; ")
+                        : c.key === "is_active" ? (row.is_active === true ? "Active" : row.is_active === false ? "Inactive" : row.user_id ? "Active" : "No Account")
+                        : c.key === "last_login_at" ? (row.last_login_at ? new Date(row.last_login_at).toLocaleString() : "—")
+                        : String((row as any)[c.key] ?? "");
+                      return escape(val);
+                    }).join(",")
+                  );
+
+                  const csv = [header, ...csvRows].join("\n");
+                  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = `users-export-${new Date().toISOString().slice(0, 10)}.csv`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                  setExportOpen(false);
+                }}
+              >
+                Download CSV
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AppLayout>
   );
 }

@@ -443,13 +443,13 @@ export default function JournalsClient({ companyId }: { companyId: string }) {
   }, []);
 
   const inputClass =
-    "w-full rounded-md border border-white/30 bg-white/90 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-500 outline-none focus:border-primary focus:ring-2 focus:ring-primary/40 appearance-none";
-  const labelClass = "text-xs font-semibold text-white/70";
-  const panelClass = "space-y-4 bg-slate-900/70 border border-white/10 p-4 shadow-xl text-white";
+    "w-full rounded-md border border-border bg-muted/80 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-500 outline-none focus:border-primary focus:ring-2 focus:ring-primary/40 appearance-none";
+  const labelClass = "text-xs font-semibold text-foreground/70";
+  const panelClass = "space-y-4 bg-popover/70 border border-border p-4 shadow-xl text-foreground";
   const buttonClass =
-    "rounded-md border border-white/20 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition hover:border-white/50 hover:bg-white/10 disabled:opacity-50";
+    "rounded-md border border-border bg-muted/40 px-4 py-2 text-sm font-semibold text-foreground transition hover:border-border hover:bg-muted disabled:opacity-50";
   const addLineClass =
-    "rounded-md border border-white/20 bg-transparent px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white/70 transition hover:border-white/50 hover:text-white";
+    "rounded-md border border-border bg-transparent px-3 py-1 text-xs font-semibold uppercase tracking-wide text-foreground/70 transition hover:border-border hover:text-foreground";
 
   return (
     <div className="space-y-6 py-4">
@@ -479,7 +479,7 @@ export default function JournalsClient({ companyId }: { companyId: string }) {
             {editingJournalId && (
               <button
                 type="button"
-                className="text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-white"
+                className="text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
                 onClick={cancelEdit}
               >
                 Cancel edit
@@ -539,7 +539,7 @@ export default function JournalsClient({ companyId }: { companyId: string }) {
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-            <thead className="text-left text-xs uppercase tracking-wide text-white/60 border-b border-white/10">
+            <thead className="text-left text-xs uppercase tracking-wide text-muted-foreground border-b border-border">
               <tr>
                 <th className="px-2 py-2">Chart Account</th>
                 <th className="px-2 py-2">Description</th>
@@ -550,7 +550,7 @@ export default function JournalsClient({ companyId }: { companyId: string }) {
             </thead>
                 <tbody>
                   {lines.map((line, idx) => (
-                    <tr key={line.id} className="border-t border-white/10">
+                    <tr key={line.id} className="border-t border-border">
                       <td className="px-2 py-2">
                         <Select
                           options={accountOptions}
@@ -600,7 +600,7 @@ export default function JournalsClient({ companyId }: { companyId: string }) {
                       </td>
                       <td className="px-2 py-2">
                         <button
-                          className="text-xs text-destructive hover:text-red-400 disabled:text-white/40"
+                          className="text-xs text-destructive hover:text-red-400 disabled:text-muted-foreground"
                           type="button"
                           onClick={() => removeLine(line.id)}
                           disabled={lines.length <= 2}
@@ -610,14 +610,14 @@ export default function JournalsClient({ companyId }: { companyId: string }) {
                       </td>
                     </tr>
                   ))}
-                  <tr className="border-t border-white/10 bg-white/5">
+                  <tr className="border-t border-border bg-muted/40">
                     <td className="px-2 py-2 font-semibold" colSpan={2}>
                       Totals
                     </td>
                     <td className="px-2 py-2">
                       <input
                         ref={totalDebitRef}
-                        className={`${inputClass} border-dashed border-white/40 bg-white/40 text-slate-900`}
+                        className={`${inputClass} border-dashed border-border bg-muted/40 text-slate-900`}
                         value={totalDebit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         readOnly
                       />
@@ -625,7 +625,7 @@ export default function JournalsClient({ companyId }: { companyId: string }) {
                     <td className="px-2 py-2">
                       <input
                         ref={totalCreditRef}
-                        className={`${inputClass} border-dashed border-white/40 bg-white/40 text-slate-900`}
+                        className={`${inputClass} border-dashed border-border bg-muted/40 text-slate-900`}
                         value={totalCredit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         readOnly
                       />
@@ -662,7 +662,7 @@ export default function JournalsClient({ companyId }: { companyId: string }) {
           {actionMessage.text}
         </div>
       )}
-      <Card className="overflow-x-auto bg-slate-900/70 border border-white/10 shadow-xl">
+      <Card className="overflow-x-auto bg-popover/70 border border-border shadow-xl">
         {error && <div className="p-4 text-sm text-destructive">{error}</div>}
         {loading && !error && <div className="p-4 text-sm text-muted-foreground">Loading journals...</div>}
         {!loading && !error && journals.length === 0 && (
@@ -712,8 +712,8 @@ export default function JournalsClient({ companyId }: { companyId: string }) {
                           type="button"
                           className={`text-xs font-semibold rounded border px-2 py-1 transition ${
                             postingJournalId === j.id
-                              ? "border-white/30 text-white/40"
-                              : "border-white/20 text-emerald-400 hover:border-white/40 hover:text-emerald-300"
+                              ? "border-border text-muted-foreground"
+                              : "border-border text-emerald-400 hover:border-border hover:text-emerald-300"
                           }`}
                           disabled={postingJournalId === j.id}
                           onClick={() => handlePostJournal(j.id)}
@@ -732,7 +732,7 @@ export default function JournalsClient({ companyId }: { companyId: string }) {
                     {j.is_posted && (
                       <button
                         type="button"
-                        className="text-xs text-white/40 border border-white/20 px-2 py-1 rounded"
+                        className="text-xs text-muted-foreground border border-border px-2 py-1 rounded"
                         disabled
                       >
                         Edit
@@ -747,7 +747,7 @@ export default function JournalsClient({ companyId }: { companyId: string }) {
       </Card>
 
       {(viewLoading || viewError || viewJournal) && (
-        <Card className="bg-slate-900/80 border border-white/10 shadow-xl">
+        <Card className="bg-popover/80 border border-border shadow-xl">
           {viewLoading && (
             <div className="p-4 text-sm text-muted-foreground">Loading journal details...</div>
           )}
@@ -777,7 +777,7 @@ export default function JournalsClient({ companyId }: { companyId: string }) {
                   </span>
                   <button
                     type="button"
-                    className="rounded-md border border-white/20 bg-white/5 px-3 py-1 text-xs font-semibold text-white transition hover:border-white/50 hover:bg-white/10"
+                    className="rounded-md border border-border bg-muted/40 px-3 py-1 text-xs font-semibold text-foreground transition hover:border-border hover:bg-muted"
                     onClick={() => {
                       setViewJournal(null);
                       setViewError(null);
@@ -789,7 +789,7 @@ export default function JournalsClient({ companyId }: { companyId: string }) {
               </div>
               <div className="overflow-x-auto">
                 <table className="min-w-full text-sm">
-                  <thead className="border-b border-white/10 text-left text-xs uppercase tracking-wide text-muted-foreground">
+                  <thead className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
                     <tr>
                       <th className="px-4 py-2">Line</th>
                       <th className="px-4 py-2">Account</th>
@@ -807,7 +807,7 @@ export default function JournalsClient({ companyId }: { companyId: string }) {
                       </tr>
                     )}
                     {viewJournalLines.map((line) => (
-                      <tr key={line.id} className="border-b border-white/10">
+                      <tr key={line.id} className="border-b border-border">
                         <td className="px-4 py-3 text-sm font-semibold">{line.line_no}</td>
                         <td className="px-4 py-3 text-sm">{getViewAccountLabel(line)}</td>
                         <td className="px-4 py-3 text-sm text-muted-foreground">

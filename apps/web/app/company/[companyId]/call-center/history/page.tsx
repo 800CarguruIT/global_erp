@@ -343,7 +343,7 @@ function CallHistoryPanel({ companyId }: { companyId: string }) {
                   : "";
 
                 return (
-                  <tr key={row.id} className={`align-top transition-colors hover:bg-white/[0.03] ${idx !== rows.length - 1 ? "border-b" : ""}`}
+                  <tr key={row.id} className={`align-top transition-colors hover:bg-card/40 ${idx !== rows.length - 1 ? "border-b" : ""}`}
                     style={{ borderColor: "rgba(255,255,255,0.06)" }}>
 
                     {/* Customer + Phone */}
@@ -547,7 +547,7 @@ function LeadInquiriesPanel({ companyId }: { companyId: string }) {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-white/10 text-left">
+              <tr className="border-b border-border text-left">
                 {["Created","Call ID","From","Customer","To","Inquiry","Summary","Verification","Conversion","Lead Type","Recording","AI Analysis","Outcome","Actions"].map((h) => (
                   <th key={h} className="py-2 pr-3 text-xs font-medium uppercase text-muted-foreground">{h}</th>
                 ))}
@@ -555,7 +555,7 @@ function LeadInquiriesPanel({ companyId }: { companyId: string }) {
             </thead>
             <tbody>
               {filtered.map((row) => (
-                <tr key={row.id} className="border-b border-white/5">
+                <tr key={row.id} className="border-b border-border">
                   <td className="whitespace-nowrap py-2 pr-3 text-xs">{new Date(row.created_at).toLocaleString()}</td>
                   <td className="py-2 pr-3 text-xs">{row.provider_call_id}</td>
                   <td className="py-2 pr-3 text-xs">{row.from_number ?? "-"}</td>

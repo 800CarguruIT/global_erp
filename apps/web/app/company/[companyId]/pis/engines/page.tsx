@@ -15,12 +15,12 @@ export default function PisEnginesPage() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-lg font-bold text-white">All 7 AI Engines</h2>
+      <h2 className="text-lg font-bold text-foreground">All 7 AI Engines</h2>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {engines.map((e:any) => (
-          <div key={e.engine_key} className={`rounded-xl border p-5 ${ENGINE_COLORS[e.engine_key] ?? "border-white/10 bg-slate-900/50"}`}>
+          <div key={e.engine_key} className={`rounded-xl border p-5 ${ENGINE_COLORS[e.engine_key] ?? "border-border bg-popover/50"}`}>
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-bold text-white">{ENGINE_LABELS[e.engine_key] ?? e.engine_key}</h3>
+              <h3 className="text-sm font-bold text-foreground">{ENGINE_LABELS[e.engine_key] ?? e.engine_key}</h3>
               <span className="text-[10px] text-slate-500">{e.cached ? "Cached" : "Live"}</span>
             </div>
             <div className="text-xs text-slate-400 mb-2">{e.signals?.length ?? 0} signals</div>
@@ -30,7 +30,7 @@ export default function PisEnginesPage() {
                   <div className="flex gap-2 mb-1">
                     <span className={`px-1 py-0.5 rounded text-[8px] font-bold ${s.urgency==="HIGH"?"bg-red-500/20 text-red-400":s.urgency==="MED"?"bg-amber-500/20 text-amber-400":"bg-slate-500/20 text-slate-400"}`}>{s.urgency}</span>
                   </div>
-                  <div className="text-white font-medium">{s.metric}</div>
+                  <div className="text-foreground font-medium">{s.metric}</div>
                   <div className="text-slate-400 mt-0.5">{s.observation}</div>
                 </div>
               ))}

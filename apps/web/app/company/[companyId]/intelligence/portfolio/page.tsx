@@ -47,7 +47,7 @@ export default function PortfolioIntelligencePage({
         </div>
 
         {/* Risk Tier Reference */}
-        <div className="rounded-xl border border-white/10 bg-slate-900/40 p-4">
+        <div className="rounded-xl border border-border bg-slate-900/40 p-4">
           <div className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">Churn Risk Tiers</div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[

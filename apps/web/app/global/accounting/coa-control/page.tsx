@@ -134,7 +134,7 @@ export default function CoaControlPage() {
       <Card className="p-4 space-y-3">
         <div className="text-sm font-semibold">Company</div>
         <select
-          className="w-full max-w-md rounded-md border border-white/15 bg-black/20 px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-white/30"
+          className="w-full max-w-md rounded-md border border-border bg-black/20 px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring/30"
           value={selectedCompanyId}
           onChange={(e) => setSelectedCompanyId(e.target.value)}
         >
@@ -160,7 +160,7 @@ export default function CoaControlPage() {
                   </div>
                   <div className="text-xs text-muted-foreground">{h.financialStmt}</div>
                 </div>
-                <label className="inline-flex items-center gap-2 text-xs uppercase tracking-wide text-white/70">
+                <label className="inline-flex items-center gap-2 text-xs uppercase tracking-wide text-foreground/70">
                   <input
                     type="checkbox"
                     checked={h.enabled}
@@ -171,11 +171,11 @@ export default function CoaControlPage() {
               </div>
               <div className="space-y-2">
                 {(groupedSubheadings.get(h.headCode) ?? []).map((s) => (
-                  <div key={`${s.headCode}-${s.subheadCode}`} className="flex items-center justify-between rounded-lg border border-white/5 px-3 py-2">
+                  <div key={`${s.headCode}-${s.subheadCode}`} className="flex items-center justify-between rounded-lg border border-border px-3 py-2">
                     <div className="text-sm">
                       {s.subheadCode} - {s.name}
                     </div>
-                    <label className="inline-flex items-center gap-2 text-xs uppercase tracking-wide text-white/70">
+                    <label className="inline-flex items-center gap-2 text-xs uppercase tracking-wide text-foreground/70">
                       <input
                         type="checkbox"
                         checked={s.enabled}

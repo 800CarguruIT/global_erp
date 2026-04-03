@@ -41,25 +41,25 @@ export function DateFilter({ from, to, onChange }: Props) {
           className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
             activePreset === p.label
               ? "bg-emerald-500/20 text-emerald-400"
-              : "opacity-40 hover:opacity-70 hover:bg-white/5"
+              : "opacity-40 hover:opacity-70 hover:bg-muted/40"
           }`}
         >
           {p.label}
         </button>
       ))}
-      <div className="w-px h-4 bg-white/10 mx-1" />
+      <div className="w-px h-4 bg-muted mx-1" />
       <input
         type="date"
         value={from}
         onChange={e => { setActivePreset(""); onChange(e.target.value, to); }}
-        className="bg-white/[0.04] rounded-md px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-emerald-500/30"
+        className="bg-card/40 rounded-md px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-emerald-500/30"
       />
       <span className="opacity-30 text-xs">—</span>
       <input
         type="date"
         value={to}
         onChange={e => { setActivePreset(""); onChange(from, e.target.value); }}
-        className="bg-white/[0.04] rounded-md px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-emerald-500/30"
+        className="bg-card/40 rounded-md px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-emerald-500/30"
       />
     </div>
   );

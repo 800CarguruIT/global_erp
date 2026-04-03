@@ -25,7 +25,7 @@ export function WorkshopJobListTable({ jobs, onCreate, onRowClick }: WorkshopJob
           <button
             type="button"
             onClick={onCreate}
-            className="rounded-md border px-3 py-1 text-sm font-medium hover:bg-white/10"
+            className="rounded-md border px-3 py-1 text-sm font-medium hover:bg-muted"
           >
             New Job
           </button>

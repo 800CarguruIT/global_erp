@@ -111,19 +111,19 @@ function TableShell({
   body?: React.ReactNode;
 }) {
   return (
-    <div className="overflow-hidden rounded-2xl bg-slate-950/85 shadow-[0_30px_70px_-40px_rgba(8,15,30,0.9)] ring-1 ring-white/5">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/5 bg-gradient-to-r from-slate-950/70 via-slate-900/60 to-slate-950/80 px-3 py-3 sm:px-4">
+    <div className="overflow-hidden rounded-2xl bg-background/85 shadow-[0_30px_70px_-40px_rgba(8,15,30,0.9)] ring-1 ring-border/40">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/40 bg-gradient-to-r from-background/70 via-popover/60 to-background/80 px-3 py-3 sm:px-4">
         <div>
           <div className="text-sm font-semibold sm:text-base">{title}</div>
           <div className="text-xs text-muted-foreground">{subtitle}</div>
         </div>
-        <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] uppercase tracking-[0.2em] text-white/60">
+        <span className="rounded-full border border-border bg-muted/40 px-2.5 py-1 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
           Live
         </span>
       </div>
       <div className="overflow-x-auto">
         <table className="min-w-[920px] text-xs sm:min-w-full sm:text-sm">
-          <thead className="bg-slate-900/70 text-xs uppercase tracking-wide text-slate-300">
+          <thead className="bg-popover/70 text-xs uppercase tracking-wide text-slate-300">
             <tr>
               {columns.map((col) => (
                 <th key={col} className="px-2 py-2 text-left font-medium sm:px-3">
@@ -132,7 +132,7 @@ function TableShell({
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-white/5">
+          <tbody className="divide-y divide-border/40">
             {body ?? (
               <tr>
                 <td className="px-3 py-8 text-center text-sm text-slate-300/80" colSpan={columns.length}>
@@ -622,7 +622,7 @@ export default function VendorDashboardPage() {
       );
     }
     return visibleInquiries.map((row, index) => (
-      <tr key={row.inquiryId} className="border-t border-white/5">
+      <tr key={row.inquiryId} className="border-t border-border/40">
         <td className="px-3 py-3 text-xs text-slate-300/80">{index + 1}</td>
         <td className="px-3 py-3">
           {row.sourceType === "inventory" ? "Inventory" : row.carMake ?? "—"}
@@ -679,7 +679,7 @@ export default function VendorDashboardPage() {
                 setPartsLoading(false);
               }
             }}
-            className="rounded-md bg-emerald-500/90 px-2 py-1 text-xs font-semibold text-white hover:bg-emerald-500"
+            className="rounded-md bg-emerald-500/90 px-2 py-1 text-xs font-semibold text-foreground hover:bg-emerald-500"
           >
             View parts
           </button>
@@ -726,7 +726,7 @@ export default function VendorDashboardPage() {
       };
     };
     return bids.map((row, index) => (
-      <tr key={row.id} className="border-t border-white/5 hover:bg-white/[0.02]">
+      <tr key={row.id} className="border-t border-border/40 hover:bg-card/30">
         <td className={cell}>{index + 1}</td>
         <td className={cell}>
           <div className="text-sm font-semibold text-slate-100">{row.partName}</div>
@@ -747,7 +747,7 @@ export default function VendorDashboardPage() {
                 { label: "Used", data: formatQuote(row.used, row.usedQty, row.usedEtd) },
               ] as const
             ).map((quote) => (
-              <div key={quote.label} className="rounded-lg border border-white/10 bg-slate-950/60 p-2">
+              <div key={quote.label} className="rounded-lg border border-border bg-background/60 p-2">
                 <div className="text-[10px] uppercase tracking-wide text-slate-400">{quote.label}</div>
                 <div className="text-sm font-semibold text-slate-100">{quote.data.amount}</div>
                 <div className="mt-1 flex flex-wrap gap-2 text-[11px] text-slate-400">
@@ -1010,7 +1010,7 @@ export default function VendorDashboardPage() {
       const qtyLabel = `${quote.qty ?? "—"} (${quote.type})`;
       const priceLabel = quote.amount != null ? `${quote.amount} AED` : "—";
       return (
-        <tr key={row.id} className="border-t border-white/5">
+        <tr key={row.id} className="border-t border-border/40">
           <td className="px-3 py-3 text-xs text-slate-300/80">{index + 1}</td>
           <td className="px-3 py-3">
             <div className="text-sm font-semibold text-slate-100">{row.partName}</div>
@@ -1101,7 +1101,7 @@ export default function VendorDashboardPage() {
       const qtyLabel = `${quote.qty ?? "-"} (${quote.type})`;
       const priceLabel = quote.amount != null ? `${quote.amount} AED` : "-";
       return (
-        <tr key={row.id} className="border-t border-white/5">
+        <tr key={row.id} className="border-t border-border/40">
           <td className="px-3 py-3 text-xs text-slate-300/80">{index + 1}</td>
           <td className="px-3 py-3">
             <div className="text-sm font-semibold text-slate-100">{row.partName}</div>
@@ -1171,7 +1171,7 @@ export default function VendorDashboardPage() {
       const quote = statusRows.pickQuote(row);
       const qtyLabel = `${quote.qty ?? "-"} (${quote.type})`;
       return (
-        <tr key={row.id} className="border-t border-white/5">
+        <tr key={row.id} className="border-t border-border/40">
           <td className="px-3 py-3 text-xs text-slate-300/80">{index + 1}</td>
           <td className="px-3 py-3">
             <div className="text-sm font-semibold text-slate-100">{row.partName}</div>
@@ -1212,7 +1212,7 @@ export default function VendorDashboardPage() {
   return (
     <AppLayout>
       <div className="mx-auto w-full max-w-[1600px] space-y-6 px-3 py-4 sm:px-6">
-        <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-slate-950/90 via-slate-900/80 to-slate-950/90 p-4 shadow-[0_35px_80px_-45px_rgba(8,15,30,0.9)] sm:p-6">
+        <div className="relative overflow-hidden rounded-3xl border border-border bg-gradient-to-br from-background/90 via-popover/80 to-background/90 p-4 shadow-[0_35px_80px_-45px_rgba(8,15,30,0.9)] sm:p-6">
           <div className="pointer-events-none absolute inset-0">
             <div className="absolute -left-24 -top-24 h-56 w-56 rounded-full bg-emerald-400/15 blur-3xl" />
             <div className="absolute -right-16 top-6 h-48 w-48 rounded-full bg-sky-400/10 blur-3xl" />
@@ -1220,36 +1220,36 @@ export default function VendorDashboardPage() {
           </div>
           <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="space-y-2">
-              <div className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-[0.3em] text-white/40">
+              <div className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-[0.3em] text-muted-foreground">
                 <span>Vendor Portal</span>
-                <span className="h-1 w-1 rounded-full bg-white/30" />
+                <span className="h-1 w-1 rounded-full bg-muted-foreground/50" />
                 <span>Live Operations</span>
               </div>
-              <h1 className="text-xl font-semibold text-white sm:text-2xl">800CarGuru Parts Portal</h1>
-              <p className="text-sm text-white/60">Vendor workspace for parts inquiries, bids, and deliveries.</p>
-              <div className="flex flex-wrap gap-2 text-xs text-white/60">
-                <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1">
+              <h1 className="text-xl font-semibold text-foreground sm:text-2xl">800CarGuru Parts Portal</h1>
+              <p className="text-sm text-muted-foreground">Vendor workspace for parts inquiries, bids, and deliveries.</p>
+              <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                <span className="rounded-full border border-border bg-muted/40 px-2.5 py-1">
                   Company {companyId.slice(0, 8)}…
                 </span>
-                <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1">
+                <span className="rounded-full border border-border bg-muted/40 px-2.5 py-1">
                   Vendor {vendorId.slice(0, 8)}…
                 </span>
               </div>
             </div>
-            <div className="grid w-full gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 text-slate-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] sm:max-w-sm">
+            <div className="grid w-full gap-3 rounded-2xl border border-border bg-muted/40 p-4 text-slate-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] sm:max-w-sm">
               <div className="flex items-center justify-between">
                 <div className="text-xs font-semibold uppercase tracking-wide text-slate-300">Car Make Filter</div>
                 <button
                   type="button"
                   onClick={() => setSelectedMakes([])}
-                  className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] uppercase tracking-[0.2em] text-white/70"
+                  className="rounded-full border border-border bg-muted/40 px-2.5 py-1 text-[10px] uppercase tracking-[0.2em] text-foreground/70"
                 >
                   Clear
                 </button>
               </div>
               <select
                 multiple
-                className="min-h-[84px] rounded-xl bg-slate-900/80 px-2 py-2 text-sm text-slate-100 shadow-inner outline-none ring-1 ring-white/10 focus:ring-2 focus:ring-emerald-400/60 sm:min-h-[92px]"
+                className="min-h-[84px] rounded-xl bg-popover/80 px-2 py-2 text-sm text-slate-100 shadow-inner outline-none ring-1 ring-border focus:ring-2 focus:ring-emerald-400/60 sm:min-h-[92px]"
                 value={selectedMakes}
                 onChange={(e) =>
                   setSelectedMakes(Array.from(e.target.selectedOptions).map((opt) => opt.value))
@@ -1261,7 +1261,7 @@ export default function VendorDashboardPage() {
                   </option>
                 ))}
               </select>
-              <div className="text-[11px] text-white/50">
+              <div className="text-[11px] text-muted-foreground">
                 {selectedMakes.length ? `${selectedMakes.length} selected` : "Showing all makes"}
               </div>
             </div>
@@ -1272,21 +1272,21 @@ export default function VendorDashboardPage() {
           {summaryCards.map((card) => (
             <div
               key={card.label}
-              className="rounded-2xl border border-white/5 bg-slate-950/80 p-4 shadow-[0_18px_40px_-28px_rgba(15,23,42,0.9)]"
+              className="rounded-2xl border border-border/40 bg-background/80 p-4 shadow-[0_18px_40px_-28px_rgba(15,23,42,0.9)]"
             >
-              <div className="text-[11px] uppercase tracking-[0.2em] text-white/40">{card.label}</div>
+              <div className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">{card.label}</div>
               <div className={`mt-2 text-2xl font-semibold ${card.tone}`}>{card.value}</div>
-              <div className="text-xs text-white/50">Updated just now</div>
+              <div className="text-xs text-muted-foreground">Updated just now</div>
             </div>
           ))}
         </div>
 
         <div className="space-y-4">
-          <div className="rounded-2xl bg-slate-950/80 p-3 shadow-[0_18px_40px_-28px_rgba(15,23,42,0.9)]">
+          <div className="rounded-2xl bg-background/80 p-3 shadow-[0_18px_40px_-28px_rgba(15,23,42,0.9)]">
             <div className="space-y-3">
-              <div className="rounded-2xl bg-white/[0.03] shadow-sm backdrop-blur">
+              <div className="rounded-2xl bg-card/40 shadow-sm backdrop-blur">
                 <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-                  <div className="w-full overflow-x-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/20">
+                  <div className="w-full overflow-x-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted/80">
                     <div className="inline-flex min-w-max flex-nowrap gap-2 text-xs">
                       {TAB_CONFIG.map((tab) => {
                         const isActive = activeTab === tab.id;
@@ -1298,13 +1298,13 @@ export default function VendorDashboardPage() {
                             className={`min-w-[120px] shrink-0 inline-flex items-center justify-between gap-2 rounded-full px-4 py-1.5 text-[11px] font-medium transition ${
                               isActive
                                 ? "bg-gradient-to-b from-emerald-500/30 to-emerald-500/10 text-emerald-100 shadow-[0_0_8px_rgba(16,185,129,0.35)] border border-emerald-400/40"
-                                : "bg-white/5 text-white/70 border border-white/10 hover:text-white hover:border-white/30"
+                                : "bg-muted/40 text-foreground/70 border border-border hover:text-foreground hover:border-border"
                             }`}
                           >
                             <span>{tab.label}</span>
                             <span
                               className={`inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
-                                isActive ? "bg-emerald-200/20 text-emerald-100" : "bg-white/15 text-white/90"
+                                isActive ? "bg-emerald-200/20 text-emerald-100" : "bg-muted text-foreground/90"
                               }`}
                             >
                               {tabCounts[tab.id] ?? 0}
@@ -1314,9 +1314,9 @@ export default function VendorDashboardPage() {
                       })}
                     </div>
                   </div>
-                  <div className="text-xs text-white/70">{activeTabCount} entries</div>
+                  <div className="text-xs text-foreground/70">{activeTabCount} entries</div>
                 </div>
-                <div className="px-4 pb-3 text-xs text-white/70">{currentTab.subtitle}</div>
+                <div className="px-4 pb-3 text-xs text-foreground/70">{currentTab.subtitle}</div>
               </div>
             </div>
           </div>
@@ -1417,18 +1417,18 @@ export default function VendorDashboardPage() {
 
       {/* Part Details Modal */}
       {partDetailsModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-2xl border border-amber-400/25 bg-gradient-to-b from-slate-950 via-slate-900/95 to-slate-950 shadow-xl p-5">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/60 p-3 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-2xl border border-amber-400/25 bg-gradient-to-b from-background via-popover/95 to-background shadow-xl p-5">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <div className="text-sm font-bold text-white">Complete Part Details</div>
+                <div className="text-sm font-bold text-foreground">Complete Part Details</div>
                 <div className="text-[11px] text-slate-400">Required before viewing order</div>
               </div>
-              <button type="button" onClick={() => setPartDetailsModal(null)} className="text-slate-500 hover:text-white text-lg">&times;</button>
+              <button type="button" onClick={() => setPartDetailsModal(null)} className="text-slate-500 hover:text-foreground text-lg">&times;</button>
             </div>
 
-            <div className="mb-4 rounded-lg border border-slate-700/60 bg-slate-950/50 p-3">
-              <div className="text-sm font-semibold text-white">{partDetailsModal.partName}</div>
+            <div className="mb-4 rounded-lg border border-border/60 bg-background/50 p-3">
+              <div className="text-sm font-semibold text-foreground">{partDetailsModal.partName}</div>
               <div className="text-[10px] text-slate-400 mt-0.5">{partDetailsModal.carInfo}</div>
             </div>
 
@@ -1439,7 +1439,7 @@ export default function VendorDashboardPage() {
                 <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-400">Part Number <span className="text-red-400">*</span></label>
                 <input
                   type="text"
-                  className="h-9 w-full rounded border border-slate-700 bg-slate-950/80 px-3 text-xs text-slate-100 placeholder:text-slate-500"
+                  className="h-9 w-full rounded border border-border bg-background/80 px-3 text-xs text-slate-100 placeholder:text-slate-500"
                   placeholder="e.g. 4M0827211"
                   value={partDetailsForm.partNumber}
                   onChange={(e) => setPartDetailsForm((prev) => ({ ...prev, partNumber: e.target.value }))}
@@ -1454,7 +1454,7 @@ export default function VendorDashboardPage() {
                     <button type="button" onClick={() => setPartDetailsForm((prev) => ({ ...prev, diagramFileId: "", diagramFileName: "" }))} className="ml-2 text-slate-400 hover:text-rose-400">&times;</button>
                   </div>
                 ) : (
-                  <label className="flex cursor-pointer items-center justify-center gap-2 rounded border-2 border-dashed border-slate-700 bg-slate-950/50 px-4 py-6 text-xs text-slate-400 hover:border-amber-500/40 hover:text-amber-300 transition">
+                  <label className="flex cursor-pointer items-center justify-center gap-2 rounded border-2 border-dashed border-border bg-background/50 px-4 py-6 text-xs text-slate-400 hover:border-amber-500/40 hover:text-amber-300 transition">
                     <input
                       type="file"
                       accept="image/*"
@@ -1485,11 +1485,11 @@ export default function VendorDashboardPage() {
             </div>
 
             <div className="mt-4 flex items-center justify-end gap-2">
-              <button type="button" onClick={() => setPartDetailsModal(null)} className="rounded border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:bg-slate-700">Cancel</button>
+              <button type="button" onClick={() => setPartDetailsModal(null)} className="rounded border border-border bg-card px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-muted">Cancel</button>
               <button
                 type="button"
                 disabled={partDetailsSaving || !partDetailsForm.partNumber.trim() || !partDetailsForm.diagramFileId}
-                className="rounded bg-amber-500 px-4 py-1.5 text-xs font-bold text-slate-950 hover:bg-amber-400 disabled:opacity-50"
+                className="rounded bg-amber-500 px-4 py-1.5 text-xs font-bold text-background hover:bg-amber-400 disabled:opacity-50"
                 onClick={async () => {
                   if (!partDetailsForm.partNumber.trim() || !partDetailsForm.diagramFileId) {
                     setPartDetailsError("Both part number and diagram are required.");
@@ -1529,11 +1529,11 @@ export default function VendorDashboardPage() {
       )}
 
       {deliveryNoteModal ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-3 backdrop-blur-sm">
-          <div className="w-full max-w-3xl overflow-hidden rounded-2xl border border-cyan-400/25 bg-gradient-to-b from-slate-950 via-slate-900/95 to-slate-950 shadow-[0_35px_90px_-45px_rgba(6,182,212,0.45)]">
-            <div className="flex items-start justify-between border-b border-white/10 bg-white/[0.03] px-5 py-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/55 p-3 backdrop-blur-sm">
+          <div className="w-full max-w-3xl overflow-hidden rounded-2xl border border-cyan-400/25 bg-gradient-to-b from-background via-popover/95 to-background shadow-[0_35px_90px_-45px_rgba(6,182,212,0.45)]">
+            <div className="flex items-start justify-between border-b border-border bg-card/40 px-5 py-4">
               <div className="space-y-1">
-                <div className="text-[10px] uppercase tracking-[0.25em] text-white/45">Delivery Note</div>
+                <div className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground">Delivery Note</div>
                 <div className="text-lg font-semibold text-cyan-200">
                   {deliveryNoteModal.noteNo ?? "Not Issued Yet"}
                 </div>
@@ -1560,23 +1560,23 @@ export default function VendorDashboardPage() {
               <button
                 type="button"
                 onClick={() => setDeliveryNoteModal(null)}
-                className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold text-white/80 hover:bg-white/20"
+                className="rounded-full border border-border bg-muted px-3 py-1 text-xs font-semibold text-foreground/80 hover:bg-muted/80"
               >
                 Close
               </button>
             </div>
 
             <div className="p-5">
-              <div className="overflow-hidden rounded-xl border border-white/10">
+              <div className="overflow-hidden rounded-xl border border-border">
                 <table className="w-full text-xs text-slate-100">
-                  <thead className="bg-slate-900/90 text-[10px] uppercase tracking-[0.2em] text-slate-400">
+                  <thead className="bg-popover/90 text-[10px] uppercase tracking-[0.2em] text-slate-400">
                     <tr>
                       <th className="px-3 py-2 text-left">Part</th>
                       <th className="px-3 py-2 text-left">Qty</th>
                       <th className="px-3 py-2 text-left">Price</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-white/10 bg-slate-950/60">
+                  <tbody className="divide-y divide-border bg-background/60">
                     {(deliveryNoteModal.items.length ? deliveryNoteModal.items : [{ partName: "-", qty: "-", price: "-" }]).map(
                       (item, idx) => (
                         <tr key={`${item.partName}-${idx}`}>
@@ -1591,7 +1591,7 @@ export default function VendorDashboardPage() {
               </div>
             </div>
 
-            <div className="grid gap-3 border-t border-white/10 px-5 py-4 md:grid-cols-2">
+            <div className="grid gap-3 border-t border-border px-5 py-4 md:grid-cols-2">
               {(() => {
                 const sourceMapUrl =
                   deliveryNoteModal.sourceUrl ??
@@ -1611,7 +1611,7 @@ export default function VendorDashboardPage() {
                   `https://www.google.com/maps?q=${encodeURIComponent(destinationSearchText)}`;
                 return (
                   <>
-              <div className="rounded-xl border border-white/10 bg-slate-900/70 p-3">
+              <div className="rounded-xl border border-border bg-popover/70 p-3">
                 <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400">Pickup Location</div>
                 <div className="mt-1 text-sm font-medium text-slate-100">
                   {deliveryNoteModal.sourceName ?? "-"}
@@ -1631,7 +1631,7 @@ export default function VendorDashboardPage() {
                   </div>
                 ) : null}
               </div>
-              <div className="rounded-xl border border-white/10 bg-slate-900/70 p-3">
+              <div className="rounded-xl border border-border bg-popover/70 p-3">
                 <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400">Destination</div>
                 <div className="mt-1 text-sm font-medium text-slate-100">
                   Assigned Workshop
@@ -1664,9 +1664,9 @@ export default function VendorDashboardPage() {
       ) : null}
 
       {partsOpen && selectedInquiry ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-2 backdrop-blur-sm">
-          <div className="w-full max-w-[1600px] overflow-hidden rounded-2xl border border-white/15 bg-slate-900/85 text-slate-100 shadow-[0_30px_80px_-40px_rgba(15,23,42,0.85)]">
-            <div className="flex items-center justify-between border-b border-white/10 bg-slate-900/70 px-4 py-3 text-sm font-semibold text-slate-100">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/40 p-2 backdrop-blur-sm">
+          <div className="w-full max-w-[1600px] overflow-hidden rounded-2xl border border-border bg-popover/85 text-slate-100 shadow-[0_30px_80px_-40px_rgba(15,23,42,0.85)]">
+            <div className="flex items-center justify-between border-b border-border bg-popover/70 px-4 py-3 text-sm font-semibold text-slate-100">
               <span>Enter Part Details.</span>
               <button
                 type="button"
@@ -1678,12 +1678,12 @@ export default function VendorDashboardPage() {
                   setBrandLoadingByRow({});
                   setBrandTypeaheadByField({});
                 }}
-                className="text-lg font-semibold text-slate-200 hover:text-white"
+                className="text-lg font-semibold text-muted-foreground hover:text-foreground"
               >
                 ×
               </button>
             </div>
-            <div className="grid gap-3 border-b border-white/10 p-4 md:grid-cols-4">
+            <div className="grid gap-3 border-b border-border p-4 md:grid-cols-4">
               <div className="space-y-1">
                 <div className="text-xs font-semibold text-slate-300">Car Make</div>
                 <input
@@ -1693,7 +1693,7 @@ export default function VendorDashboardPage() {
                       ? "Inventory"
                       : selectedInquiry.carMake ?? ""
                   }
-                  className="w-full rounded-md border border-white/15 bg-slate-900/70 px-2 py-1 text-sm text-slate-100 placeholder:text-slate-400"
+                  className="w-full rounded-md border border-border bg-popover/70 px-2 py-1 text-sm text-slate-100 placeholder:text-slate-400"
                 />
               </div>
               <div className="space-y-1">
@@ -1705,7 +1705,7 @@ export default function VendorDashboardPage() {
                       ? selectedInquiry.requestNumber ?? "Request"
                       : selectedInquiry.carModel ?? ""
                   }
-                  className="w-full rounded-md border border-white/15 bg-slate-900/70 px-2 py-1 text-sm text-slate-100 placeholder:text-slate-400"
+                  className="w-full rounded-md border border-border bg-popover/70 px-2 py-1 text-sm text-slate-100 placeholder:text-slate-400"
                 />
               </div>
               <div className="space-y-1">
@@ -1713,7 +1713,7 @@ export default function VendorDashboardPage() {
                 <input
                   readOnly
                   value={selectedInquiry.sourceType === "inventory" ? "" : selectedInquiry.carPlate ?? ""}
-                  className="w-full rounded-md border border-white/15 bg-slate-900/70 px-2 py-1 text-sm text-slate-100 placeholder:text-slate-400"
+                  className="w-full rounded-md border border-border bg-popover/70 px-2 py-1 text-sm text-slate-100 placeholder:text-slate-400"
                 />
               </div>
               <div className="space-y-1">
@@ -1721,12 +1721,12 @@ export default function VendorDashboardPage() {
                 <input
                   readOnly
                   value={selectedInquiry.sourceType === "inventory" ? "" : selectedInquiry.carVin ?? ""}
-                  className="w-full rounded-md border border-white/15 bg-slate-900/70 px-2 py-1 text-sm text-slate-100 placeholder:text-slate-400"
+                  className="w-full rounded-md border border-border bg-popover/70 px-2 py-1 text-sm text-slate-100 placeholder:text-slate-400"
                 />
               </div>
             </div>
 
-            <div className="max-h-[72vh] overflow-y-auto bg-slate-900/30 px-4 pb-6">
+            <div className="max-h-[72vh] overflow-y-auto bg-popover/30 px-4 pb-6">
               {partsLoading ? (
                 <div className="py-8 text-center text-sm text-slate-500">Loading parts...</div>
               ) : partsError ? (
@@ -1758,7 +1758,7 @@ export default function VendorDashboardPage() {
                     ];
 
                     return (
-                      <div key={row.id} className="rounded-xl border border-slate-700/70 bg-slate-900/45 p-3">
+                      <div key={row.id} className="rounded-xl border border-border/70 bg-popover/45 p-3">
                         <div className="flex flex-wrap items-start justify-between gap-3">
                           <div>
                             <div className="text-sm font-semibold text-slate-100">{row.partName}</div>
@@ -1772,10 +1772,10 @@ export default function VendorDashboardPage() {
 
                         <div className="mt-3 space-y-3">
                           {/* Remarks */}
-                          <div className="rounded-lg border border-slate-700/60 bg-slate-950/30 p-3">
+                          <div className="rounded-lg border border-border/60 bg-background/30 p-3">
                             <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Remarks <span className="normal-case font-normal text-slate-600">(optional)</span></div>
                             <textarea
-                              className="h-16 w-full rounded border border-slate-700 bg-slate-950/80 px-2 py-1.5 text-xs text-slate-100 placeholder:text-slate-500"
+                              className="h-16 w-full rounded border border-border bg-background/80 px-2 py-1.5 text-xs text-slate-100 placeholder:text-slate-500"
                               placeholder="Add notes about this part..."
                               value={form?.remarks ?? ""}
                               onChange={(e) => updatePartForm(row.id, "remarks", e.target.value)}
@@ -1783,16 +1783,16 @@ export default function VendorDashboardPage() {
                             />
                           </div>
 
-                          <div className="rounded-lg border border-slate-700/60 bg-slate-950/30 p-3">
+                          <div className="rounded-lg border border-border/60 bg-background/30 p-3">
                             <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-300">Quote Options</div>
                             <div className="grid gap-2 sm:grid-cols-2">
                               {options.map((opt) => {
                                 const enabled = isTypeEnabled(row, opt.key);
                                 return (
-                                  <div key={opt.key} className={`rounded-lg border p-2 ${enabled ? "border-slate-700 bg-slate-900/40" : "border-slate-800 bg-slate-900/20 opacity-50"}`}>
+                                  <div key={opt.key} className={`rounded-lg border p-2 ${enabled ? "border-border bg-popover/40" : "border-slate-800 bg-popover/20 opacity-50"}`}>
                                     <div className="mb-1 text-[11px] font-semibold text-slate-300">{opt.label}</div>
                                     <select
-                                      className="mb-1 w-full rounded border border-slate-700 bg-slate-950/80 px-2 py-1 text-xs text-slate-100"
+                                      className="mb-1 w-full rounded border border-border bg-background/80 px-2 py-1 text-xs text-slate-100"
                                       value={(form?.[opt.brandKey] as string) ?? ""}
                                       onChange={(e) => updatePartForm(row.id, opt.brandKey, e.target.value)}
                                       onBlur={() => markDraftSaved(row.id)}
@@ -1813,7 +1813,7 @@ export default function VendorDashboardPage() {
                                     {(String(form?.[opt.brandKey] ?? "") === BRAND_OTHER_VALUE) ? (
                                       <>
                                         <input
-                                          className="mb-1 w-full rounded border border-slate-700 bg-slate-950/80 px-2 py-1 text-xs text-slate-100 placeholder:text-slate-500"
+                                          className="mb-1 w-full rounded border border-border bg-background/80 px-2 py-1 text-xs text-slate-100 placeholder:text-slate-500"
                                           placeholder={`Enter ${opt.label} brand`}
                                           value={(form?.[opt.customBrandKey] as string) ?? ""}
                                           onChange={(e) => {
@@ -1848,7 +1848,7 @@ export default function VendorDashboardPage() {
                                       </>
                                     ) : null}
                                     <input
-                                      className="w-full rounded border border-slate-700 bg-slate-950/80 px-2 py-1 text-xs text-slate-100 placeholder:text-slate-500"
+                                      className="w-full rounded border border-border bg-background/80 px-2 py-1 text-xs text-slate-100 placeholder:text-slate-500"
                                       placeholder={`${opt.label} Unit Price`}
                                       value={(form?.[opt.amountKey] as string) ?? ""}
                                       onChange={(e) => updatePartForm(row.id, opt.amountKey, e.target.value)}
@@ -1857,7 +1857,7 @@ export default function VendorDashboardPage() {
                                     />
                                     <div className="mt-1 grid grid-cols-2 gap-1">
                                       <input
-                                        className="rounded border border-slate-700 bg-slate-950/80 px-2 py-1 text-xs text-slate-100"
+                                        className="rounded border border-border bg-background/80 px-2 py-1 text-xs text-slate-100"
                                         placeholder="Qty"
                                         value={(form?.[opt.qtyKey] as string) ?? "1"}
                                         onChange={(e) => updatePartForm(row.id, opt.qtyKey, e.target.value)}
@@ -1865,7 +1865,7 @@ export default function VendorDashboardPage() {
                                         disabled={!enabled}
                                       />
                                       <select
-                                        className="rounded border border-slate-700 bg-slate-950/80 px-2 py-1 text-xs text-slate-100"
+                                        className="rounded border border-border bg-background/80 px-2 py-1 text-xs text-slate-100"
                                         value={(form?.[opt.etdKey] as string) ?? "Same Day"}
                                         onChange={(e) => {
                                           const nextEtd = e.target.value;
@@ -1884,7 +1884,7 @@ export default function VendorDashboardPage() {
                                     </div>
                                     {(form?.[opt.etdKey] as string) === "Same Day" ? (
                                       <select
-                                        className="mt-1 w-full rounded border border-slate-700 bg-slate-950/80 px-2 py-1 text-xs text-slate-100"
+                                        className="mt-1 w-full rounded border border-border bg-background/80 px-2 py-1 text-xs text-slate-100"
                                         value={(form?.[opt.timeKey] as string) ?? ""}
                                         onChange={(e) => updatePartForm(row.id, opt.timeKey, e.target.value)}
                                         onBlur={() => markDraftSaved(row.id)}
@@ -1908,7 +1908,7 @@ export default function VendorDashboardPage() {
                           </div>
                         </div>
 
-                        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-700/60 pt-3">
+                        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-3">
                           <div className="text-[11px]">
                             {submitErrors[row.id] ? (
                               <span className="text-rose-400">{submitErrors[row.id]}</span>
@@ -1997,7 +1997,7 @@ export default function VendorDashboardPage() {
                                 }));
                               }
                             }}
-                            className="rounded-md bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="rounded-md bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-foreground transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             {status === "saving"
                               ? "Saving..."

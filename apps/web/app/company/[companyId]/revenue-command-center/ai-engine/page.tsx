@@ -49,7 +49,7 @@ export default function RccAiEnginePage() {
 
       <div className="grid grid-cols-4 gap-3">
         {(data.kpis as Kpi[]).map((k, i) => (
-          <div key={i} className={`rounded-xl p-4 ${i === 0 ? "bg-emerald-500/[0.06]" : "bg-white/[0.03]"}`}>
+          <div key={i} className={`rounded-xl p-4 ${i === 0 ? "bg-emerald-500/[0.06]" : "bg-card/40"}`}>
             <p className="text-[11px] opacity-40 uppercase tracking-wider">{k.label}</p>
             <p className={`text-2xl font-bold mt-1 ${i === 0 ? "text-emerald-400" : ""}`}>{k.formatted}</p>
           </div>
@@ -64,7 +64,7 @@ export default function RccAiEnginePage() {
         <div className="space-y-2">
           {(data.signals as AiSignal[]).length === 0 && <p className="text-center opacity-30 py-8">No signals for the current period. Signals appear when AI engines detect leakage patterns, ROI anomalies, or optimization opportunities.</p>}
           {(data.signals as AiSignal[]).map(sig => (
-            <div key={sig.id} className="rounded-lg p-4 bg-white/[0.03] border-l-[3px]" style={{ borderLeftColor: sig.severity === "CRITICAL" ? "#ef4444" : sig.severity === "HIGH" ? "#f59e0b" : "#3b82f6" }}>
+            <div key={sig.id} className="rounded-lg p-4 bg-card/40 border-l-[3px]" style={{ borderLeftColor: sig.severity === "CRITICAL" ? "#ef4444" : sig.severity === "HIGH" ? "#f59e0b" : "#3b82f6" }}>
               <div className="flex justify-between items-start">
                 <div>
                   <div className="flex items-center gap-2 mb-1">
@@ -85,11 +85,11 @@ export default function RccAiEnginePage() {
         </div>
       </div>
 
-      <div className="rounded-xl bg-white/[0.03] p-5">
+      <div className="rounded-xl bg-card/40 p-5">
         <h3 className="font-semibold mb-4">AI ENGINE STATUS</h3>
         <div className="grid grid-cols-7 gap-3">
           {(data.engines as EngineStatus[]).map(eng => (
-            <div key={eng.key} className="rounded-lg bg-white/[0.03] p-3 text-center">
+            <div key={eng.key} className="rounded-lg bg-card/40 p-3 text-center">
               <div className="flex items-center justify-center gap-1.5 mb-2">
                 <span className={`w-1.5 h-1.5 rounded-full ${eng.isActive ? "bg-emerald-400" : "bg-red-400"}`} />
                 <span className={`text-[10px] font-medium ${eng.isActive ? "text-emerald-400/80" : "text-red-400/80"}`}>{eng.isActive ? "ACTIVE" : "OFF"}</span>

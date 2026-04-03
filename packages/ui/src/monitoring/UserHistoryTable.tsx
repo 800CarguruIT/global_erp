@@ -29,7 +29,7 @@ export function UserHistoryTable({ items }: Props) {
         </thead>
         <tbody>
           {items.map((it) => (
-            <tr key={it.id} className="border-b border-white/5">
+            <tr key={it.id} className="border-b border-border/40">
               <td className="px-3 py-2">{new Date(it.change_timestamp).toLocaleString()}</td>
               <td className="px-3 py-2">{it.change_type}</td>
               <td className="px-3 py-2 text-xs">

@@ -203,7 +203,7 @@ export function AiControlPanel() {
           <div className="md:col-span-1">
             <label className="text-[11px] opacity-70">Key</label>
             <input
-              className="mt-1 w-full rounded-md border border-white/10 bg-black/20 px-2 py-1 text-sm"
+              className="mt-1 w-full rounded-md border border-border bg-black/20 px-2 py-1 text-sm"
               value={createForm.key}
               onChange={(e) => setCreateForm({ ...createForm, key: e.target.value })}
               placeholder="voice_ai"
@@ -212,7 +212,7 @@ export function AiControlPanel() {
           <div className="md:col-span-1">
             <label className="text-[11px] opacity-70">Label</label>
             <input
-              className="mt-1 w-full rounded-md border border-white/10 bg-black/20 px-2 py-1 text-sm"
+              className="mt-1 w-full rounded-md border border-border bg-black/20 px-2 py-1 text-sm"
               value={createForm.label}
               onChange={(e) => setCreateForm({ ...createForm, label: e.target.value })}
               placeholder="AI Voice"
@@ -221,7 +221,7 @@ export function AiControlPanel() {
           <div>
             <label className="text-[11px] opacity-70">Category</label>
             <input
-              className="mt-1 w-full rounded-md border border-white/10 bg-black/20 px-2 py-1 text-sm"
+              className="mt-1 w-full rounded-md border border-border bg-black/20 px-2 py-1 text-sm"
               value={createForm.category}
               onChange={(e) => setCreateForm({ ...createForm, category: e.target.value })}
               placeholder="call-center / automation"
@@ -230,7 +230,7 @@ export function AiControlPanel() {
           <div className="md:col-span-2">
             <label className="text-[11px] opacity-70">Description</label>
             <input
-              className="mt-1 w-full rounded-md border border-white/10 bg-black/20 px-2 py-1 text-sm"
+              className="mt-1 w-full rounded-md border border-border bg-black/20 px-2 py-1 text-sm"
               value={createForm.description}
               onChange={(e) => setCreateForm({ ...createForm, description: e.target.value })}
               placeholder="What this module does"
@@ -246,7 +246,7 @@ export function AiControlPanel() {
             <button
               type="submit"
               disabled={saving}
-              className="ml-auto rounded-full border border-white/20 px-3 py-1 text-sm hover:border-white/40 disabled:opacity-50"
+              className="ml-auto rounded-full border border-border px-3 py-1 text-sm hover:border-border disabled:opacity-50"
             >
               Add module
             </button>

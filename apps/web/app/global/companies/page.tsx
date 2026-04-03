@@ -255,8 +255,8 @@ function GlobalCompaniesContent() {
                           disabled={statusUpdatingId === c.id}
                           onClick={() => handleToggleStatus(c.id, !isActive)}
                           className={`relative inline-flex h-6 w-11 items-center rounded-full border transition ${
-                            isActive ? "border-emerald-400/70 bg-emerald-500/30" : "border-white/15 bg-white/5"
-                          } ${statusUpdatingId === c.id ? "opacity-60 cursor-not-allowed" : "hover:border-white/40"}`}
+                            isActive ? "border-emerald-400/70 bg-emerald-500/30" : "border-border bg-muted/40"
+                          } ${statusUpdatingId === c.id ? "opacity-60 cursor-not-allowed" : "hover:border-border"}`}
                         >
                           <span
                             className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${
@@ -276,8 +276,8 @@ function GlobalCompaniesContent() {
                         disabled={updatingId === c.id}
                         onClick={() => handleToggleCoa(c.id, !c.allow_custom_coa)}
                         className={`relative inline-flex h-6 w-11 items-center rounded-full border transition ${
-                          c.allow_custom_coa ? "border-emerald-400/70 bg-emerald-500/30" : "border-white/15 bg-white/5"
-                        } ${updatingId === c.id ? "opacity-60 cursor-not-allowed" : "hover:border-white/40"}`}
+                          c.allow_custom_coa ? "border-emerald-400/70 bg-emerald-500/30" : "border-border bg-muted/40"
+                        } ${updatingId === c.id ? "opacity-60 cursor-not-allowed" : "hover:border-border"}`}
                       >
                         <span
                           className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${

@@ -59,7 +59,7 @@ export default function BalanceSheetPage() {
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead>
-                <tr className="border-b border-white/10 text-left text-xs text-muted-foreground">
+                <tr className="border-b border-border text-left text-xs text-muted-foreground">
                   <th className="px-3 py-2">{t("accounting.balance.account")}</th>
                   <th className="px-3 py-2 text-right">{t("accounting.balance.amount")}</th>
                 </tr>
@@ -70,7 +70,7 @@ export default function BalanceSheetPage() {
                   const name = r.accountName ?? "";
                   const amount = typeof r.amount === "number" ? r.amount : Number(r.amount ?? 0);
                   return (
-                    <tr key={`${code || "acct"}-${idx}`} className="border-b border-white/5">
+                    <tr key={`${code || "acct"}-${idx}`} className="border-b border-border">
                       <td className="px-3 py-2">
                         <div className="font-semibold">{name || code || "-"}</div>
                         <div className="text-xs text-muted-foreground">{code}</div>

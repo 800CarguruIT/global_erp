@@ -19,6 +19,9 @@ const publicPaths = [
   "/api/public/recovery-requests",
   "/api/public/pre-inspection",
   "/api/public/estimate-approval",
+  "/api/public/lead",
+  // Public share pages
+  "/share",
   // Webhook receivers (use provider-specific signature verification)
   "/api/webhooks/dialer",
   "/api/webhooks/channels",

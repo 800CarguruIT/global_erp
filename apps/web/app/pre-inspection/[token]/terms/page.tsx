@@ -28,7 +28,7 @@ export default function PreInspectionTermsPage({ params }: Params) {
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100">
       <div className="mx-auto max-w-3xl px-4 py-8">
-        <div className="rounded-2xl border border-white/10 bg-slate-900/70 p-5">
+        <div className="rounded-2xl border border-border bg-slate-900/70 p-5">
           <h1 className="text-2xl font-semibold">Terms and Conditions</h1>
           <p className="mt-1 text-sm text-slate-300">
             Pre-inspection / pre-pickup consent and declaration.
@@ -39,7 +39,7 @@ export default function PreInspectionTermsPage({ params }: Params) {
           </div>
         </div>
 
-        <section className="mt-4 space-y-3 rounded-2xl border border-white/10 bg-slate-900/70 p-5 text-sm leading-6 text-slate-200">
+        <section className="mt-4 space-y-3 rounded-2xl border border-border bg-slate-900/70 p-5 text-sm leading-6 text-slate-200">
           <p>
             By submitting this form, I confirm the provided information is accurate to the best of my knowledge.
           </p>

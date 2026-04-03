@@ -10,7 +10,7 @@ export default function GlobalChannelsNewPage() {
         <h1 className="text-xl sm:text-2xl font-semibold">Create Global Channel Integration</h1>
         <div className="flex justify-start">
           <button
-            className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs sm:text-sm transition"
+            className="px-3 py-1.5 rounded-lg bg-muted hover:bg-muted/80 text-xs sm:text-sm transition"
             onClick={() => (window.location.href = "/global/integrations/channels")}
           >
             ← Back to Channel Integrations

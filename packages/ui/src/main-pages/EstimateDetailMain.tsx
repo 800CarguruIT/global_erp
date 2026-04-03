@@ -2313,7 +2313,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
           <button
             type="button"
             onClick={() => window.history.back()}
-            className="rounded-md border border-slate-400/40 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-white/15"
+            className="rounded-md border border-border bg-muted px-3 py-1.5 text-xs font-semibold text-foreground shadow-sm transition hover:bg-muted"
           >
             Back
           </button>
@@ -2321,7 +2321,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
             href={`/api/company/${companyId}/workshop/estimates/${estimate.id}/quote`}
             target="_blank"
             rel="noreferrer"
-            className="rounded-md border border-slate-400/40 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-white/15"
+            className="rounded-md border border-border bg-muted px-3 py-1.5 text-xs font-semibold text-foreground shadow-sm transition hover:bg-muted"
           >
             Print Quotation
           </a>
@@ -2382,34 +2382,34 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
         </div>
       )}
       <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <div className={`rounded-xl border border-slate-600/60 px-3 py-2 ${theme.cardBg}`}>
+        <div className={`rounded-xl border border-border px-3 py-2 ${theme.cardBg}`}>
           <div className="text-[11px] text-muted-foreground">Estimate Status</div>
           <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${estimateStatusTone}`}>
             {estimate.status.replace("_", " ")}
           </span>
         </div>
-        <div className={`rounded-xl border border-slate-600/60 px-3 py-2 ${theme.cardBg}`}>
+        <div className={`rounded-xl border border-border px-3 py-2 ${theme.cardBg}`}>
           <div className="text-[11px] text-muted-foreground">Approved Items</div>
           <div className="mt-1 text-lg font-semibold text-emerald-400">{approvedItemsCount}</div>
         </div>
-        <div className={`rounded-xl border border-slate-600/60 px-3 py-2 ${theme.cardBg}`}>
+        <div className={`rounded-xl border border-border px-3 py-2 ${theme.cardBg}`}>
           <div className="text-[11px] text-muted-foreground">Pending Items</div>
           <div className="mt-1 text-lg font-semibold text-amber-400">{pendingItemsCount}</div>
         </div>
-        <div className={`rounded-xl border border-slate-600/60 px-3 py-2 ${theme.cardBg}`}>
+        <div className={`rounded-xl border border-border px-3 py-2 ${theme.cardBg}`}>
           <div className="text-[11px] text-muted-foreground">Grand Total (Approved)</div>
           <div className="mt-1 text-lg font-semibold">{totals ? totals.approved.grandTotal.toFixed(2) : "0.00"}</div>
         </div>
-        <div className={`rounded-xl border border-slate-600/60 px-3 py-2 ${theme.cardBg}`}>
+        <div className={`rounded-xl border border-border px-3 py-2 ${theme.cardBg}`}>
           <div className="text-[11px] text-muted-foreground">Save Status</div>
           <div className="mt-1 text-xs font-semibold">{saveStatusText}</div>
         </div>
       </div>
       <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,1fr)]">
         <div className="space-y-4">
-          <section className={`rounded-xl border border-slate-600/60 ${theme.cardBg}`}>
+          <section className={`rounded-xl border border-border ${theme.cardBg}`}>
             <div
-              className={`flex items-center justify-between rounded-t-xl border-b border-slate-600/60 px-4 py-3 text-xs font-semibold ${theme.surfaceSubtle} ${theme.appText}`}
+              className={`flex items-center justify-between rounded-t-xl border-b border-border px-4 py-3 text-xs font-semibold ${theme.surfaceSubtle} ${theme.appText}`}
             >
               <span>Estimate Details</span>
             </div>
@@ -2475,16 +2475,16 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                 <button
                   type="button"
                   onClick={refreshQuoteUpdates}
-                  className="rounded-md border border-slate-500/60 bg-slate-800/60 px-3 py-1.5 text-xs font-semibold text-slate-100"
+                  className="rounded-md border border-border bg-popover/60 px-3 py-1.5 text-xs font-semibold text-foreground"
                   disabled={isRefreshingQuotes || isEstimateClosed}
                 >
                   {isRefreshingQuotes ? "Refreshing..." : "Refresh Quotes"}
                 </button>
               </div>
-              <div className="rounded-md border border-slate-600/60 bg-slate-900/20 px-3 py-2 text-[11px] text-slate-300">
+              <div className="rounded-md border border-border bg-popover/20 px-3 py-2 text-[11px] text-muted-foreground">
                 Step flow: Review AI type-sale thresholds, select type, edit type sale, then set status. Final discount is set in Invoice Summary.
               </div>
-              <div className="overflow-x-auto rounded-lg border border-slate-600/60">
+              <div className="overflow-x-auto rounded-lg border border-border">
                 <table className="min-w-full text-xs">
                   <thead className={`${theme.surfaceSubtle} ${theme.appText} text-[10px] uppercase tracking-[0.08em]`}>
                     <tr>
@@ -2527,7 +2527,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                         const minAllowedSubtotal = getSelectedTypeMinSubtotal(item);
                         const needsApproval = requiresDiscountApproval(item);
                         return (
-                          <tr key={idx} className="border-b border-slate-600/60 transition-colors odd:bg-slate-900/15 hover:bg-slate-800/25 last:border-0">
+                          <tr key={idx} className="border-b border-border transition-colors odd:bg-popover/15 hover:bg-muted/25 last:border-0">
                             <td className="px-2 py-1">
                               <div className="relative space-y-1">
                                 <input
@@ -2551,7 +2551,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                                     {marketPricingLoading ? "AI..." : "AI Avg"}
                                   </button>
                                   {marketPricingInsight?.source ? (
-                                    <span className="text-[9px] text-slate-400 uppercase">{marketPricingInsight.source}</span>
+                                    <span className="text-[9px] text-muted-foreground uppercase">{marketPricingInsight.source}</span>
                                   ) : null}
                                 </div>
                               </div>
@@ -2637,9 +2637,9 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                                       }}
                                     />
                                     <div className="grid grid-cols-2 gap-1 text-[9px]">
-                                      <div className="rounded border border-slate-600/60 bg-slate-900/25 px-1 py-0.5 text-center">
-                                        <div className="text-[8px] uppercase text-slate-400">Min</div>
-                                        <div className="font-semibold text-slate-200">{thresholdByType.minSale.toFixed(2)}</div>
+                                      <div className="rounded border border-border bg-popover/25 px-1 py-0.5 text-center">
+                                        <div className="text-[8px] uppercase text-muted-foreground">Min</div>
+                                        <div className="font-semibold text-foreground/80">{thresholdByType.minSale.toFixed(2)}</div>
                                       </div>
                                       <div className="rounded border border-cyan-500/40 bg-cyan-500/10 px-1 py-0.5 text-center">
                                         <div className="text-[8px] uppercase text-cyan-300">Avg</div>
@@ -2734,7 +2734,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                   </tbody>
                   {draft.items.length > 0 && lineItemTableTotals && (
                     <tfoot className={`${theme.surfaceSubtle} ${theme.appText}`}>
-                      <tr className="border-t border-slate-600/60 font-semibold">
+                      <tr className="border-t border-border font-semibold">
                         <td className="px-2 py-2 text-left">Totals</td>
                         <td className="px-2 py-2 text-left">-</td>
                         <td className="px-2 py-2 text-left">{lineItemTableTotals.qty.toFixed(2)}</td>
@@ -2789,7 +2789,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                   )}
                 </table>
               </div>
-              <div className="flex flex-wrap items-center gap-2 rounded-md border border-slate-600/60 bg-slate-900/20 p-2">
+              <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-popover/20 p-2">
                 <button
                   type="button"
                   onClick={addItem}
@@ -2820,7 +2820,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
               </div>
               <div className="flex justify-end">
                 <div
-                  className={`flex items-center gap-2 rounded-md border border-slate-600/60 px-3 py-2 text-xs font-semibold ${theme.surfaceSubtle} ${theme.appText}`}
+                  className={`flex items-center gap-2 rounded-md border border-border px-3 py-2 text-xs font-semibold ${theme.surfaceSubtle} ${theme.appText}`}
                 >
                   <span>Show Total in Estimate</span>
                   <label className="flex items-center gap-1 text-xs">
@@ -2833,7 +2833,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                   </label>
                 </div>
               </div>
-              <div className="rounded-lg border border-slate-600/60 bg-slate-900/30 p-3">
+              <div className="rounded-lg border border-border bg-popover/30 p-3">
                 <div className="mb-3 grid gap-2 sm:grid-cols-3">
                   <div className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2">
                     <div className="text-[10px] uppercase tracking-wide text-emerald-300">Approved Share</div>
@@ -2852,7 +2852,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                     </div>
                   </div>
                 </div>
-                <div className="overflow-x-auto rounded-md border border-slate-600/60">
+                <div className="overflow-x-auto rounded-md border border-border">
                   <table className="min-w-full text-xs">
                     <thead className={`${theme.surfaceSubtle} ${theme.appText}`}>
                       <tr>
@@ -2862,27 +2862,27 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                       </tr>
                     </thead>
                     <tbody>
-                      <tr className="border-t border-slate-600/60">
+                      <tr className="border-t border-border">
                         <td className="px-3 py-2">Total Cost</td>
                         <td className="px-3 py-2 text-right">{totals ? totals.pending.cost.toFixed(2) : "0.00"}</td>
                         <td className="px-3 py-2 text-right">{totals ? totals.approved.cost.toFixed(2) : "0.00"}</td>
                       </tr>
-                      <tr className="border-t border-slate-600/60">
+                      <tr className="border-t border-border">
                         <td className="px-3 py-2">Total Sale</td>
                         <td className="px-3 py-2 text-right">{totals ? totals.pending.sale.toFixed(2) : "0.00"}</td>
                         <td className="px-3 py-2 text-right">{totals ? totals.approved.sale.toFixed(2) : "0.00"}</td>
                       </tr>
-                      <tr className="border-t border-slate-600/60">
+                      <tr className="border-t border-border">
                         <td className="px-3 py-2">Discount</td>
                         <td className="px-3 py-2 text-right">{totals ? totals.pending.discount.toFixed(2) : "0.00"}</td>
                         <td className="px-3 py-2 text-right">{totals ? totals.approved.discount.toFixed(2) : "0.00"}</td>
                       </tr>
-                      <tr className="border-t border-slate-600/60">
+                      <tr className="border-t border-border">
                         <td className="px-3 py-2">Sub Total</td>
                         <td className="px-3 py-2 text-right">{totals ? totals.pending.subTotal.toFixed(2) : "0.00"}</td>
                         <td className="px-3 py-2 text-right">{totals ? totals.approved.subTotal.toFixed(2) : "0.00"}</td>
                       </tr>
-                      <tr className="border-t border-slate-600/60">
+                      <tr className="border-t border-border">
                         <td className="px-3 py-2">{`VAT (${totals ? totals.vatRate : 0}%)`}</td>
                         <td className="px-3 py-2 text-right">{totals ? totals.pending.vat.toFixed(2) : "0.00"}</td>
                         <td className="px-3 py-2 text-right">{totals ? totals.approved.vat.toFixed(2) : "0.00"}</td>
@@ -2898,7 +2898,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                   </table>
                 </div>
               </div>
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-600/60 bg-background/30 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-background/30 p-3">
                 <div className="text-xs text-muted-foreground">{saveStatusText}</div>
                 <div className="flex items-center gap-2">
                   {activeJobCardId ? (
@@ -2919,7 +2919,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                       className={`rounded-md px-4 py-2 text-xs font-semibold shadow-sm ${
                         canStartJobCard && !isEstimateClosed
                           ? "bg-indigo-600 text-white"
-                          : "cursor-not-allowed border border-slate-500/40 bg-slate-700/35 text-slate-300/70 opacity-70"
+                          : "cursor-not-allowed border border-border/40 bg-muted/35 text-muted-foreground/70 opacity-70"
                       }`}
                       disabled={!canStartJobCard || isEstimateClosed}
                     >
@@ -2931,7 +2931,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                     onClick={saveEstimate}
                     className={`rounded-md px-4 py-2 text-xs font-semibold shadow-sm ${
                       isSaving || isEstimateClosed
-                        ? "cursor-not-allowed border border-slate-500/40 bg-slate-700/35 text-slate-300/70 opacity-70"
+                        ? "cursor-not-allowed border border-border/40 bg-muted/35 text-muted-foreground/70 opacity-70"
                         : "bg-emerald-600 text-white"
                     }`}
                     disabled={isSaving || isEstimateClosed}
@@ -2942,9 +2942,9 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
               </div>
             </div>
           </section>
-          <section className={`rounded-xl border border-slate-600/60 ${theme.cardBg}`}>
+          <section className={`rounded-xl border border-border ${theme.cardBg}`}>
             <div
-              className={`flex items-center justify-between rounded-t-xl border-b border-slate-600/60 px-4 py-3 text-xs font-semibold ${theme.surfaceSubtle} ${theme.appText}`}
+              className={`flex items-center justify-between rounded-t-xl border-b border-border px-4 py-3 text-xs font-semibold ${theme.surfaceSubtle} ${theme.appText}`}
             >
               <span>New Job</span>
               <button
@@ -2958,11 +2958,11 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
             </div>
             {newJobItems.length > 0 ? (
               <div className="space-y-3 p-4">
-                <div className="text-xs font-semibold text-slate-200">New Job Line Items</div>
-                <div className="rounded-md border border-slate-600/60 bg-slate-900/20 px-3 py-2 text-[11px] text-slate-300">
+                <div className="text-xs font-semibold text-foreground/80">New Job Line Items</div>
+                <div className="rounded-md border border-border bg-popover/20 px-3 py-2 text-[11px] text-muted-foreground">
                   Same process as main job card with type-sale thresholds. Final discount is set in Invoice Summary.
                 </div>
-                <div className="overflow-x-auto rounded-lg border border-slate-600/60">
+                <div className="overflow-x-auto rounded-lg border border-border">
                   <table className="min-w-full text-xs">
                     <thead className={`${theme.surfaceSubtle} ${theme.appText} text-[10px] uppercase tracking-[0.08em]`}>
                       <tr>
@@ -2998,7 +2998,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                         const needsApproval = requiresDiscountApproval(item);
 
                         return (
-                          <tr key={`new-job-${idx}`} className="border-b border-slate-600/60 transition-colors odd:bg-slate-900/15 hover:bg-slate-800/25 last:border-0">
+                          <tr key={`new-job-${idx}`} className="border-b border-border transition-colors odd:bg-popover/15 hover:bg-muted/25 last:border-0">
                             <td className="px-2 py-1">
                               <div className="space-y-1">
                                 <input
@@ -3022,7 +3022,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                                     {marketPricingLoading ? "AI..." : "AI Avg"}
                                   </button>
                                   {marketPricingInsight?.source ? (
-                                    <span className="text-[9px] text-slate-400 uppercase">{marketPricingInsight.source}</span>
+                                    <span className="text-[9px] text-muted-foreground uppercase">{marketPricingInsight.source}</span>
                                   ) : null}
                                 </div>
                               </div>
@@ -3107,9 +3107,9 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                                       }}
                                     />
                                     <div className="grid grid-cols-2 gap-1 text-[9px]">
-                                      <div className="rounded border border-slate-600/60 bg-slate-900/25 px-1 py-0.5 text-center">
-                                        <div className="text-[8px] uppercase text-slate-400">Min</div>
-                                        <div className="font-semibold text-slate-200">{thresholdByType.minSale.toFixed(2)}</div>
+                                      <div className="rounded border border-border bg-popover/25 px-1 py-0.5 text-center">
+                                        <div className="text-[8px] uppercase text-muted-foreground">Min</div>
+                                        <div className="font-semibold text-foreground/80">{thresholdByType.minSale.toFixed(2)}</div>
                                       </div>
                                       <div className="rounded border border-cyan-500/40 bg-cyan-500/10 px-1 py-0.5 text-center">
                                         <div className="text-[8px] uppercase text-cyan-300">Avg</div>
@@ -3210,7 +3210,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                     </tbody>
                     {newJobItems.length > 0 && (
                       <tfoot className={`${theme.surfaceSubtle} ${theme.appText}`}>
-                        <tr className="border-t border-slate-600/60 font-semibold">
+                        <tr className="border-t border-border font-semibold">
                           <td className="px-2 py-2 text-left">Totals</td>
                           <td className="px-2 py-2 text-left">-</td>
                           <td className="px-2 py-2 text-left">{newJobLineItemTableTotals.qty.toFixed(2)}</td>
@@ -3265,7 +3265,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                     )}
                   </table>
                 </div>
-                <div className="flex items-center gap-2 rounded-md border border-slate-600/60 bg-slate-900/20 p-2">
+                <div className="flex items-center gap-2 rounded-md border border-border bg-popover/20 p-2">
                   <button
                     type="button"
                     onClick={addNewJobItem}
@@ -3286,7 +3286,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                     Remove ?
                   </button>
                 </div>
-                <div className="rounded-lg border border-slate-600/60 bg-slate-900/30 p-3">
+                <div className="rounded-lg border border-border bg-popover/30 p-3">
                   <div className="mb-3 grid gap-2 sm:grid-cols-3">
                     <div className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2">
                       <div className="text-[10px] uppercase tracking-wide text-emerald-300">Approved Share</div>
@@ -3305,7 +3305,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                       </div>
                     </div>
                   </div>
-                  <div className="overflow-x-auto rounded-md border border-slate-600/60">
+                  <div className="overflow-x-auto rounded-md border border-border">
                     <table className="min-w-full text-xs">
                       <thead className={`${theme.surfaceSubtle} ${theme.appText}`}>
                         <tr>
@@ -3315,27 +3315,27 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                         </tr>
                       </thead>
                       <tbody>
-                        <tr className="border-t border-slate-600/60">
+                        <tr className="border-t border-border">
                           <td className="px-3 py-2">Total Cost</td>
                           <td className="px-3 py-2 text-right">{newJobSummary.pending.cost.toFixed(2)}</td>
                           <td className="px-3 py-2 text-right">{newJobSummary.approved.cost.toFixed(2)}</td>
                         </tr>
-                        <tr className="border-t border-slate-600/60">
+                        <tr className="border-t border-border">
                           <td className="px-3 py-2">Total Sale</td>
                           <td className="px-3 py-2 text-right">{newJobSummary.pending.sale.toFixed(2)}</td>
                           <td className="px-3 py-2 text-right">{newJobSummary.approved.sale.toFixed(2)}</td>
                         </tr>
-                        <tr className="border-t border-slate-600/60">
+                        <tr className="border-t border-border">
                           <td className="px-3 py-2">Discount</td>
                           <td className="px-3 py-2 text-right">{newJobSummary.pending.discount.toFixed(2)}</td>
                           <td className="px-3 py-2 text-right">{newJobSummary.approved.discount.toFixed(2)}</td>
                         </tr>
-                        <tr className="border-t border-slate-600/60">
+                        <tr className="border-t border-border">
                           <td className="px-3 py-2">Sub Total</td>
                           <td className="px-3 py-2 text-right">{newJobSummary.pending.subTotal.toFixed(2)}</td>
                           <td className="px-3 py-2 text-right">{newJobSummary.approved.subTotal.toFixed(2)}</td>
                         </tr>
-                        <tr className="border-t border-slate-600/60">
+                        <tr className="border-t border-border">
                           <td className="px-3 py-2">{`VAT (${newJobSummary.vatRate}%)`}</td>
                           <td className="px-3 py-2 text-right">{newJobSummary.pending.vat.toFixed(2)}</td>
                           <td className="px-3 py-2 text-right">{newJobSummary.approved.vat.toFixed(2)}</td>
@@ -3366,7 +3366,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                     className={`rounded-md px-3 py-1.5 text-xs font-semibold ${
                       canStartAdditionalJobCard
                         ? "bg-indigo-600 text-white"
-                        : "cursor-not-allowed bg-slate-600/60 text-white/60"
+                        : "cursor-not-allowed bg-muted/60 text-muted-foreground"
                     }`}
                     disabled={!canStartAdditionalJobCard || isEstimateClosed}
                   >
@@ -3382,9 +3382,9 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
           </section>
         </div>
         <div className="space-y-3 lg:sticky lg:top-4 lg:self-start">
-          <section className={`rounded-xl border border-slate-600/60 ${theme.cardBg}`}>
+          <section className={`rounded-xl border border-border ${theme.cardBg}`}>
             <div
-              className={`rounded-t-xl border-b border-slate-600/60 px-3 py-2 text-xs font-semibold ${theme.surfaceSubtle} ${theme.appText}`}
+              className={`rounded-t-xl border-b border-border px-3 py-2 text-xs font-semibold ${theme.surfaceSubtle} ${theme.appText}`}
             >
               Customer Details
             </div>
@@ -3399,9 +3399,9 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
               </div>
             </div>
           </section>
-          <section className={`rounded-xl border border-slate-600/60 ${theme.cardBg}`}>
+          <section className={`rounded-xl border border-border ${theme.cardBg}`}>
             <div
-              className={`rounded-t-xl border-b border-slate-600/60 px-3 py-2 text-xs font-semibold ${theme.surfaceSubtle} ${theme.appText}`}
+              className={`rounded-t-xl border-b border-border px-3 py-2 text-xs font-semibold ${theme.surfaceSubtle} ${theme.appText}`}
             >
               Car Details
             </div>
@@ -3416,15 +3416,15 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
               </div>
             </div>
           </section>
-          <section className={`rounded-xl border border-slate-600/60 ${theme.cardBg}`}>
+          <section className={`rounded-xl border border-border ${theme.cardBg}`}>
             <div
-              className={`rounded-t-xl border-b border-slate-600/60 px-3 py-2 text-xs font-semibold ${theme.surfaceSubtle} ${theme.appText}`}
+              className={`rounded-t-xl border-b border-border px-3 py-2 text-xs font-semibold ${theme.surfaceSubtle} ${theme.appText}`}
             >
               Invoice Summary
             </div>
             <div className="space-y-2 p-3 text-xs">
-              <div className="rounded-md border border-slate-600/60 bg-slate-900/30 px-2 py-2">
-                <div className="mb-1 text-[11px] font-semibold text-slate-200">Readiness</div>
+              <div className="rounded-md border border-border bg-popover/30 px-2 py-2">
+                <div className="mb-1 text-[11px] font-semibold text-foreground/80">Readiness</div>
                 <div className="space-y-1 text-[11px]">
                   <div className="flex items-center justify-between">
                     <span>All job cards completed</span>
@@ -3446,8 +3446,8 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                   </div>
                 </div>
               </div>
-              <div className="rounded-md border border-slate-600/60 px-2 py-2">
-                <div className="mb-1 text-[11px] font-semibold text-slate-200">Job Cards</div>
+              <div className="rounded-md border border-border px-2 py-2">
+                <div className="mb-1 text-[11px] font-semibold text-foreground/80">Job Cards</div>
                 {jobCardTotals.length === 0 ? (
                   <div className="text-muted-foreground">No job cards yet.</div>
                 ) : (
@@ -3458,7 +3458,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                         href={`/company/${companyId}/workshop/job-cards/${row.jobId}`}
                         target="_blank"
                         rel="noreferrer"
-                        className="flex items-center justify-between rounded-md border border-slate-600/60 px-2 py-1.5 hover:bg-slate-800/40"
+                        className="flex items-center justify-between rounded-md border border-border px-2 py-1.5 hover:bg-slate-800/40"
                       >
                         <span className="font-semibold">{row.jobId.slice(0, 8)}...</span>
                         <span className="text-[10px] text-muted-foreground">{String(row.status || "").toUpperCase()}</span>
@@ -3469,21 +3469,21 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                 )}
               </div>
               <div className="rounded-md border border-slate-500/70 bg-slate-800/40 px-2 py-2">
-                <div className="mb-1 text-[11px] font-semibold text-slate-200">Invoice Preview</div>
+                <div className="mb-1 text-[11px] font-semibold text-foreground/80">Invoice Preview</div>
                 <div className="flex items-center justify-between text-[11px]">
                   <span className="text-muted-foreground">Subtotal</span>
                   <span>AED {invoiceSubTotalPreview.toFixed(2)}</span>
                 </div>
-                <div className="mt-2 rounded-md border border-slate-600/60 bg-slate-900/30 p-2">
-                  <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-300">Invoice Discount</div>
+                <div className="mt-2 rounded-md border border-border bg-popover/30 p-2">
+                  <div className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">Invoice Discount</div>
                   <div className="space-y-2">
-                    <div className="inline-flex rounded-md border border-slate-600/70 bg-slate-950/50 p-0.5">
+                    <div className="inline-flex rounded-md border border-border bg-background/50 p-0.5">
                       <button
                         type="button"
                         className={`h-7 rounded px-2.5 text-[11px] font-semibold transition ${
                           invoiceDiscountMode === "amount"
                             ? "bg-cyan-500/20 text-cyan-200"
-                            : "text-slate-300 hover:bg-slate-700/40"
+                            : "text-muted-foreground hover:bg-muted/40"
                         }`}
                         onClick={() => {
                           const mode: "amount" | "percent" = "amount";
@@ -3507,7 +3507,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                         className={`h-7 rounded px-2.5 text-[11px] font-semibold transition ${
                           invoiceDiscountMode === "percent"
                             ? "bg-cyan-500/20 text-cyan-200"
-                            : "text-slate-300 hover:bg-slate-700/40"
+                            : "text-muted-foreground hover:bg-muted/40"
                         }`}
                         onClick={() => {
                           const mode: "amount" | "percent" = "percent";
@@ -3560,11 +3560,11 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                           setDraft((prev) => (prev ? { ...prev, discountAmount: Math.max(0, value) } : prev));
                         }}
                       />
-                      <div className="inline-flex h-9 min-w-[52px] items-center justify-center rounded border border-slate-600/70 bg-slate-950/60 px-2 text-[11px] font-semibold text-slate-200">
+                      <div className="inline-flex h-9 min-w-[52px] items-center justify-center rounded border border-border bg-background/60 px-2 text-[11px] font-semibold text-foreground/80">
                         {invoiceDiscountMode === "percent" ? "%" : "AED"}
                       </div>
                     </div>
-                    <div className="flex items-center justify-between text-[10px] text-slate-400">
+                    <div className="flex items-center justify-between text-[10px] text-muted-foreground">
                       <span>
                         {invoiceDiscountMode === "percent"
                           ? `Applied: ${invoiceDiscountPercent.toFixed(2)}%`
@@ -3592,7 +3592,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                   <span className="text-muted-foreground">VAT ({Number(draft.vatRate || 0).toFixed(2)}%)</span>
                   <span>AED {invoiceVatPreview.toFixed(2)}</span>
                 </div>
-                <div className="mt-1 flex items-center justify-between border-t border-slate-600/60 pt-1 text-sm font-semibold">
+                <div className="mt-1 flex items-center justify-between border-t border-border pt-1 text-sm font-semibold">
                   <span>Grand Total</span>
                   <span>AED {invoiceGrandTotalPreview.toFixed(2)}</span>
                 </div>
@@ -3601,7 +3601,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                 type="button"
                 className={`w-full rounded-md px-3 py-2 text-xs font-semibold ${
                   isConvertDisabled
-                    ? "cursor-not-allowed border border-slate-500/40 bg-slate-700/70 text-slate-300"
+                    ? "cursor-not-allowed border border-border/40 bg-muted/70 text-muted-foreground"
                     : "bg-emerald-600 text-white"
                 }`}
                 disabled={isConvertDisabled}
@@ -3623,7 +3623,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                 {reviewConvertLabel}
               </button>
               {convertDisabledReason && (
-                <div className="text-center text-[11px] text-slate-400">{convertDisabledReason}</div>
+                <div className="text-center text-[11px] text-muted-foreground">{convertDisabledReason}</div>
               )}
               {convertBlocked && (
                 <div className="space-y-1 text-[11px] text-amber-300">
@@ -3635,7 +3635,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
               )}
             </div>
           </section>
-          <div className={`rounded-xl border border-slate-600/60 ${theme.cardBg} p-3`}>
+          <div className={`rounded-xl border border-border ${theme.cardBg} p-3`}>
             <span className="inline-flex rounded-md bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white">
               CarGuru 3000 Promo Consumed
             </span>
@@ -3644,15 +3644,15 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
       </div>
       {showInvoiceModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className={`w-full max-w-2xl rounded-xl border border-slate-600/60 ${theme.cardBg}`}>
-            <div className={`flex items-center justify-between rounded-t-xl border-b border-slate-600/60 px-4 py-3 ${theme.surfaceSubtle}`}>
+          <div className={`w-full max-w-2xl rounded-xl border border-border ${theme.cardBg}`}>
+            <div className={`flex items-center justify-between rounded-t-xl border-b border-border px-4 py-3 ${theme.surfaceSubtle}`}>
               <div>
                 <div className="text-sm font-semibold">Invoice Verification</div>
                 <div className="text-[11px] text-muted-foreground">Review job totals before converting.</div>
               </div>
               <button
                 type="button"
-                className="rounded-md border border-slate-500/60 px-2 py-1 text-xs"
+                className="rounded-md border border-border px-2 py-1 text-xs"
                 onClick={() => setShowInvoiceModal(false)}
               >
                 Close
@@ -3661,7 +3661,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
             <div className="space-y-3 p-4 text-xs">
               <div className="space-y-2">
                 {jobCardTotals.map((row) => (
-                  <div key={`modal-${row.jobId}`} className="flex items-center justify-between rounded-md border border-slate-600/60 px-3 py-2">
+                  <div key={`modal-${row.jobId}`} className="flex items-center justify-between rounded-md border border-border px-3 py-2">
                     <div>
                       <div className="font-semibold">{row.jobId.slice(0, 8)}...</div>
                       <div className="text-[11px] text-muted-foreground">{String(row.status || "").toUpperCase()}</div>
@@ -3669,13 +3669,13 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                     <div className="font-semibold">AED {row.total.toFixed(2)}</div>
                   </div>
                 ))}
-                <div className="rounded-md border border-slate-600/60 bg-slate-900/30 p-2">
+                <div className="rounded-md border border-border bg-popover/30 p-2">
                   <div className="mb-2 flex items-center justify-between">
-                    <div className="text-[11px] font-semibold text-slate-200">Invoice Line Items</div>
-                    <div className="text-[10px] text-slate-400">{invoicePreviewLineItems.length} item(s)</div>
+                    <div className="text-[11px] font-semibold text-foreground/80">Invoice Line Items</div>
+                    <div className="text-[10px] text-muted-foreground">{invoicePreviewLineItems.length} item(s)</div>
                   </div>
                   {invoicePreviewLineItems.length === 0 ? (
-                    <div className="text-[11px] text-slate-400">No approved line items available.</div>
+                    <div className="text-[11px] text-muted-foreground">No approved line items available.</div>
                   ) : (
                     <div className="max-h-56 overflow-auto rounded-md border border-slate-700/60">
                       <table className="min-w-full text-[11px]">
@@ -3694,7 +3694,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                             <tr key={`inv-line-${item.key}`} className="border-t border-slate-700/50">
                               <td className="px-2 py-1">{item.lineNo}</td>
                               <td className="px-2 py-1 font-semibold">{item.partName}</td>
-                              <td className="px-2 py-1 text-slate-300">{item.description}</td>
+                              <td className="px-2 py-1 text-muted-foreground">{item.description}</td>
                               <td className="px-2 py-1 text-right">{item.qty.toFixed(2)}</td>
                               <td className="px-2 py-1 text-right">AED {item.unitRate.toFixed(2)}</td>
                               <td className="px-2 py-1 text-right font-semibold">AED {item.total.toFixed(2)}</td>
@@ -3709,47 +3709,47 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                 <div className="rounded-md border border-cyan-500/30 bg-cyan-500/5 px-3 py-2 space-y-2">
                   <div className="text-[11px] font-semibold text-cyan-300">Service Charges</div>
                   <div className="flex items-center justify-between gap-2">
-                    <label className="text-[11px] text-slate-300 flex-1">Inspection Fee</label>
+                    <label className="text-[11px] text-muted-foreground flex-1">Inspection Fee</label>
                     <div className="flex items-center gap-1">
-                      <span className="text-[10px] text-slate-500">AED</span>
+                      <span className="text-[10px] text-muted-foreground">AED</span>
                       <input type="number" min={0} step={0.01}
                         value={serviceCharges.inspectionFee}
                         onChange={(e) => setServiceCharges((p) => ({ ...p, inspectionFee: Number(e.target.value) || 0 }))}
-                        className="w-20 rounded border border-slate-600 bg-slate-900/80 px-2 py-1 text-xs text-right text-white" />
+                        className="w-20 rounded border border-border bg-popover/80 px-2 py-1 text-xs text-right text-foreground" />
                     </div>
                   </div>
                   {serviceCharges.hasRecoveryPickup && (
                     <div className="flex items-center justify-between gap-2">
-                      <label className="text-[11px] text-slate-300 flex-1">Recovery Pickup Fee</label>
+                      <label className="text-[11px] text-muted-foreground flex-1">Recovery Pickup Fee</label>
                       <div className="flex items-center gap-1">
-                        <span className="text-[10px] text-slate-500">AED</span>
+                        <span className="text-[10px] text-muted-foreground">AED</span>
                         <input type="number" min={0} step={0.01}
                           value={serviceCharges.recoveryPickupFee}
                           onChange={(e) => setServiceCharges((p) => ({ ...p, recoveryPickupFee: Number(e.target.value) || 0 }))}
-                          className="w-20 rounded border border-slate-600 bg-slate-900/80 px-2 py-1 text-xs text-right text-white" />
+                          className="w-20 rounded border border-border bg-popover/80 px-2 py-1 text-xs text-right text-foreground" />
                       </div>
                     </div>
                   )}
                   {serviceCharges.hasRecoveryDropoff && (
                     <div className="flex items-center justify-between gap-2">
-                      <label className="text-[11px] text-slate-300 flex-1">Recovery Dropoff Fee</label>
+                      <label className="text-[11px] text-muted-foreground flex-1">Recovery Dropoff Fee</label>
                       <div className="flex items-center gap-1">
-                        <span className="text-[10px] text-slate-500">AED</span>
+                        <span className="text-[10px] text-muted-foreground">AED</span>
                         <input type="number" min={0} step={0.01}
                           value={serviceCharges.recoveryDropoffFee}
                           onChange={(e) => setServiceCharges((p) => ({ ...p, recoveryDropoffFee: Number(e.target.value) || 0 }))}
-                          className="w-20 rounded border border-slate-600 bg-slate-900/80 px-2 py-1 text-xs text-right text-white" />
+                          className="w-20 rounded border border-border bg-popover/80 px-2 py-1 text-xs text-right text-foreground" />
                       </div>
                     </div>
                   )}
                   <div className="flex items-center justify-between gap-2">
-                    <label className="text-[11px] text-slate-300 flex-1">Labour Charge</label>
+                    <label className="text-[11px] text-muted-foreground flex-1">Labour Charge</label>
                     <div className="flex items-center gap-1">
-                      <span className="text-[10px] text-slate-500">AED</span>
+                      <span className="text-[10px] text-muted-foreground">AED</span>
                       <input type="number" min={0} step={0.01}
                         value={serviceCharges.labourCharge}
                         onChange={(e) => setServiceCharges((p) => ({ ...p, labourCharge: Number(e.target.value) || 0 }))}
-                        className="w-20 rounded border border-slate-600 bg-slate-900/80 px-2 py-1 text-xs text-right text-white" />
+                        className="w-20 rounded border border-border bg-popover/80 px-2 py-1 text-xs text-right text-foreground" />
                     </div>
                   </div>
                   <div className="flex items-center justify-between border-t border-cyan-500/20 pt-1 text-[11px] font-semibold text-cyan-200">
@@ -3785,7 +3785,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                     <span className="text-muted-foreground">VAT ({Number(draft.vatRate || 0).toFixed(2)}%)</span>
                     <span>AED {invoiceVatPreview.toFixed(2)}</span>
                   </div>
-                  <div className="mt-1 flex items-center justify-between border-t border-slate-600/60 pt-1 font-semibold">
+                  <div className="mt-1 flex items-center justify-between border-t border-border pt-1 font-semibold">
                     <span>Grand Total</span>
                     <span>AED {invoiceGrandTotalPreview.toFixed(2)}</span>
                   </div>
@@ -3841,7 +3841,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
               <div className="flex items-center justify-end gap-2">
                 <button
                   type="button"
-                  className="rounded-md border border-slate-500/60 px-3 py-1.5 text-xs font-semibold"
+                  className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold"
                   onClick={() => setShowInvoiceModal(false)}
                 >
                   Keep
@@ -3850,7 +3850,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                   type="button"
                   className={`rounded-md px-3 py-1.5 text-xs font-semibold ${
                     isConvertDisabled
-                      ? "cursor-not-allowed border border-slate-500/40 bg-slate-700/70 text-slate-300"
+                      ? "cursor-not-allowed border border-border/40 bg-muted/70 text-muted-foreground"
                       : "bg-emerald-600 text-white"
                   }`}
                   disabled={isConvertDisabled || isConvertingInvoice}
@@ -3865,8 +3865,8 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
       )}
       {topupOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
-          <div className={`w-full max-w-lg rounded-xl border border-slate-600/60 ${theme.cardBg}`}>
-            <div className={`flex items-center justify-between rounded-t-xl border-b border-slate-600/60 px-4 py-3 ${theme.surfaceSubtle}`}>
+          <div className={`w-full max-w-lg rounded-xl border border-border ${theme.cardBg}`}>
+            <div className={`flex items-center justify-between rounded-t-xl border-b border-border px-4 py-3 ${theme.surfaceSubtle}`}>
               <div>
                 <div className="text-sm font-semibold">Topup Wallet</div>
                 <div className="text-[11px] text-muted-foreground">
@@ -3875,7 +3875,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
               </div>
               <button
                 type="button"
-                className="rounded-md border border-slate-500/60 px-2 py-1 text-xs"
+                className="rounded-md border border-border px-2 py-1 text-xs"
                 onClick={() => setTopupOpen(false)}
                 disabled={topupSaving}
               >
@@ -3935,7 +3935,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
               <div className="flex items-center justify-end gap-2">
                 <button
                   type="button"
-                  className="rounded-md border border-slate-500/60 px-3 py-1.5 text-xs font-semibold"
+                  className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold"
                   onClick={() => setTopupOpen(false)}
                   disabled={topupSaving}
                 >
@@ -3969,7 +3969,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
         ? createPortal(
             <div
               ref={productDropdownRef}
-              className="fixed z-50 max-h-64 overflow-y-auto rounded-md border border-slate-600/60 bg-slate-950 text-xs shadow-lg"
+              className="fixed z-50 max-h-64 overflow-y-auto rounded-md border border-border bg-background text-xs shadow-lg"
               style={{
                 top: productAnchor.top,
                 left: productAnchor.left,
@@ -3980,7 +3980,7 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                 <button
                   key={product.id}
                   type="button"
-                  className="flex w-full items-start gap-2 px-3 py-2 text-left text-white/80 hover:bg-white/10"
+                  className="flex w-full items-start gap-2 px-3 py-2 text-left text-foreground/80 hover:bg-muted"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => {
                     if (productOpenIndex >= NEW_JOB_PRODUCT_INDEX_OFFSET) {
@@ -4003,11 +4003,11 @@ export function EstimateDetailMain({ companyId, estimateId }: EstimateDetailMain
                   }}
                 >
                   <span className="font-semibold">{product.label || product.name}</span>
-                  {product.type && <span className="text-[10px] text-white/50">{product.type}</span>}
+                  {product.type && <span className="text-[10px] text-muted-foreground">{product.type}</span>}
                 </button>
               ))}
               {productResults.length === 0 && products.length === 0 && (
-                <div className="px-3 py-2 text-white/50">No products found.</div>
+                <div className="px-3 py-2 text-muted-foreground">No products found.</div>
               )}
             </div>,
             document.body

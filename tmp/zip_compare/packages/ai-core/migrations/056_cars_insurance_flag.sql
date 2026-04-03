@@ -1,2 +1,0 @@
-ALTER TABLE cars
-  ADD COLUMN IF NOT EXISTS is_insurance boolean NOT NULL DEFAULT false;

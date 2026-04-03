@@ -258,6 +258,71 @@ export async function createCar(input: CreateCarInput): Promise<CarRow> {
   });
 }
 
+/**
+ * Find existing car by VIN or plate number, or create a new one.
+ * If found, updates the existing car with any new info (mileage, tyre size, etc.)
+ */
+export async function findOrCreateCar(input: CreateCarInput): Promise<{ car: CarRow; created: boolean }> {
+  const { getSql } = await import("../db");
+  const sql = getSql();
+  const vin = String(input.vin ?? "").trim().toUpperCase();
+  const plate = String(input.plateNumber ?? "").trim().toUpperCase();
+
+  // 1. Try find by VIN (most reliable identifier)
+  if (vin) {
+    const rows = await sql<CarRow[]>`
+      SELECT * FROM cars WHERE company_id = ${input.companyId} AND UPPER(TRIM(vin)) = ${vin} LIMIT 1
+    `;
+    if (rows.length > 0) {
+      const existing = rows[0]!;
+      // Update with any new info
+      const updates: Record<string, unknown> = {};
+      if (input.make && !existing.make) updates.make = input.make;
+      if (input.model && !existing.model) updates.model = input.model;
+      if (input.modelYear && !existing.model_year) updates.model_year = input.modelYear;
+      if (input.mileage && (!existing.mileage || input.mileage > existing.mileage)) updates.mileage = input.mileage;
+      if (input.tyreSizeFront && !existing.tyre_size_front) updates.tyre_size_front = input.tyreSizeFront;
+      if (input.tyreSizeBack && !existing.tyre_size_back) updates.tyre_size_back = input.tyreSizeBack;
+      if (plate && (!existing.plate_number || existing.is_unregistered)) {
+        updates.plate_number = plate;
+        updates.is_unregistered = false;
+      }
+      if (Object.keys(updates).length > 0) {
+        updates.updated_at = new Date().toISOString();
+        await sql`UPDATE cars SET ${sql(updates as any)} WHERE id = ${existing.id}`;
+      }
+      return { car: { ...existing, ...(updates as any) }, created: false };
+    }
+  }
+
+  // 2. Try find by plate number
+  if (plate) {
+    const rows = await sql<CarRow[]>`
+      SELECT * FROM cars WHERE company_id = ${input.companyId} AND UPPER(TRIM(plate_number)) = ${plate} AND is_unregistered = false LIMIT 1
+    `;
+    if (rows.length > 0) {
+      const existing = rows[0]!;
+      const updates: Record<string, unknown> = {};
+      if (vin && !existing.vin) updates.vin = vin;
+      if (input.make && !existing.make) updates.make = input.make;
+      if (input.model && !existing.model) updates.model = input.model;
+      if (input.modelYear && !existing.model_year) updates.model_year = input.modelYear;
+      if (input.mileage && (!existing.mileage || input.mileage > existing.mileage)) updates.mileage = input.mileage;
+      if (input.tyreSizeFront && !existing.tyre_size_front) updates.tyre_size_front = input.tyreSizeFront;
+      if (input.tyreSizeBack && !existing.tyre_size_back) updates.tyre_size_back = input.tyreSizeBack;
+      if (Object.keys(updates).length > 0) {
+        updates.updated_at = new Date().toISOString();
+        await sql`UPDATE cars SET ${sql(updates as any)} WHERE id = ${existing.id}`;
+      }
+      return { car: { ...existing, ...(updates as any) }, created: false };
+    }
+  }
+
+  // 3. No match — create new car
+  const car = await createCar(input);
+  return { car, created: true };
+}
+
 export async function updateCarRecord(id: string, input: UpdateCarInput): Promise<CarRow> {
   const existing = await getCarById(id);
   if (!existing) throw new Error("Car not found");

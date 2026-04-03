@@ -860,6 +860,38 @@ export async function PUT(req: NextRequest, { params }: Params) {
       } catch (err) {
         console.error("Failed to upsert rsa_inspections row", err);
       }
+
+      // Find or create car from inspection data + link to lead
+      const hasCarInfo = Boolean(inspectionPayload.vin || inspectionPayload.carPlate);
+      if (hasCarInfo) {
+        try {
+          const { findOrCreateCar, linkCustomerToCar } = await import("@repo/ai-core/crm/service");
+          const { car } = await findOrCreateCar({
+            companyId,
+            vin: inspectionPayload.vin ?? null,
+            plateNumber: inspectionPayload.carPlate ?? null,
+            make: inspectionPayload.carMake ?? null,
+            model: inspectionPayload.carModel ?? null,
+            modelYear: inspectionPayload.carYear ? Number(inspectionPayload.carYear) : null,
+            mileage: inspectionPayload.mileage ?? null,
+            tyreSizeFront: inspectionPayload.tyreSize ?? null,
+          });
+          // Link car to lead if not already linked
+          if (car.id && car.id !== lead.carId) {
+            const sqlMod = await import("@repo/ai-core/db");
+            const sql = sqlMod.getSql();
+            await sql`UPDATE leads SET car_id = ${car.id}, updated_at = now() WHERE company_id = ${companyId} AND id = ${id}`;
+          }
+          // Link car to customer if customer exists
+          if (car.id && lead.customerId) {
+            try {
+              await linkCustomerToCar({ companyId, carId: car.id, customerId: lead.customerId, relationType: "owner", isPrimary: true });
+            } catch { /* link may already exist */ }
+          }
+        } catch (err) {
+          console.error("Failed to find/create car from inspection", err);
+        }
+      }
     }
   }
 

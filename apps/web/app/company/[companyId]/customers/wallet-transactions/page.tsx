@@ -196,7 +196,7 @@ export default function WalletTransactionsPage({ params }: Params) {
           </div>
           <Link
             href={companyId ? `/company/${companyId}/customers` : "#"}
-            className="rounded-md border border-white/20 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-white/80 hover:bg-white/10"
+            className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-foreground/80 hover:bg-muted"
           >
             Back to customers
           </Link>
@@ -251,7 +251,7 @@ export default function WalletTransactionsPage({ params }: Params) {
         )} */}
 
         <Card className={`p-3 ${theme.cardBg} ${theme.cardBorder}`}>
-          <div className="overflow-x-auto py-1 [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/20">
+          <div className="overflow-x-auto py-1 [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted-foreground/30">
             <div className="flex min-w-max flex-nowrap gap-2 text-xs">
               {[
                 { id: "all", label: "All" },
@@ -265,7 +265,7 @@ export default function WalletTransactionsPage({ params }: Params) {
                   className={`min-w-[96px] shrink-0 rounded-full px-4 py-1.5 text-[11px] font-medium transition ${
                     approvalFilter === tab.id
                       ? "bg-gradient-to-b from-emerald-500/30 to-emerald-500/10 text-emerald-100 shadow-[0_0_8px_rgba(16,185,129,0.35)] border border-emerald-400/40"
-                      : "bg-white/5 text-white/70 border border-white/10 hover:text-white hover:border-white/30"
+                      : "bg-muted/40 text-foreground/70 border border-border hover:text-foreground hover:border-border"
                   }`}
                 >
                   {tab.label}
@@ -279,12 +279,12 @@ export default function WalletTransactionsPage({ params }: Params) {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search customer, phone, email, method, notes"
-              className="h-10 rounded-md border border-cyan-400/40 bg-slate-900/35 px-3 text-sm text-white placeholder:text-white/50 outline-none focus:border-cyan-300/70 md:col-span-7"
+              className="h-10 rounded-md border border-cyan-400/40 bg-slate-900/35 px-3 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-cyan-300/70 md:col-span-7"
             />
             <select
               value={paymentMethodFilter}
               onChange={(e) => setPaymentMethodFilter(e.target.value)}
-              className="h-10 rounded-md border border-cyan-400/40 bg-slate-900/35 px-2 text-sm text-white outline-none focus:border-cyan-300/70 md:col-span-2"
+              className="h-10 rounded-md border border-cyan-400/40 bg-slate-900/35 px-2 text-sm text-foreground outline-none focus:border-cyan-300/70 md:col-span-2"
             >
               <option value="all">All methods</option>
               {paymentMethodOptions.map((method) => (
@@ -294,9 +294,9 @@ export default function WalletTransactionsPage({ params }: Params) {
               ))}
             </select>
             <div className="flex items-center gap-2 md:col-span-2">
-              <span className="text-[10px] uppercase tracking-wide text-white/60">Rows</span>
+              <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Rows</span>
               <select
-                className="h-10 w-full rounded-md border border-cyan-400/40 bg-slate-900/35 px-2 text-sm text-white outline-none focus:border-cyan-300/70"
+                className="h-10 w-full rounded-md border border-cyan-400/40 bg-slate-900/35 px-2 text-sm text-foreground outline-none focus:border-cyan-300/70"
                 value={pageSize}
                 onChange={(e) => setPageSize(e.target.value as "10" | "25" | "50" | "100")}
               >
@@ -314,7 +314,7 @@ export default function WalletTransactionsPage({ params }: Params) {
                 setSearch("");
                 setDebouncedSearch("");
               }}
-              className="h-10 rounded-md border border-white/20 px-3 text-xs font-semibold uppercase tracking-wide text-white/75 hover:bg-white/10 md:col-span-1"
+              className="h-10 rounded-md border border-border px-3 text-xs font-semibold uppercase tracking-wide text-foreground/75 hover:bg-muted md:col-span-1"
             >
               Clear
             </button>
@@ -322,7 +322,7 @@ export default function WalletTransactionsPage({ params }: Params) {
 
           {hasActiveFilters && (
             <div className="flex flex-wrap items-center gap-2 text-[11px]">
-              <span className="text-white/50">Active:</span>
+              <span className="text-muted-foreground">Active:</span>
               {approvalFilter !== "all" && (
                 <span className="rounded-full border border-emerald-400/40 bg-emerald-500/10 px-2 py-0.5 text-emerald-200">
                   Status: {approvalFilter}
@@ -334,7 +334,7 @@ export default function WalletTransactionsPage({ params }: Params) {
                 </span>
               )}
               {debouncedSearch && (
-                <span className="rounded-full border border-white/25 bg-white/5 px-2 py-0.5 text-white/80">
+                <span className="rounded-full border border-border bg-muted/40 px-2 py-0.5 text-foreground/80">
                   Search: {debouncedSearch}
                 </span>
               )}
@@ -345,7 +345,7 @@ export default function WalletTransactionsPage({ params }: Params) {
         <Card className={`p-3 ${theme.cardBg} ${theme.cardBorder}`}>
           <div className={`hidden overflow-auto rounded-md border md:block ${theme.cardBorder} ${theme.surfaceSubtle} max-h-[620px]`}>
             <table className="min-w-full table-fixed text-xs">
-              <thead className="sticky top-0 z-20 bg-slate-900 text-white/80">
+              <thead className="sticky top-0 z-20 bg-popovertext-foreground/80">
                 <tr className="border-b border-slate-500/40">
                   <th className="w-[220px] px-3 py-2 text-left">Customer</th>
                   <th className="w-[130px] px-3 py-2 text-left">Phone</th>
@@ -362,27 +362,27 @@ export default function WalletTransactionsPage({ params }: Params) {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={10} className="px-3 py-8 text-center text-white/70">
+                    <td colSpan={10} className="px-3 py-8 text-center text-foreground/70">
                       Loading transactions...
                     </td>
                   </tr>
                 ) : rows.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="px-3 py-8 text-center text-white/70">
+                    <td colSpan={10} className="px-3 py-8 text-center text-foreground/70">
                       No transactions found for this filter.
                     </td>
                   </tr>
                 ) : (
                   rows.map((row) => (
-                    <tr key={row.id} className="border-b border-slate-500/30 text-white/85 hover:bg-white/[0.03]">
+                    <tr key={row.id} className="border-b border-slate-500/30 text-foreground/85 hover:bg-muted/30">
                       <td className="px-3 py-2">
                         <Link
                           href={companyId ? `/company/${companyId}/customers/${row.customer_id}` : "#"}
-                          className="font-semibold text-white hover:text-cyan-200"
+                          className="font-semibold text-foreground hover:text-cyan-200"
                         >
                           {row.customer_name ?? "Customer"}
                         </Link>
-                        <div className="text-[11px] text-white/45">{row.customer_email ?? "-"}</div>
+                        <div className="text-[11px] text-muted-foreground">{row.customer_email ?? "-"}</div>
                       </td>
                       <td className="px-3 py-2">{row.customer_phone ?? "-"}</td>
                       <td className="px-3 py-2">{formatAmount(row.amount)}</td>
@@ -393,12 +393,12 @@ export default function WalletTransactionsPage({ params }: Params) {
                             href={`/api/files/${row.payment_proof_file_id}`}
                             target="_blank"
                             rel="noreferrer"
-                            className="rounded-md border border-white/20 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white/70 hover:bg-white/10"
+                            className="rounded-md border border-border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-foreground/70 hover:bg-muted"
                           >
                             View
                           </a>
                         ) : (
-                          <span className="text-white/60">-</span>
+                          <span className="text-muted-foreground">-</span>
                         )}
                       </td>
                       <td className="px-3 py-2">{formatDateTime(row.payment_date)}</td>
@@ -430,16 +430,16 @@ export default function WalletTransactionsPage({ params }: Params) {
 
           <div className="space-y-2 md:hidden">
             {loading ? (
-              <div className="rounded-md border border-slate-500/30 bg-slate-900/40 px-3 py-4 text-sm text-white/70">Loading transactions...</div>
+              <div className="rounded-md border border-slate-500/30 bg-slate-900/40 px-3 py-4 text-sm text-foreground/70">Loading transactions...</div>
             ) : rows.length === 0 ? (
-              <div className="rounded-md border border-slate-500/30 bg-slate-900/40 px-3 py-4 text-sm text-white/70">
+              <div className="rounded-md border border-slate-500/30 bg-slate-900/40 px-3 py-4 text-sm text-foreground/70">
                 No transactions found for this filter.
               </div>
             ) : (
               rows.map((row) => (
                 <div key={row.id} className="space-y-2 rounded-md border border-slate-500/35 bg-slate-900/45 px-3 py-3 text-xs">
                   <div className="flex items-center justify-between gap-2">
-                    <Link href={companyId ? `/company/${companyId}/customers/${row.customer_id}` : "#"} className="font-semibold text-white/90">
+                    <Link href={companyId ? `/company/${companyId}/customers/${row.customer_id}` : "#"} className="font-semibold text-foreground/90">
                       {row.customer_name ?? "Customer"}
                     </Link>
                     {row.approved_at ? (
@@ -457,22 +457,22 @@ export default function WalletTransactionsPage({ params }: Params) {
                       </button>
                     )}
                   </div>
-                  <div className="text-white/70">Phone: {row.customer_phone ?? "-"}</div>
-                  <div className="text-white/70">Amount: {formatAmount(row.amount)}</div>
-                  <div className="text-white/70">Method: {row.payment_method ?? "-"}</div>
-                  <div className="text-white/60">Created: {formatDateTime(row.created_at)}</div>
+                  <div className="text-foreground/70">Phone: {row.customer_phone ?? "-"}</div>
+                  <div className="text-foreground/70">Amount: {formatAmount(row.amount)}</div>
+                  <div className="text-foreground/70">Method: {row.payment_method ?? "-"}</div>
+                  <div className="text-muted-foreground">Created: {formatDateTime(row.created_at)}</div>
                 </div>
               ))
             )}
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-white/70">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-foreground/70">
             <div>Showing {loading ? 0 : rows.length} of {total} transactions</div>
             {totalPages > 1 && (
               <div className="flex flex-wrap items-center justify-end gap-1">
                 <button
                   type="button"
-                  className="rounded-md border border-white/20 px-2 py-1 text-[11px] text-white/70 disabled:opacity-50"
+                  className="rounded-md border border-border px-2 py-1 text-[11px] text-foreground/70 disabled:opacity-50"
                   disabled={page <= 1}
                   onClick={() => setPage(Math.max(1, page - 1))}
                 >
@@ -482,7 +482,7 @@ export default function WalletTransactionsPage({ params }: Params) {
                   <button
                     key={item}
                     type="button"
-                    className={`rounded-md px-2 py-1 text-[11px] ${item === page ? "bg-blue-600 text-white" : "border border-white/20 text-white/70"}`}
+                    className={`rounded-md px-2 py-1 text-[11px] ${item === page ? "bg-blue-600 text-white" : "border border-border text-foreground/70"}`}
                     onClick={() => setPage(item)}
                   >
                     {item}
@@ -490,7 +490,7 @@ export default function WalletTransactionsPage({ params }: Params) {
                 ))}
                 <button
                   type="button"
-                  className="rounded-md border border-white/20 px-2 py-1 text-[11px] text-white/70 disabled:opacity-50"
+                  className="rounded-md border border-border px-2 py-1 text-[11px] text-foreground/70 disabled:opacity-50"
                   disabled={page >= totalPages}
                   onClick={() => setPage(Math.min(totalPages, page + 1))}
                 >
@@ -505,25 +505,25 @@ export default function WalletTransactionsPage({ params }: Params) {
       {confirmRow && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <Card className={`w-full max-w-md rounded-xl shadow-xl ${theme.cardBg} ${theme.cardBorder}`}>
-            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+            <div className="flex items-center justify-between border-b border-border px-4 py-3">
               <div className="text-sm font-semibold">Approve Wallet Transaction</div>
               <button
                 type="button"
                 onClick={() => setConfirmRow(null)}
-                className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+                className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-muted`}
               >
                 Close
               </button>
             </div>
             <div className="space-y-4 p-4 text-sm">
               <div className={theme.mutedText}>
-                Approve the topup of <span className="font-semibold text-white">{formatAmount(confirmRow.amount)}</span>{" "}
-                for <span className="font-semibold text-white">{confirmRow.customer_name ?? "Customer"}</span>?
+                Approve the topup of <span className="font-semibold text-foreground">{formatAmount(confirmRow.amount)}</span>{" "}
+                for <span className="font-semibold text-foreground">{confirmRow.customer_name ?? "Customer"}</span>?
               </div>
               <div className="flex items-center justify-end gap-2">
                 <button
                   type="button"
-                  className={`rounded-md px-4 py-2 text-xs font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+                  className={`rounded-md px-4 py-2 text-xs font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-muted`}
                   onClick={() => setConfirmRow(null)}
                 >
                   Cancel

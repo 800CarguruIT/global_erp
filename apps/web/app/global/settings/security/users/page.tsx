@@ -242,7 +242,7 @@ export default function GlobalUsersPage() {
           <button
             type="button"
             onClick={() => (window.location.href = "/global/settings/security/users/new")}
-            className="inline-flex items-center gap-2 rounded-md border border-white/20 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-white transition hover:border-white/50"
+            className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-xs font-semibold uppercase tracking-wide text-foreground transition hover:border-ring"
           >
             <span className="text-base font-bold">+</span>
             Add user
@@ -266,7 +266,7 @@ export default function GlobalUsersPage() {
               <button
                 type="button"
                 onClick={load}
-                className="rounded-md border border-white/20 px-4 py-2 text-xs  uppercase tracking-wide text-white transition hover:border-white/40"
+                className="rounded-md border border-border px-4 py-2 text-xs  uppercase tracking-wide text-foreground transition hover:border-ring"
               >
                 {t("settings.users.searchBtn")}
               </button>
@@ -279,7 +279,7 @@ export default function GlobalUsersPage() {
                   onChange={(e) =>
                     setStatusFilter(e.target.value as "all" | "active" | "inactive")
                   }
-                className="rounded-md border border-white/20 bg-slate-50 px-3 py-1.5 text-sm  text-slate-500 shadow-inner focus:outline-none focus:ring-2 focus:ring-primary/40"
+                className="rounded-md border border-border bg-slate-50 px-3 py-1.5 text-sm  text-slate-500 shadow-inner focus:outline-none focus:ring-2 focus:ring-primary/40"
                 >
                   <option value="all">{t("settings.users.status.all")}</option>
                   <option value="active">{t("settings.users.status.active")}</option>
@@ -291,7 +291,7 @@ export default function GlobalUsersPage() {
                 <select
                   value={roleFilter}
                   onChange={(e) => setRoleFilter(e.target.value)}
-                className="rounded-md border border-white/20 bg-slate-50 px-3 py-1.5 text-sm  text-slate-500 shadow-inner focus:outline-none focus:ring-2 focus:ring-primary/40"
+                className="rounded-md border border-border bg-slate-50 px-3 py-1.5 text-sm  text-slate-500 shadow-inner focus:outline-none focus:ring-2 focus:ring-primary/40"
                 >
                   <option value="">{t("settings.users.roles.all")}</option>
                   {roleOptions.map((role) => (
@@ -330,10 +330,10 @@ export default function GlobalUsersPage() {
       </Card>
       {passwordTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="absolute inset-0 bg-slate-950/70" onClick={closePasswordModal} />
+          <div className="absolute inset-0 bg-background/70" onClick={closePasswordModal} />
           <form
             onSubmit={handlePasswordSubmit}
-            className="relative w-full max-w-md space-y-4 rounded-2xl border border-white/10 bg-background p-6 shadow-2xl"
+            className="relative w-full max-w-md space-y-4 rounded-2xl border border-border bg-background p-6 shadow-2xl"
           >
             <div className="text-lg font-semibold">Share new credentials</div>
             <p className="text-sm text-muted-foreground">Email and password for copying.</p>
@@ -373,7 +373,7 @@ export default function GlobalUsersPage() {
             <div className="flex justify-end gap-2 pt-2">
               <button
                 type="button"
-                className="rounded-md border border-border/60 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground transition hover:border-white/40"
+                className="rounded-md border border-border/60 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground transition hover:border-ring"
                 onClick={closePasswordModal}
                 disabled={passwordSaving}
               >

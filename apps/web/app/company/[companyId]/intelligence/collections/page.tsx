@@ -47,7 +47,7 @@ export default function CollectionsIntelligencePage({
         </div>
 
         {/* Collections Signals */}
-        <div className="rounded-xl border border-white/10 bg-slate-900/40 p-4">
+        <div className="rounded-xl border border-border bg-slate-900/40 p-4">
           <div className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">Collections Signal Triggers</div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {[
@@ -56,7 +56,7 @@ export default function CollectionsIntelligencePage({
               { signal: "Pipeline Dry Alert", trigger: "<24h of booked car-ins remaining in schedule", sev: "CRITICAL", sevColor: "text-red-500" },
               { signal: "Revenue Forecast Gap", trigger: "72h projection <85% of target", sev: "HIGH", sevColor: "text-red-400" },
             ].map((s) => (
-              <div key={s.signal} className="rounded-lg border border-white/5 bg-slate-800/40 p-3">
+              <div key={s.signal} className="rounded-lg border border-border bg-slate-800/40 p-3">
                 <div className="flex items-center justify-between mb-1">
                   <div className="text-xs font-medium text-slate-300">{s.signal}</div>
                   <span className={`text-[10px] font-bold ${s.sevColor}`}>{s.sev}</span>

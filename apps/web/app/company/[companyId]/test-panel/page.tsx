@@ -77,7 +77,7 @@ function SummaryCards({ summary }: { summary: Summary }) {
   return (
     <div className="grid grid-cols-4 gap-3">
       {cards.map(c => (
-        <div key={c.label} className={`rounded-xl border border-white/5 bg-gradient-to-br ${c.bg} p-4 text-center`}>
+        <div key={c.label} className={`rounded-xl border border-border bg-gradient-to-br ${c.bg} p-4 text-center`}>
           <div className={`text-3xl font-bold tabular-nums ${c.color}`}>{c.value}</div>
           <div className="text-[11px] uppercase tracking-wider text-zinc-500 mt-1">{c.label}</div>
         </div>
@@ -127,7 +127,7 @@ function StepCard({ result, isExpanded, onToggle }: { result: StepResult; isExpa
 
       {/* Expanded Objectives */}
       {isExpanded && (
-        <div className="px-5 pb-4 border-t border-white/5 pt-3">
+        <div className="px-5 pb-4 border-t border-border pt-3">
           <div className="space-y-2">
             {result.objectives.map(obj => {
               const oc = STATUS_CONFIG[obj.status];

@@ -18,24 +18,21 @@ export default function CompanyRolesPage({ params }: Params) {
 
   useEffect(() => {
     let active = true;
-    Promise.resolve((params as any)?.companyId ? (params as any) : (params as any)?.params ?? params)
-      .then((p: any) => {
-        if (!active) return;
-        const cid = p?.companyId?.toString?.().trim?.() || null;
-        setCompanyId(cid);
-        if (!cid) {
-          setError("Company is required");
-          setLoading(false);
-        }
-      })
-      .catch(() => {
-        if (!active) return;
+    const raw = (params as any)?.params ?? params;
+    Promise.resolve(raw).then((p: any) => {
+      if (!active) return;
+      const cid = String(p?.companyId ?? "").trim() || null;
+      setCompanyId(cid);
+      if (!cid) {
         setError("Company is required");
         setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
+      }
+    }).catch(() => {
+      if (!active) return;
+      setError("Company is required");
+      setLoading(false);
+    });
+    return () => { active = false; };
   }, [params]);
 
   async function load() {

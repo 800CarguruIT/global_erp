@@ -87,17 +87,17 @@ function PendingOfferCard({ offer, accepting, onAccept }: { offer: PendingOffer;
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
             <div>
               <div className="text-[10px] uppercase tracking-wider text-slate-500">Customer</div>
-              <div className="text-sm font-semibold text-white">{offer.customerName ?? "Unknown"}</div>
+              <div className="text-sm font-semibold text-foreground">{offer.customerName ?? "Unknown"}</div>
               <div className="text-[11px] text-slate-400 font-mono">{offer.customerPhone ?? "—"}</div>
             </div>
             <div>
               <div className="text-[10px] uppercase tracking-wider text-slate-500">Vehicle</div>
-              <div className="text-sm font-medium text-white">{offer.carPlate ?? "No plate"}</div>
+              <div className="text-sm font-medium text-foreground">{offer.carPlate ?? "No plate"}</div>
               <div className="text-[11px] text-slate-400">{offer.carModel ?? "—"}</div>
             </div>
             <div>
               <div className="text-[10px] uppercase tracking-wider text-slate-500">Service</div>
-              <div className="text-sm font-medium text-white capitalize">{offer.serviceType ?? offer.leadType ?? "—"}</div>
+              <div className="text-sm font-medium text-foreground capitalize">{offer.serviceType ?? offer.leadType ?? "—"}</div>
               <div className="text-[11px] text-slate-400">{offer.branchName ?? "—"}</div>
             </div>
             <div>
@@ -110,11 +110,11 @@ function PendingOfferCard({ offer, accepting, onAccept }: { offer: PendingOffer;
         {/* Accept Action + Timer */}
         <div className="flex flex-col items-center gap-2 shrink-0">
           {/* Countdown */}
-          <div className={`text-center rounded-lg px-3 py-2 border ${countdown.expired ? "border-red-500/30 bg-red-500/10" : "border-white/10 bg-slate-900/60"}`}>
+          <div className={`text-center rounded-lg px-3 py-2 border ${countdown.expired ? "border-red-500/30 bg-red-500/10" : "border-border bg-card/60"}`}>
             <div className="text-[9px] uppercase tracking-wider text-slate-500 mb-0.5">
               {countdown.expired ? "Expired" : "Time Left"}
             </div>
-            <div className={`text-xl font-bold tabular-nums ${countdown.expired ? "text-red-400" : countdown.remaining < 60 ? "text-red-400 animate-pulse" : "text-white"}`}>
+            <div className={`text-xl font-bold tabular-nums ${countdown.expired ? "text-red-400" : countdown.remaining < 60 ? "text-red-400 animate-pulse" : "text-foreground"}`}>
               {countdown.display}
             </div>
           </div>
@@ -231,21 +231,21 @@ export default function PisAdvisorPortalPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h2 className="text-lg font-bold text-white">Advisor Portal</h2>
-          <p className="text-xs text-slate-500">Welcome, <span className="text-white font-medium">{currentUser.fullName}</span></p>
+          <h2 className="text-lg font-bold text-foreground">Advisor Portal</h2>
+          <p className="text-xs text-slate-500">Welcome, <span className="text-foreground font-medium">{currentUser.fullName}</span></p>
         </div>
         <div className="flex items-center gap-3">
-          <button onClick={() => setShowAi(!showAi)} className={`rounded-lg px-3 py-1.5 text-[10px] font-semibold ${showAi ? "bg-purple-500/20 text-purple-400" : "bg-slate-800 text-slate-400 hover:text-white"}`}>
+          <button onClick={() => setShowAi(!showAi)} className={`rounded-lg px-3 py-1.5 text-[10px] font-semibold ${showAi ? "bg-purple-500/20 text-purple-400" : "bg-slate-800 text-slate-400 hover:text-foreground"}`}>
             {showAi ? "Hide AI" : "AI Coaching"}
           </button>
-          <button onClick={loadAgentData} className="rounded-lg bg-slate-800 px-3 py-1.5 text-[10px] font-semibold text-slate-400 hover:text-white">Refresh</button>
+          <button onClick={loadAgentData} className="rounded-lg bg-slate-800 px-3 py-1.5 text-[10px] font-semibold text-slate-400 hover:text-foreground">Refresh</button>
         </div>
       </div>
 
       {/* KPIs */}
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
         {[
-          { l: "Total Leads", v: kpis.assigned, c: "text-white" },
+          { l: "Total Leads", v: kpis.assigned, c: "text-foreground" },
           { l: "Converted", v: kpis.contacted, c: "text-emerald-400" },
           { l: "Car-In", v: kpis.pending, c: "text-amber-400" },
           { l: "Car-Out", v: kpis.carOutCount, c: "text-cyan-400" },
@@ -254,7 +254,7 @@ export default function PisAdvisorPortalPage() {
           { l: "Total Calls", v: kpis.totalCalls, c: "text-cyan-400" },
           { l: "Answer Rate", v: `${kpis.answerRate}%`, c: kpis.answerRate >= 80 ? "text-emerald-400" : "text-red-400" },
         ].map(k => (
-          <div key={k.l} className="rounded-xl border border-white/10 bg-gradient-to-br from-slate-900/80 to-black/90 p-3">
+          <div key={k.l} className="rounded-xl border border-border bg-gradient-to-br from-slate-900/80 to-black/90 p-3">
             <div className="text-[10px] uppercase tracking-widest text-slate-400 mb-1">{k.l}</div>
             <div className={`text-lg font-bold ${k.c}`}>{k.v}</div>
           </div>
@@ -293,7 +293,7 @@ export default function PisAdvisorPortalPage() {
       <div className="flex gap-2">
         {([["leads", "Leads", leads.length], ["car-in", "Car-In", leads.filter(l => (l.lead_status === "car_in" || l.checkinAt) && !["closed_won", "closed", "completed"].includes(l.lead_status)).length], ["car-out", "Car Out", leads.filter(l => ["closed_won", "closed", "completed"].includes(l.lead_status) || (l as any).workflow?.gatepass?.status === "released").length], ["customers", "Customers", new Set(leads.map(l => (l as any).customerId).filter(Boolean)).size], ["calls", "Calls", calls.length]] as const).map(([key, label, count]) => (
           <button key={key} onClick={() => setTab(key)}
-            className={`px-4 py-2 rounded-lg text-xs font-semibold ${tab === key ? "bg-amber-500/20 text-amber-400" : "bg-slate-800 text-slate-400 hover:text-white"}`}>
+            className={`px-4 py-2 rounded-lg text-xs font-semibold ${tab === key ? "bg-amber-500/20 text-amber-400" : "bg-slate-800 text-slate-400 hover:text-foreground"}`}>
             {label} <span className="ml-1 text-[10px] opacity-70">{count}</span>
           </button>
         ))}
@@ -305,25 +305,25 @@ export default function PisAdvisorPortalPage() {
         placeholder="Search by name, phone, email..."
         value={search}
         onChange={e => setSearch(e.target.value)}
-        className="w-full sm:w-72 rounded-lg bg-slate-800 border border-white/20 px-3 py-2 text-xs text-white placeholder:text-slate-600 focus:border-amber-500/50 focus:outline-none"
+        className="w-full sm:w-72 rounded-lg bg-slate-800 border border-border px-3 py-2 text-xs text-foreground placeholder:text-slate-600 focus:border-amber-500/50 focus:outline-none"
       />
 
       <div className={`${showAi ? "grid grid-cols-1 lg:grid-cols-3 gap-6" : ""}`}>
         <div className={`${showAi ? "lg:col-span-2" : ""}`}>
           {dataLoading ? <div className="text-slate-400 py-4">Loading {tab}...</div> : (
-            <div className="rounded-xl border border-white/10 bg-gradient-to-br from-slate-900/80 to-black/90 overflow-hidden">
+            <div className="rounded-xl border border-border bg-gradient-to-br from-slate-900/80 to-black/90 overflow-hidden">
               {/* LEADS TAB */}
               {tab === "leads" && (
                 <table className="w-full text-xs">
-                  <thead><tr className="border-b border-white/10 text-left">
+                  <thead><tr className="border-b border-border text-left">
                     {["Customer", "Phone", "Status", "Type", "Source", "Created"].map(h => (
                       <th key={h} className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{h}</th>
                     ))}
                   </tr></thead>
                   <tbody>
                     {leads.filter(l => !search || [l.customer_name, l.customer_phone].some(v => v?.toLowerCase().includes(search.toLowerCase()))).map(l => (
-                      <tr key={l.id} className="border-b border-white/5 hover:bg-white/5">
-                        <td className="px-3 py-2 text-white font-medium">{l.customer_name ?? "—"}</td>
+                      <tr key={l.id} className="border-b border-border/40 hover:bg-muted/40">
+                        <td className="px-3 py-2 text-foreground font-medium">{l.customer_name ?? "—"}</td>
                         <td className="px-3 py-2 text-slate-300 font-mono">{l.customer_phone ?? "—"}</td>
                         <td className="px-3 py-2"><span className={`px-2 py-0.5 rounded text-[9px] font-bold ${STATUS_STYLES[l.lead_status] ?? "bg-slate-500/15 text-slate-400"}`}>{l.lead_status}</span></td>
                         <td className="px-3 py-2 text-slate-300">{l.lead_type}</td>
@@ -342,7 +342,7 @@ export default function PisAdvisorPortalPage() {
                 const filtered = carOutLeads.filter(l => !search || [l.customer_name, l.customer_phone, l.carPlateNumber, l.carModel].some(v => v?.toLowerCase().includes(search.toLowerCase())));
                 return (
                   <table className="w-full text-xs">
-                    <thead><tr className="border-b border-white/10 text-left">
+                    <thead><tr className="border-b border-border text-left">
                       {["Customer", "Phone", "Plate", "Car", "Invoice", "Amount", "Status", "Delivered"].map(h => (
                         <th key={h} className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{h}</th>
                       ))}
@@ -351,8 +351,8 @@ export default function PisAdvisorPortalPage() {
                       {filtered.map(l => {
                         const w = (l as any).workflow;
                         return (
-                          <tr key={l.id} className="border-b border-white/5 hover:bg-white/5">
-                            <td className="px-3 py-2.5 text-white font-medium">{l.customer_name ?? "—"}</td>
+                          <tr key={l.id} className="border-b border-border/40 hover:bg-muted/40">
+                            <td className="px-3 py-2.5 text-foreground font-medium">{l.customer_name ?? "—"}</td>
                             <td className="px-3 py-2.5 text-slate-300 font-mono">{l.customer_phone ?? "—"}</td>
                             <td className="px-3 py-2.5 text-amber-400 font-mono font-bold">{l.carPlateNumber ?? "—"}</td>
                             <td className="px-3 py-2.5 text-slate-300">{l.carModel ?? "—"}</td>
@@ -383,7 +383,7 @@ export default function PisAdvisorPortalPage() {
                 const filtered = uniqueCustomers.filter(l => !search || [l.customer_name, l.customer_phone, (l as any).customer_email].some(v => v?.toLowerCase().includes(search.toLowerCase())));
                 return (
                   <table className="w-full text-xs">
-                    <thead><tr className="border-b border-white/10 text-left">
+                    <thead><tr className="border-b border-border text-left">
                       {["Customer", "Phone", "Plate", "Car", "Lead Status", "Leads", "Wallet"].map(h => (
                         <th key={h} className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{h}</th>
                       ))}
@@ -393,9 +393,9 @@ export default function PisAdvisorPortalPage() {
                         const custId = (l as any).customerId;
                         const custLeads = leads.filter(ll => (ll as any).customerId === custId);
                         return (
-                          <tr key={custId} className="border-b border-white/5 hover:bg-white/5">
+                          <tr key={custId} className="border-b border-border/40 hover:bg-muted/40">
                             <td className="px-3 py-2.5">
-                              <a href={`/company/${companyId}/customers/${custId}`} className="text-white font-medium hover:underline">{l.customer_name ?? "—"}</a>
+                              <a href={`/company/${companyId}/customers/${custId}`} className="text-foreground font-medium hover:underline">{l.customer_name ?? "—"}</a>
                             </td>
                             <td className="px-3 py-2.5 text-slate-300 font-mono">{l.customer_phone ?? "—"}</td>
                             <td className="px-3 py-2.5 text-amber-400 font-mono font-bold">{l.carPlateNumber ?? "—"}</td>
@@ -421,14 +421,14 @@ export default function PisAdvisorPortalPage() {
               {/* CALLS TAB */}
               {tab === "calls" && (
                 <table className="w-full text-xs">
-                  <thead><tr className="border-b border-white/10 text-left">
+                  <thead><tr className="border-b border-border text-left">
                     {["Time", "Direction", "From", "To", "Customer", "Status", "Duration"].map(h => (
                       <th key={h} className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{h}</th>
                     ))}
                   </tr></thead>
                   <tbody>
                     {calls.filter(c => !search || [c.customer_name, c.from_number, c.to_number].some(v => v?.toLowerCase().includes(search.toLowerCase()))).map(c => (
-                      <tr key={c.id} className="border-b border-white/5 hover:bg-white/5">
+                      <tr key={c.id} className="border-b border-border/40 hover:bg-muted/40">
                         <td className="px-3 py-2 text-slate-500">{timeAgo(c.created_at)}</td>
                         <td className="px-3 py-2">
                           <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${c.direction === "inbound" ? "bg-cyan-500/20 text-cyan-400" : "bg-blue-500/20 text-blue-400"}`}>
@@ -454,7 +454,7 @@ export default function PisAdvisorPortalPage() {
                 return (
                   <div className="overflow-x-auto">
                     <table className="w-full text-xs">
-                      <thead><tr className="border-b border-white/10 text-left">
+                      <thead><tr className="border-b border-border text-left">
                         {["Customer / Car", "Car In Time", "Pre-Inspection", "Inspection", "Estimate", "Parts Order", "Job Card", "Quality", "Invoice", "Wallet", "Delivery"].map(h => (
                           <th key={h} className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400 whitespace-nowrap">{h}</th>
                         ))}
@@ -464,10 +464,10 @@ export default function PisAdvisorPortalPage() {
                           const w = l.workflow;
                           const cid = companyId as string;
                           return (
-                            <tr key={l.id} className="border-b border-white/5 hover:bg-white/5 align-top">
+                            <tr key={l.id} className="border-b border-border/40 hover:bg-muted/40 align-top">
                               {/* Customer / Car */}
                               <td className="px-3 py-2.5">
-                                <a href={`/company/${cid}/leads/${l.id}`} className="text-white font-medium hover:underline">{l.customer_name ?? "—"}</a>
+                                <a href={`/company/${cid}/leads/${l.id}`} className="text-foreground font-medium hover:underline">{l.customer_name ?? "—"}</a>
                                 <div className="text-[10px] text-slate-400 font-mono">{l.customer_phone ?? ""}</div>
                                 <div className="text-[10px] text-amber-400 font-mono font-bold mt-0.5">{l.carPlateNumber ?? "No plate"}</div>
                                 <div className="text-[10px] text-slate-500">{l.carModel ?? ""}</div>
@@ -494,7 +494,7 @@ export default function PisAdvisorPortalPage() {
                                     <WorkflowBadge status={w.inspection.status} labels={{ completed: "Completed", pending: "Pending", in_progress: "In Progress", cancelled: "Cancelled" }} />
                                     <div className="mt-1">
                                       <a href={`/api/company/${cid}/workshop/inspections/${w.inspection.id}/print`} target="_blank" rel="noreferrer"
-                                        className="inline-flex rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[8px] font-semibold uppercase text-slate-400 hover:bg-white/10 hover:text-white">PDF</a>
+                                        className="inline-flex rounded border border-border bg-muted/40 px-1.5 py-0.5 text-[8px] font-semibold uppercase text-slate-400 hover:bg-muted hover:text-foreground">PDF</a>
                                     </div>
                                   </>
                                 ) : <span className="text-slate-600">Pending</span>}
@@ -504,7 +504,7 @@ export default function PisAdvisorPortalPage() {
                                 {w?.estimate ? (
                                   <>
                                     <a href={`/company/${cid}/estimates/${w.estimate.id}`}
-                                      className="inline-flex rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[8px] font-semibold uppercase text-slate-400 hover:bg-white/10 hover:text-white">
+                                      className="inline-flex rounded border border-border bg-muted/40 px-1.5 py-0.5 text-[8px] font-semibold uppercase text-slate-400 hover:bg-muted hover:text-foreground">
                                       View Estimate
                                     </a>
                                     <div className="mt-1">
@@ -515,7 +515,7 @@ export default function PisAdvisorPortalPage() {
                                 ) : (
                                   <button
                                     type="button"
-                                    className="inline-flex rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[8px] font-semibold uppercase text-amber-400 hover:bg-amber-500/10 hover:text-amber-300"
+                                    className="inline-flex rounded border border-border bg-muted/40 px-1.5 py-0.5 text-[8px] font-semibold uppercase text-amber-400 hover:bg-amber-500/10 hover:text-amber-300"
                                     onClick={async () => {
                                       if (!w?.inspection?.id) { alert("Inspection is required to create an estimate."); return; }
                                       try {
@@ -546,7 +546,7 @@ export default function PisAdvisorPortalPage() {
                                     <button
                                       type="button"
                                       onClick={() => setPartsModal({ partName: l.customer_name ?? "Parts", items: w.parts.items ?? [] })}
-                                      className="inline-flex mt-1 rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[8px] font-semibold uppercase text-slate-400 hover:bg-white/10 hover:text-white">
+                                      className="inline-flex mt-1 rounded border border-border bg-muted/40 px-1.5 py-0.5 text-[8px] font-semibold uppercase text-slate-400 hover:bg-muted hover:text-foreground">
                                       View Parts
                                     </button>
                                   </div>
@@ -562,7 +562,7 @@ export default function PisAdvisorPortalPage() {
                                     {w.jobCard.finalInspectionAt && <div className="text-[9px] text-emerald-400 mt-0.5">Final inspected</div>}
                                     {w.jobCard.carWash && <div className="text-[9px] text-cyan-400">Car washed</div>}
                                     <a href={`/company/${cid}/workshop/job-cards/${w.jobCard.id}`}
-                                      className="inline-flex mt-1 rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[8px] font-semibold uppercase text-slate-400 hover:bg-white/10 hover:text-white">
+                                      className="inline-flex mt-1 rounded border border-border bg-muted/40 px-1.5 py-0.5 text-[8px] font-semibold uppercase text-slate-400 hover:bg-muted hover:text-foreground">
                                       View Job Card
                                     </a>
                                   </>
@@ -578,7 +578,7 @@ export default function PisAdvisorPortalPage() {
                                     <button
                                       type="button"
                                       onClick={() => setQcModal({ customerName: l.customer_name, carPlate: l.carPlateNumber, ...w.jobCard })}
-                                      className="inline-flex mt-1 rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[8px] font-semibold uppercase text-slate-400 hover:bg-white/10 hover:text-white">
+                                      className="inline-flex mt-1 rounded border border-border bg-muted/40 px-1.5 py-0.5 text-[8px] font-semibold uppercase text-slate-400 hover:bg-muted hover:text-foreground">
                                       View QC Report
                                     </button>
                                   </div>
@@ -617,7 +617,7 @@ export default function PisAdvisorPortalPage() {
                                 ) : w?.estimate?.id && w?.jobCard?.status === "Completed" ? (
                                   <button
                                     type="button"
-                                    className="inline-flex rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[8px] font-semibold uppercase text-amber-400 hover:bg-amber-500/10 hover:text-amber-300"
+                                    className="inline-flex rounded border border-border bg-muted/40 px-1.5 py-0.5 text-[8px] font-semibold uppercase text-amber-400 hover:bg-amber-500/10 hover:text-amber-300"
                                     onClick={async () => {
                                       try {
                                         const res = await fetch(`/api/company/${cid}/workshop/estimates/${w.estimate.id}/invoice`, {
@@ -719,21 +719,21 @@ export default function PisAdvisorPortalPage() {
         {/* Release Car Modal */}
         {releaseModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-            <div className="w-full max-w-md rounded-xl border border-white/10 bg-slate-950 shadow-xl">
-              <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+            <div className="w-full max-w-md rounded-xl border border-border bg-backgroundshadow-xl">
+              <div className="flex items-center justify-between border-b border-border px-4 py-3">
                 <div>
-                  <div className="text-sm font-semibold text-white">Release Car</div>
+                  <div className="text-sm font-semibold text-foreground">Release Car</div>
                   <div className="text-[11px] text-slate-400">Confirm car handover to customer</div>
                 </div>
-                <button onClick={() => setReleaseModal(null)} className="rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-semibold text-slate-400 hover:bg-white/10">Close</button>
+                <button onClick={() => setReleaseModal(null)} className="rounded-md border border-border bg-muted/40 px-3 py-1.5 text-[11px] font-semibold text-slate-400 hover:bg-muted">Close</button>
               </div>
               <div className="p-4 space-y-3">
                 {releaseError && <div className="rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-2 text-xs text-red-300">{releaseError}</div>}
 
-                <div className="rounded-lg border border-white/5 bg-white/[0.02] p-3 space-y-2">
+                <div className="rounded-lg border border-border/40 bg-card/30 p-3 space-y-2">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-slate-400">Customer</span>
-                    <span className="text-white font-semibold">{releaseModal.customerName}</span>
+                    <span className="text-foreground font-semibold">{releaseModal.customerName}</span>
                   </div>
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-slate-400">Vehicle</span>
@@ -748,14 +748,14 @@ export default function PisAdvisorPortalPage() {
                 <div className="space-y-2">
                   <label className="text-xs font-semibold text-slate-400">Handover Notes <span className="font-normal text-slate-600">(optional)</span></label>
                   <textarea
-                    className="h-16 w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-xs text-white placeholder:text-white/60"
+                    className="h-16 w-full rounded border border-border bg-muted px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground"
                     placeholder="Any notes about the handover..."
                     value={releaseNotes}
                     onChange={(e) => setReleaseNotes(e.target.value)} />
                 </div>
 
                 <div className="flex items-center justify-end gap-2">
-                  <button onClick={() => setReleaseModal(null)} className="rounded-md border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold text-slate-400 hover:bg-white/10">Cancel</button>
+                  <button onClick={() => setReleaseModal(null)} className="rounded-md border border-border bg-muted/40 px-4 py-2 text-xs font-semibold text-slate-400 hover:bg-muted">Cancel</button>
                   <button
                     disabled={releaseSaving}
                     className="rounded-md bg-emerald-600 px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
@@ -795,34 +795,34 @@ export default function PisAdvisorPortalPage() {
         {/* Pay Invoice Modal */}
         {payModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-            <div className="w-full max-w-md rounded-xl border border-white/10 bg-slate-950 shadow-xl">
-              <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+            <div className="w-full max-w-md rounded-xl border border-border bg-backgroundshadow-xl">
+              <div className="flex items-center justify-between border-b border-border px-4 py-3">
                 <div>
-                  <div className="text-sm font-semibold text-white">Pay Invoice</div>
+                  <div className="text-sm font-semibold text-foreground">Pay Invoice</div>
                   <div className="text-[11px] text-slate-400">{payModal.customerName}</div>
                 </div>
-                <button onClick={() => setPayModal(null)} className="rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-semibold text-slate-400 hover:bg-white/10">Close</button>
+                <button onClick={() => setPayModal(null)} className="rounded-md border border-border bg-muted/40 px-3 py-1.5 text-[11px] font-semibold text-slate-400 hover:bg-muted">Close</button>
               </div>
               <div className="p-4 space-y-3">
                 {payError && <div className="rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-2 text-xs text-red-300">{payError}</div>}
 
-                <div className="rounded-lg border border-white/5 bg-white/[0.02] p-3 space-y-2">
+                <div className="rounded-lg border border-border/40 bg-card/30 p-3 space-y-2">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-slate-400">Invoice</span>
-                    <span className="text-white font-semibold">#{payModal.invoiceNumber}</span>
+                    <span className="text-foreground font-semibold">#{payModal.invoiceNumber}</span>
                   </div>
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-slate-400">Amount Due</span>
-                    <span className="text-lg font-bold text-white">AED {payModal.grandTotal.toFixed(2)}</span>
+                    <span className="text-lg font-bold text-foreground">AED {payModal.grandTotal.toFixed(2)}</span>
                   </div>
-                  <div className="flex items-center justify-between text-xs border-t border-white/5 pt-2">
+                  <div className="flex items-center justify-between text-xs border-t border-border/40 pt-2">
                     <span className="text-slate-400">Wallet Balance</span>
                     <span className={`font-semibold ${payModal.walletBalance >= payModal.grandTotal ? "text-emerald-400" : "text-red-400"}`}>
                       AED {payModal.walletBalance.toFixed(2)}
                     </span>
                   </div>
                   {payModal.walletBalance >= payModal.grandTotal ? (
-                    <div className="flex items-center justify-between text-xs border-t border-white/5 pt-2">
+                    <div className="flex items-center justify-between text-xs border-t border-border/40 pt-2">
                       <span className="text-slate-400">After Payment</span>
                       <span className="text-slate-300">AED {(payModal.walletBalance - payModal.grandTotal).toFixed(2)}</span>
                     </div>
@@ -834,7 +834,7 @@ export default function PisAdvisorPortalPage() {
                 </div>
 
                 <div className="flex items-center justify-end gap-2">
-                  <button onClick={() => setPayModal(null)} className="rounded-md border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold text-slate-400 hover:bg-white/10">Cancel</button>
+                  <button onClick={() => setPayModal(null)} className="rounded-md border border-border bg-muted/40 px-4 py-2 text-xs font-semibold text-slate-400 hover:bg-muted">Cancel</button>
                   <button
                     disabled={paySaving || payModal.walletBalance < payModal.grandTotal}
                     className="rounded-md bg-emerald-600 px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
@@ -868,26 +868,26 @@ export default function PisAdvisorPortalPage() {
         {/* Topup Wallet Modal */}
         {topupModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-            <div className="w-full max-w-lg rounded-xl border border-white/10 bg-slate-950 shadow-xl">
-              <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+            <div className="w-full max-w-lg rounded-xl border border-border bg-backgroundshadow-xl">
+              <div className="flex items-center justify-between border-b border-border px-4 py-3">
                 <div>
-                  <div className="text-sm font-semibold text-white">Topup Wallet</div>
+                  <div className="text-sm font-semibold text-foreground">Topup Wallet</div>
                   <div className="text-[11px] text-slate-400">{topupModal.customerName} | Balance: <span className={topupModal.currentBalance > 0 ? "text-emerald-400" : "text-red-400"}>AED {topupModal.currentBalance.toFixed(2)}</span></div>
                 </div>
-                <button onClick={() => setTopupModal(null)} className="rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-semibold text-slate-400 hover:bg-white/10">Close</button>
+                <button onClick={() => setTopupModal(null)} className="rounded-md border border-border bg-muted/40 px-3 py-1.5 text-[11px] font-semibold text-slate-400 hover:bg-muted">Close</button>
               </div>
               <div className="space-y-4 p-4">
                 {topupError && <div className="text-sm text-red-400">{topupError}</div>}
                 <div className="space-y-2">
                   <label className="text-xs font-semibold text-slate-400">Amount</label>
                   <input type="number" min="0" step="0.01" placeholder="Enter amount"
-                    className="h-10 w-full rounded border border-white/20 bg-white/10 px-3 text-sm text-white placeholder:text-white/60"
+                    className="h-10 w-full rounded border border-border bg-muted px-3 text-sm text-foreground placeholder:text-muted-foreground"
                     value={topupForm.amount}
                     onChange={(e) => setTopupForm((p) => ({ ...p, amount: e.target.value }))} />
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-semibold text-slate-400">Payment Method</label>
-                  <select className="h-10 w-full rounded border border-white/20 bg-white/10 px-3 text-sm text-white"
+                  <select className="h-10 w-full rounded border border-border bg-muted px-3 text-sm text-foreground"
                     value={topupForm.method}
                     onChange={(e) => setTopupForm((p) => ({ ...p, method: e.target.value }))}>
                     <option value="cash">Cash</option>
@@ -898,7 +898,7 @@ export default function PisAdvisorPortalPage() {
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-semibold text-slate-400">Payment Date</label>
-                  <input type="date" className="h-10 w-full rounded border border-white/20 bg-white/10 px-3 text-sm text-white"
+                  <input type="date" className="h-10 w-full rounded border border-border bg-muted px-3 text-sm text-foreground"
                     value={topupForm.paymentDate}
                     onChange={(e) => setTopupForm((p) => ({ ...p, paymentDate: e.target.value }))} />
                 </div>
@@ -928,7 +928,7 @@ export default function PisAdvisorPortalPage() {
                 </div>
                 <div className="flex items-center justify-end gap-2">
                   <button type="button" onClick={() => setTopupModal(null)}
-                    className="rounded-md border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold text-slate-400 hover:bg-white/10">Cancel</button>
+                    className="rounded-md border border-border bg-muted/40 px-4 py-2 text-xs font-semibold text-slate-400 hover:bg-muted">Cancel</button>
                   <button type="button" disabled={topupSaving || !topupForm.amount || Number(topupForm.amount) <= 0}
                     className="rounded-md bg-emerald-600 px-4 py-2 text-xs font-semibold text-white disabled:opacity-50"
                     onClick={async () => {
@@ -969,13 +969,13 @@ export default function PisAdvisorPortalPage() {
         {/* QC Report Modal */}
         {qcModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-            <div className="w-full max-w-2xl rounded-xl border border-white/10 bg-slate-950 shadow-xl overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+            <div className="w-full max-w-2xl rounded-xl border border-border bg-backgroundshadow-xl overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-border">
                 <div>
-                  <div className="text-sm font-bold text-white">Quality Check Report</div>
+                  <div className="text-sm font-bold text-foreground">Quality Check Report</div>
                   <div className="text-[11px] text-slate-400">{qcModal.customerName} | {qcModal.carPlate}</div>
                 </div>
-                <button onClick={() => setQcModal(null)} className="text-slate-500 hover:text-white text-lg">&times;</button>
+                <button onClick={() => setQcModal(null)} className="text-slate-500 hover:text-foreground text-lg">&times;</button>
               </div>
               <div className="max-h-[65vh] overflow-y-auto p-4 space-y-4">
                 {/* Final Inspection Checklist */}
@@ -990,7 +990,7 @@ export default function PisAdvisorPortalPage() {
                       { label: "Protective Shields", value: qcModal.protectiveShields },
                       { label: "Car Wash", value: qcModal.carWash },
                     ].map((item) => (
-                      <div key={item.label} className="flex items-center justify-between rounded border border-white/5 bg-white/[0.02] px-3 py-2">
+                      <div key={item.label} className="flex items-center justify-between rounded border border-border/40 bg-card/30 px-3 py-2">
                         <span className="text-xs text-slate-300">{item.label}</span>
                         <span className={`text-xs font-bold ${item.value ? "text-emerald-400" : "text-red-400"}`}>
                           {item.value ? "PASS" : "FAIL"}
@@ -1004,13 +1004,13 @@ export default function PisAdvisorPortalPage() {
                 <div>
                   <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2">Inspection Details</div>
                   <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="rounded border border-white/5 bg-white/[0.02] px-3 py-2">
+                    <div className="rounded border border-border/40 bg-card/30 px-3 py-2">
                       <span className="text-slate-500">Inspected At</span>
-                      <div className="text-white mt-0.5">{qcModal.finalInspectionAt ? new Date(qcModal.finalInspectionAt).toLocaleString() : "—"}</div>
+                      <div className="text-foreground mt-0.5">{qcModal.finalInspectionAt ? new Date(qcModal.finalInspectionAt).toLocaleString() : "—"}</div>
                     </div>
-                    <div className="rounded border border-white/5 bg-white/[0.02] px-3 py-2">
+                    <div className="rounded border border-border/40 bg-card/30 px-3 py-2">
                       <span className="text-slate-500">Inspected By</span>
-                      <div className="text-white mt-0.5">{qcModal.finalInspectionBy ?? "—"}</div>
+                      <div className="text-foreground mt-0.5">{qcModal.finalInspectionBy ?? "—"}</div>
                     </div>
                   </div>
                 </div>
@@ -1019,7 +1019,7 @@ export default function PisAdvisorPortalPage() {
                 {qcModal.finalRemarks && (
                   <div>
                     <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2">Remarks</div>
-                    <div className="rounded border border-white/5 bg-white/[0.02] px-3 py-2 text-xs text-slate-300">{qcModal.finalRemarks}</div>
+                    <div className="rounded border border-border/40 bg-card/30 px-3 py-2 text-xs text-slate-300">{qcModal.finalRemarks}</div>
                   </div>
                 )}
 
@@ -1034,11 +1034,11 @@ export default function PisAdvisorPortalPage() {
                           <div key={key} className="text-center">
                             {fileId ? (
                               <a href={`/api/files/${fileId}`} target="_blank" rel="noreferrer" className="block">
-                                <img src={`/api/files/${fileId}`} alt={key} className="w-full h-20 object-cover rounded border border-white/10" />
+                                <img src={`/api/files/${fileId}`} alt={key} className="w-full h-20 object-cover rounded border border-border" />
                                 <div className="text-[8px] text-slate-400 mt-1 uppercase">{key}</div>
                               </a>
                             ) : (
-                              <div className="h-20 rounded border border-white/5 bg-white/[0.02] flex items-center justify-center text-[9px] text-slate-600">{key}</div>
+                              <div className="h-20 rounded border border-border/40 bg-card/30 flex items-center justify-center text-[9px] text-slate-600">{key}</div>
                             )}
                           </div>
                         );
@@ -1065,7 +1065,7 @@ export default function PisAdvisorPortalPage() {
                     <div className="space-y-2">
                       <WorkflowBadge status="completed" labels={{ completed: "Completed" }} />
                       {qcModal.carWashNotes && (
-                        <div className="rounded border border-white/5 bg-white/[0.02] px-3 py-2 text-xs text-slate-300">Notes: {qcModal.carWashNotes}</div>
+                        <div className="rounded border border-border/40 bg-card/30 px-3 py-2 text-xs text-slate-300">Notes: {qcModal.carWashNotes}</div>
                       )}
                       {qcModal.carWashMedia && Object.values(qcModal.carWashMedia).some(Boolean) && (
                         <div className="grid grid-cols-5 gap-2">
@@ -1078,12 +1078,12 @@ export default function PisAdvisorPortalPage() {
                                     {key === "video" ? (
                                       <div className="h-16 rounded border border-cyan-500/20 bg-cyan-500/5 flex items-center justify-center text-cyan-400 text-lg">&#9654;</div>
                                     ) : (
-                                      <img src={`/api/files/${fileId}`} alt={key} className="w-full h-16 object-cover rounded border border-white/10" />
+                                      <img src={`/api/files/${fileId}`} alt={key} className="w-full h-16 object-cover rounded border border-border" />
                                     )}
                                     <div className="text-[8px] text-slate-400 mt-1 uppercase">{key}</div>
                                   </a>
                                 ) : (
-                                  <div className="h-16 rounded border border-white/5 bg-white/[0.02] flex items-center justify-center text-[9px] text-slate-600">{key}</div>
+                                  <div className="h-16 rounded border border-border/40 bg-card/30 flex items-center justify-center text-[9px] text-slate-600">{key}</div>
                                 )}
                               </div>
                             );
@@ -1096,7 +1096,7 @@ export default function PisAdvisorPortalPage() {
                   )}
                 </div>
               </div>
-              <div className="px-4 py-3 border-t border-white/10 flex justify-end">
+              <div className="px-4 py-3 border-t border-border flex justify-end">
                 <button onClick={() => setQcModal(null)} className="rounded border border-slate-700 bg-slate-800 px-4 py-1.5 text-xs font-semibold text-slate-300 hover:bg-slate-700">Close</button>
               </div>
             </div>
@@ -1106,13 +1106,13 @@ export default function PisAdvisorPortalPage() {
         {/* Parts Detail Modal */}
         {partsModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-            <div className="w-full max-w-2xl rounded-xl border border-white/10 bg-slate-950 shadow-xl overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+            <div className="w-full max-w-2xl rounded-xl border border-border bg-backgroundshadow-xl overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-border">
                 <div>
-                  <div className="text-sm font-bold text-white">Parts & Order Status</div>
+                  <div className="text-sm font-bold text-foreground">Parts & Order Status</div>
                   <div className="text-[11px] text-slate-400">{partsModal.partName} - {partsModal.items.length} part(s)</div>
                 </div>
-                <button onClick={() => setPartsModal(null)} className="text-slate-500 hover:text-white text-lg">&times;</button>
+                <button onClick={() => setPartsModal(null)} className="text-slate-500 hover:text-foreground text-lg">&times;</button>
               </div>
               <div className="max-h-[60vh] overflow-y-auto">
                 {partsModal.items.length === 0 ? (
@@ -1120,7 +1120,7 @@ export default function PisAdvisorPortalPage() {
                 ) : (
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="border-b border-white/10 text-left">
+                      <tr className="border-b border-border text-left">
                         <th className="px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Part</th>
                         <th className="px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Vendor</th>
                         <th className="px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Type</th>
@@ -1131,9 +1131,9 @@ export default function PisAdvisorPortalPage() {
                     </thead>
                     <tbody>
                       {partsModal.items.map((item: any, idx: number) => (
-                        <tr key={item.id ?? idx} className="border-b border-white/5 hover:bg-white/5">
+                        <tr key={item.id ?? idx} className="border-b border-border/40 hover:bg-muted/40">
                           <td className="px-4 py-2.5">
-                            <div className="text-white font-medium">{item.partName}</div>
+                            <div className="text-foreground font-medium">{item.partName}</div>
                             {item.vendorPartNumber && <div className="text-[10px] text-slate-500 font-mono">#{item.vendorPartNumber}</div>}
                           </td>
                           <td className="px-4 py-2.5 text-slate-300">{item.vendorName ?? "—"}</td>
@@ -1162,7 +1162,7 @@ export default function PisAdvisorPortalPage() {
                   </table>
                 )}
               </div>
-              <div className="px-4 py-3 border-t border-white/10 flex justify-end">
+              <div className="px-4 py-3 border-t border-border flex justify-end">
                 <button onClick={() => setPartsModal(null)} className="rounded border border-slate-700 bg-slate-800 px-4 py-1.5 text-xs font-semibold text-slate-300 hover:bg-slate-700">Close</button>
               </div>
             </div>

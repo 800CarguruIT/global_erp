@@ -59,7 +59,7 @@ export default function TrialBalancePage() {
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead>
-                <tr className="border-b border-white/10 text-left text-xs text-muted-foreground">
+                <tr className="border-b border-border text-left text-xs text-muted-foreground">
                   <th className="px-3 py-2">{t("accounting.trial.account")}</th>
                   <th className="px-3 py-2 text-right">{t("accounting.trial.debit")}</th>
                   <th className="px-3 py-2 text-right">{t("accounting.trial.credit")}</th>
@@ -74,7 +74,7 @@ export default function TrialBalancePage() {
                   const credit = Number(r.credit ?? 0);
                   const balance = Number(r.balance ?? 0);
                   return (
-                    <tr key={`${code || "acct"}-${idx}`} className="border-b border-white/5">
+                    <tr key={`${code || "acct"}-${idx}`} className="border-b border-border">
                       <td className="px-3 py-2">
                         <div className="font-semibold">{name || code || "-"}</div>
                         <div className="text-xs text-muted-foreground">{code}</div>

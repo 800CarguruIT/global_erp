@@ -56,10 +56,10 @@ export default function RccLeadSourcesPage() {
         <DateFilter from={from} to={to} onChange={(f, t) => { setFrom(f); setTo(t); }} />
       </div>
 
-      <div className="rounded-xl bg-white/[0.03] p-5 overflow-x-auto">
+      <div className="rounded-xl bg-card/40 p-5 overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="opacity-40 text-[11px] uppercase border-b border-white/[0.06]">
+            <tr className="opacity-40 text-[11px] uppercase border-b border-border/60">
               <th className="text-left py-2 px-2 font-medium">Source</th>
               <th className="text-right py-2 px-2 font-medium">Leads</th>
               <th className="text-right py-2 px-2 font-medium">Qualified</th>
@@ -74,7 +74,7 @@ export default function RccLeadSourcesPage() {
           </thead>
           <tbody>
             {(data.table as SourcePerf[]).map((r, i) => (
-              <tr key={i} className="border-b border-white/[0.03] hover:bg-white/[0.03] transition-colors">
+              <tr key={i} className="border-b border-border/30 hover:bg-card/40 transition-colors">
                 <td className="py-2.5 px-2 flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: SOURCE_COLORS[r.source] || "#6b7280" }} />
                   <span className="font-medium">{fmtSource(r.source)}</span>
@@ -91,7 +91,7 @@ export default function RccLeadSourcesPage() {
                 <td className="text-right px-2 tabular-nums"><span className={r.roi < 0 ? "text-red-400" : r.roi > 0 ? "text-emerald-400" : "opacity-30"}>{r.roi !== 0 ? `${r.roi}%` : "—"}</span></td>
               </tr>
             ))}
-            <tr className="font-semibold border-t border-white/[0.08]">
+            <tr className="font-semibold border-t border-border">
               <td className="py-2.5 px-2">TOTAL</td>
               <td className="text-right px-2 tabular-nums">{data.totals.leads.toLocaleString()}</td>
               <td className="text-right px-2 tabular-nums">{data.totals.qualified.toLocaleString()}</td>
@@ -109,7 +109,7 @@ export default function RccLeadSourcesPage() {
 
       <div className="grid grid-cols-4 gap-3">
         {(data.table as SourcePerf[]).slice(0, 8).map((r, i) => (
-          <div key={i} className="rounded-xl bg-white/[0.03] p-4 border-t-2" style={{ borderTopColor: SOURCE_COLORS[r.source] || "#6b7280" }}>
+          <div key={i} className="rounded-xl bg-card/40 p-4 border-t-2" style={{ borderTopColor: SOURCE_COLORS[r.source] || "#6b7280" }}>
             <h4 className="font-semibold text-sm mb-2">{fmtSource(r.source)}</h4>
             <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
               <div><span className="opacity-30 text-[10px] uppercase">Leads</span><br /><span className="font-medium">{r.leads.toLocaleString()}</span></div>

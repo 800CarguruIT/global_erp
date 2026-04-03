@@ -287,13 +287,13 @@ export function DocsIndexClient({ docs }: { docs: DocSummary[] }) {
 
   return (
     <div className="mx-auto w-full max-w-[1720px] space-y-4 py-4 lg:py-6">
-      <header className="rounded-2xl border border-white/10 bg-background/80 p-4">
+      <header className="rounded-2xl border border-border bg-background/80 p-4">
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground/95">Documentation</p>
             <h1 className="text-3xl font-semibold text-foreground">Global docs</h1>
           </div>
-          <Link href="/global" className="rounded-full border border-white/20 bg-white/5 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-white transition hover:border-white/40">
+          <Link href="/global" className="rounded-full border border-border bg-muted/40 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-foreground transition hover:border-border">
             Back to dashboard
           </Link>
         </div>
@@ -302,7 +302,7 @@ export function DocsIndexClient({ docs }: { docs: DocSummary[] }) {
       {error && <div className="rounded-2xl border border-red-400/30 bg-red-950/20 p-3 text-sm text-red-200">{error}</div>}
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
-        <section className="rounded-2xl border border-white/10 bg-background/80 p-4">
+        <section className="rounded-2xl border border-border bg-background/80 p-4">
           <div className="mb-4 flex flex-wrap items-center gap-2">
             <button type="button" onClick={openCreate} className="rounded-xl border border-primary/60 bg-primary/15 px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-primary transition hover:bg-primary/20">
               New doc
@@ -311,7 +311,7 @@ export function DocsIndexClient({ docs }: { docs: DocSummary[] }) {
               type="button"
               onClick={() => void exportAllPdf()}
               disabled={busy}
-              className="rounded-xl border border-white/20 bg-white/5 px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-white transition hover:border-white/40 disabled:opacity-60"
+              className="rounded-xl border border-border bg-muted/40 px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-foreground transition hover:border-border disabled:opacity-60"
             >
               {busy ? "Exporting..." : "Export PDF"}
             </button>
@@ -320,14 +320,14 @@ export function DocsIndexClient({ docs }: { docs: DocSummary[] }) {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search docs"
-              className="h-9 min-w-56 flex-1 rounded-xl border border-white/15 bg-black/20 px-3 text-sm text-foreground outline-none focus:border-primary/60"
+              className="h-9 min-w-56 flex-1 rounded-xl border border-border bg-black/20 px-3 text-sm text-foreground outline-none focus:border-primary/60"
             />
             <div className="flex flex-wrap gap-1.5">
-              <button type="button" onClick={() => setActiveSection("all")} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.1em] ${activeSection === "all" ? "border-primary/60 bg-primary/15 text-primary" : "border-white/15 text-white/80"}`}>
+              <button type="button" onClick={() => setActiveSection("all")} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.1em] ${activeSection === "all" ? "border-primary/60 bg-primary/15 text-primary" : "border-border text-foreground/80"}`}>
                 All
               </button>
               {sections.map((s) => (
-                <button key={s} type="button" onClick={() => setActiveSection(s)} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.1em] ${activeSection === s ? "border-primary/60 bg-primary/15 text-primary" : "border-white/15 text-white/80"}`}>
+                <button key={s} type="button" onClick={() => setActiveSection(s)} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.1em] ${activeSection === s ? "border-primary/60 bg-primary/15 text-primary" : "border-border text-foreground/80"}`}>
                   {toSectionTitle(s)}
                 </button>
               ))}
@@ -340,32 +340,32 @@ export function DocsIndexClient({ docs }: { docs: DocSummary[] }) {
               const sectionDocs = (grouped.get(key) ?? []).sort((a, b) => a.title.localeCompare(b.title));
               const isCollapsed = Boolean(collapsed[key]);
               return (
-                <div key={key} className="rounded-xl border border-white/10 bg-white/[0.02]">
+                <div key={key} className="rounded-xl border border-border bg-card/30">
                   <button
                     type="button"
                     onClick={() => setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }))}
                     className="flex w-full items-center justify-between px-3 py-2 text-left"
                   >
-                    <span className="text-sm font-semibold uppercase tracking-[0.12em] text-white">{toSectionTitle(key)}</span>
-                    <span className="text-xs text-white/70">{isCollapsed ? "Expand" : "Collapse"}</span>
+                    <span className="text-sm font-semibold uppercase tracking-[0.12em] text-foreground">{toSectionTitle(key)}</span>
+                    <span className="text-xs text-foreground/70">{isCollapsed ? "Expand" : "Collapse"}</span>
                   </button>
                   {!isCollapsed && (
-                    <div className="space-y-2 border-t border-white/10 p-2">
+                    <div className="space-y-2 border-t border-border p-2">
                       {sectionDocs.map((doc) => (
-                        <div key={doc.slug} className="rounded-lg border border-white/10 bg-black/20 p-3">
+                        <div key={doc.slug} className="rounded-lg border border-border bg-black/20 p-3">
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <div>
-                              <Link href={`/global/docs/${doc.slug}`} className="text-sm font-semibold text-white hover:text-primary">
+                              <Link href={`/global/docs/${doc.slug}`} className="text-sm font-semibold text-foreground hover:text-primary">
                                 {doc.title}
                               </Link>
-                              <p className="mt-1 text-[11px] text-white/60">{doc.relativePath}</p>
-                              <p className="text-[11px] text-white/50">Updated {new Date(doc.updatedAt).toLocaleDateString()}</p>
+                              <p className="mt-1 text-[11px] text-muted-foreground">{doc.relativePath}</p>
+                              <p className="text-[11px] text-muted-foreground">Updated {new Date(doc.updatedAt).toLocaleDateString()}</p>
                             </div>
                             <div className="flex flex-wrap gap-1">
-                              <button type="button" onClick={() => copyLink(doc.slug)} className="rounded-full border border-white/15 px-2 py-0.5 text-[10px] text-white/80">
+                              <button type="button" onClick={() => copyLink(doc.slug)} className="rounded-full border border-border px-2 py-0.5 text-[10px] text-foreground/80">
                                 {copiedSlug === doc.slug ? "Copied" : "Copy"}
                               </button>
-                              <button type="button" onClick={() => void startEdit(doc.slug)} className="rounded-full border border-white/15 px-2 py-0.5 text-[10px] text-white/80">
+                              <button type="button" onClick={() => void startEdit(doc.slug)} className="rounded-full border border-border px-2 py-0.5 text-[10px] text-foreground/80">
                                 Edit
                               </button>
                               <button type="button" onClick={() => void removeDoc(doc.slug, doc.title)} className="rounded-full border border-red-400/30 px-2 py-0.5 text-[10px] text-red-200">
@@ -373,7 +373,7 @@ export function DocsIndexClient({ docs }: { docs: DocSummary[] }) {
                               </button>
                             </div>
                           </div>
-                          <p className="mt-2 text-xs text-white/70">{doc.excerpt}</p>
+                          <p className="mt-2 text-xs text-foreground/70">{doc.excerpt}</p>
                         </div>
                       ))}
                     </div>
@@ -385,17 +385,17 @@ export function DocsIndexClient({ docs }: { docs: DocSummary[] }) {
         </section>
 
         <section className="space-y-4">
-          <div className="rounded-2xl border border-white/10 bg-background/80 p-4">
+          <div className="rounded-2xl border border-border bg-background/80 p-4">
             <h2 className="text-lg font-semibold text-foreground">Activity</h2>
             <div className="mt-2 space-y-2">
               <div className="flex flex-wrap gap-1">
                 {(["all", "create", "edit", "delete", "draft", "publish", "revert"] as const).map((a) => (
-                  <button key={a} type="button" onClick={() => setLogAction(a)} className={`rounded-full border px-2 py-0.5 text-[10px] uppercase ${logAction === a ? "border-primary/60 bg-primary/15 text-primary" : "border-white/15 text-white/80"}`}>
+                  <button key={a} type="button" onClick={() => setLogAction(a)} className={`rounded-full border px-2 py-0.5 text-[10px] uppercase ${logAction === a ? "border-primary/60 bg-primary/15 text-primary" : "border-border text-foreground/80"}`}>
                     {a}
                   </button>
                 ))}
               </div>
-              <select value={logSection} onChange={(e) => setLogSection(e.target.value)} className="h-8 w-full rounded-lg border border-white/15 bg-black/20 px-2 text-xs text-white">
+              <select value={logSection} onChange={(e) => setLogSection(e.target.value)} className="h-8 w-full rounded-lg border border-border bg-black/20 px-2 text-xs text-foreground">
                 <option value="all">All sections</option>
                 {logSections.map((s) => (
                   <option key={s} value={s}>
@@ -403,7 +403,7 @@ export function DocsIndexClient({ docs }: { docs: DocSummary[] }) {
                   </option>
                 ))}
               </select>
-              <select value={logTimeframe} onChange={(e) => setLogTimeframe(e.target.value as LogTimeframe)} className="h-8 w-full rounded-lg border border-white/15 bg-black/20 px-2 text-xs text-white">
+              <select value={logTimeframe} onChange={(e) => setLogTimeframe(e.target.value as LogTimeframe)} className="h-8 w-full rounded-lg border border-border bg-black/20 px-2 text-xs text-foreground">
                 <option value="all">All time</option>
                 <option value="today">Today</option>
                 <option value="7d">Last 7 days</option>
@@ -411,50 +411,50 @@ export function DocsIndexClient({ docs }: { docs: DocSummary[] }) {
               </select>
               <div className="max-h-64 space-y-1 overflow-y-auto">
                 {filteredLogs.slice(0, 20).map((entry) => (
-                  <div key={entry.id} className="rounded-lg border border-white/10 bg-black/20 p-2">
+                  <div key={entry.id} className="rounded-lg border border-border bg-black/20 p-2">
                     <p className="text-[10px] font-semibold uppercase text-primary">{actionLabel(entry.action)}</p>
-                    <p className="text-xs font-semibold text-white">{entry.title}</p>
-                    <p className="text-[11px] text-white/60">{entry.relativePath}</p>
+                    <p className="text-xs font-semibold text-foreground">{entry.title}</p>
+                    <p className="text-[11px] text-muted-foreground">{entry.relativePath}</p>
                   </div>
                 ))}
-                {filteredLogs.length === 0 && <p className="text-xs text-white/60">No activity for selected filters.</p>}
+                {filteredLogs.length === 0 && <p className="text-xs text-muted-foreground">No activity for selected filters.</p>}
               </div>
             </div>
           </div>
 
           {(createOpen || editing) && (
-            <div className="rounded-2xl border border-white/10 bg-background/80 p-4">
+            <div className="rounded-2xl border border-border bg-background/80 p-4">
               <div className="mb-3 flex items-center justify-between">
                 <h2 className="text-lg font-semibold text-foreground">{editing ? "Edit document" : "Create document"}</h2>
-                <span className="rounded-full border border-white/20 px-2.5 py-1 text-[10px] uppercase text-white/80">Step {step} / 2</span>
+                <span className="rounded-full border border-border px-2.5 py-1 text-[10px] uppercase text-foreground/80">Step {step} / 2</span>
               </div>
               {step === 1 ? (
                 <div className="space-y-2">
-                  <input value={activeTitle} onChange={(e) => (editing ? setEditTitle(e.target.value) : setCreateTitle(e.target.value))} className="h-9 w-full rounded-lg border border-white/15 bg-black/20 px-2.5 text-sm text-foreground outline-none focus:border-primary/60" placeholder="Document title" />
-                  <input value={activeSectionInput} onChange={(e) => (editing ? setEditSection(e.target.value) : setCreateSection(e.target.value))} className="h-9 w-full rounded-lg border border-white/15 bg-black/20 px-2.5 text-sm text-foreground outline-none focus:border-primary/60" placeholder="root, global, company, vendors, workshop" />
+                  <input value={activeTitle} onChange={(e) => (editing ? setEditTitle(e.target.value) : setCreateTitle(e.target.value))} className="h-9 w-full rounded-lg border border-border bg-black/20 px-2.5 text-sm text-foreground outline-none focus:border-primary/60" placeholder="Document title" />
+                  <input value={activeSectionInput} onChange={(e) => (editing ? setEditSection(e.target.value) : setCreateSection(e.target.value))} className="h-9 w-full rounded-lg border border-border bg-black/20 px-2.5 text-sm text-foreground outline-none focus:border-primary/60" placeholder="root, global, company, vendors, workshop" />
                   <div className="flex gap-2">
                     <button type="button" onClick={() => { if (!activeTitle.trim()) return setError("Title is required."); setStep(2); }} className="rounded-lg border border-primary/60 bg-primary/15 px-3 py-1.5 text-[11px] font-semibold uppercase text-primary">
                       Next
                     </button>
-                    <button type="button" onClick={closeEditor} className="rounded-lg border border-white/20 px-3 py-1.5 text-[11px] font-semibold uppercase text-white/90">
+                    <button type="button" onClick={closeEditor} className="rounded-lg border border-border px-3 py-1.5 text-[11px] font-semibold uppercase text-foreground/90">
                       Cancel
                     </button>
                   </div>
                 </div>
               ) : (
                 <div className="space-y-2">
-                  <textarea value={activeContent} onChange={(e) => (editing ? setEditContent(e.target.value) : setCreateContent(e.target.value))} className="min-h-48 w-full rounded-lg border border-white/15 bg-black/20 p-2.5 text-sm text-foreground outline-none focus:border-primary/60" />
-                  <div className="max-h-56 overflow-y-auto rounded-lg border border-white/15 bg-black/20 p-2.5">
+                  <textarea value={activeContent} onChange={(e) => (editing ? setEditContent(e.target.value) : setCreateContent(e.target.value))} className="min-h-48 w-full rounded-lg border border-border bg-black/20 p-2.5 text-sm text-foreground outline-none focus:border-primary/60" />
+                  <div className="max-h-56 overflow-y-auto rounded-lg border border-border bg-black/20 p-2.5">
                     <MarkdownRenderer text={activeContent} />
                   </div>
                   <div className="flex gap-2">
-                    <button type="button" onClick={() => setStep(1)} className="rounded-lg border border-white/20 px-3 py-1.5 text-[11px] font-semibold uppercase text-white/90">
+                    <button type="button" onClick={() => setStep(1)} className="rounded-lg border border-border px-3 py-1.5 text-[11px] font-semibold uppercase text-foreground/90">
                       Back
                     </button>
                     <button type="button" onClick={editing ? saveEdit : saveCreate} disabled={busy} className="rounded-lg border border-primary/60 bg-primary/15 px-3 py-1.5 text-[11px] font-semibold uppercase text-primary disabled:opacity-60">
                       {busy ? "Saving..." : editing ? "Save" : "Create"}
                     </button>
-                    <button type="button" onClick={closeEditor} className="rounded-lg border border-white/20 px-3 py-1.5 text-[11px] font-semibold uppercase text-white/90">
+                    <button type="button" onClick={closeEditor} className="rounded-lg border border-border px-3 py-1.5 text-[11px] font-semibold uppercase text-foreground/90">
                       Cancel
                     </button>
                   </div>

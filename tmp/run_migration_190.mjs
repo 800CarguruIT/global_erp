@@ -1,0 +1,13 @@
+import { createRequire } from "module";
+import { readFileSync } from "fs";
+const require = createRequire(import.meta.url);
+const postgres = require("../node_modules/.pnpm/postgres@3.4.7/node_modules/postgres/src/index.js").default || require("../node_modules/.pnpm/postgres@3.4.7/node_modules/postgres/src/index.js");
+const sql = postgres("postgres://autoguru:autoguru@localhost:5432/global_erp_dev");
+const migration = readFileSync("packages/ai-core/migrations/190_recovery_requests_permission.sql", "utf8");
+await sql.unsafe(migration);
+const perms = await sql`SELECT key, description FROM permissions WHERE key LIKE 'ops.recovery%' ORDER BY key`;
+console.log("Permissions:");
+for (const p of perms) console.log("  " + p.key + " — " + p.description);
+const links = await sql`SELECT count(*) as cnt FROM role_permissions rp JOIN permissions p ON p.id = rp.permission_id WHERE p.key LIKE 'ops.recovery%'`;
+console.log("Role-permission links:", links[0].cnt);
+await sql.end();

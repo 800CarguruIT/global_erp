@@ -65,10 +65,10 @@ function GlobalProductsContent() {
 
       <div className="rounded-2xl bg-gradient-to-r from-cyan-500/15 via-blue-500/10 to-transparent shadow-xl shadow-cyan-900/20">
         <div className="flex flex-wrap items-center gap-2 p-4">
-          <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-foreground/90">
+          <span className="rounded-full bg-muted px-3 py-1 text-xs font-semibold text-foreground/90">
             {loading ? "Loading..." : `${total} total`}
           </span>
-          <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-muted-foreground">
+          <span className="rounded-full bg-muted/40 px-3 py-1 text-xs text-muted-foreground">
             {query.trim() ? `${visibleTotal} visible` : "All visible"}
           </span>
         </div>
@@ -81,19 +81,19 @@ function GlobalProductsContent() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search categories..."
-            className="min-w-[220px] flex-1 rounded-xl bg-white/10 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-cyan-400/50"
+            className="min-w-[220px] flex-1 rounded-xl bg-muted px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-cyan-400/50"
           />
           <button
             type="button"
             onClick={() => setExpanded(expandAll(filteredTree))}
-            className="rounded-xl bg-white/10 px-3 py-2 text-xs font-semibold text-foreground/90 transition hover:bg-white/20"
+            className="rounded-xl bg-muted px-3 py-2 text-xs font-semibold text-foreground/90 transition hover:bg-muted/80"
           >
             Expand All
           </button>
           <button
             type="button"
             onClick={() => setExpanded({})}
-            className="rounded-xl bg-white/10 px-3 py-2 text-xs font-semibold text-foreground/90 transition hover:bg-white/20"
+            className="rounded-xl bg-muted px-3 py-2 text-xs font-semibold text-foreground/90 transition hover:bg-muted/80"
           >
             Collapse All
           </button>
@@ -134,14 +134,14 @@ function CategoryTreeNode({
 
   if (!hasChildren) {
     return (
-      <div className="rounded-xl bg-white/[0.045] px-3 py-2 shadow-lg shadow-blue-950/20">
+      <div className="rounded-xl bg-card/50 px-3 py-2 shadow-lg shadow-blue-950/20">
         <div className="text-sm font-medium text-foreground/90">{node.name}</div>
       </div>
     );
   }
 
   return (
-    <div className="rounded-xl bg-white/[0.045] px-3 py-2 shadow-lg shadow-blue-950/20">
+    <div className="rounded-xl bg-card/50 px-3 py-2 shadow-lg shadow-blue-950/20">
       <button
         type="button"
         onClick={() => setExpanded((prev) => ({ ...prev, [node.id]: !isOpen }))}
@@ -149,7 +149,7 @@ function CategoryTreeNode({
       >
         <span className="text-xs text-cyan-300/90">{isOpen ? "▼" : "▶"}</span>
         <span className="text-sm font-semibold text-foreground/95">{node.name}</span>
-        <span className="ml-auto rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-foreground/80">
+        <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-[10px] text-foreground/80">
           {node.children.length}
         </span>
       </button>

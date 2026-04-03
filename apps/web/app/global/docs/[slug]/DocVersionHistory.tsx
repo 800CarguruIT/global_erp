@@ -83,8 +83,8 @@ export function DocVersionHistory({ slug }: { slug: string }) {
   };
 
   return (
-    <div className="mt-4 rounded-2xl border border-white/10 bg-background/80 p-4 shadow-lg">
-      <div className="mb-3 border-b border-white/10 pb-2">
+    <div className="mt-4 rounded-2xl border border-border bg-background/80 p-4 shadow-lg">
+      <div className="mb-3 border-b border-border pb-2">
         <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-foreground">Versions</h3>
       </div>
       {loading ? <p className="text-sm text-muted-foreground">Loading versions...</p> : null}
@@ -99,7 +99,7 @@ export function DocVersionHistory({ slug }: { slug: string }) {
       ) : null}
       <div className="space-y-2">
         {versions.map((version) => (
-          <div key={version.id} className="rounded-lg border border-white/10 bg-white/[0.02] p-2">
+          <div key={version.id} className="rounded-lg border border-border bg-card/30 p-2">
             <div className="flex items-center justify-between gap-2">
               <p className="text-sm font-semibold text-foreground">
                 v{version.versionLabel}{" "}
@@ -126,7 +126,7 @@ export function DocVersionHistory({ slug }: { slug: string }) {
                     type="button"
                     disabled={saving}
                     onClick={() => void handleRevert(version.id)}
-                    className="rounded border border-white/30 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-white/90 disabled:opacity-60"
+                    className="rounded border border-border bg-muted/40 px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-foreground/90 disabled:opacity-60"
                   >
                     Revert
                   </button>

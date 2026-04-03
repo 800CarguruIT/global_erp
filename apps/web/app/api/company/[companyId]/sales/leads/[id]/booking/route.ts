@@ -134,14 +134,11 @@ export async function POST(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: String(error?.message ?? "Unsupported lead type") }, { status: 400 });
   }
 
-  if (bookingKind === "rsa" && !pickupLocation) {
-    return NextResponse.json({ error: "pickupLocation is required for RSA booking" }, { status: 400 });
+  if ((bookingKind === "rsa" || bookingKind === "workshop_recovery") && !pickupLocation) {
+    return NextResponse.json({ error: "Pickup location is required." }, { status: 400 });
   }
-  if ((bookingKind === "recovery" || bookingKind === "workshop_recovery") && (!pickupLocation || !dropoffLocation)) {
-    return NextResponse.json(
-      { error: "pickupLocation and dropoffLocation are required for recovery booking" },
-      { status: 400 }
-    );
+  if (bookingKind === "recovery" && (!pickupLocation || !dropoffLocation)) {
+    return NextResponse.json({ error: "Pickup and dropoff locations are required for recovery booking." }, { status: 400 });
   }
 
   const currentUserId = await getCurrentUserIdFromRequest(req);

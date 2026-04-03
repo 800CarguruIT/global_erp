@@ -181,7 +181,7 @@ export default function BalanceSheetClient({ companyId }: { companyId: string })
           <select
             value={rangePreset}
             onChange={(e) => setRangePreset(e.target.value)}
-            className="rounded-full border border-white/15 bg-black/30 px-3 py-2 text-sm text-white/90"
+            className="rounded-full border border-border bg-black/30 px-3 py-2 text-sm text-foreground/90"
           >
             <option value="today">Today</option>
             <option value="yesterday">Yesterday</option>
@@ -194,7 +194,7 @@ export default function BalanceSheetClient({ companyId }: { companyId: string })
           <select
             value={journalScope}
             onChange={(e) => setJournalScope(e.target.value as "posted" | "all")}
-            className="rounded-full border border-white/15 bg-black/30 px-3 py-2 text-sm text-white/90"
+            className="rounded-full border border-border bg-black/30 px-3 py-2 text-sm text-foreground/90"
           >
             <option value="posted">Posted entries</option>
             <option value="all">All entries (including drafts)</option>
@@ -205,17 +205,17 @@ export default function BalanceSheetClient({ companyId }: { companyId: string })
                 type="date"
                 value={from ?? ""}
                 onChange={(e) => setFrom(e.target.value)}
-                className="rounded-full border border-white/15 bg-black/30 px-3 py-2 text-sm text-white/90"
+                className="rounded-full border border-border bg-black/30 px-3 py-2 text-sm text-foreground/90"
               />
               <input
                 type="date"
                 value={to ?? ""}
                 onChange={(e) => setTo(e.target.value)}
-                className="rounded-full border border-white/15 bg-black/30 px-3 py-2 text-sm text-white/90"
+                className="rounded-full border border-border bg-black/30 px-3 py-2 text-sm text-foreground/90"
               />
             </>
           ) : (
-            <div className="rounded-full border border-white/15 bg-black/20 px-3 py-2 text-sm text-white/80">
+            <div className="rounded-full border border-border bg-black/20 px-3 py-2 text-sm text-foreground/80">
               {from} → {to}
             </div>
           )}
@@ -239,7 +239,7 @@ export default function BalanceSheetClient({ companyId }: { companyId: string })
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
                 <thead>
-                  <tr className="text-left text-xs text-muted-foreground border-b border-white/10">
+                  <tr className="text-left text-xs text-muted-foreground border-b border-border">
                     <th className="px-3 py-2">Heading Name</th>
                     <th className="px-3 py-2">Sub Heading Name</th>
                     <th className="px-3 py-2">Group Name</th>
@@ -281,7 +281,7 @@ export default function BalanceSheetClient({ companyId }: { companyId: string })
                                   renderHeading: boolean,
                                   renderSub: boolean
                                 ) => (
-                                  <tr key={`${groupKey}::${account.accountCode}`} className="border-b border-white/5">
+                                  <tr key={`${groupKey}::${account.accountCode}`} className="border-b border-border/40">
                                     {isFirstRow && renderHeading && (
                                       <td className="px-3 py-2 font-semibold" rowSpan={headingRowSpan}>
                                         {heading}
@@ -297,7 +297,7 @@ export default function BalanceSheetClient({ companyId }: { companyId: string })
                                         <button
                                           type="button"
                                           onClick={() => toggleGroup(heading, subheading, group)}
-                                          className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded border border-white/15 text-xs text-white/80"
+                                          className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded border border-border text-xs text-foreground/80"
                                         >
                                           {groupOpen ? "−" : "+"}
                                         </button>
@@ -350,8 +350,8 @@ export default function BalanceSheetClient({ companyId }: { companyId: string })
                                       return null;
                                     })()}
                                     {groupOpen && (
-                                      <tr className="border-b border-white/5 bg-white/5">
-                                        <td className="px-3 py-2 font-semibold text-white/90" colSpan={2}>
+                                      <tr className="border-b border-border/40 bg-muted/40">
+                                        <td className="px-3 py-2 font-semibold text-foreground/90" colSpan={2}>
                                           {`Total for ${group}:`}
                                         </td>
                                         <td className="px-3 py-2">{groupData.totals.debit.toLocaleString()} AED</td>
@@ -362,7 +362,7 @@ export default function BalanceSheetClient({ companyId }: { companyId: string })
                                   </React.Fragment>
                                 );
                               })}
-                              <tr className="border-b border-white/10 bg-emerald-500/80 text-white">
+                              <tr className="border-b border-border bg-emerald-500/80 text-white">
                                 <td className="px-3 py-2 font-semibold" colSpan={3}>{`Total for ${subheading}:`}</td>
                                 <td className="px-3 py-2">{subTotals.debit.toLocaleString()} AED</td>
                                 <td className="px-3 py-2">{subTotals.credit.toLocaleString()} AED</td>
@@ -371,7 +371,7 @@ export default function BalanceSheetClient({ companyId }: { companyId: string })
                             </React.Fragment>
                           );
                         })}
-                        <tr className="border-b border-white/10 bg-emerald-600 text-white">
+                        <tr className="border-b border-border bg-emerald-600 text-white">
                           <td className="px-3 py-2 font-semibold" colSpan={4}>{`Total for ${heading}:`}</td>
                           <td className="px-3 py-2">{headingTotals.debit.toLocaleString()} AED</td>
                           <td className="px-3 py-2">{headingTotals.credit.toLocaleString()} AED</td>

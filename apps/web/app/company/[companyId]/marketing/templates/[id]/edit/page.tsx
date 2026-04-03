@@ -73,7 +73,7 @@ export default function CompanyMarketingTemplatesEditPage() {
 
         <div className="flex gap-2">
           <button
-            className="rounded-full border border-white/10 px-3 py-1 text-xs hover:border-primary"
+            className="rounded-full border border-border px-3 py-1 text-xs hover:border-primary"
             onClick={() => router.push(backHref)}
           >
             Back to templates

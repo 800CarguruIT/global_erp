@@ -344,13 +344,13 @@ export function DialerIntegrationForm({
           </div>
         )}
 
-        <div className="border border-white/10 rounded-lg p-3 space-y-2">
+        <div className="border border-border rounded-lg p-3 space-y-2">
           <div className="flex items-center justify-between">
             <div className="text-xs font-semibold">Advanced JSON</div>
             {!isCustom && (
               <button
                 type="button"
-                className="text-[11px] px-2 py-1 rounded bg-white/10 hover:bg-white/20"
+                className="text-[11px] px-2 py-1 rounded bg-muted hover:bg-muted/80"
                 onClick={() => setShowAdvanced((v) => !v)}
               >
                 {showAdvanced ? "Hide" : "Show"}
@@ -395,7 +395,7 @@ export function DialerIntegrationForm({
         <div className="pt-2">
           <button
             type="submit"
-            className="px-4 py-2 rounded-lg text-xs sm:text-sm font-medium bg-white/10 hover:bg-white/20 transition disabled:opacity-50"
+            className="px-4 py-2 rounded-lg text-xs sm:text-sm font-medium bg-muted hover:bg-muted/80 transition disabled:opacity-50"
             disabled={submitting}
           >
             {submitting

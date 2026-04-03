@@ -1435,18 +1435,18 @@ export function CarInDashboardMain({ companyId, companyName }: CarInDashboardMai
         {topupOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
             <Card className={`w-full max-w-lg rounded-xl shadow-xl ${theme.cardBg} ${theme.cardBorder}`}>
-              <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+              <div className="flex items-center justify-between border-b border-border px-4 py-3">
                 <div className="text-sm font-semibold">Topup Wallet</div>
                 <button
                   type="button"
                   onClick={closeTopupModal}
-                  className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+                  className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-muted`}
                 >
                   Close
                 </button>
               </div>
               <div className="space-y-4 p-4">
-                {topupError && <div className="text-sm text-red-400">{topupError}</div>}
+                {topupError && <div className="text-sm text-destructive">{topupError}</div>}
                 <div className="space-y-2">
                   <label className={`text-xs font-semibold ${theme.mutedText}`}>Amount</label>
                   <input
@@ -1489,7 +1489,7 @@ export function CarInDashboardMain({ companyId, companyName }: CarInDashboardMai
                 <div className="flex items-center justify-end gap-2">
                   <button
                     type="button"
-                    className={`rounded-md px-4 py-2 text-xs font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+                    className={`rounded-md px-4 py-2 text-xs font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-muted`}
                     onClick={closeTopupModal}
                   >
                     Cancel
@@ -1510,25 +1510,25 @@ export function CarInDashboardMain({ companyId, companyName }: CarInDashboardMai
         {payOpen && payInvoice && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
             <Card className={`w-full max-w-lg rounded-xl shadow-xl ${theme.cardBg} ${theme.cardBorder}`}>
-              <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+              <div className="flex items-center justify-between border-b border-border px-4 py-3">
                 <div className="text-sm font-semibold">Record Payment</div>
                 <button
                   type="button"
                   onClick={closePayModal}
-                  className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+                  className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-muted`}
                 >
                   Close
                 </button>
               </div>
               <div className="space-y-4 p-4">
-                {payError && <div className="text-sm text-red-400">{payError}</div>}
-                <div className="text-sm text-white/80">
+                {payError && <div className="text-sm text-destructive">{payError}</div>}
+                <div className="text-sm text-foreground/80">
                   Proceed to pay AED {payInvoice.amount.toFixed(2)} from wallet?
                 </div>
                 <div className="flex items-center justify-end gap-2">
                   <button
                     type="button"
-                    className={`rounded-md px-4 py-2 text-xs font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+                    className={`rounded-md px-4 py-2 text-xs font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-muted`}
                     onClick={closePayModal}
                   >
                     Cancel
@@ -1549,18 +1549,18 @@ export function CarInDashboardMain({ companyId, companyName }: CarInDashboardMai
         {assignOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
             <Card className={`w-full max-w-lg rounded-xl shadow-xl ${theme.cardBg} ${theme.cardBorder}`}>
-              <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+              <div className="flex items-center justify-between border-b border-border px-4 py-3">
                 <div className="text-sm font-semibold">Assign Workshop Branch</div>
                 <button
                   type="button"
                   onClick={closeAssignModal}
-                  className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+                  className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-muted`}
                 >
                   Close
                 </button>
               </div>
               <div className="space-y-4 p-4">
-                {assignError && <div className="text-sm text-red-400">{assignError}</div>}
+                {assignError && <div className="text-sm text-destructive">{assignError}</div>}
                 <div className="space-y-2">
                   <label className={`text-xs font-semibold ${theme.mutedText}`}>Workshop Branch</label>
                   <select
@@ -1579,7 +1579,7 @@ export function CarInDashboardMain({ companyId, companyName }: CarInDashboardMai
                 <div className="flex items-center justify-end gap-2">
                   <button
                     type="button"
-                    className={`rounded-md px-4 py-2 text-xs font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+                    className={`rounded-md px-4 py-2 text-xs font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-muted`}
                     onClick={closeAssignModal}
                   >
                     Cancel
@@ -1600,18 +1600,18 @@ export function CarInDashboardMain({ companyId, companyName }: CarInDashboardMai
         {dropoffOpen && dropoffLead && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
             <Card className={`w-full max-w-3xl rounded-xl shadow-xl ${theme.cardBg} ${theme.cardBorder}`}>
-              <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+              <div className="flex items-center justify-between border-b border-border px-4 py-3">
                 <div className="text-sm font-semibold">Schedule Dropoff Recovery</div>
                 <button
                   type="button"
                   onClick={closeDropoffModal}
-                  className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+                  className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-muted`}
                 >
                   Close
                 </button>
               </div>
               <div className="space-y-4 p-4">
-                {dropoffError && <div className="text-sm text-red-400">{dropoffError}</div>}
+                {dropoffError && <div className="text-sm text-destructive">{dropoffError}</div>}
                 <div className="space-y-1">
                   <div className={`text-xs font-semibold ${theme.mutedText}`}>Car Location</div>
                   <div className={`rounded-md border px-3 py-2 text-xs ${theme.cardBorder} ${theme.surfaceSubtle}`}>
@@ -1690,7 +1690,7 @@ export function CarInDashboardMain({ companyId, companyName }: CarInDashboardMai
                 <div className="flex items-center justify-end gap-2">
                   <button
                     type="button"
-                    className={`rounded-md px-4 py-2 text-xs font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+                    className={`rounded-md px-4 py-2 text-xs font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-muted`}
                     onClick={closeDropoffModal}
                   >
                     Cancel
@@ -1710,27 +1710,27 @@ export function CarInDashboardMain({ companyId, companyName }: CarInDashboardMai
         )}
         {partsModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-            <div className="w-full max-w-3xl rounded-lg bg-slate-950 text-white shadow-xl">
-            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3 text-sm font-semibold">
+            <div className="w-full max-w-3xl rounded-lg bg-background text-foreground shadow-xl">
+            <div className="flex items-center justify-between border-b border-border px-4 py-3 text-sm font-semibold">
               <span>Parts</span>
               <button
                 type="button"
                 onClick={() => setPartsModal(null)}
-                className="text-xs text-white/70 hover:text-white"
+                className="text-xs text-foreground/70 hover:text-foreground"
               >
                 Close
               </button>
             </div>
             <div className="p-4">
               {partsLoading ? (
-                <div className="text-xs text-white/70">Loading parts…</div>
+                <div className="text-xs text-foreground/70">Loading parts…</div>
               ) : partsModal.parts.length === 0 ? (
-                <div className="text-xs text-white/70">No parts found.</div>
+                <div className="text-xs text-foreground/70">No parts found.</div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="min-w-full text-xs">
                     <thead>
-                      <tr className="border-b border-white/10 text-[11px] text-white/70">
+                      <tr className="border-b border-border text-[11px] text-foreground/70">
                         <th className="px-2 py-2 text-left">Name</th>
                         <th className="px-2 py-2 text-left">Type</th>
                         <th className="px-2 py-2 text-left">Order Status</th>
@@ -1738,7 +1738,7 @@ export function CarInDashboardMain({ companyId, companyName }: CarInDashboardMai
                     </thead>
                     <tbody>
                       {partsModal.parts.map((part: any) => (
-                        <tr key={part.id} className="border-b border-white/5 last:border-0">
+                        <tr key={part.id} className="border-b border-border/40 last:border-0">
                           <td className="px-2 py-2 font-semibold">{part.product_name ?? "-"}</td>
                           <td className="px-2 py-2">{part.product_type ?? "-"}</td>
                           <td className="px-2 py-2 uppercase">{part.order_status ?? "Ordered"}</td>

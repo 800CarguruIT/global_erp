@@ -415,7 +415,7 @@ export function ProcurementDetailMain({ companyId, poId }: { companyId: string; 
       subtitle="Purchase order / LPO."
       scopeLabel={`PO ${po.poNumber}`}
       primaryAction={
-        <div className="flex items-center gap-2 text-xs text-slate-300">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
           {isSaving ? "Saving…" : "Autosaves"} · Total {totals.totalWithVat.toFixed(2)}
         </div>
       }
@@ -428,7 +428,7 @@ export function ProcurementDetailMain({ companyId, poId }: { companyId: string; 
               void save();
             }}
             disabled={isSaving}
-            className="rounded-md bg-slate-800/80 px-3 py-1 text-sm font-medium text-slate-100 hover:bg-slate-700/80"
+            className="rounded-md bg-popover/80 px-3 py-1 text-sm font-medium text-foreground hover:bg-popover/70"
           >
             Save
           </button>
@@ -457,32 +457,32 @@ export function ProcurementDetailMain({ companyId, poId }: { companyId: string; 
         </div>
       }
     >
-      <div className="rounded-2xl bg-slate-950/70 p-5 shadow-[0_25px_80px_-50px_rgba(15,23,42,0.9)]">
+      <div className="rounded-2xl bg-background/70 p-5 shadow-[0_25px_80px_-50px_rgba(15,23,42,0.9)]">
       <div className="space-y-6">
-        <section className="rounded-2xl border border-white/5 bg-slate-950/60 p-4">
+        <section className="rounded-2xl border border-border/40 bg-background/60 p-4">
           <div className="grid gap-2 md:grid-cols-3">
-            <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
-              <div className="text-[10px] uppercase tracking-wide text-slate-400">Step 1</div>
-              <div className="text-sm font-semibold text-slate-100">Review PO</div>
-              <div className="text-[11px] text-slate-400">Check supplier and ordered quantities.</div>
+            <div className="rounded-lg border border-border bg-muted/40 px-3 py-2">
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Step 1</div>
+              <div className="text-sm font-semibold text-foreground">Review PO</div>
+              <div className="text-[11px] text-muted-foreground">Check supplier and ordered quantities.</div>
             </div>
-            <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
-              <div className="text-[10px] uppercase tracking-wide text-slate-400">Step 2</div>
-              <div className="text-sm font-semibold text-slate-100">Receive Items</div>
-              <div className="text-[11px] text-slate-400">Use line-item receive to create GRN entries.</div>
+            <div className="rounded-lg border border-border bg-muted/40 px-3 py-2">
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Step 2</div>
+              <div className="text-sm font-semibold text-foreground">Receive Items</div>
+              <div className="text-[11px] text-muted-foreground">Use line-item receive to create GRN entries.</div>
             </div>
-            <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
-              <div className="text-[10px] uppercase tracking-wide text-slate-400">Step 3</div>
-              <div className="text-sm font-semibold text-slate-100">Close PO</div>
-              <div className="text-[11px] text-slate-400">Close only when all lines are received/cancelled.</div>
+            <div className="rounded-lg border border-border bg-muted/40 px-3 py-2">
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Step 3</div>
+              <div className="text-sm font-semibold text-foreground">Close PO</div>
+              <div className="text-[11px] text-muted-foreground">Close only when all lines are received/cancelled.</div>
             </div>
           </div>
         </section>
-        <section className="space-y-4 rounded-2xl border border-white/5 bg-slate-950/60 p-5">
+        <section className="space-y-4 rounded-2xl border border-border/40 bg-background/60 p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <div className="text-xs uppercase tracking-[0.2em] text-slate-400">Purchase order</div>
-              <div className="text-lg font-semibold text-slate-100">{po.poNumber}</div>
+              <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Purchase order</div>
+              <div className="text-lg font-semibold text-foreground">{po.poNumber}</div>
             </div>
             <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-200">
               {header.status ?? po.status}
@@ -529,11 +529,11 @@ export function ProcurementDetailMain({ companyId, poId }: { companyId: string; 
           />
         </section>
 
-        <section className="space-y-4 rounded-2xl border border-white/5 bg-slate-950/60 p-5">
+        <section className="space-y-4 rounded-2xl border border-border/40 bg-background/60 p-5">
           <div className="flex items-center justify-between gap-2">
             <div>
-              <div className="text-xs uppercase tracking-[0.2em] text-slate-400">Items</div>
-              <div className="text-sm font-semibold text-slate-100">Line items & costs</div>
+              <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Items</div>
+              <div className="text-sm font-semibold text-foreground">Line items & costs</div>
             </div>
             {editable && (
               <button
@@ -544,16 +544,16 @@ export function ProcurementDetailMain({ companyId, poId }: { companyId: string; 
                     { name: "New item", description: "", quantity: 1, unitCost: 0 },
                   ])
                 }
-                className="rounded-md border border-white/10 bg-slate-900/70 px-3 py-1 text-sm font-medium text-slate-100 hover:bg-slate-800/80"
+                className="rounded-md border border-border bg-popover/70 px-3 py-1 text-sm font-medium text-foreground hover:bg-popover/80"
               >
                 Add line
               </button>
             )}
           </div>
-          <div className="overflow-x-auto rounded-xl border border-white/5 bg-slate-950/70">
+          <div className="overflow-x-auto rounded-xl border border-border/40 bg-background/70">
             <table className="min-w-full text-xs">
               <thead>
-                <tr className="bg-slate-900/70 text-[11px] uppercase tracking-wide text-slate-300">
+                <tr className="bg-popover/70 text-[11px] uppercase tracking-wide text-muted-foreground">
                   <th className="py-1 pl-2 pr-3 text-left">Item</th>
                   <th className="px-2 py-1 text-left">Qty</th>
                   <th className="px-2 py-1 text-left">Unit cost</th>
@@ -567,7 +567,7 @@ export function ProcurementDetailMain({ companyId, poId }: { companyId: string; 
               <tbody>
                 {items.length === 0 ? (
                   <tr>
-                      <td colSpan={8} className="py-2 text-center text-xs text-slate-400">
+                      <td colSpan={8} className="py-2 text-center text-xs text-muted-foreground">
                         No items.
                       </td>
                     </tr>
@@ -586,16 +586,16 @@ export function ProcurementDetailMain({ companyId, poId }: { companyId: string; 
                       item.status?.toLowerCase() !== "cancelled" &&
                       item.status?.toLowerCase() !== "received";
                     return (
-                      <tr key={item.id ?? idx} className="border-t border-white/5">
+                      <tr key={item.id ?? idx} className="border-t border-border/40">
                       <td className="py-1 pl-2 pr-3 align-top">
                         <input
-                          className="w-full rounded border border-white/10 bg-slate-900/70 px-2 py-1 text-xs text-slate-100 placeholder:text-slate-500 focus:border-emerald-400/60 focus:outline-none"
+                          className="w-full rounded border border-border bg-popover/70 px-2 py-1 text-xs text-foreground placeholder:text-muted-foreground focus:border-emerald-400/60 focus:outline-none"
                           value={item.name}
                           onChange={(e) => updateItem(idx, { name: e.target.value })}
                           readOnly={!editable || item.status?.toLowerCase() === "received"}
                         />
                         <textarea
-                          className="mt-1 h-14 w-full resize-none rounded border border-white/10 bg-slate-900/70 px-2 py-1 text-[11px] text-slate-100 placeholder:text-slate-500 focus:border-emerald-400/60 focus:outline-none"
+                          className="mt-1 h-14 w-full resize-none rounded border border-border bg-popover/70 px-2 py-1 text-[11px] text-foreground placeholder:text-muted-foreground focus:border-emerald-400/60 focus:outline-none"
                           value={item.description ?? ""}
                           onChange={(e) => updateItem(idx, { description: e.target.value })}
                           readOnly={!editable || item.status?.toLowerCase() === "received"}
@@ -604,7 +604,7 @@ export function ProcurementDetailMain({ companyId, poId }: { companyId: string; 
                       <td className="px-2 py-1 align-top">
                         <input
                           type="number"
-                          className="w-20 rounded border border-white/10 bg-slate-900/70 px-2 py-1 text-xs text-slate-100 focus:border-emerald-400/60 focus:outline-none"
+                          className="w-20 rounded border border-border bg-popover/70 px-2 py-1 text-xs text-foreground focus:border-emerald-400/60 focus:outline-none"
                           value={item.quantity}
                           onChange={(e) => updateItem(idx, { quantity: Number(e.target.value) })}
                           min={0}
@@ -614,7 +614,7 @@ export function ProcurementDetailMain({ companyId, poId }: { companyId: string; 
                       <td className="px-2 py-1 align-top">
                         <input
                           type="number"
-                          className="w-24 rounded border border-white/10 bg-slate-900/70 px-2 py-1 text-xs text-slate-100 focus:border-emerald-400/60 focus:outline-none"
+                          className="w-24 rounded border border-border bg-popover/70 px-2 py-1 text-xs text-foreground focus:border-emerald-400/60 focus:outline-none"
                           value={item.unitCost}
                           onChange={(e) => updateItem(idx, { unitCost: Number(e.target.value) })}
                           min={0}
@@ -622,18 +622,18 @@ export function ProcurementDetailMain({ companyId, poId }: { companyId: string; 
                           readOnly={!editable || item.status?.toLowerCase() === "received"}
                         />
                       </td>
-                      <td className="px-2 py-1 align-top text-right text-slate-100">{lineTotal.toFixed(2)}</td>
-                      <td className="px-2 py-1 align-top text-xs text-slate-200">
+                      <td className="px-2 py-1 align-top text-right text-foreground">{lineTotal.toFixed(2)}</td>
+                      <td className="px-2 py-1 align-top text-xs text-foreground/80">
                         {(totals.vatRate * 100).toFixed(0)}
                       </td>
-                      <td className="px-2 py-1 align-top text-right text-slate-100">
+                      <td className="px-2 py-1 align-top text-right text-foreground">
                         {lineWithVat.toFixed(2)}
                       </td>
                       <td className="px-2 py-1 align-top">
-                        <span className="rounded-full bg-white/5 px-2 py-0.5 text-[11px] text-slate-200 capitalize">
+                        <span className="rounded-full bg-muted/40 px-2 py-0.5 text-[11px] text-foreground/80 capitalize">
                           {item.status ?? "pending"}
                         </span>
-                        <div className="mt-1 text-[10px] text-slate-400">
+                        <div className="mt-1 text-[10px] text-muted-foreground">
                           Received {Number(item.receivedQty ?? 0)} / {Number(item.quantity ?? 0)}
                         </div>
                         {(item as any).vendorPartNumber ? (
@@ -702,13 +702,13 @@ export function ProcurementDetailMain({ companyId, poId }: { companyId: string; 
                               Remove
                             </button>
                           ) : (
-                            <span className="text-[11px] text-slate-400">
+                            <span className="text-[11px] text-muted-foreground">
                               {item.status ?? "Pending"}
                             </span>
                           )}
                           {item.id && (
-                            <div className="mt-2 rounded-md border border-white/10 bg-white/[0.02] p-2">
-                              <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-400">Line GRNs</div>
+                            <div className="mt-2 rounded-md border border-border bg-card/30 p-2">
+                              <div className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">Line GRNs</div>
                               {(grnsByItem.get(item.id) ?? []).length === 0 ? (
                                 <div className="text-[11px] text-slate-500">No GRN for this line yet.</div>
                               ) : (
@@ -716,9 +716,9 @@ export function ProcurementDetailMain({ companyId, poId }: { companyId: string; 
                                   {(grnsByItem.get(item.id) ?? []).map((grn) => (
                                     <div
                                       key={grn.id}
-                                      className="flex flex-wrap items-center justify-between gap-2 rounded border border-white/5 bg-slate-900/50 px-2 py-1.5"
+                                      className="flex flex-wrap items-center justify-between gap-2 rounded border border-border/40 bg-popover/50 px-2 py-1.5"
                                     >
-                                      <div className="text-[11px] text-slate-200">
+                                      <div className="text-[11px] text-foreground/80">
                                         <span className="font-semibold text-emerald-300">{grn.grnNumber}</span>{" "}
                                         · Qty {grn.quantity}
                                         {grn.receivedBy ? ` · By ${grn.receivedBy}` : ""}
@@ -756,28 +756,28 @@ export function ProcurementDetailMain({ companyId, poId }: { companyId: string; 
             </table>
           </div>
           <div className="flex justify-end">
-            <div className="grid w-full max-w-sm gap-2 rounded-xl border border-white/5 bg-slate-950/80 p-3 text-xs text-slate-200">
+            <div className="grid w-full max-w-sm gap-2 rounded-xl border border-border/40 bg-background/80 p-3 text-xs text-foreground/80">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] uppercase tracking-wide text-slate-400">Subtotal</span>
-                <span className="text-sm font-semibold text-slate-100">{totals.subtotal.toFixed(2)}</span>
+                <span className="text-[11px] uppercase tracking-wide text-muted-foreground">Subtotal</span>
+                <span className="text-sm font-semibold text-foreground">{totals.subtotal.toFixed(2)}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-[11px] uppercase tracking-wide text-slate-400">VAT ({(totals.vatRate * 100).toFixed(0)}%)</span>
+                <span className="text-[11px] uppercase tracking-wide text-muted-foreground">VAT ({(totals.vatRate * 100).toFixed(0)}%)</span>
                 <span className="text-sm font-semibold text-amber-200">{totals.vat.toFixed(2)}</span>
               </div>
-              <div className="h-px bg-white/5" />
+              <div className="h-px bg-muted/40" />
               <div className="flex items-center justify-between">
-                <span className="text-[11px] uppercase tracking-wide text-slate-300">Total (incl. VAT)</span>
+                <span className="text-[11px] uppercase tracking-wide text-muted-foreground">Total (incl. VAT)</span>
                 <span className="text-base font-semibold text-emerald-200">{totals.totalWithVat.toFixed(2)}</span>
               </div>
             </div>
           </div>
         </section>
-        <section className="space-y-3 rounded-2xl border border-white/5 bg-slate-950/60 p-5">
+        <section className="space-y-3 rounded-2xl border border-border/40 bg-background/60 p-5">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <div className="text-xs uppercase tracking-[0.2em] text-slate-400">GRN</div>
-              <div className="text-sm font-semibold text-slate-100">Goods receipt notes</div>
+              <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">GRN</div>
+              <div className="text-sm font-semibold text-foreground">Goods receipt notes</div>
             </div>
             <div className="flex flex-col items-end gap-1">
               <div className="flex items-center gap-2">
@@ -785,7 +785,7 @@ export function ProcurementDetailMain({ companyId, poId }: { companyId: string; 
                   href={`/company/${companyId}/workshop/procurement/${poId}/grn`}
                   target="_blank"
                   rel="noreferrer"
-                  className="rounded-md border border-slate-400/30 bg-slate-500/10 px-3 py-1 text-xs font-medium text-slate-200 hover:bg-slate-500/20"
+                  className="rounded-md border border-slate-400/30 bg-slate-500/10 px-3 py-1 text-xs font-medium text-foreground/80 hover:bg-slate-500/20"
                 >
                   View GRN
                 </a>
@@ -813,10 +813,10 @@ export function ProcurementDetailMain({ companyId, poId }: { companyId: string; 
               ) : null}
             </div>
           </div>
-          <div className="overflow-x-auto rounded-xl border border-white/5 bg-slate-950/70">
+          <div className="overflow-x-auto rounded-xl border border-border/40 bg-background/70">
             <table className="min-w-full text-xs">
               <thead>
-                <tr className="bg-slate-900/70 text-[11px] uppercase tracking-wide text-slate-300">
+                <tr className="bg-popover/70 text-[11px] uppercase tracking-wide text-muted-foreground">
                   <th className="py-2 pl-3 pr-4 text-left">GRN Number</th>
                   <th className="px-4 py-2 text-left">Part</th>
                   <th className="px-4 py-2 text-left">Qty</th>
@@ -827,20 +827,20 @@ export function ProcurementDetailMain({ companyId, poId }: { companyId: string; 
               <tbody>
                 {(state.data?.grns ?? []).length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-3 text-center text-xs text-slate-400">
+                    <td colSpan={5} className="py-3 text-center text-xs text-muted-foreground">
                       No GRN entries yet.
                     </td>
                   </tr>
                 ) : (
                   (state.data?.grns ?? []).map((grn) => (
-                    <tr key={grn.id} className="border-t border-white/5">
+                    <tr key={grn.id} className="border-t border-border/40">
                       <td className="py-2 pl-3 pr-4 font-semibold text-emerald-300">{grn.grnNumber}</td>
-                      <td className="px-4 py-2 text-slate-100">
+                      <td className="px-4 py-2 text-foreground">
                         {grn.partName}
                       </td>
-                      <td className="px-4 py-2 text-slate-100">{grn.quantity}</td>
-                      <td className="px-4 py-2 text-slate-200">{grn.receivedBy || "-"}</td>
-                      <td className="px-4 py-2 text-slate-300">
+                      <td className="px-4 py-2 text-foreground">{grn.quantity}</td>
+                      <td className="px-4 py-2 text-foreground/80">{grn.receivedBy || "-"}</td>
+                      <td className="px-4 py-2 text-muted-foreground">
                         {grn.createdAt ? new Date(grn.createdAt).toLocaleString() : "-"}
                       </td>
                     </tr>
@@ -853,7 +853,7 @@ export function ProcurementDetailMain({ companyId, poId }: { companyId: string; 
       </div>
     </div>
       {moveModal.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-popover/40 p-4 backdrop-blur-sm">
           <div className="w-full max-w-xl rounded-2xl bg-slate-100 p-6 text-slate-900 shadow-[0_30px_80px_-40px_rgba(15,23,42,0.45)]">
             <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Move to inventory</div>
             <div className="mt-2 text-lg font-semibold text-slate-900">Confirm move</div>
@@ -1082,7 +1082,7 @@ export function ProcurementDetailMain({ companyId, poId }: { companyId: string; 
         </div>
       )}
       {receiveModal.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-popover/40 p-4 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-2xl bg-slate-100 p-6 text-slate-900 shadow-[0_30px_80px_-40px_rgba(15,23,42,0.45)]">
             <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Create GRN</div>
             <div className="mt-2 text-lg font-semibold text-slate-900">Receive Line Item</div>
@@ -1318,9 +1318,9 @@ function SelectField({
 }) {
   return (
     <div className="space-y-1">
-      <label className="text-xs font-medium text-slate-200">{label}</label>
+      <label className="text-xs font-medium text-foreground/80">{label}</label>
       <select
-        className="w-full rounded border border-white/10 bg-slate-900/70 px-2 py-1 text-sm text-slate-100 focus:border-emerald-400/60 focus:outline-none"
+        className="w-full rounded border border-border bg-popover/70 px-2 py-1 text-sm text-foreground focus:border-emerald-400/60 focus:outline-none"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}
@@ -1350,9 +1350,9 @@ function TextField({
 }) {
   return (
     <div className="space-y-1">
-      <label className="text-xs font-medium text-slate-200">{label}</label>
+      <label className="text-xs font-medium text-foreground/80">{label}</label>
       <input
-        className="w-full rounded border border-white/10 bg-slate-900/70 px-2 py-1 text-sm text-slate-100 placeholder:text-slate-500 focus:border-emerald-400/60 focus:outline-none"
+        className="w-full rounded border border-border bg-popover/70 px-2 py-1 text-sm text-foreground placeholder:text-muted-foreground focus:border-emerald-400/60 focus:outline-none"
         value={value}
         readOnly={readOnly}
         type={type}
@@ -1373,9 +1373,9 @@ function TextareaField({
 }) {
   return (
     <div className="space-y-1">
-      <label className="text-xs font-medium text-slate-200">{label}</label>
+      <label className="text-xs font-medium text-foreground/80">{label}</label>
       <textarea
-        className="h-24 w-full resize-none rounded border border-white/10 bg-slate-900/70 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-emerald-400/60 focus:outline-none"
+        className="h-24 w-full resize-none rounded border border-border bg-popover/70 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-emerald-400/60 focus:outline-none"
         value={value}
         onChange={(e) => onChange(e.target.value)}
       />

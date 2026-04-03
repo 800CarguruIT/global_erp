@@ -47,7 +47,7 @@ export function CategoryNav({
             key={cat}
             href={href}
             className={`rounded-full border px-3 py-1 transition ${
-              active ? "bg-primary text-primary-foreground border-primary" : "border-white/30 bg-card/60"
+              active ? "bg-primary text-primary-foreground border-primary" : "border-border bg-card/60"
             }`}
           >
             {cat}

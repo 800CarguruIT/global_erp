@@ -29,7 +29,7 @@ export function GlowProgress({ value, label, sublabel }: GlowProgressProps) {
         />
         <div className="absolute inset-0 rounded-full blur-xl opacity-50 bg-gradient-to-r from-white/20 via-transparent to-white/10" />
       </div>
-      <div className="mt-2 text-[11px] uppercase tracking-wide text-white/70">Progress</div>
+      <div className="mt-2 text-[11px] uppercase tracking-wide text-foreground/70">Progress</div>
     </div>
   );
 }

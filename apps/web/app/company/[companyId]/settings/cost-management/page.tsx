@@ -129,7 +129,7 @@ export default function CompanyCostManagementPage() {
         </div>
 
         {loading ? (
-          <div className="rounded-xl border border-white/10 bg-slate-900/40 p-3 text-sm text-slate-300">Loading settings...</div>
+          <div className="rounded-xl border border-border bg-slate-900/40 p-3 text-sm text-slate-300">Loading settings...</div>
         ) : null}
         {error ? (
           <div className="rounded-xl border border-rose-500/30 bg-rose-900/20 p-3 text-sm text-rose-300">{error}</div>

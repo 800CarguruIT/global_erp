@@ -63,7 +63,8 @@ export async function listLeadsForCompany(
         car.plate_number AS car_plate_number,
         car.model AS car_model,
         COALESCE(b.display_name, b.name, b.code) AS branch_name,
-        COALESCE(e.full_name, au.full_name, au.email) AS agent_name
+        COALESCE(e.full_name, au.full_name, au.email) AS agent_name,
+        COALESCE(au.full_name, au.email) AS assigned_user_name
       FROM leads l
       LEFT JOIN customers c ON c.id = l.customer_id
       LEFT JOIN cars car ON car.id = l.car_id
@@ -93,6 +94,7 @@ export async function listLeadsForCustomer(
         car.model AS car_model,
         COALESCE(b.display_name, b.name, b.code) AS branch_name,
         COALESCE(e.full_name, au.full_name, au.email) AS agent_name,
+        COALESCE(au.full_name, au.email) AS assigned_user_name,
         l.customer_details_requested,
         l.customer_details_approved,
         l.recovery_direction,
@@ -126,6 +128,7 @@ export async function getLeadById(
         car.model AS car_model,
         COALESCE(b.display_name, b.name, b.code) AS branch_name,
         COALESCE(e.full_name, au.full_name, au.email) AS agent_name,
+        COALESCE(au.full_name, au.email) AS assigned_user_name,
         l.customer_details_requested,
         l.customer_details_approved,
         l.recovery_direction,
@@ -297,6 +300,7 @@ function mapLeadRow(row: any): Lead {
     carModel: row.car_model,
     branchName: row.branch_name ?? null,
     agentName: row.agent_name,
+    assignedUserName: row.assigned_user_name ?? null,
     customerDetailsRequested: row.customer_details_requested ?? false,
     customerDetailsApproved: row.customer_details_approved ?? false,
   };

@@ -270,26 +270,26 @@ export function AccountingConfigMain({ companyId }: { companyId: string }) {
       {settingsState.status === "loaded" && settings && (
         <div className="space-y-4">
           <div className="grid gap-3 md:grid-cols-3">
-            <div className="rounded-xl border border-white/10 bg-card/70 p-4">
+            <div className="rounded-xl border border-border bg-card/70 p-4">
               <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Mapped Fields</div>
               <div className="mt-2 text-xl font-semibold text-foreground">
                 {mappedFields}/{totalFields}
               </div>
-              <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10">
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
                 <div
                   className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400"
                   style={{ width: `${completionPct}%` }}
                 />
               </div>
             </div>
-            <div className="rounded-xl border border-white/10 bg-card/70 p-4">
+            <div className="rounded-xl border border-border bg-card/70 p-4">
               <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Automation Readiness</div>
               <div className={`mt-2 text-xl font-semibold ${requiredReady ? "text-emerald-400" : "text-amber-300"}`}>
                 {requiredReady ? "Ready" : "Action Needed"}
               </div>
               <div className="mt-1 text-xs text-muted-foreground">Required: AP Control + Inventory</div>
             </div>
-            <div className="rounded-xl border border-white/10 bg-card/70 p-4">
+            <div className="rounded-xl border border-border bg-card/70 p-4">
               <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Available Accounts</div>
               <div className="mt-2 text-xl font-semibold text-foreground">{accounts.length}</div>
               <div className="mt-1 text-xs text-muted-foreground">Source list from company chart of accounts</div>
@@ -302,7 +302,7 @@ export function AccountingConfigMain({ companyId }: { companyId: string }) {
             </div>
           )}
 
-          <div className="rounded-2xl border border-white/10 bg-card/60 p-4">
+          <div className="rounded-2xl border border-border bg-card/60 p-4">
             <div className="mb-3">
               <h3 className="text-sm font-semibold text-foreground">Account Terms</h3>
               <p className="mt-1 text-xs text-muted-foreground">
@@ -311,9 +311,9 @@ export function AccountingConfigMain({ companyId }: { companyId: string }) {
             </div>
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
               {glossary.map((item) => (
-                <div key={item.key} className="rounded-lg border border-white/10 bg-slate-950/30 p-2.5">
+                <div key={item.key} className="rounded-lg border border-border bg-background/30 p-2.5">
                   <div className="text-xs font-semibold uppercase tracking-wide text-cyan-200">{item.title}</div>
-                  <div className="mt-1 text-xs text-slate-300">{item.description}</div>
+                  <div className="mt-1 text-xs text-muted-foreground">{item.description}</div>
                 </div>
               ))}
             </div>
@@ -325,7 +325,7 @@ export function AccountingConfigMain({ companyId }: { companyId: string }) {
               return (
                 <div
                   key={section.title}
-                  className="rounded-2xl border border-white/10 bg-card/60 p-4 shadow-[0_18px_45px_-28px_rgba(15,23,42,0.9)]"
+                  className="rounded-2xl border border-border bg-card/60 p-4 shadow-[0_18px_45px_-28px_rgba(15,23,42,0.9)]"
                 >
                   <div className="mb-3 flex items-start justify-between gap-3">
                     <div>
@@ -333,7 +333,7 @@ export function AccountingConfigMain({ companyId }: { companyId: string }) {
                       <p className="mt-1 text-xs text-muted-foreground">{section.description}</p>
                     </div>
                     <span
-                      className={`rounded-full bg-gradient-to-r px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-white/90 ${section.tone}`}
+                      className={`rounded-full bg-gradient-to-r px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-foreground/90 ${section.tone}`}
                     >
                       {mapped}/{section.fields.length}
                     </span>
@@ -361,10 +361,10 @@ export function AccountingConfigMain({ companyId }: { companyId: string }) {
           </div>
 
           <div className="sticky bottom-3 z-10">
-            <div className="rounded-xl border border-white/10 bg-slate-950/80 px-4 py-3 backdrop-blur">
+            <div className="rounded-xl border border-border bg-background/80 px-4 py-3 backdrop-blur">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="text-xs text-slate-300">
-                  Completion: <span className="font-semibold text-white">{completionPct}%</span>
+                <div className="text-xs text-muted-foreground">
+                  Completion: <span className="font-semibold text-foreground">{completionPct}%</span>
                 </div>
                 <button
                   type="button"

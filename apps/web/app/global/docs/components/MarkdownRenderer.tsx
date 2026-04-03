@@ -67,7 +67,7 @@ export function MarkdownRenderer({ text }: MarkdownRendererProps) {
                     return (
                         <pre
                             key={`code-${idx}`}
-                            className="overflow-x-auto rounded-xl border border-white/10 bg-black/40 p-4 text-xs leading-relaxed text-white"
+                            className="overflow-x-auto rounded-xl border border-border bg-black/40 p-4 text-xs leading-relaxed text-white"
                         >
                             <code data-language={block.language || undefined}>{block.content}</code>
                         </pre>
@@ -76,14 +76,14 @@ export function MarkdownRenderer({ text }: MarkdownRendererProps) {
 
                 if (block.type === "table") {
                     return (
-                        <div key={`table-${idx}`} className="overflow-x-auto rounded-xl border border-white/10 bg-black/20">
+                        <div key={`table-${idx}`} className="overflow-x-auto rounded-xl border border-border bg-black/20">
                             <table className="min-w-full border-collapse text-left text-sm">
-                                <thead className="bg-white/5">
+                                <thead className="bg-muted/40">
                                     <tr>
                                         {block.headers.map((header, headerIdx) => (
                                             <th
                                                 key={`th-${idx}-${headerIdx}`}
-                                                className="border-b border-white/10 px-3 py-2 font-semibold text-foreground"
+                                                className="border-b border-border px-3 py-2 font-semibold text-foreground"
                                             >
                                                 {renderInlineNodes(header)}
                                             </th>
@@ -92,7 +92,7 @@ export function MarkdownRenderer({ text }: MarkdownRendererProps) {
                                 </thead>
                                 <tbody>
                                     {block.rows.map((row, rowIdx) => (
-                                        <tr key={`tr-${idx}-${rowIdx}`} className="border-b border-white/10 last:border-b-0">
+                                        <tr key={`tr-${idx}-${rowIdx}`} className="border-b border-border last:border-b-0">
                                             {row.map((cell, cellIdx) => (
                                                 <td key={`td-${idx}-${rowIdx}-${cellIdx}`} className="px-3 py-2 align-top text-foreground/90">
                                                     {renderInlineNodes(cell)}

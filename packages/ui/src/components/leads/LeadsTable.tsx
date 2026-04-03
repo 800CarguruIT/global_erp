@@ -70,11 +70,11 @@ export function LeadsTable({
     <div className="overflow-x-auto">
       <table className="min-w-full text-sm border-separate border-spacing-0">
         <thead>
-          <tr className="text-left bg-muted/20">
+          <tr className="text-left bg-card/40">
             {selectable && (
-              <th className="w-10 px-4 py-3 sticky top-0 bg-muted/20 backdrop-blur border-b border-border/30 text-xs font-semibold text-muted-foreground" />
+              <th className="w-10 px-4 py-3 sticky top-0 bg-card/40 backdrop-blur border-b border-border/60 text-xs font-semibold text-muted-foreground" />
             )}
-            <th className="px-4 py-3 sticky top-0 bg-muted/20 backdrop-blur border-b border-border/30 text-xs font-semibold text-muted-foreground">
+            <th className="px-4 py-3 sticky top-0 bg-card/40 backdrop-blur border-b border-border/60 text-xs font-semibold text-muted-foreground">
               <button
                 type="button"
                 onClick={() => onSort?.("lead")}
@@ -84,7 +84,7 @@ export function LeadsTable({
                 {sortKey === "lead" && <span className="text-[10px] text-muted-foreground">{sortLabel}</span>}
               </button>
             </th>
-            <th className="px-4 py-3 sticky top-0 bg-muted/20 backdrop-blur border-b border-border/30 text-xs font-semibold text-muted-foreground">
+            <th className="px-4 py-3 sticky top-0 bg-card/40 backdrop-blur border-b border-border/60 text-xs font-semibold text-muted-foreground">
               <button
                 type="button"
                 onClick={() => onSort?.("customer")}
@@ -94,7 +94,7 @@ export function LeadsTable({
                 {sortKey === "customer" && <span className="text-[10px] text-muted-foreground">{sortLabel}</span>}
               </button>
             </th>
-            <th className="px-4 py-3 sticky top-0 bg-muted/20 backdrop-blur border-b border-border/30 text-xs font-semibold text-muted-foreground">
+            <th className="px-4 py-3 sticky top-0 bg-card/40 backdrop-blur border-b border-border/60 text-xs font-semibold text-muted-foreground">
               <button
                 type="button"
                 onClick={() => onSort?.("car")}
@@ -104,10 +104,10 @@ export function LeadsTable({
                 {sortKey === "car" && <span className="text-[10px] text-muted-foreground">{sortLabel}</span>}
               </button>
             </th>
-            <th className="px-4 py-3 sticky top-0 bg-muted/20 backdrop-blur border-b border-border/30 text-xs font-semibold text-muted-foreground">
+            <th className="px-4 py-3 sticky top-0 bg-card/40 backdrop-blur border-b border-border/60 text-xs font-semibold text-muted-foreground">
               Type / Stage
             </th>
-            <th className="px-4 py-3 sticky top-0 bg-muted/20 backdrop-blur border-b border-border/30 text-xs font-semibold text-muted-foreground">
+            <th className="px-4 py-3 sticky top-0 bg-card/40 backdrop-blur border-b border-border/60 text-xs font-semibold text-muted-foreground">
               <button
                 type="button"
                 onClick={() => onSort?.("status")}
@@ -117,7 +117,7 @@ export function LeadsTable({
                 {sortKey === "status" && <span className="text-[10px] text-muted-foreground">{sortLabel}</span>}
               </button>
             </th>
-            <th className="px-4 py-3 sticky top-0 bg-muted/20 backdrop-blur border-b border-border/30 text-xs font-semibold text-muted-foreground">
+            <th className="px-4 py-3 sticky top-0 bg-card/40 backdrop-blur border-b border-border/60 text-xs font-semibold text-muted-foreground">
               <button
                 type="button"
                 onClick={() => onSort?.("source")}
@@ -127,7 +127,7 @@ export function LeadsTable({
                 {sortKey === "source" && <span className="text-[10px] text-muted-foreground">{sortLabel}</span>}
               </button>
             </th>
-            <th className="px-4 py-3 sticky top-0 bg-muted/20 backdrop-blur border-b border-border/30 text-xs font-semibold text-muted-foreground">
+            <th className="px-4 py-3 sticky top-0 bg-card/40 backdrop-blur border-b border-border/60 text-xs font-semibold text-muted-foreground">
               <button
                 type="button"
                 onClick={() => onSort?.("branch")}
@@ -137,7 +137,7 @@ export function LeadsTable({
                 {sortKey === "branch" && <span className="text-[10px] text-muted-foreground">{sortLabel}</span>}
               </button>
             </th>
-            <th className="px-4 py-3 sticky top-0 bg-muted/20 backdrop-blur border-b border-border/30 text-xs font-semibold text-muted-foreground">
+            <th className="px-4 py-3 sticky top-0 bg-card/40 backdrop-blur border-b border-border/60 text-xs font-semibold text-muted-foreground">
               <button
                 type="button"
                 onClick={() => onSort?.("agent")}
@@ -147,7 +147,7 @@ export function LeadsTable({
                 {sortKey === "agent" && <span className="text-[10px] text-muted-foreground">{sortLabel}</span>}
               </button>
             </th>
-            <th className="px-4 py-3 sticky top-0 bg-muted/20 backdrop-blur border-b border-border/30 text-xs font-semibold text-muted-foreground">
+            <th className="px-4 py-3 sticky top-0 bg-card/40 backdrop-blur border-b border-border/60 text-xs font-semibold text-muted-foreground">
               <button
                 type="button"
                 onClick={() => onSort?.("service")}
@@ -157,10 +157,10 @@ export function LeadsTable({
                 {sortKey === "service" && <span className="text-[10px] text-muted-foreground">{sortLabel}</span>}
               </button>
             </th>
-            <th className="px-4 py-3 sticky top-0 bg-muted/20 backdrop-blur border-b border-border/30 text-xs font-semibold text-muted-foreground">
+            <th className="px-4 py-3 sticky top-0 bg-card/40 backdrop-blur border-b border-border/60 text-xs font-semibold text-muted-foreground">
               Customer Info
             </th>
-            <th className="px-4 py-3 sticky top-0 bg-muted/20 backdrop-blur border-b border-border/30 text-xs font-semibold text-muted-foreground">
+            <th className="px-4 py-3 sticky top-0 bg-card/40 backdrop-blur border-b border-border/60 text-xs font-semibold text-muted-foreground">
               <button
                 type="button"
                 onClick={() => onSort?.("health")}
@@ -170,7 +170,7 @@ export function LeadsTable({
                 {sortKey === "health" && <span className="text-[10px] text-muted-foreground">{sortLabel}</span>}
               </button>
             </th>
-            <th className="px-4 py-3 sticky top-0 bg-muted/20 backdrop-blur border-b border-border/30 text-xs font-semibold text-muted-foreground">
+            <th className="px-4 py-3 sticky top-0 bg-card/40 backdrop-blur border-b border-border/60 text-xs font-semibold text-muted-foreground">
               Actions
             </th>
           </tr>
@@ -195,9 +195,9 @@ export function LeadsTable({
               !["closed", "closed_won", "lost", "done", "completed"].includes(leadStatus);
 
             return (
-              <tr key={lead.id} className="hover:bg-muted/20">
+              <tr key={lead.id} className="transition hover:bg-muted/30">
                 {selectable && (
-                  <td className="px-4 py-3 border-b border-border/30 align-top">
+                  <td className="px-4 py-3 border-b border-border/60 align-top">
                     <input
                       type="checkbox"
                       checked={selectedIds?.has(lead.id) ?? false}
@@ -205,13 +205,13 @@ export function LeadsTable({
                     />
                   </td>
                 )}
-                <td className="px-4 py-3 border-b border-border/30">
+                <td className="px-4 py-3 border-b border-border/60">
                   <a href={detailHref} className="font-medium text-primary hover:underline">
                     {lead.id.slice(0, 8)}
                   </a>
                   <div className="text-xs text-muted-foreground">{new Date(lead.createdAt).toLocaleString()}</div>
                 </td>
-                <td className="px-4 py-3 border-b border-border/30">
+                <td className="px-4 py-3 border-b border-border/60">
                   {lead.customerName ? (
                     customerHref ? (
                       <a href={customerHref} className="text-sm hover:underline">
@@ -225,7 +225,7 @@ export function LeadsTable({
                   )}
                   {lead.customerPhone && <div className="text-xs text-muted-foreground">{lead.customerPhone}</div>}
                 </td>
-                <td className="px-4 py-3 border-b border-border/30">
+                <td className="px-4 py-3 border-b border-border/60">
                   {lead.carPlateNumber ? (
                     carHref ? (
                       <a href={carHref} className="hover:underline">
@@ -254,19 +254,23 @@ export function LeadsTable({
                     <span className="text-xs text-muted-foreground">No car</span>
                   )}
                 </td>
-                <td className="px-4 py-3 border-b border-border/30">
+                <td className="px-4 py-3 border-b border-border/60">
                   <div className="flex flex-col gap-1">
                     <LeadTypeBadge type={lead.leadType as any} />
                     <span className="text-xs text-muted-foreground capitalize">{lead.leadStage.replace(/_/g, " ")}</span>
                   </div>
                 </td>
-                <td className="px-4 py-3 border-b border-border/30">
+                <td className="px-4 py-3 border-b border-border/60">
                   <LeadStatusBadge status={lead.leadStatus as any} />
                 </td>
-                <td className="px-4 py-3 border-b border-border/30 text-xs capitalize">
-                  {lead.source || <span className="text-muted-foreground">Unknown</span>}
+                <td className="px-4 py-3 border-b border-border/60 text-xs">
+                  {lead.source ? (
+                    <span className="capitalize">{lead.source.replace(/_/g, " ").replace(/ai /i, "AI ")}</span>
+                  ) : (
+                    <span className="text-muted-foreground">Unknown</span>
+                  )}
                 </td>
-                <td className="px-4 py-3 border-b border-border/30 text-sm">
+                <td className="px-4 py-3 border-b border-border/60 text-sm">
                   {lead.branchId ? (
                     <a
                       href={`/company/${companyId}/branches/${lead.branchId}`}
@@ -278,7 +282,7 @@ export function LeadsTable({
                     <span className="text-xs text-muted-foreground">Unassigned</span>
                   )}
                 </td>
-                <td className="px-4 py-3 border-b border-border/30 text-sm">
+                <td className="px-4 py-3 border-b border-border/60 text-sm">
                   {lead.agentName ? (
                     <div className="flex flex-col gap-0.5">
                       <span>{lead.agentName}</span>
@@ -288,7 +292,7 @@ export function LeadsTable({
                     <span className="text-xs text-muted-foreground">Unassigned</span>
                   )}
                 </td>
-                <td className="px-4 py-3 border-b border-border/30 text-xs capitalize">
+                <td className="px-4 py-3 border-b border-border/60 text-xs capitalize">
                   {lead.serviceType ? (
                     <div className="flex flex-col gap-0.5">
                       <span>{lead.serviceType.replace("_", " ")}</span>
@@ -315,14 +319,14 @@ export function LeadsTable({
                     </div>
                   )}
                 </td>
-                <td className="px-4 py-3 border-b border-border/30 text-xs">
+                <td className="px-4 py-3 border-b border-border/60 text-xs">
                   {lead.customerDetailsApproved ? (
                     <div className="flex items-center gap-2">
-                      <span className="rounded-full border border-emerald-500/60 bg-emerald-500/10 px-2 py-1 text-emerald-500">
+                      <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-400">
                         Visible
                       </span>
                       <button
-                        className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-destructive hover:shadow-md"
+                        className="rounded-md border border-border bg-muted/40 px-2 py-1 text-[10px] font-medium text-muted-foreground transition hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/20"
                         type="button"
                         onClick={() => handleVisibilityToggle(lead.id, false)}
                       >
@@ -331,11 +335,11 @@ export function LeadsTable({
                     </div>
                   ) : lead.customerDetailsRequested ? (
                     <div className="flex items-center gap-2">
-                      <span className="rounded-full border border-amber-500/60 bg-amber-500/10 px-2 py-1 text-amber-500">
+                      <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-400">
                         Requested
                       </span>
                       <button
-                        className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-primary hover:shadow-md"
+                        className="rounded-md border border-border bg-muted/40 px-2 py-1 text-[10px] font-medium text-muted-foreground transition hover:bg-emerald-500/10 hover:text-emerald-400 hover:border-emerald-500/20"
                         type="button"
                         onClick={() => handleVisibilityToggle(lead.id, true)}
                       >
@@ -346,18 +350,29 @@ export function LeadsTable({
                     <span className="text-muted-foreground">-</span>
                   )}
                 </td>
-                <td className="px-4 py-3 border-b border-border/30">
+                <td className="px-4 py-3 border-b border-border/60">
                   <LeadHealthBadge score={lead.healthScore} />
                 </td>
-                <td className="px-4 py-3 border-b border-border/30 text-sm">
+                <td className="px-4 py-3 border-b border-border/60 text-sm">
                   {renderActions ? (
                     renderActions(lead)
                   ) : (
                     <div className="flex flex-col gap-1.5">
+                      {/* Assign to Tech — RSA only */}
+                      {leadType === "rsa" && canAssign ? (
+                        <button
+                          className="rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-1.5 text-xs font-medium text-sky-300 transition hover:bg-sky-500/20"
+                          onClick={() => onAssign?.(lead.id, lead)}
+                          type="button"
+                        >
+                          {(lead as any).assignedUserName ? `Tech: ${(lead as any).assignedUserName}` : "Assign to Tech"}
+                        </button>
+                      ) : null}
                       {(lead as any).bookingId ? (
-                        <div className="space-y-1">
+                        <div className="space-y-1.5">
                           <div className="flex items-center gap-1.5">
-                            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-400">
+                            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-400">
+                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                               Booked
                             </span>
                             <span className="text-[10px] text-muted-foreground capitalize">
@@ -382,7 +397,7 @@ export function LeadsTable({
                             </div>
                           )}
                           <button
-                            className="rounded-md border border-indigo-300/40 bg-indigo-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-indigo-400 transition hover:bg-indigo-500/20"
+                            className="rounded-md border border-border bg-muted/40 px-2.5 py-1 text-[10px] font-medium text-foreground transition hover:bg-muted"
                             onClick={() => onBook?.(lead.id, lead)}
                             type="button"
                           >
@@ -391,7 +406,7 @@ export function LeadsTable({
                         </div>
                       ) : canBook ? (
                         <button
-                          className="rounded-md border border-indigo-300/40 bg-indigo-500/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-indigo-400 shadow-sm transition hover:bg-indigo-500/20 hover:shadow-md"
+                          className="rounded-lg border border-border bg-muted/40 px-4 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted"
                           onClick={() => onBook?.(lead.id, lead)}
                           type="button"
                         >

@@ -79,6 +79,7 @@ export interface Lead {
   carModel?: string | null;
   branchName?: string | null;
   agentName?: string | null;
+  assignedUserName?: string | null;
 }
 
 export interface LeadEvent {

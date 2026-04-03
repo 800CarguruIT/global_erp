@@ -23,6 +23,11 @@ const SECTION_COLORS: Record<string, { bg: string; text: string; dot: string; gl
   "Service Center":       { bg: "bg-orange-500/15",  text: "text-orange-300",  dot: "bg-orange-400",  glow: "shadow-[0_0_8px_rgba(251,146,60,0.8)]",  iconBg: "bg-orange-500/20",  iconText: "text-orange-300" },
   "Operations Dashboard": { bg: "bg-violet-500/15",  text: "text-violet-300",  dot: "bg-violet-400",  glow: "shadow-[0_0_8px_rgba(167,139,250,0.8)]", iconBg: "bg-violet-500/20",  iconText: "text-violet-300" },
   "Parts Quotes":         { bg: "bg-amber-500/15",   text: "text-amber-300",   dot: "bg-amber-400",   glow: "shadow-[0_0_8px_rgba(251,191,36,0.8)]",  iconBg: "bg-amber-500/20",   iconText: "text-amber-300" },
+  "Recovery Requests":    { bg: "bg-red-500/15",      text: "text-red-300",     dot: "bg-red-400",     glow: "shadow-[0_0_8px_rgba(248,113,113,0.8)]", iconBg: "bg-red-500/20",     iconText: "text-red-300" },
+  "My RSA Jobs":          { bg: "bg-cyan-500/15",     text: "text-cyan-300",    dot: "bg-cyan-400",    glow: "shadow-[0_0_8px_rgba(34,211,238,0.8)]",  iconBg: "bg-cyan-500/20",    iconText: "text-cyan-300" },
+  Employees:              { bg: "bg-teal-500/15",    text: "text-teal-300",    dot: "bg-teal-400",    glow: "shadow-[0_0_8px_rgba(45,212,191,0.8)]",  iconBg: "bg-teal-500/20",    iconText: "text-teal-300" },
+  Users:                  { bg: "bg-indigo-500/15",  text: "text-indigo-300",  dot: "bg-indigo-400",  glow: "shadow-[0_0_8px_rgba(129,140,248,0.8)]", iconBg: "bg-indigo-500/20",  iconText: "text-indigo-300" },
+  "Roles & Permissions":  { bg: "bg-rose-500/15",    text: "text-rose-300",    dot: "bg-rose-400",    glow: "shadow-[0_0_8px_rgba(251,113,133,0.8)]", iconBg: "bg-rose-500/20",    iconText: "text-rose-300" },
 };
 const DEFAULT_COLOR = { bg: "bg-emerald-500/15", text: "text-emerald-300", dot: "bg-emerald-400", glow: "shadow-[0_0_8px_rgba(52,211,153,0.8)]", iconBg: "bg-emerald-500/20", iconText: "text-emerald-300" };
 
@@ -165,18 +170,7 @@ export function SidebarNav({
   onRequestClose?: () => void;
 }) {
   const { t } = useI18n();
-
   const isDocsRoute = currentPathname.startsWith("/global/docs");
-  if (isDocsRoute) {
-    return (
-    <div className="mx-auto flex w-full max-w-[1720px] gap-6">
-      <aside className="w-64 shrink-0">
-        <DocsSidebar currentPathname={currentPathname} />
-      </aside>
-      <div className="min-w-0 flex-1">{children}</div>
-    </div>
-  );
-}
 
   const [permissions, setPermissions] = useState<string[] | null>(null);
   const [permissionsLoaded, setPermissionsLoaded] = useState(false);
@@ -382,13 +376,10 @@ export function SidebarNav({
     const filterTree = (items: SidebarItem[]): SidebarItem[] =>
       items.flatMap((item) => {
         const childItems = item.children ? filterTree(item.children) : undefined;
-        const strict = scope === "branch" || scope === "company";
         const allowed = !item.permissionKeys?.length
           ? true
           : permissionsLoaded
-          ? strict
-            ? hasAnyExactPermission(item.permissionKeys)
-            : hasAnyPermission(item.permissionKeys)
+          ? hasAnyPermission(item.permissionKeys)
           : false;
         if (!allowed) return [];
         return [{ ...item, children: childItems }];
@@ -631,10 +622,6 @@ export function SidebarNav({
   const [hoverPreview, setHoverPreview] = useState<{ label: string; children: string[]; top: number } | null>(null);
   const hoverTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  if (!sections.length && !filteredTreeItems?.length) {
-    return <div className="w-full">{children}</div>;
-  }
-
   // Sort tree items by user-defined order
   const orderedTreeItems = useMemo(() => {
     if (!filteredTreeItems?.length) return filteredTreeItems;
@@ -644,9 +631,9 @@ export function SidebarNav({
   }, [filteredTreeItems, sectionOrder]);
 
   const navBaseClass =
-    "relative max-h-[calc(100vh-2.5rem)] overflow-y-auto rounded-2xl border border-white/10 p-4 text-sm shadow-[0_24px_60px_-32px_rgba(15,23,42,0.85)] [scrollbar-width:thin] [scrollbar-color:rgba(148,163,184,0.45)_transparent] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/25 hover:[&::-webkit-scrollbar-thumb]:bg-white/40";
-  const desktopNavClass = "bg-gradient-to-b from-slate-950/85 via-slate-900/70 to-slate-950/85";
-  const mobileNavClass = "bg-slate-950 border-white/20 shadow-2xl";
+    "relative max-h-[calc(100vh-2.5rem)] overflow-y-auto rounded-2xl border border-border p-4 text-sm shadow-[0_24px_60px_-32px_rgba(15,23,42,0.85)] [scrollbar-width:thin] [scrollbar-color:rgba(148,163,184,0.45)_transparent] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted/80 hover:[&::-webkit-scrollbar-thumb]:bg-muted";
+  const desktopNavClass = "bg-gradient-to-b from-background/85 via-popover/70 to-background/85";
+  const mobileNavClass = "bg-background border-border shadow-2xl";
 
   const ChevronIcon = ({ open, className = "" }: { open: boolean; className?: string }) => (
     <svg className={`h-3.5 w-3.5 transition-transform duration-200 ${open ? "rotate-90" : ""} ${className}`} viewBox="0 0 20 20" fill="currentColor">
@@ -666,16 +653,16 @@ export function SidebarNav({
         <div className="pointer-events-none absolute inset-0">
           <div className="absolute -right-16 -top-20 h-48 w-48 rounded-full bg-emerald-400/20 blur-3xl" />
           <div className="absolute -left-24 -bottom-24 h-52 w-52 rounded-full bg-amber-400/20 blur-3xl" />
-          <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-white/5 to-transparent" />
+          <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-muted/40 to-transparent" />
         </div>
         <div className="relative mb-3">
-          <div className="text-[10px] uppercase tracking-[0.2em] text-white/50">Navigation</div>
+          <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Navigation</div>
         </div>
 
         {/* #8 Pinned favorites quick access */}
         {pinnedEntries.length > 0 ? (
           <div className="relative mb-3">
-            <div className="mb-1.5 text-[10px] uppercase tracking-[0.2em] text-white/35">Pinned</div>
+            <div className="mb-1.5 text-[10px] uppercase tracking-[0.2em] text-muted-foreground/50">Pinned</div>
             <div className="flex flex-col gap-1">
               {pinnedEntries.map((pin) => (
                 <Link
@@ -684,7 +671,7 @@ export function SidebarNav({
                   className={`group relative flex items-center gap-2 rounded-lg px-3 py-1.5 text-[12px] transition duration-150 ${
                     currentPathname === pin.href || currentPathname.startsWith(pin.href + "/")
                       ? `${pin.color.bg} ${pin.color.text} shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)]`
-                      : "text-white/55 hover:bg-white/5 hover:text-white/80"
+                      : "text-muted-foreground hover:bg-muted/40 hover:text-foreground/80"
                   }`}
                 >
                   <span className={`h-1 w-1 rounded-full ${pin.color.dot}`} />
@@ -692,7 +679,7 @@ export function SidebarNav({
                 </Link>
               ))}
             </div>
-            <div className="mt-2 border-b border-white/5" />
+            <div className="mt-2 border-b border-border/40" />
           </div>
         ) : null}
 
@@ -713,13 +700,13 @@ export function SidebarNav({
               const parentBg = active && !hasActiveChild
                 ? `${color.bg} text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.12)]`
                 : hasActiveChild
-                ? "bg-white/6 text-white"
-                : "text-white/80 hover:bg-white/6";
+                ? "bg-muted/40 text-foreground"
+                : "text-foreground/80 hover:bg-muted/40";
 
               return (
                 <div
                   key={key}
-                  className="group/section rounded-xl border border-white/5 bg-white/[0.02]"
+                  className="group/section rounded-xl border border-border/40 bg-card/30"
                   role="treeitem"
                   aria-expanded={hasChildren ? isOpen : undefined}
                   /* #6 Hover preview */
@@ -743,21 +730,21 @@ export function SidebarNav({
                       <Link href={smartHref} className={`group relative flex flex-1 items-center gap-3 rounded-xl px-3 py-2.5 transition duration-150 ${parentBg}`}>
                         <span
                           className={`absolute left-1.5 top-1/2 h-5 w-1 -translate-y-1/2 rounded-full transition ${
-                            active ? `${color.dot} ${color.glow}` : hasActiveChild ? `${color.dot} opacity-50` : "bg-white/10 group-hover:bg-white/30"
+                            active ? `${color.dot} ${color.glow}` : hasActiveChild ? `${color.dot} opacity-50` : "bg-muted group-hover:bg-muted/80"
                           }`}
                         />
-                        <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition ${active || hasActiveChild ? `${color.iconBg} ${color.iconText}` : "bg-white/5 text-white/50 group-hover:bg-white/10 group-hover:text-white/70"}`}>
+                        <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition ${active || hasActiveChild ? `${color.iconBg} ${color.iconText}` : "bg-muted/40 text-muted-foreground group-hover:bg-muted group-hover:text-foreground/70"}`}>
                           {icon}
                         </span>
                         <span className="flex-1 truncate text-[13px] font-medium">{label}</span>
                         {hasChildren ? (
-                          <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] tabular-nums text-white/40">{childCount}</span>
+                          <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] tabular-nums text-muted-foreground">{childCount}</span>
                         ) : null}
                       </Link>
                     ) : (
                       <span className={`group relative flex flex-1 items-center gap-3 rounded-xl px-3 py-2.5 opacity-50 cursor-not-allowed ${parentBg}`} aria-disabled>
-                        <span className="absolute left-1.5 top-1/2 h-5 w-1 -translate-y-1/2 rounded-full bg-white/10" />
-                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/5 text-white/50">{icon}</span>
+                        <span className="absolute left-1.5 top-1/2 h-5 w-1 -translate-y-1/2 rounded-full bg-muted" />
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-muted/40 text-muted-foreground">{icon}</span>
                         <span className="flex-1 truncate text-[13px] font-medium">{label}</span>
                       </span>
                     )}
@@ -765,12 +752,12 @@ export function SidebarNav({
                       {/* #7 Reorder buttons */}
                       <div className="mr-0.5 flex flex-col opacity-0 transition-opacity group-hover/section:opacity-100">
                         {idx > 0 ? (
-                          <button type="button" onClick={() => moveSection(label, -1)} className="px-0.5 text-white/30 hover:text-white/70" aria-label={`Move ${label} up`}>
+                          <button type="button" onClick={() => moveSection(label, -1)} className="px-0.5 text-muted-foreground/50 hover:text-foreground/70" aria-label={`Move ${label} up`}>
                             <svg className="h-2.5 w-2.5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M14.77 12.79a.75.75 0 01-1.06-.02L10 9.168l-3.71 3.6a.75.75 0 11-1.08-1.04l4.25-4.5a.75.75 0 011.08 0l4.25 4.5a.75.75 0 01-.02 1.06z" clipRule="evenodd" /></svg>
                           </button>
                         ) : <span className="h-2.5" />}
                         {idx < (orderedTreeItems?.length ?? 0) - 1 ? (
-                          <button type="button" onClick={() => moveSection(label, 1)} className="px-0.5 text-white/30 hover:text-white/70" aria-label={`Move ${label} down`}>
+                          <button type="button" onClick={() => moveSection(label, 1)} className="px-0.5 text-muted-foreground/50 hover:text-foreground/70" aria-label={`Move ${label} down`}>
                             <svg className="h-2.5 w-2.5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.832l3.71-3.6a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" /></svg>
                           </button>
                         ) : <span className="h-2.5" />}
@@ -779,7 +766,7 @@ export function SidebarNav({
                         <button
                           type="button"
                           onClick={() => toggleSection(key)}
-                          className="mr-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-white/40 transition hover:bg-white/10 hover:text-white"
+                          className="mr-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground"
                           aria-label={isOpen ? `Collapse ${label}` : `Expand ${label}`}
                         >
                           <ChevronIcon open={!!isOpen} />
@@ -808,12 +795,12 @@ export function SidebarNav({
                                 className={`group relative flex flex-1 items-center rounded-lg px-3 py-2 pl-[2.75rem] text-[13px] transition duration-150 ${
                                   childActive
                                     ? `${color.bg} ${color.text} shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)]`
-                                    : "text-white/60 hover:bg-white/5 hover:text-white/90"
+                                    : "text-muted-foreground hover:bg-muted/40 hover:text-foreground/90"
                                 }`}
                               >
                                 <span
                                   className={`absolute left-6 top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full transition ${
-                                    childActive ? `${color.dot} ${color.glow}` : "bg-white/20 group-hover:bg-white/40"
+                                    childActive ? `${color.dot} ${color.glow}` : "bg-muted/80 group-hover:bg-muted"
                                   }`}
                                 />
                                 <span className="truncate">{childLabel}</span>
@@ -823,7 +810,7 @@ export function SidebarNav({
                                 type="button"
                                 onClick={() => togglePin(child.href)}
                                 className={`ml-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded transition ${
-                                  isPinned ? `${color.iconText}` : "text-white/15 opacity-0 group-hover/child:opacity-100 hover:text-white/50"
+                                  isPinned ? `${color.iconText}` : "text-muted-foreground/30 opacity-0 group-hover/child:opacity-100 hover:text-muted-foreground"
                                 }`}
                                 aria-label={isPinned ? `Unpin ${childLabel}` : `Pin ${childLabel}`}
                               >
@@ -831,8 +818,8 @@ export function SidebarNav({
                               </button>
                             </div>
                           ) : (
-                            <span key={childKey} className="group relative flex items-center rounded-lg px-3 py-2 pl-[2.75rem] text-[13px] text-white/30 cursor-not-allowed" aria-disabled role="treeitem">
-                              <span className="absolute left-6 top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-white/10" />
+                            <span key={childKey} className="group relative flex items-center rounded-lg px-3 py-2 pl-[2.75rem] text-[13px] text-muted-foreground/50 cursor-not-allowed" aria-disabled role="treeitem">
+                              <span className="absolute left-6 top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-muted" />
                               <span className="truncate">{childLabel}</span>
                             </span>
                           );
@@ -853,10 +840,10 @@ export function SidebarNav({
                   const enabledItems = group.items.filter((entry) => entry.resolvedHref);
                   const disabledItems = group.items.filter((entry) => !entry.resolvedHref);
                   return (
-                    <div key={group.key} className="rounded-xl border border-white/5 bg-white/[0.02]">
-                      <button type="button" onClick={() => setOpenMainGroups((prev) => ({ ...prev, [group.key]: !prev[group.key] }))} className="flex w-full items-center justify-between px-3 py-2 text-left text-[11px] uppercase tracking-[0.2em] text-white/70 hover:text-white">
+                    <div key={group.key} className="rounded-xl border border-border/40 bg-card/30">
+                      <button type="button" onClick={() => setOpenMainGroups((prev) => ({ ...prev, [group.key]: !prev[group.key] }))} className="flex w-full items-center justify-between px-3 py-2 text-left text-[11px] uppercase tracking-[0.2em] text-foreground/70 hover:text-foreground">
                         <span>{group.key}</span>
-                        <span className="flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-white/40">
+                        <span className="flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
                           <span>{group.items.length}</span>
                           <ChevronIcon open={!!isOpen} />
                         </span>
@@ -867,8 +854,8 @@ export function SidebarNav({
                             const active = resolvedHref ? currentPathname.startsWith(resolvedHref) : false;
                             const label = item.labelKey ? t(item.labelKey) : item.label ?? item.href;
                             return (
-                              <Link key={item.href} href={resolvedHref as string} className={`group relative flex items-center rounded-lg px-3 py-2 pl-6 text-[13px] transition duration-150 ${active ? "bg-emerald-500/15 text-white shadow-[inset_0_0_0_1px_rgba(52,211,153,0.25)]" : "text-white/60 hover:bg-white/5 hover:text-white/90"}`}>
-                                <span className={`absolute left-2 top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full transition ${active ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" : "bg-white/20 group-hover:bg-white/40"}`} />
+                              <Link key={item.href} href={resolvedHref as string} className={`group relative flex items-center rounded-lg px-3 py-2 pl-6 text-[13px] transition duration-150 ${active ? "bg-emerald-500/15 text-white shadow-[inset_0_0_0_1px_rgba(52,211,153,0.25)]" : "text-muted-foreground hover:bg-muted/40 hover:text-foreground/90"}`}>
+                                <span className={`absolute left-2 top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full transition ${active ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" : "bg-muted/80 group-hover:bg-muted"}`} />
                                 <span className="truncate">{label}</span>
                               </Link>
                             );
@@ -876,8 +863,8 @@ export function SidebarNav({
                           {disabledItems.map(({ item }) => {
                             const label = item.labelKey ? t(item.labelKey) : item.label ?? item.href;
                             return (
-                              <span key={item.href} className="relative flex items-center rounded-lg px-3 py-2 pl-6 text-[13px] text-white/30 cursor-not-allowed" aria-disabled>
-                                <span className="absolute left-2 top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-white/10" />
+                              <span key={item.href} className="relative flex items-center rounded-lg px-3 py-2 pl-6 text-[13px] text-muted-foreground/50 cursor-not-allowed" aria-disabled>
+                                <span className="absolute left-2 top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-muted" />
                                 <span className="truncate">{label}</span>
                               </span>
                             );
@@ -893,20 +880,20 @@ export function SidebarNav({
         )}
       </nav>
       {/* Scroll fade indicator */}
-      <div className={`pointer-events-none absolute inset-x-0 bottom-0 h-8 rounded-b-2xl bg-gradient-to-t from-slate-950/90 to-transparent transition-opacity duration-200 ${canScrollDown ? "opacity-100" : "opacity-0"}`} />
+      <div className={`pointer-events-none absolute inset-x-0 bottom-0 h-8 rounded-b-2xl bg-gradient-to-t from-background/90 to-transparent transition-opacity duration-200 ${canScrollDown ? "opacity-100" : "opacity-0"}`} />
       {/* #6 Hover preview tooltip */}
       {hoverPreview ? (
         <div
-          className="fixed left-[17.5rem] z-50 w-44 rounded-xl border border-white/10 bg-slate-900/95 p-3 shadow-xl backdrop-blur-lg"
+          className="fixed left-[17.5rem] z-50 w-44 rounded-xl border border-border bg-popover/95 p-3 shadow-xl backdrop-blur-lg"
           style={{ top: hoverPreview.top }}
           onMouseEnter={() => clearTimeout(hoverTimeout.current)}
           onMouseLeave={() => setHoverPreview(null)}
         >
-          <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-white/60">{hoverPreview.label}</div>
+          <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">{hoverPreview.label}</div>
           <div className="flex flex-col gap-1">
             {hoverPreview.children.map((c) => (
-              <div key={c} className="flex items-center gap-2 text-[12px] text-white/50">
-                <span className="h-1 w-1 rounded-full bg-white/30" />
+              <div key={c} className="flex items-center gap-2 text-[12px] text-muted-foreground">
+                <span className="h-1 w-1 rounded-full bg-muted/80" />
                 {c}
               </div>
             ))}
@@ -937,6 +924,23 @@ export function SidebarNav({
     : "opacity-0 pointer-events-none";
   const panelTransformClass = mobileSidebarOpen ? "translate-x-0" : "-translate-x-full";
 
+  if (isDocsRoute) {
+    return (
+      <div className="mx-auto flex w-full max-w-[1720px] gap-6">
+        <aside className="w-64 shrink-0">
+          <DocsSidebar currentPathname={currentPathname} />
+        </aside>
+        <div className="min-w-0 flex-1">{children}</div>
+      </div>
+    );
+  }
+
+  const hasAnySidebar = Boolean(sections.length || filteredTreeItems?.length);
+
+  if (!hasAnySidebar) {
+    return <div className="w-full">{children}</div>;
+  }
+
   return (
     <BreadcrumbCtx.Provider value={breadcrumb}>
       <div className="relative">
@@ -945,20 +949,20 @@ export function SidebarNav({
           <div className="min-w-0 flex-1 pb-20 lg:pb-0">
             {/* #10 Breadcrumb bar */}
             {breadcrumb.length > 0 ? (
-              <div className="mb-4 flex items-center gap-1.5 text-[12px] text-white/40">
+              <div className="mb-4 flex items-center gap-1.5 text-[12px] text-muted-foreground">
                 {breadcrumb.map((entry, i) => (
                   <React.Fragment key={entry.label}>
                     {i > 0 ? (
-                      <svg className="h-3 w-3 text-white/20" viewBox="0 0 20 20" fill="currentColor">
+                      <svg className="h-3 w-3 text-muted-foreground/30" viewBox="0 0 20 20" fill="currentColor">
                         <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
                       </svg>
                     ) : null}
                     {entry.href ? (
-                      <Link href={entry.href} className={`rounded px-1.5 py-0.5 transition hover:bg-white/5 hover:text-white/70 ${i === breadcrumb.length - 1 ? "text-white/70 font-medium" : ""}`}>
+                      <Link href={entry.href} className={`rounded px-1.5 py-0.5 transition hover:bg-muted/40 hover:text-foreground/70 ${i === breadcrumb.length - 1 ? "text-foreground/70 font-medium" : ""}`}>
                         {entry.label}
                       </Link>
                     ) : (
-                      <span className={i === breadcrumb.length - 1 ? "text-white/70 font-medium" : ""}>{entry.label}</span>
+                      <span className={i === breadcrumb.length - 1 ? "text-foreground/70 font-medium" : ""}>{entry.label}</span>
                     )}
                   </React.Fragment>
                 ))}
@@ -976,7 +980,7 @@ export function SidebarNav({
         </div>
         {/* Mobile bottom tab bar with section colors */}
         {mobileTabItems.length > 0 ? (
-          <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-white/10 bg-slate-950/95 backdrop-blur-lg">
+          <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-border bg-background/95 backdrop-blur-lg">
             <div className="flex items-stretch justify-around px-2 py-1">
               {mobileTabItems.map((tab) =>
                 tab.href ? (
@@ -984,7 +988,7 @@ export function SidebarNav({
                     key={tab.label}
                     href={tab.href}
                     className={`flex flex-1 flex-col items-center gap-0.5 rounded-lg px-1 py-2 text-center transition ${
-                      tab.active ? tab.color.text : "text-white/50 hover:text-white/80"
+                      tab.active ? tab.color.text : "text-muted-foreground hover:text-foreground/80"
                     }`}
                   >
                     <span className={`flex h-6 w-6 items-center justify-center ${tab.active ? tab.color.iconText : ""}`}>
@@ -994,7 +998,7 @@ export function SidebarNav({
                     {tab.active ? <span className={`mt-0.5 h-0.5 w-4 rounded-full ${tab.color.dot}`} /> : null}
                   </Link>
                 ) : (
-                  <span key={tab.label} className="flex flex-1 flex-col items-center gap-0.5 rounded-lg px-1 py-2 text-center text-white/25 cursor-not-allowed">
+                  <span key={tab.label} className="flex flex-1 flex-col items-center gap-0.5 rounded-lg px-1 py-2 text-center text-muted-foreground/30 cursor-not-allowed">
                     <span className="flex h-6 w-6 items-center justify-center">{tab.icon}</span>
                     <span className="text-[10px] font-medium leading-tight truncate max-w-[4.5rem]">{tab.label}</span>
                   </span>
@@ -1036,6 +1040,39 @@ const SECTION_ICONS: Record<string, React.ReactNode> = {
       <path d="M3.27 6.96L12 12.01l8.73-5.05M12 22.08V12" />
     </svg>
   ),
+  "Recovery Requests": (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M7 17m-2 0a2 2 0 104 0 2 2 0 10-4 0M17 17m-2 0a2 2 0 104 0 2 2 0 10-4 0" />
+      <path d="M5 17H3v-6l2-5h9l4 5h1a2 2 0 012 2v4h-2" />
+      <path d="M9 17h6M14 6l4 5h-5V6" />
+    </svg>
+  ),
+  "My RSA Jobs": (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" />
+      <rect x="9" y="3" width="6" height="4" rx="1" />
+      <path d="M9 14l2 2 4-4" />
+    </svg>
+  ),
+  Employees: (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />
+    </svg>
+  ),
+  Users: (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </svg>
+  ),
+  "Roles & Permissions": (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+      <path d="M7 11V7a5 5 0 0110 0v4" />
+    </svg>
+  ),
   default: (
     <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="12" r="10" />
@@ -1062,15 +1099,15 @@ function DocsSidebar({ currentPathname }: { currentPathname: string }) {
   };
 
   return (
-    <nav className="relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-slate-950/85 via-slate-900/70 to-slate-950/85 p-4 text-sm shadow-[0_24px_60px_-32px_rgba(15,23,42,0.85)]">
+    <nav className="relative overflow-hidden rounded-2xl border border-border bg-gradient-to-b from-background/85 via-popover/70 to-background/85 p-4 text-sm shadow-[0_24px_60px_-32px_rgba(15,23,42,0.85)]">
       <div className="relative mb-4 flex items-center justify-between gap-3">
         <div>
-          <p className="text-[10px] uppercase tracking-[0.16em] text-white/60">Documentation</p>
-          <p className="text-xs text-white/85">Global system handbook</p>
+          <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Documentation</p>
+          <p className="text-xs text-foreground/80">Global system handbook</p>
         </div>
         <Link
           href="/global"
-          className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-white transition hover:border-white/40"
+          className="rounded-full border border-border bg-muted px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-foreground transition hover:border-border"
         >
           Dashboard
         </Link>
@@ -1080,14 +1117,14 @@ function DocsSidebar({ currentPathname }: { currentPathname: string }) {
         {DOCUMENTATION_STRUCTURE.map((chapter) => {
           const isOpen = Boolean(openChapters[chapter.key]);
           return (
-            <div key={chapter.key} className="rounded-2xl border border-white/5 bg-white/[0.03] p-3">
+            <div key={chapter.key} className="rounded-2xl border border-border/40 bg-card/40 p-3">
               <button
                 type="button"
                 onClick={() => toggleChapter(chapter.key)}
                 className="flex w-full flex-col items-start gap-1 text-left"
               >
-                <span className="text-sm font-semibold uppercase tracking-[0.16em] text-white">{chapter.title}</span>
-                <span className="text-[10px] uppercase tracking-[0.14em] text-white/65">{chapter.tagline}</span>
+                <span className="text-sm font-semibold uppercase tracking-[0.16em] text-foreground">{chapter.title}</span>
+                <span className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">{chapter.tagline}</span>
               </button>
               {isOpen && (
                 <div className="mt-3 space-y-2">
@@ -1130,17 +1167,17 @@ function DocNavItem({
       className={`group relative flex items-center gap-3 rounded-2xl border px-3 py-2 text-sm font-semibold uppercase tracking-[0.12em] text-white transition duration-200 ${
         active
           ? "border-primary/60 bg-primary/20 text-white shadow-[inset_0_0_0_1px_rgba(16,185,129,0.35)]"
-          : "border-white/10 bg-black/40 hover:border-white/50 hover:bg-white/[0.06]"
+          : "border-border bg-black/40 hover:border-border/400 hover:bg-muted/40"
       }`}
     >
       <span
         className={`h-6 w-1 rounded-full transition ${
-          active ? "bg-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.8)]" : "bg-white/30 group-hover:bg-white/55"
+          active ? "bg-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.8)]" : "bg-muted/80 group-hover:bg-muted"
         }`}
       />
       <span className="flex-1 text-left">{label}</span>
       {badge && (
-        <span className="rounded-full border border-white/25 px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-white/80">
+        <span className="rounded-full border border-border px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-foreground/80">
           {badge}
         </span>
       )}

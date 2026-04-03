@@ -28,7 +28,7 @@ function ThemeSwitcher() {
       <select
         value={theme}
         onChange={(e) => setTheme(e.target.value as any)}
-        className="rounded-xl border border-white/20 bg-black/40 px-2 py-1 text-xs sm:text-sm outline-none"
+        className="rounded-xl border border-border bg-black/40 px-2 py-1 text-xs sm:text-sm outline-none"
       >
         {themes.map((t) => (
           <option key={t.id} value={t.id}>
@@ -54,7 +54,7 @@ function LanguageSwitcher() {
           setLanguage(next);
           setLang(next);
         }}
-        className="rounded-xl border border-white/20 bg-black/40 px-2 py-1 text-xs sm:text-sm outline-none"
+        className="rounded-xl border border-border bg-black/40 px-2 py-1 text-xs sm:text-sm outline-none"
       >
         {languages.map((l) => (
           <option key={l.code} value={l.code}>
@@ -431,6 +431,17 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
       : `GLOBAL ERP - ${companyName ?? scopeInfo.companyId ?? "Company"}`;
 
   const canLookupCustomers = Boolean(scopeInfo.companyId);
+  const [isCompanyAdmin, setIsCompanyAdmin] = useState(false);
+  useEffect(() => {
+    if (!scopeInfo.companyId) return;
+    fetch(`/api/auth/permissions/me?scope=company&companyId=${scopeInfo.companyId}`, { cache: "no-store" })
+      .then((r) => r.ok ? r.json() : {})
+      .then((d) => {
+        const perms = Array.isArray(d?.permissions) ? d.permissions as string[] : [];
+        setIsCompanyAdmin(perms.includes("company.admin") || perms.includes("global.admin"));
+      })
+      .catch(() => {});
+  }, [scopeInfo.companyId]);
   const simulationCompanyId =
     scopeInfo.scope === "company" || scopeInfo.scope === "branch" || scopeInfo.scope === "vendor"
       ? String(scopeInfo.companyId ?? "").trim()
@@ -2050,12 +2061,12 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="relative z-50 flex flex-col gap-2 px-4 sm:px-8 py-3 sm:py-4 border-b border-white/10 bg-black/20 backdrop-blur-xl overflow-visible sm:flex-row sm:items-center sm:justify-between">
+      <header className="relative z-50 flex flex-col gap-2 px-4 sm:px-8 py-3 sm:py-4 border-b border-border bg-black/20 backdrop-blur-xl overflow-visible sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           {!hideSidebar && (
             <button
               type="button"
-              className="lg:hidden rounded-full border border-white/20 bg-black/40 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-white transition hover:border-white/40"
+              className="lg:hidden rounded-full border border-border bg-black/40 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-foreground transition hover:border-ring"
               aria-label="Toggle navigation"
               aria-expanded={sidebarOpen}
               onClick={() => setSidebarOpen((prev) => !prev)}
@@ -2063,7 +2074,7 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
               <FontAwesomeIcon icon={faBars} className="h-3 w-3" />
             </button>
           )}
-          <Link href={brandHref} className="flex items-center gap-3 rounded-lg px-2 py-1 hover:bg-white/5">
+          <Link href={brandHref} className="flex items-center gap-3 rounded-lg px-2 py-1 hover:bg-muted/40">
             <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-fuchsia-500 via-orange-400 to-emerald-400 shadow-lg" />
             <div className="leading-tight text-sm sm:text-base font-semibold uppercase tracking-wide">
               {brandLabel}
@@ -2071,11 +2082,11 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
           </Link>
         </div>
 
-        <div className="relative z-50 flex flex-wrap items-center gap-3 rounded-xl bg-white/5 px-3 py-2 sm:bg-transparent sm:px-0 sm:py-0">
+        <div className="relative z-50 flex flex-wrap items-center gap-3 rounded-xl bg-muted/40 px-3 py-2 sm:bg-transparent sm:px-0 sm:py-0">
           <LanguageSwitcher />
           <ThemeSwitcher />
-          {simulationCompanyId && (
-            <label className="inline-flex items-center gap-2 rounded-full border border-white/30 px-3 py-1 text-xs sm:text-sm">
+          {isCompanyAdmin && simulationCompanyId && (
+            <label className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1 text-xs sm:text-sm">
               <span>Simulation</span>
               <input
                 type="checkbox"
@@ -2086,28 +2097,30 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
               />
             </label>
           )}
-          {canDial && (
+          {isCompanyAdmin && canDial && (
             <button
               type="button"
               onClick={() => { setDialPadOpen((prev) => !prev); setDialError(null); }}
-              className="rounded-full border border-white/30 px-3 py-1 text-xs sm:text-sm hover:border-white"
+              className="rounded-full border border-border px-3 py-1 text-xs sm:text-sm hover:border-ring"
               aria-expanded={dialPadOpen}
               aria-controls="navbar-dial-pad"
             >
               📞 Dial
             </button>
           )}
-          <button
-            type="button"
-            onClick={() => setLookupOpen((prev) => !prev)}
-            disabled={!canLookupCustomers}
-            className="rounded-full border border-white/30 px-3 py-1 text-xs sm:text-sm hover:border-white disabled:cursor-not-allowed disabled:opacity-60"
-            aria-expanded={lookupOpen}
-            aria-controls="navbar-customer-lookup"
-          >
-            Find Customer
-          </button>
-          {scopeInfo.companyId && (
+          {isCompanyAdmin && (
+            <button
+              type="button"
+              onClick={() => setLookupOpen((prev) => !prev)}
+              disabled={!canLookupCustomers}
+              className="rounded-full border border-border px-3 py-1 text-xs sm:text-sm hover:border-ring disabled:cursor-not-allowed disabled:opacity-60"
+              aria-expanded={lookupOpen}
+              aria-controls="navbar-customer-lookup"
+            >
+              Find Customer
+            </button>
+          )}
+          {isCompanyAdmin && scopeInfo.companyId && (
             <Link
               href={`/company/${scopeInfo.companyId}/test-panel`}
               className="rounded-full border border-blue-500/40 bg-blue-500/10 px-3 py-1 text-xs sm:text-sm text-blue-400 hover:border-blue-400 hover:bg-blue-500/20"
@@ -2115,16 +2128,18 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
               Test Panel
             </Link>
           )}
-          <Link
-            href={settingsHref}
-            className="rounded-full border border-white/30 px-3 py-1 text-xs sm:text-sm hover:border-white"
-          >
-            Settings
-          </Link>
+          {isCompanyAdmin && (
+            <Link
+              href={settingsHref}
+              className="rounded-full border border-border px-3 py-1 text-xs sm:text-sm hover:border-ring"
+            >
+              Settings
+            </Link>
+          )}
           <button
             type="button"
             onClick={handleLogout}
-            className="rounded-full border border-white/30 px-3 py-1 text-xs sm:text-sm hover:border-white"
+            className="rounded-full border border-border px-3 py-1 text-xs sm:text-sm hover:border-ring"
           >
             Logout
           </button>
@@ -2132,9 +2147,9 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
           {dialPadOpen && canDial && (
             <div
               id="navbar-dial-pad"
-              className="absolute right-0 top-full z-50 mt-2 w-72 max-w-[90vw] rounded-2xl border border-white/10 bg-black p-3 shadow-xl"
+              className="absolute right-0 top-full z-50 mt-2 w-72 max-w-[90vw] rounded-2xl border border-border bg-black p-3 shadow-xl"
             >
-              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-white/60">New Outbound Call</div>
+              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">New Outbound Call</div>
               <div className="flex items-center gap-2">
                 <input
                   autoFocus
@@ -2143,7 +2158,7 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
                   onChange={(e) => setDialToNumber(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") void handleDialOut(); }}
                   placeholder="Enter phone number"
-                  className="h-9 w-full rounded-lg border border-white/15 bg-black/40 px-3 text-sm outline-none focus:ring-2 focus:ring-white/20"
+                  className="h-9 w-full rounded-lg border border-border bg-black/40 px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
                 />
                 <button
                   type="button"
@@ -2161,7 +2176,7 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
           {lookupOpen && (
             <div
               id="navbar-customer-lookup"
-              className="absolute right-0 top-full z-50 mt-2 w-80 max-w-[90vw] rounded-2xl border border-white/10 bg-black p-3 shadow-xl sm:w-96"
+              className="absolute right-0 top-full z-50 mt-2 w-80 max-w-[90vw] rounded-2xl border border-border bg-black p-3 shadow-xl sm:w-96"
             >
               <div className="flex items-center gap-2">
                 <input
@@ -2174,12 +2189,12 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
                     if (e.key === "Enter") handleLookup();
                   }}
                   placeholder="Search by mobile or plate"
-                  className="h-9 w-full rounded-lg border border-white/15 bg-black/40 px-3 text-sm outline-none focus:ring-2 focus:ring-white/20"
+                  className="h-9 w-full rounded-lg border border-border bg-black/40 px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
                 />
                 <button
                   type="button"
                   onClick={handleLookup}
-                  className="rounded-lg border border-white/20 px-3 py-2 text-[10px] font-semibold uppercase tracking-wide transition hover:border-white/60 disabled:opacity-60"
+                  className="rounded-lg border border-border px-3 py-2 text-[10px] font-semibold uppercase tracking-wide transition hover:border-ring disabled:opacity-60"
                   disabled={lookupLoading}
                 >
                   {lookupLoading ? "Searching" : "Search"}
@@ -2194,14 +2209,14 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
                     const carId = row.carId ?? null;
                     const customerId = row.type === "customer" ? row.id ?? null : null;
                     return (
-                      <div key={`${row.type ?? "result"}-${row.id ?? row.car ?? Math.random()}`} className="rounded-lg border border-white/10 p-2">
+                      <div key={`${row.type ?? "result"}-${row.id ?? row.car ?? Math.random()}`} className="rounded-lg border border-border p-2">
                         <div className="text-sm font-semibold">{row.name ?? phone ?? plate ?? "Customer"}</div>
                         <div className="text-xs opacity-70">{[phone, plate].filter(Boolean).join(" • ")}</div>
                         <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
                           {customerId && (
                             <Link
                               href={`/company/${scopeInfo.companyId}/customers/${customerId}`}
-                              className="rounded-full border border-white/20 px-3 py-1 hover:border-white/70"
+                              className="rounded-full border border-border px-3 py-1 hover:border-border"
                               onClick={() => setLookupOpen(false)}
                             >
                               View Customer
@@ -2210,7 +2225,7 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
                           {carId && (
                             <Link
                               href={`/company/${scopeInfo.companyId}/cars/${carId}`}
-                              className="rounded-full border border-white/20 px-3 py-1 hover:border-white/70"
+                              className="rounded-full border border-border px-3 py-1 hover:border-border"
                               onClick={() => setLookupOpen(false)}
                             >
                               View Car
@@ -2219,7 +2234,7 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
                           {!customerId && (
                             <Link
                               href={`/company/${scopeInfo.companyId}/customers/new${phone ? `?phone=${encodeURIComponent(phone)}` : ""}`}
-                              className="rounded-full border border-white/20 px-3 py-1 hover:border-white/70"
+                              className="rounded-full border border-border px-3 py-1 hover:border-border"
                               onClick={() => setLookupOpen(false)}
                             >
                               Create Customer
@@ -2232,12 +2247,12 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
                 </div>
               )}
               {!lookupLoading && lookupResults.length === 0 && lookupAttempted && !lookupError && (
-                <div className="mt-3 rounded-lg border border-white/10 p-3">
+                <div className="mt-3 rounded-lg border border-border p-3">
                   <div className="text-sm font-medium">Customer not found</div>
                   <div className="mt-1 text-xs opacity-70">No customer matched your search.</div>
                   <Link
                     href={`/company/${scopeInfo.companyId}/customers/new`}
-                    className="mt-3 inline-flex rounded-full border border-white/20 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide transition hover:border-white/70"
+                    className="mt-3 inline-flex rounded-full border border-border px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide transition hover:border-border"
                     onClick={() => setLookupOpen(false)}
                   >
                     Add Customer
@@ -2333,7 +2348,7 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
               return (
               <div
                 key={popup.callId}
-                className={`isolate w-[22rem] rounded-2xl border bg-slate-950 p-4 shadow-2xl transition-all duration-300 ${toneClasses.border} ${
+                className={`isolate w-[22rem] rounded-2xl border bg-background p-4 shadow-2xl transition-all duration-300 ${toneClasses.border} ${
                   hasEnded ? "opacity-70 translate-y-1 scale-[0.99]" : ""
                 }`}
               >
@@ -2344,7 +2359,7 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
                   {autoCompact ? (
                     <button
                       type="button"
-                      className="rounded-full border border-white/15 px-2 py-0.5 text-[10px] uppercase tracking-wide text-slate-300 hover:border-white/40"
+                      className="rounded-full border border-border px-2 py-0.5 text-[10px] uppercase tracking-wide text-slate-300 hover:border-ring"
                       onClick={() =>
                         setExpandedPopups((prev) => ({
                           ...prev,
@@ -2397,7 +2412,7 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
                       <div key={`${popup.callId}-${step.key}`} className="flex flex-col items-center gap-1">
                         <div
                           className={`h-1.5 w-full rounded-full ${
-                            active ? toneClasses.timeline : "bg-white/10"
+                            active ? toneClasses.timeline : "bg-muted"
                           } ${current && !hasEnded ? "animate-pulse" : ""}`}
                         />
                         <span className={`text-[9px] ${current ? toneClasses.timelineLabel : "text-slate-400"}`}>
@@ -2420,7 +2435,7 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
                             ? `/company/${scopeInfo.companyId}/leads/new?phone=${encodeURIComponent(popup.fromNumber)}`
                             : `/company/${scopeInfo.companyId}/leads/new`
                         }
-                        className="mt-2 inline-flex rounded-full border border-white/30 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide hover:border-white/70"
+                        className="mt-2 inline-flex rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide hover:border-border"
                         onClick={() => setIncomingPopups((prev) => prev.filter((p) => p.callId !== popup.callId))}
                       >
                         Create Inquiry
@@ -2434,7 +2449,7 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
                   </div>
                 ) : null}
                 {!isCompact ? (
-                  <div className="mt-2 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-sm">
+                  <div className="mt-2 rounded-lg border border-border bg-muted/40 px-2 py-1 text-sm">
                     <div className="text-xs text-slate-300">Mobile No: {popup.customer?.phone ?? (popup.direction === "outbound" ? popup.toNumber : popup.fromNumber)}</div>
                     {popup.customer?.car ? (
                       <div className="text-xs text-slate-300">Car: {popup.customer.car}</div>
@@ -2494,7 +2509,7 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
                       {popup.customer?.id ? (
                         <Link
                           href={`/company/${scopeInfo.companyId}/customers/${popup.customer.id}`}
-                          className="rounded-full border border-white/25 px-3 py-1 hover:border-white/60"
+                          className="rounded-full border border-border px-3 py-1 hover:border-ring"
                           onClick={() =>
                             setIncomingPopups((prev) => prev.filter((p) => p.callId !== popup.callId))
                           }
@@ -2511,7 +2526,7 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
                                   )}`
                                 : `/company/${scopeInfo.companyId}/customers/new`
                             }
-                            className="rounded-full border border-white/25 px-3 py-1 hover:border-white/60"
+                            className="rounded-full border border-border px-3 py-1 hover:border-ring"
                             onClick={() =>
                               setIncomingPopups((prev) => prev.filter((p) => p.callId !== popup.callId))
                             }
@@ -2526,7 +2541,7 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
                                   )}`
                                 : `/company/${scopeInfo.companyId}/leads/new`
                             }
-                            className="rounded-full border border-white/25 px-3 py-1 hover:border-white/60"
+                            className="rounded-full border border-border px-3 py-1 hover:border-ring"
                             onClick={() =>
                               setIncomingPopups((prev) => prev.filter((p) => p.callId !== popup.callId))
                             }
@@ -2537,7 +2552,7 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
                       )}
                       <button
                         type="button"
-                        className="rounded-full border border-white/15 px-3 py-1 opacity-80 hover:opacity-100"
+                        className="rounded-full border border-border px-3 py-1 opacity-80 hover:opacity-100"
                         onClick={() =>
                           setIncomingPopups((prev) => prev.filter((p) => p.callId !== popup.callId))
                         }
@@ -2548,7 +2563,7 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
                   ) : (
                     <button
                       type="button"
-                      className="self-start rounded-full border border-white/15 px-3 py-1 opacity-80 hover:opacity-100"
+                      className="self-start rounded-full border border-border px-3 py-1 opacity-80 hover:opacity-100"
                       onClick={() =>
                         setIncomingPopups((prev) => prev.filter((p) => p.callId !== popup.callId))
                       }
@@ -2568,7 +2583,7 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
             incomingPopups.length > 0 ? "bottom-[22rem]" : "bottom-4"
           }`}
         >
-          <div className="rounded-full border border-white/15 bg-slate-950/90 px-3 py-1.5 text-[11px] shadow-lg backdrop-blur">
+          <div className="rounded-full border border-border bg-background/90 px-3 py-1.5 text-[11px] shadow-lg backdrop-blur">
             <span className="mr-2 text-slate-300">SDK</span>
             <span
               className={
@@ -2604,14 +2619,14 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
             <div className="font-semibold text-amber-200">{sdkNotice.title}</div>
             <button
               type="button"
-              className="rounded-full border border-white/20 px-2 py-0.5 text-[10px] text-white/80 hover:text-white"
+              className="rounded-full border border-border px-2 py-0.5 text-[10px] text-foreground/80 hover:text-foreground"
               onClick={() => clearSdkNotice()}
             >
               Dismiss
             </button>
             <button
               type="button"
-              className="rounded-full border border-white/20 px-2 py-0.5 text-[10px] text-white/80 hover:text-white"
+              className="rounded-full border border-border px-2 py-0.5 text-[10px] text-foreground/80 hover:text-foreground"
               onClick={() => resumeAutoSdkApi()}
             >
               Resume Auto Setup
@@ -2627,13 +2642,13 @@ function LayoutInner({ children, forceScope, hideSidebar, disableIncomingCallRea
             <div className="mt-3 flex flex-wrap gap-2 text-[11px]">
               <Link
                 href={`/company/${sdkCompanyId}/integrations/dialer/extensions`}
-                className="rounded-full border border-white/20 px-2.5 py-1 hover:border-white/40"
+                className="rounded-full border border-border px-2.5 py-1 hover:border-ring"
               >
                 User Extensions
               </Link>
               <Link
                 href={`/company/${sdkCompanyId}/integrations/dialer`}
-                className="rounded-full border border-white/20 px-2.5 py-1 hover:border-white/40"
+                className="rounded-full border border-border px-2.5 py-1 hover:border-ring"
               >
                 Dialer Integrations
               </Link>

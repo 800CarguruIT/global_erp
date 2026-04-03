@@ -98,7 +98,7 @@ export default function CompanyEmployeesPage({ params }: { params: Promise<{ com
         <div className="flex items-center justify-between">
           <h1 className="text-xl sm:text-2xl font-semibold">Company Employees</h1>
           <button
-            className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs sm:text-sm transition"
+            className="px-3 py-1.5 rounded-lg bg-muted hover:bg-muted/80 text-xs sm:text-sm transition"
             onClick={() =>
               (window.location.href = `/company/${companyId}/hr/employees/new`)
             }
@@ -110,19 +110,19 @@ export default function CompanyEmployeesPage({ params }: { params: Promise<{ com
 
         {/* Filter Box */}
         {!loading && items.length > 0 && (
-          <div className="flex flex-wrap items-center gap-3 rounded-lg bg-white/5 p-3">
+          <div className="flex flex-wrap items-center gap-3 rounded-lg bg-muted/40 p-3">
             <input
               type="text"
               placeholder="Search by name, ID, title..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="min-w-[200px] flex-1 rounded-md bg-white/10 px-3 py-1.5 text-sm outline-none placeholder:opacity-50 focus:ring-1 focus:ring-white/30"
+              className="min-w-[200px] flex-1 rounded-md bg-muted px-3 py-1.5 text-sm outline-none placeholder:opacity-50 focus:ring-1 focus:ring-ring"
             />
             {employeeTypes.length > 1 && (
               <select
                 value={filterType}
                 onChange={(e) => setFilterType(e.target.value)}
-                className="rounded-md bg-white/10 px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-white/30"
+                className="rounded-md bg-muted px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring"
               >
                 <option value="">All Types</option>
                 {employeeTypes.map((t) => (
@@ -134,7 +134,7 @@ export default function CompanyEmployeesPage({ params }: { params: Promise<{ com
               <select
                 value={filterDepartment}
                 onChange={(e) => setFilterDepartment(e.target.value)}
-                className="rounded-md bg-white/10 px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-white/30"
+                className="rounded-md bg-muted px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring"
               >
                 <option value="">All Departments</option>
                 {departments.map((d) => (
@@ -146,7 +146,7 @@ export default function CompanyEmployeesPage({ params }: { params: Promise<{ com
               <select
                 value={filterDivision}
                 onChange={(e) => setFilterDivision(e.target.value)}
-                className="rounded-md bg-white/10 px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-white/30"
+                className="rounded-md bg-muted px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring"
               >
                 <option value="">All Divisions</option>
                 {divisions.map((d) => (
@@ -157,7 +157,7 @@ export default function CompanyEmployeesPage({ params }: { params: Promise<{ com
             {(search || filterType || filterDepartment || filterDivision) && (
               <button
                 onClick={() => { setSearch(""); setFilterType(""); setFilterDepartment(""); setFilterDivision(""); }}
-                className="rounded-md bg-white/10 px-3 py-1.5 text-xs hover:bg-white/20 transition"
+                className="rounded-md bg-muted px-3 py-1.5 text-xs hover:bg-muted/80 transition"
               >
                 Clear
               </button>

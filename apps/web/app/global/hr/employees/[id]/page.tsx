@@ -85,7 +85,7 @@ export default function GlobalEmployeeEditPage({
         <div className="flex items-center justify-between">
           <h1 className="text-xl sm:text-2xl font-semibold">Edit Employee</h1>
           <button
-            className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs sm:text-sm transition"
+            className="px-3 py-1.5 rounded-lg bg-muted hover:bg-muted/80 text-xs sm:text-sm transition"
             onClick={() => (window.location.href = "/global/hr/employees")}
           >
             ← Back to Employees

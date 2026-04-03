@@ -572,7 +572,7 @@ export default function CompanyAiInquiriesPage({ params }: Params) {
             </div>
             <button type="button"
               onClick={() => { setSearchInput(""); setSearch(""); setDateFrom(todayDefaultFrom()); setDateTo(todayDefaultTo()); setFilterToNumber(""); setFilterConversion(""); setPage(1); }}
-              className="self-end rounded-lg border border-white/20 bg-white/5 px-3 py-1.5 text-xs text-white/60 hover:text-white"
+              className="self-end rounded-lg border border-border bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground"
             >
               Reset to today
             </button>
@@ -618,11 +618,11 @@ export default function CompanyAiInquiriesPage({ params }: Params) {
 
           {/* Log panel */}
           {autoAnalyzeLogs.length > 0 && (
-            <div className="mt-3 rounded-lg border border-white/10 bg-black/30 font-mono text-[11px] text-muted-foreground overflow-auto max-h-48">
+            <div className="mt-3 rounded-lg border border-border bg-black/30 font-mono text-[11px] text-muted-foreground overflow-auto max-h-48">
               {autoAnalyzeLogs.map((run, i) => (
-                <div key={i} className="px-3 py-1.5 border-b border-white/5 last:border-0">
-                  <span className="text-white/40 mr-2">[{run.ts}]</span>
-                  <span className={run.failed > 0 ? "text-red-400" : run.processed === 0 ? "text-white/40" : "text-emerald-400"}>
+                <div key={i} className="px-3 py-1.5 border-b border-border/40 last:border-0">
+                  <span className="text-muted-foreground mr-2">[{run.ts}]</span>
+                  <span className={run.failed > 0 ? "text-red-400" : run.processed === 0 ? "text-muted-foreground" : "text-emerald-400"}>
                     {run.processed === 0 ? "Nothing pending" : `${run.processed} processed · ${run.succeeded} ok · ${run.skipped} skipped · ${run.failed} failed`}
                   </span>
                   {run.logs.filter(l => !l.ok && !l.skipped).map((l, j) => (
@@ -653,7 +653,7 @@ export default function CompanyAiInquiriesPage({ params }: Params) {
             <div className="overflow-x-auto space-y-3">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-white/10 text-left">
+                  <tr className="border-b border-border text-left">
                     <th className="py-2 pr-3">Mobile / Customer</th>
                     <th className="py-2 pr-3 text-center">Calls</th>
                     <th className="py-2 pr-3 text-center">Converted</th>
@@ -664,7 +664,7 @@ export default function CompanyAiInquiriesPage({ params }: Params) {
                 </thead>
                 <tbody>
                   {groupedItems.map((row) => (
-                    <tr key={row.from_number ?? "__unknown__"} className="border-b border-white/5 hover:bg-white/[0.02]">
+                    <tr key={row.from_number ?? "__unknown__"} className="border-b border-border/40 hover:bg-muted/30">
                       <td className="py-2.5 pr-3">
                         <div className="space-y-0.5">
                           <div className="font-mono text-sm">{row.from_number ?? <span className="italic text-muted-foreground">Unknown</span>}</div>
@@ -712,7 +712,7 @@ export default function CompanyAiInquiriesPage({ params }: Params) {
 
               {/* Pagination */}
               {totalPages > 1 ? (
-                <div className="flex items-center justify-between gap-3 border-t border-white/10 pt-3">
+                <div className="flex items-center justify-between gap-3 border-t border-border pt-3">
                   <div className="text-xs text-muted-foreground">
                     Page {page} of {totalPages} · {totalCount} caller{totalCount !== 1 ? "s" : ""}
                   </div>
@@ -750,7 +750,7 @@ export default function CompanyAiInquiriesPage({ params }: Params) {
               style={{ background: "rgba(2, 8, 23, 0.98)", maxHeight: "92vh", maxWidth: "95vw" }}
             >
               {/* Header */}
-              <div className="flex items-center justify-between gap-3 border-b border-white/10 px-5 py-4 shrink-0">
+              <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4 shrink-0">
                 <div>
                   <div>
                     <h3 className="text-base font-semibold">
@@ -773,7 +773,7 @@ export default function CompanyAiInquiriesPage({ params }: Params) {
                   </div>
                 </div>
                 <button type="button" onClick={closeCallsModal}
-                  className="rounded border px-2.5 py-1 text-xs text-muted-foreground hover:text-white border-white/20 bg-white/5"
+                  className="rounded border px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground border-border bg-muted/40"
                 >✕</button>
               </div>
 
@@ -787,7 +787,7 @@ export default function CompanyAiInquiriesPage({ params }: Params) {
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
-                        <tr className="border-b border-white/10 text-left">
+                        <tr className="border-b border-border text-left">
                           <th className="py-2 pr-3">Created</th>
                           <th className="py-2 pr-3">To (Agent)</th>
                           <th className="py-2 pr-3">Status</th>
@@ -804,7 +804,7 @@ export default function CompanyAiInquiriesPage({ params }: Params) {
                         {callsModalItems.map((row) => {
                           const rowLocked = isInquiryActionLocked(row);
                           return (
-                            <tr key={row.id} className="border-b border-white/5">
+                            <tr key={row.id} className="border-b border-border/40">
                               <td className="py-2 pr-3 text-xs">
                                 <div>{new Date(row.created_at).toLocaleString()}</div>
                                 {row.call_direction === "outbound" ? (
@@ -930,7 +930,7 @@ export default function CompanyAiInquiriesPage({ params }: Params) {
 
               {/* Pagination footer */}
               {callsModalTotalPages > 1 ? (
-                <div className="flex items-center justify-between border-t border-white/10 px-5 py-3 shrink-0">
+                <div className="flex items-center justify-between border-t border-border px-5 py-3 shrink-0">
                   <span className="text-xs text-muted-foreground">
                     Showing {((callsModalPage - 1) * MODAL_PAGE_LIMIT) + 1}–{Math.min(callsModalPage * MODAL_PAGE_LIMIT, callsModalTotalCount)} of {callsModalTotalCount}
                   </span>
@@ -939,7 +939,7 @@ export default function CompanyAiInquiriesPage({ params }: Params) {
                       type="button"
                       disabled={callsModalPage <= 1 || callsModalLoading}
                       onClick={() => { const p = callsModalPage - 1; setCallsModalPage(p); void loadCallsForGroup(callsModalGroup?.from_number ?? null, {}, companyId, p); }}
-                      className="rounded border border-white/20 bg-white/5 px-3 py-1 text-xs text-muted-foreground hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
+                      className="rounded border border-border bg-muted/40 px-3 py-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed"
                     >
                       Prev
                     </button>
@@ -948,7 +948,7 @@ export default function CompanyAiInquiriesPage({ params }: Params) {
                       type="button"
                       disabled={callsModalPage >= callsModalTotalPages || callsModalLoading}
                       onClick={() => { const p = callsModalPage + 1; setCallsModalPage(p); void loadCallsForGroup(callsModalGroup?.from_number ?? null, {}, companyId, p); }}
-                      className="rounded border border-white/20 bg-white/5 px-3 py-1 text-xs text-muted-foreground hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
+                      className="rounded border border-border bg-muted/40 px-3 py-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed"
                     >
                       Next
                     </button>
@@ -1050,7 +1050,7 @@ export default function CompanyAiInquiriesPage({ params }: Params) {
               style={{ background: "rgba(2, 8, 23, 0.98)" }}
             >
               {/* Header */}
-              <div className="flex items-start justify-between gap-3 border-b border-white/10 px-5 py-4">
+              <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
                 <div>
                   <h3 className="text-base font-semibold">AI Analysis</h3>
                   <p className="text-xs text-muted-foreground">
@@ -1060,7 +1060,7 @@ export default function CompanyAiInquiriesPage({ params }: Params) {
                 <button
                   type="button"
                   onClick={closeAnalysisModal}
-                  className="mt-0.5 rounded border px-2.5 py-1 text-xs text-muted-foreground hover:text-white border-white/20 bg-white/5"
+                  className="mt-0.5 rounded border px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground border-border bg-muted/40"
                 >
                   ✕
                 </button>
@@ -1165,7 +1165,7 @@ export default function CompanyAiInquiriesPage({ params }: Params) {
               style={{ background: "rgba(2, 8, 23, 0.98)", maxHeight: "85vh" }}
             >
               {/* Header */}
-              <div className="flex items-start justify-between gap-3 border-b border-white/10 px-5 py-4 shrink-0">
+              <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-4 shrink-0">
                 <div>
                   <h3 className="text-base font-semibold">AI Transcript</h3>
                   <p className="text-xs text-muted-foreground">
@@ -1178,7 +1178,7 @@ export default function CompanyAiInquiriesPage({ params }: Params) {
                 <button
                   type="button"
                   onClick={closeTranscriptModal}
-                  className="mt-0.5 rounded border px-2.5 py-1 text-xs text-muted-foreground hover:text-white border-white/20 bg-white/5"
+                  className="mt-0.5 rounded border px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground border-border bg-muted/40"
                 >
                   ✕
                 </button>

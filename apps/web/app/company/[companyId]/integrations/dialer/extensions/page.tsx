@@ -137,7 +137,7 @@ export default function CompanyDialerExtensionsPage({ params }: Params) {
           {companyId ? (
             <Link
               href={`/company/${companyId}/integrations/dialer`}
-              className="rounded-full border border-white/25 px-3 py-1 text-xs hover:border-white/60"
+              className="rounded-full border border-border px-3 py-1 text-xs hover:border-ring"
             >
               Back to Dialer
             </Link>
@@ -149,7 +149,7 @@ export default function CompanyDialerExtensionsPage({ params }: Params) {
           <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm">{notice}</div>
         ) : null}
 
-        <div className="rounded-2xl border border-white/10 bg-black/20 p-3 sm:p-4">
+        <div className="rounded-2xl border border-border bg-black/20 p-3 sm:p-4">
           {loading ? (
             <div className="text-sm opacity-70">Loading users...</div>
           ) : (
@@ -157,7 +157,7 @@ export default function CompanyDialerExtensionsPage({ params }: Params) {
               {users.map((user) => (
                 <div
                   key={user.id}
-                  className="flex flex-col gap-2 rounded-xl border border-white/10 bg-white/5 p-3 sm:flex-row sm:items-center"
+                  className="flex flex-col gap-2 rounded-xl border border-border bg-muted/40 p-3 sm:flex-row sm:items-center"
                 >
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-semibold">{user.full_name ?? "Unnamed User"}</div>
@@ -165,7 +165,7 @@ export default function CompanyDialerExtensionsPage({ params }: Params) {
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     {/* Inhouse / Remote toggle */}
-                    <div className="flex h-9 overflow-hidden rounded-lg border border-white/20 text-xs font-semibold">
+                    <div className="flex h-9 overflow-hidden rounded-lg border border-border text-xs font-semibold">
                       {(["inhouse", "remote"] as const).map((opt) => {
                         const active = (locationDraft[user.id] ?? "") === opt;
                         return (
@@ -183,7 +183,7 @@ export default function CompanyDialerExtensionsPage({ params }: Params) {
                                 ? opt === "inhouse"
                                   ? "bg-emerald-600/80 text-white"
                                   : "bg-blue-600/80 text-white"
-                                : "bg-black/40 text-white/50 hover:text-white/80"
+                                : "bg-black/40 text-muted-foreground hover:text-foreground/80"
                             }`}
                           >
                             {opt === "inhouse" ? "In-house" : "Remote"}
@@ -197,13 +197,13 @@ export default function CompanyDialerExtensionsPage({ params }: Params) {
                         setDraft((prev) => ({ ...prev, [user.id]: e.target.value }))
                       }
                       placeholder="Extension e.g. 1010"
-                      className="h-9 w-36 rounded-lg border border-white/20 bg-black/40 px-3 text-sm outline-none focus:border-white/50"
+                      className="h-9 w-36 rounded-lg border border-border bg-black/40 px-3 text-sm outline-none focus:border-ring"
                     />
                     <button
                       type="button"
                       onClick={() => saveUserExtension(user)}
                       disabled={savingId === user.id}
-                      className="h-9 rounded-lg border border-white/30 px-3 text-xs font-semibold uppercase tracking-wide hover:border-white/70 disabled:opacity-60"
+                      className="h-9 rounded-lg border border-border px-3 text-xs font-semibold uppercase tracking-wide hover:border-ring disabled:opacity-60"
                     >
                       {savingId === user.id ? "Saving" : "Save"}
                     </button>

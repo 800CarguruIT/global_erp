@@ -181,7 +181,7 @@ export function IntegrationHealthDashboard({ scope, companyId }: Props) {
         : h.status === "unreachable"
         ? "text-red-300"
         : "text-slate-300";
-    return <span className={`px-2 py-1 rounded bg-white/10 text-[11px] ${color}`}>{h.status}</span>;
+    return <span className={`px-2 py-1 rounded bg-muted text-[11px] ${color}`}>{h.status}</span>;
   }
 
   return (
@@ -229,10 +229,10 @@ export function IntegrationHealthDashboard({ scope, companyId }: Props) {
       )}
 
       {!loading && !error && filteredRows.length > 0 && (
-        <div className="overflow-x-auto rounded-lg border border-white/10">
+        <div className="overflow-x-auto rounded-lg border border-border">
           <table className="w-full text-left text-xs sm:text-sm">
             <thead>
-              <tr className="border-b border-white/10 bg-white/5">
+              <tr className="border-b border-border bg-muted/40">
                 <th className="px-4 py-2">Name</th>
                 <th className="px-4 py-2">Type</th>
                 <th className="px-4 py-2">Category</th>
@@ -242,9 +242,9 @@ export function IntegrationHealthDashboard({ scope, companyId }: Props) {
                 <th className="px-4 py-2">Last Error</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/10">
+            <tbody className="divide-y divide-border">
               {filteredRows.map((r) => (
-                <tr key={`${r.type}-${r.id}`} className="hover:bg-white/5">
+                <tr key={`${r.type}-${r.id}`} className="hover:bg-muted/40">
                   <td className="px-4 py-3">{r.name}</td>
                   <td className="px-4 py-3">{r.type}</td>
                   <td className="px-4 py-3">{r.category}</td>
@@ -270,7 +270,7 @@ export function IntegrationHealthDashboard({ scope, companyId }: Props) {
       )}
 
       {!loading && !error && filteredRows.length === 0 && (
-        <div className="border border-dashed border-white/10 rounded-lg px-4 py-6 text-xs sm:text-sm opacity-80">
+        <div className="border border-dashed border-border rounded-lg px-4 py-6 text-xs sm:text-sm opacity-80">
           No integrations found for the selected filters.
         </div>
       )}

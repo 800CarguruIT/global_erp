@@ -951,7 +951,7 @@ export default function CustomerDetailPage({ params }: Params) {
             </div>
             <Link
               href={companyId ? `/company/${companyId}/customers` : "#"}
-              className="inline-flex items-center gap-1 rounded-full border border-white/30 bg-white/5 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white shadow-sm transition hover:bg-white/10"
+              className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/40 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-foreground shadow-sm transition hover:bg-muted"
             >
               Back to customers
             </Link>
@@ -998,7 +998,7 @@ export default function CustomerDetailPage({ params }: Params) {
           ))}
         </div>
 
-        <div className="overflow-x-auto border-b border-white/10 pb-3">
+        <div className="overflow-x-auto border-b border-border pb-3">
           <div className="flex gap-2 whitespace-nowrap">
             {actions.map((action) => {
               const isServiceRequest = action.key === "service_request";
@@ -1008,7 +1008,7 @@ export default function CustomerDetailPage({ params }: Params) {
                   key={action.label}
                   type="button"
                   className={`inline-flex items-center gap-2 rounded-md px-4 py-2 text-xs font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${
-                    isDisabled ? "opacity-50 cursor-not-allowed" : `${theme.mutedText} hover:bg-white/10`
+                    isDisabled ? "opacity-50 cursor-not-allowed" : `${theme.mutedText} hover:bg-muted`
                   }`}
                   disabled={isDisabled}
                   onClick={() => {
@@ -1019,7 +1019,7 @@ export default function CustomerDetailPage({ params }: Params) {
                   }}
                 >
                   {action.label}
-                  <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-white/10 text-[10px]">
+                  <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-muted text-[10px]">
                     v
                   </span>
                 </button>
@@ -1036,7 +1036,7 @@ export default function CustomerDetailPage({ params }: Params) {
                 <div className="absolute -left-8 top-20 h-20 w-20 rounded-full bg-amber-500/30" />
                 <div className="space-y-4 p-5 sm:p-6">
                   <div className="flex items-center gap-3">
-                    <div className="h-14 w-14 rounded-full bg-white/10 text-2xl flex items-center justify-center">
+                    <div className="h-14 w-14 rounded-full bg-muted text-2xl flex items-center justify-center">
                       C
                     </div>
                     <div>
@@ -1071,7 +1071,7 @@ export default function CustomerDetailPage({ params }: Params) {
                         setAddCarError(null);
                         setAddCarOpen(true);
                       }}
-                      className={`rounded-md px-3 py-1 text-xs font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+                      className={`rounded-md px-3 py-1 text-xs font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-muted`}
                     >
                       Add New Car
                     </button>
@@ -1098,7 +1098,7 @@ export default function CustomerDetailPage({ params }: Params) {
                           >
                             <div className="flex items-center justify-between">
                               <div className="font-semibold">{plate}</div>
-                              <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-white/70">
+                              <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-foreground/70">
                                 {type}
                               </span>
                             </div>
@@ -1176,7 +1176,7 @@ export default function CustomerDetailPage({ params }: Params) {
 
           <div className="space-y-4">
             <Card className={`p-4 ${theme.cardBg} ${theme.cardBorder}`}>
-              <div className="overflow-x-auto border-b border-white/10 pb-3">
+              <div className="overflow-x-auto border-b border-border pb-3">
                 <div className="flex gap-2 whitespace-nowrap">
                   {tabLabels.map((tab) => (
                     <button
@@ -1186,7 +1186,7 @@ export default function CustomerDetailPage({ params }: Params) {
                       className={`rounded-md px-3 py-2 text-xs font-semibold uppercase tracking-wide ${
                         activeTab === tab.id
                           ? "bg-blue-600 text-white"
-                          : "text-white/60 hover:bg-white/10"
+                          : "text-muted-foreground hover:bg-muted"
                       }`}
                     >
                       {tab.label}
@@ -1324,11 +1324,11 @@ export default function CustomerDetailPage({ params }: Params) {
                           const minorTotal = c.minor_count ?? c.minor_quota ?? 0;
                           const majorTotal = c.major_count ?? c.major_quota ?? 0;
                           return (
-                            <div key={c.id} className="rounded-lg border border-white/10 overflow-hidden">
+                            <div key={c.id} className="rounded-lg border border-border overflow-hidden">
                               {/* Contract header */}
                               <button
                                 type="button"
-                                className="w-full flex items-start gap-4 px-4 py-3 text-left hover:bg-white/5 transition-colors"
+                                className="w-full flex items-start gap-4 px-4 py-3 text-left hover:bg-muted/40 transition-colors"
                                 onClick={() => setExpandedContractId(isExpanded ? null : c.id)}
                               >
                                 <div className="flex-1 min-w-0">
@@ -1353,7 +1353,7 @@ export default function CustomerDetailPage({ params }: Params) {
 
                               {/* Service history */}
                               {isExpanded && (
-                                <div className="border-t border-white/10 px-4 py-3">
+                                <div className="border-t border-border px-4 py-3">
                                   <div className="text-[11px] font-semibold uppercase opacity-50 mb-2">Service History</div>
                                   {c.entitlements.length === 0 ? (
                                     <div className="text-[11px] opacity-40">No service records.</div>
@@ -1375,7 +1375,7 @@ export default function CustomerDetailPage({ params }: Params) {
                                             ent.status === "cancelled" || ent.status === "expired" ? "text-red-400" :
                                             "text-yellow-400";
                                           return (
-                                            <tr key={ent.id} className="border-t border-white/5">
+                                            <tr key={ent.id} className="border-t border-border/40">
                                               <td className="py-1 pr-3 opacity-50">{ent.sequence_no}</td>
                                               <td className="py-1 pr-3 capitalize">{ent.service_kind}</td>
                                               <td className={`py-1 pr-3 capitalize font-semibold ${entColor}`}>{ent.status}</td>
@@ -1445,12 +1445,12 @@ export default function CustomerDetailPage({ params }: Params) {
       {topupOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <Card className={`w-full max-w-lg rounded-xl shadow-xl ${theme.cardBg} ${theme.cardBorder}`}>
-            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+            <div className="flex items-center justify-between border-b border-border px-4 py-3">
               <div className="text-sm font-semibold">Topup Wallet</div>
               <button
                 type="button"
                 onClick={() => setTopupOpen(false)}
-                className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+                className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-muted`}
               >
                 Close
               </button>
@@ -1499,7 +1499,7 @@ export default function CustomerDetailPage({ params }: Params) {
               <div className="flex items-center justify-end gap-2">
                 <button
                   type="button"
-                  className={`rounded-md px-4 py-2 text-xs font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+                  className={`rounded-md px-4 py-2 text-xs font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-muted`}
                   onClick={() => setTopupOpen(false)}
                 >
                   Cancel
@@ -1568,12 +1568,12 @@ export default function CustomerDetailPage({ params }: Params) {
       {addCarOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <Card className={`w-full max-w-2xl rounded-xl shadow-xl ${theme.cardBg} ${theme.cardBorder}`}>
-            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+            <div className="flex items-center justify-between border-b border-border px-4 py-3">
               <div className="text-sm font-semibold">Add New Car</div>
               <button
                 type="button"
                 onClick={() => setAddCarOpen(false)}
-                className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+                className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-muted`}
               >
                 Close
               </button>
@@ -1660,7 +1660,7 @@ export default function CustomerDetailPage({ params }: Params) {
                   </select>
                 </div>
               </div>
-              <label className="flex items-center gap-2 text-xs font-semibold text-white/70">
+              <label className="flex items-center gap-2 text-xs font-semibold text-foreground/70">
                 <input
                   type="checkbox"
                   className="h-4 w-4"
@@ -1672,7 +1672,7 @@ export default function CustomerDetailPage({ params }: Params) {
               <div className="flex items-center justify-end gap-2">
                 <button
                   type="button"
-                  className={`rounded-md px-4 py-2 text-xs font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+                  className={`rounded-md px-4 py-2 text-xs font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-muted`}
                   onClick={() => setAddCarOpen(false)}
                 >
                   Cancel
@@ -1738,12 +1738,12 @@ export default function CustomerDetailPage({ params }: Params) {
       {viewCar && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <Card className={`w-full max-w-lg rounded-xl shadow-xl ${theme.cardBg} ${theme.cardBorder}`}>
-            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+            <div className="flex items-center justify-between border-b border-border px-4 py-3">
               <div className="text-sm font-semibold">Car Details</div>
               <button
                 type="button"
                 onClick={() => setViewCar(null)}
-                className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+                className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-muted`}
               >
                 Close
               </button>
@@ -1787,12 +1787,12 @@ export default function CustomerDetailPage({ params }: Params) {
       {servicePickerOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <Card className={`w-full max-w-2xl rounded-xl shadow-xl ${theme.cardBg} ${theme.cardBorder}`}>
-            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+            <div className="flex items-center justify-between border-b border-border px-4 py-3">
               <div className="text-sm font-semibold">Select Service</div>
               <button
                 type="button"
                 onClick={() => setServicePickerOpen(false)}
-                className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+                className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-muted`}
               >
                 Close
               </button>
@@ -1802,7 +1802,7 @@ export default function CustomerDetailPage({ params }: Params) {
               <div className="grid gap-3 md:grid-cols-2">
                 <button
                   type="button"
-                  className={`rounded-lg border px-4 py-3 text-left text-sm font-semibold ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+                  className={`rounded-lg border px-4 py-3 text-left text-sm font-semibold ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-muted`}
                   onClick={() => {
                     setRsaLeadError(null);
                     setRsaLeadForm(getInitialRsaLeadForm(selectedCarId));
@@ -1811,7 +1811,7 @@ export default function CustomerDetailPage({ params }: Params) {
                   }}
                 >
                   <div className="flex flex-col items-center gap-2 text-center">
-                    <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-2xl">
+                    <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-muted text-2xl">
                       ⚡
                     </span>
                     <span>RSA (Batteries / Jump Start)</span>
@@ -1819,7 +1819,7 @@ export default function CustomerDetailPage({ params }: Params) {
                 </button>
                 <button
                   type="button"
-                  className={`rounded-lg border px-4 py-3 text-left text-sm font-semibold ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+                  className={`rounded-lg border px-4 py-3 text-left text-sm font-semibold ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-muted`}
                   onClick={() => {
                     const car = linkedCars.find((item) => item?.car?.id === selectedCarId)?.car ?? null;
                     if (!car) {
@@ -1834,7 +1834,7 @@ export default function CustomerDetailPage({ params }: Params) {
                   }}
                 >
                   <div className="flex flex-col items-center gap-2 text-center">
-                    <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-2xl">
+                    <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-muted text-2xl">
                       🚗
                     </span>
                     <span>Service Request (Car In / Walk In)</span>
@@ -1842,7 +1842,7 @@ export default function CustomerDetailPage({ params }: Params) {
                 </button>
                 <button
                   type="button"
-                  className={`rounded-lg border px-4 py-3 text-left text-sm font-semibold ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+                  className={`rounded-lg border px-4 py-3 text-left text-sm font-semibold ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-muted`}
                   onClick={() => {
                     const car = linkedCars.find((item) => item?.car?.id === selectedCarId)?.car ?? null;
                     if (!car) {
@@ -1857,7 +1857,7 @@ export default function CustomerDetailPage({ params }: Params) {
                   }}
                 >
                   <div className="flex flex-col items-center gap-2 text-center">
-                    <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-2xl">
+                    <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-muted text-2xl">
                       📅
                     </span>
                     <span>Create Appointment</span>
@@ -1865,11 +1865,11 @@ export default function CustomerDetailPage({ params }: Params) {
                 </button>
                 <button
                   type="button"
-                  className={`rounded-lg border px-4 py-3 text-left text-sm font-semibold ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+                  className={`rounded-lg border px-4 py-3 text-left text-sm font-semibold ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-muted`}
                   onClick={() => setServicePickerError("Towing service will be added later.")}
                 >
                   <div className="flex flex-col items-center gap-2 text-center">
-                    <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-2xl">
+                    <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-muted text-2xl">
                       🚚
                     </span>
                     <span>Towing Service</span>
@@ -1884,12 +1884,12 @@ export default function CustomerDetailPage({ params }: Params) {
       {rsaLeadOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <Card className={`w-full max-w-2xl rounded-xl shadow-xl ${theme.cardBg} ${theme.cardBorder}`}>
-            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+            <div className="flex items-center justify-between border-b border-border px-4 py-3">
               <div className="text-sm font-semibold">Create RSA Lead</div>
               <button
                 type="button"
                 onClick={() => setRsaLeadOpen(false)}
-                className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+                className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-muted`}
               >
                 Close
               </button>
@@ -1969,7 +1969,7 @@ export default function CustomerDetailPage({ params }: Params) {
               <div className="flex items-center justify-end gap-2">
                 <button
                   type="button"
-                  className={`rounded-md px-4 py-2 text-xs font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+                  className={`rounded-md px-4 py-2 text-xs font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-muted`}
                   onClick={() => setRsaLeadOpen(false)}
                 >
                   Cancel
@@ -1991,12 +1991,12 @@ export default function CustomerDetailPage({ params }: Params) {
       {selectActionOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <Card className={`w-full max-w-lg rounded-xl shadow-xl ${theme.cardBg} ${theme.cardBorder}`}>
-            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+            <div className="flex items-center justify-between border-b border-border px-4 py-3">
               <div className="text-sm font-semibold">Customer Car Action</div>
               <button
                 type="button"
                 onClick={() => setSelectActionOpen(false)}
-                className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+                className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-muted`}
               >
                 Close
               </button>
@@ -2019,7 +2019,7 @@ export default function CustomerDetailPage({ params }: Params) {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <label className={`text-xs font-semibold ${theme.mutedText}`}>Remarks</label>
-                      <span className="text-[10px] uppercase tracking-wide text-white/60">
+                      <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
                         Required for service requests
                       </span>
                     </div>
@@ -2036,7 +2036,7 @@ export default function CustomerDetailPage({ params }: Params) {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <label className={`text-xs font-semibold ${theme.mutedText}`}>Service Type</label>
-                      <span className="text-[10px] uppercase tracking-wide text-white/60">
+                      <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
                         Required
                       </span>
                     </div>
@@ -2056,7 +2056,7 @@ export default function CustomerDetailPage({ params }: Params) {
                         </option>
                       ))}
                     </select>
-                    <p className="text-[11px] text-white/60">
+                    <p className="text-[11px] text-muted-foreground">
                       You can update this later from the lead details screen.
                     </p>
                   </div>
@@ -2071,7 +2071,7 @@ export default function CustomerDetailPage({ params }: Params) {
                     </button>
                     <button
                       type="button"
-                      className={`rounded-md px-3 py-2 text-xs font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+                      className={`rounded-md px-3 py-2 text-xs font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-muted`}
                       onClick={() => setSelectActionMode("appointment")}
                     >
                       Create Appointment
@@ -2137,7 +2137,7 @@ export default function CustomerDetailPage({ params }: Params) {
                   <div className="flex items-center justify-end gap-2">
                     <button
                       type="button"
-                      className={`rounded-md px-4 py-2 text-xs font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+                      className={`rounded-md px-4 py-2 text-xs font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-muted`}
                       onClick={() => setSelectActionMode("menu")}
                     >
                       Back
@@ -2180,7 +2180,7 @@ const carYears = Array.from({ length: 30 }, (_, index) => new Date().getFullYear
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
   const { theme } = useTheme();
   return (
-    <div className="overflow-hidden rounded-md border border-white/15">
+    <div className="overflow-hidden rounded-md border border-border">
       <div className={`flex items-center justify-between px-4 py-2 text-sm font-semibold ${theme.surfaceSubtle} ${theme.cardBorder}`}>
         <span>{title}</span>
         <span className="text-lg leading-none">-</span>
@@ -2363,7 +2363,7 @@ function CustomerInvoicesTable({
           ))}
         </select>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-white/70">Rows</span>
+          <span className="text-xs text-foreground/70">Rows</span>
           <select
             className={`${theme.input} h-8 w-[90px] py-0 text-xs`}
             value={rows}
@@ -2378,11 +2378,11 @@ function CustomerInvoicesTable({
         </div>
       </div>
 
-      <div className="text-xs text-white/70">Showing {loading ? 0 : paged.length} of {filtered.length} invoices</div>
+      <div className="text-xs text-foreground/70">Showing {loading ? 0 : paged.length} of {filtered.length} invoices</div>
 
       <div className={`hidden overflow-auto rounded-md border md:block ${theme.cardBorder} ${theme.surfaceSubtle} max-h-[560px]`}>
         <table className="min-w-full table-fixed text-xs">
-          <thead className="sticky top-0 z-20 bg-slate-900 text-white/80">
+          <thead className="sticky top-0 z-20 bg-popovertext-foreground/80">
             <tr className="border-b border-slate-500/40">
               <th className="w-[180px] px-3 py-2 text-left">Invoice ID</th>
               <th className="w-[170px] px-3 py-2 text-left">Invoice Date</th>
@@ -2398,15 +2398,15 @@ function CustomerInvoicesTable({
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={9} className="px-3 py-8 text-center text-white/70">Loading invoices...</td>
+                <td colSpan={9} className="px-3 py-8 text-center text-foreground/70">Loading invoices...</td>
               </tr>
             ) : paged.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-3 py-8 text-center text-white/70">{error ?? "No invoices found for this filter."}</td>
+                <td colSpan={9} className="px-3 py-8 text-center text-foreground/70">{error ?? "No invoices found for this filter."}</td>
               </tr>
             ) : (
               paged.map((row) => (
-                <tr key={row.id} className="border-b border-slate-500/30 text-white/85 hover:bg-white/[0.03]">
+                <tr key={row.id} className="border-b border-slate-500/30 text-foreground/85 hover:bg-muted/30">
                   <td className="px-3 py-2">{row.invoice_number ?? row.id}</td>
                   <td className="px-3 py-2">{formatDateTime(row.invoice_date ?? row.created_at)}</td>
                   <td className="px-3 py-2">{row.car_plate ?? "-"}</td>
@@ -2447,12 +2447,12 @@ function CustomerInvoicesTable({
                         <Link
                           href={row.print_url ?? `/api/company/${companyId}/workshop/invoices/${row.id}/print`}
                           target="_blank"
-                          className="rounded-md border border-white/20 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white/70 hover:bg-white/10"
+                          className="rounded-md border border-border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-foreground/70 hover:bg-muted"
                         >
                           Print
                         </Link>
                       ) : (
-                        <span className="text-white/60">-</span>
+                        <span className="text-muted-foreground">-</span>
                       )}
                     </div>
                   </td>
@@ -2467,7 +2467,7 @@ function CustomerInvoicesTable({
         <div className="flex flex-wrap items-center justify-end gap-1">
           <button
             type="button"
-            className="rounded-md border border-white/20 px-2 py-1 text-[11px] text-white/70 disabled:opacity-50"
+            className="rounded-md border border-border px-2 py-1 text-[11px] text-foreground/70 disabled:opacity-50"
             disabled={page <= 1}
             onClick={() => setPage(Math.max(1, page - 1))}
           >
@@ -2477,7 +2477,7 @@ function CustomerInvoicesTable({
             <button
               key={item}
               type="button"
-              className={`rounded-md px-2 py-1 text-[11px] ${item === page ? "bg-blue-600 text-white" : "border border-white/20 text-white/70"}`}
+              className={`rounded-md px-2 py-1 text-[11px] ${item === page ? "bg-blue-600 text-white" : "border border-border text-foreground/70"}`}
               onClick={() => setPage(item)}
             >
               {item}
@@ -2485,7 +2485,7 @@ function CustomerInvoicesTable({
           ))}
           <button
             type="button"
-            className="rounded-md border border-white/20 px-2 py-1 text-[11px] text-white/70 disabled:opacity-50"
+            className="rounded-md border border-border px-2 py-1 text-[11px] text-foreground/70 disabled:opacity-50"
             disabled={page >= totalPages}
             onClick={() => setPage(Math.min(totalPages, page + 1))}
           >
@@ -2601,7 +2601,7 @@ function CustomerTransactionsTable({
           <option value="pending">Pending Verification</option>
         </select>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-white/70">Rows</span>
+          <span className="text-xs text-foreground/70">Rows</span>
           <select
             className={`${theme.input} h-8 w-[90px] py-0 text-xs`}
             value={rows}
@@ -2616,13 +2616,13 @@ function CustomerTransactionsTable({
         </div>
       </div>
 
-      <div className="text-xs text-white/70">
+      <div className="text-xs text-foreground/70">
         Showing {loading ? 0 : paged.length} of {filtered.length} transactions
       </div>
 
       <div className={`hidden overflow-auto rounded-md border md:block ${theme.cardBorder} ${theme.surfaceSubtle} max-h-[560px]`}>
         <table className="min-w-full table-fixed text-xs">
-          <thead className="sticky top-0 z-20 bg-slate-900 text-white/80">
+          <thead className="sticky top-0 z-20 bg-popovertext-foreground/80">
             <tr className="border-b border-slate-500/40">
               <th className="w-[200px] px-3 py-2 text-left">Txn ID</th>
               <th className="w-[140px] px-3 py-2 text-left">Payment Mode</th>
@@ -2637,13 +2637,13 @@ function CustomerTransactionsTable({
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={8} className="px-3 py-8 text-center text-white/70">
+                <td colSpan={8} className="px-3 py-8 text-center text-foreground/70">
                   Loading transactions...
                 </td>
               </tr>
             ) : paged.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-3 py-8 text-center text-white/70">
+                <td colSpan={8} className="px-3 py-8 text-center text-foreground/70">
                   {error ?? "No transactions found for this filter."}
                 </td>
               </tr>
@@ -2651,7 +2651,7 @@ function CustomerTransactionsTable({
               paged.map((tx) => {
                 const approved = Boolean(tx.approved_at);
                 return (
-                  <tr key={tx.id} className="border-b border-slate-500/30 text-white/85 hover:bg-white/[0.03]">
+                  <tr key={tx.id} className="border-b border-slate-500/30 text-foreground/85 hover:bg-muted/30">
                     <td className="px-3 py-2">{formatTxnId(tx)}</td>
                     <td className="px-3 py-2">{titleize(tx.payment_method) ?? "-"}</td>
                     <td className="px-3 py-2">
@@ -2660,12 +2660,12 @@ function CustomerTransactionsTable({
                           href={`/api/files/${tx.payment_proof_file_id}`}
                           target="_blank"
                           rel="noreferrer"
-                          className="rounded-md border border-white/20 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white/70 hover:bg-white/10"
+                          className="rounded-md border border-border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-foreground/70 hover:bg-muted"
                         >
                           View
                         </a>
                       ) : (
-                        <span className="text-white/60">-</span>
+                        <span className="text-muted-foreground">-</span>
                       )}
                     </td>
                     <td className="px-3 py-2">{formatAmount(tx.amount)}</td>
@@ -2684,12 +2684,12 @@ function CustomerTransactionsTable({
                         <Link
                           href={`/api/customers/${customerId}/wallet/transactions/${tx.id}/proforma?companyId=${companyId ?? ""}`}
                           target="_blank"
-                          className="rounded-md border border-white/20 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white/70 hover:bg-white/10"
+                          className="rounded-md border border-border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-foreground/70 hover:bg-muted"
                         >
                           Print
                         </Link>
                       ) : (
-                        <span className="text-white/60">-</span>
+                        <span className="text-muted-foreground">-</span>
                       )}
                     </td>
                     <td className="px-3 py-2">{formatDateTime(tx.payment_date ?? tx.created_at)}</td>
@@ -2703,20 +2703,20 @@ function CustomerTransactionsTable({
 
       <div className="space-y-2 md:hidden">
         {loading ? (
-          <div className="rounded-md border border-slate-500/30 bg-slate-900/40 px-3 py-4 text-sm text-white/70">Loading transactions...</div>
+          <div className="rounded-md border border-slate-500/30 bg-card/40 px-3 py-4 text-sm text-foreground/70">Loading transactions...</div>
         ) : paged.length === 0 ? (
-          <div className="rounded-md border border-slate-500/30 bg-slate-900/40 px-3 py-4 text-sm text-white/70">
+          <div className="rounded-md border border-slate-500/30 bg-card/40 px-3 py-4 text-sm text-foreground/70">
             {error ?? "No transactions found for this filter."}
           </div>
         ) : (
           paged.map((tx) => {
             const approved = Boolean(tx.approved_at);
             return (
-              <div key={tx.id} className="space-y-2 rounded-md border border-slate-500/35 bg-slate-900/45 px-3 py-3 text-xs">
-                <div className="font-semibold text-white/90">{formatTxnId(tx)}</div>
-                <div className="text-white/70">Mode: {titleize(tx.payment_method)}</div>
-                <div className="text-white/70">Amount: {formatAmount(tx.amount)}</div>
-                <div className="text-white/60">Payment Date: {formatDateTime(tx.payment_date ?? tx.created_at)}</div>
+              <div key={tx.id} className="space-y-2 rounded-md border border-slate-500/35 bg-card/45 px-3 py-3 text-xs">
+                <div className="font-semibold text-foreground/90">{formatTxnId(tx)}</div>
+                <div className="text-foreground/70">Mode: {titleize(tx.payment_method)}</div>
+                <div className="text-foreground/70">Amount: {formatAmount(tx.amount)}</div>
+                <div className="text-muted-foreground">Payment Date: {formatDateTime(tx.payment_date ?? tx.created_at)}</div>
                 <div className="flex items-center gap-2">
                   <span
                     className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${walletTransactionStatusBadgeClass(
@@ -2729,7 +2729,7 @@ function CustomerTransactionsTable({
                     <Link
                       href={`/api/customers/${customerId}/wallet/transactions/${tx.id}/proforma?companyId=${companyId ?? ""}`}
                       target="_blank"
-                      className="rounded-md border border-white/20 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white/70 hover:bg-white/10"
+                      className="rounded-md border border-border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-foreground/70 hover:bg-muted"
                     >
                       Print
                     </Link>
@@ -2745,7 +2745,7 @@ function CustomerTransactionsTable({
         <div className="flex flex-wrap items-center justify-end gap-1">
           <button
             type="button"
-            className="rounded-md border border-white/20 px-2 py-1 text-[11px] text-white/70 disabled:opacity-50"
+            className="rounded-md border border-border px-2 py-1 text-[11px] text-foreground/70 disabled:opacity-50"
             disabled={page <= 1}
             onClick={() => setPage(Math.max(1, page - 1))}
           >
@@ -2755,7 +2755,7 @@ function CustomerTransactionsTable({
             <button
               key={item}
               type="button"
-              className={`rounded-md px-2 py-1 text-[11px] ${item === page ? "bg-blue-600 text-white" : "border border-white/20 text-white/70"}`}
+              className={`rounded-md px-2 py-1 text-[11px] ${item === page ? "bg-blue-600 text-white" : "border border-border text-foreground/70"}`}
               onClick={() => setPage(item)}
             >
               {item}
@@ -2763,7 +2763,7 @@ function CustomerTransactionsTable({
           ))}
           <button
             type="button"
-            className="rounded-md border border-white/20 px-2 py-1 text-[11px] text-white/70 disabled:opacity-50"
+            className="rounded-md border border-border px-2 py-1 text-[11px] text-foreground/70 disabled:opacity-50"
             disabled={page >= totalPages}
             onClick={() => setPage(Math.min(totalPages, page + 1))}
           >
@@ -2847,11 +2847,11 @@ function CustomerLeadsTable({
   const renderSortLabel = (label: string, value: LeadsSortBy) => (
     <button
       type="button"
-      className="inline-flex items-center gap-1 font-semibold hover:text-white"
+      className="inline-flex items-center gap-1 font-semibold hover:text-foreground"
       onClick={() => onSortChange(value)}
     >
       {label}
-      <span className={sortBy === value ? "text-blue-300" : "text-white/40"}>
+      <span className={sortBy === value ? "text-blue-300" : "text-muted-foreground"}>
         {sortBy === value ? (sortDir === "asc" ? "↑" : "↓") : "↕"}
       </span>
     </button>
@@ -2907,7 +2907,7 @@ function CustomerLeadsTable({
         </select>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-white/70">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-foreground/70">
         <div>
           Showing {loading ? 0 : leads.length} of {total} leads
           {carFilter === "selected" ? (
@@ -2932,7 +2932,7 @@ function CustomerLeadsTable({
 
       <div className={`hidden overflow-auto rounded-md border md:block ${theme.cardBorder} ${theme.surfaceSubtle} max-h-[560px]`}>
         <table className="min-w-full table-fixed text-xs">
-          <thead className="sticky top-0 z-20 bg-slate-900 text-white/80">
+          <thead className="sticky top-0 z-20 bg-popovertext-foreground/80">
             <tr className="border-b border-slate-500/40">
               <th className="w-[220px] px-3 py-2 text-left">{renderSortLabel("Car", "car")}</th>
               <th className="w-[100px] px-3 py-2 text-left">{renderSortLabel("Type", "leadType")}</th>
@@ -2945,13 +2945,13 @@ function CustomerLeadsTable({
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={6} className="px-3 py-8 text-center text-white/70">
+                <td colSpan={6} className="px-3 py-8 text-center text-foreground/70">
                   Loading leads...
                 </td>
               </tr>
             ) : leads.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-3 py-8 text-center text-white/70">
+                <td colSpan={6} className="px-3 py-8 text-center text-foreground/70">
                   {error ?? "No leads found for this filter."}
                 </td>
               </tr>
@@ -2959,7 +2959,7 @@ function CustomerLeadsTable({
               leads.map((lead) => {
                 const carLabel = [lead.carPlateNumber, lead.carModel].filter(Boolean).join(" ") || "-";
                 return (
-                  <tr key={lead.id} className="border-b border-slate-500/30 text-white/85 hover:bg-white/[0.03]">
+                  <tr key={lead.id} className="border-b border-slate-500/30 text-foreground/85 hover:bg-muted/30">
                     <td className="px-3 py-2">{carLabel}</td>
                     <td className="px-3 py-2">
                       <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${leadBadgeClass("type", lead.leadType)}`}>
@@ -2976,7 +2976,7 @@ function CustomerLeadsTable({
                     <td className="px-3 py-2">
                       <Link
                         href={companyId ? `/company/${companyId}/leads/${lead.id}` : "#"}
-                        className="rounded-md border border-white/20 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white/70 hover:bg-white/10"
+                        className="rounded-md border border-border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-foreground/70 hover:bg-muted"
                       >
                         View
                       </Link>
@@ -2991,16 +2991,16 @@ function CustomerLeadsTable({
 
       <div className="space-y-2 md:hidden">
         {loading ? (
-          <div className="rounded-md border border-slate-500/30 bg-slate-900/40 px-3 py-4 text-sm text-white/70">Loading leads...</div>
+          <div className="rounded-md border border-slate-500/30 bg-card/40 px-3 py-4 text-sm text-foreground/70">Loading leads...</div>
         ) : leads.length === 0 ? (
-          <div className="rounded-md border border-slate-500/30 bg-slate-900/40 px-3 py-4 text-sm text-white/70">
+          <div className="rounded-md border border-slate-500/30 bg-card/40 px-3 py-4 text-sm text-foreground/70">
             {error ?? "No leads found for this filter."}
           </div>
         ) : (
           leads.map((lead) => {
             const carLabel = [lead.carPlateNumber, lead.carModel].filter(Boolean).join(" ") || "-";
             return (
-              <div key={lead.id} className="space-y-2 rounded-md border border-slate-500/35 bg-slate-900/45 px-3 py-3 text-xs">
+              <div key={lead.id} className="space-y-2 rounded-md border border-slate-500/35 bg-card/45 px-3 py-3 text-xs">
                 <div className="flex flex-wrap gap-1">
                   <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${leadBadgeClass("type", lead.leadType)}`}>
                     {titleize(lead.leadType)}
@@ -3008,16 +3008,16 @@ function CustomerLeadsTable({
                   <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${leadBadgeClass("status", lead.leadStatus)}`}>
                     {titleize(lead.leadStatus)}
                   </span>
-                  <span className="inline-flex rounded-full border border-slate-500/40 bg-slate-700/35 px-2 py-0.5 text-[10px] text-white/80">
+                  <span className="inline-flex rounded-full border border-slate-500/40 bg-slate-700/35 px-2 py-0.5 text-[10px] text-foreground/80">
                     {titleize(lead.leadStage)}
                   </span>
                 </div>
-                <div className="text-white/75">Car: {carLabel}</div>
-                <div className="text-white/60">Updated: {formatDateTime(lead.updatedAt)}</div>
+                <div className="text-foreground/75">Car: {carLabel}</div>
+                <div className="text-muted-foreground">Updated: {formatDateTime(lead.updatedAt)}</div>
                 <div>
                   <Link
                     href={companyId ? `/company/${companyId}/leads/${lead.id}` : "#"}
-                    className="rounded-md border border-white/20 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white/70 hover:bg-white/10"
+                    className="rounded-md border border-border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-foreground/70 hover:bg-muted"
                   >
                     View
                   </Link>
@@ -3032,7 +3032,7 @@ function CustomerLeadsTable({
         <div className="flex flex-wrap items-center justify-end gap-1">
           <button
             type="button"
-            className="rounded-md border border-white/20 px-2 py-1 text-[11px] text-white/70 disabled:opacity-50"
+            className="rounded-md border border-border px-2 py-1 text-[11px] text-foreground/70 disabled:opacity-50"
             disabled={page <= 1}
             onClick={() => onPageChange(Math.max(1, page - 1))}
           >
@@ -3042,7 +3042,7 @@ function CustomerLeadsTable({
             <button
               key={item}
               type="button"
-              className={`rounded-md px-2 py-1 text-[11px] ${item === page ? "bg-blue-600 text-white" : "border border-white/20 text-white/70"}`}
+              className={`rounded-md px-2 py-1 text-[11px] ${item === page ? "bg-blue-600 text-white" : "border border-border text-foreground/70"}`}
               onClick={() => onPageChange(item)}
             >
               {item}
@@ -3050,7 +3050,7 @@ function CustomerLeadsTable({
           ))}
           <button
             type="button"
-            className="rounded-md border border-white/20 px-2 py-1 text-[11px] text-white/70 disabled:opacity-50"
+            className="rounded-md border border-border px-2 py-1 text-[11px] text-foreground/70 disabled:opacity-50"
             disabled={page >= totalPages}
             onClick={() => onPageChange(Math.min(totalPages, page + 1))}
           >
@@ -3124,11 +3124,11 @@ function CustomerInspectionsTable({
   const renderSortLabel = (label: string, value: InspectionsSortBy) => (
     <button
       type="button"
-      className="inline-flex items-center gap-1 font-semibold hover:text-white"
+      className="inline-flex items-center gap-1 font-semibold hover:text-foreground"
       onClick={() => onSortChange(value)}
     >
       {label}
-      <span className={sortBy === value ? "text-blue-300" : "text-white/40"}>
+      <span className={sortBy === value ? "text-blue-300" : "text-muted-foreground"}>
         {sortBy === value ? (sortDir === "asc" ? "↑" : "↓") : "↕"}
       </span>
     </button>
@@ -3167,7 +3167,7 @@ function CustomerInspectionsTable({
           ))}
         </select>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-white/70">Rows</span>
+          <span className="text-xs text-foreground/70">Rows</span>
           <select
             className={`${theme.input} h-8 w-[90px] py-0 text-xs`}
             value={pageSize}
@@ -3182,7 +3182,7 @@ function CustomerInspectionsTable({
         </div>
       </div>
 
-      <div className="text-xs text-white/70">
+      <div className="text-xs text-foreground/70">
         Showing {loading ? 0 : inspections.length} of {total} inspections
         {carFilter === "selected" ? (
           <span className="ml-2 text-blue-300">{selectedCarId ? "(selected car)" : "(no selected car)"}</span>
@@ -3191,7 +3191,7 @@ function CustomerInspectionsTable({
 
       <div className={`hidden overflow-auto rounded-md border md:block ${theme.cardBorder} ${theme.surfaceSubtle} max-h-[560px]`}>
         <table className="min-w-full table-fixed text-xs">
-          <thead className="sticky top-0 z-20 bg-slate-900 text-white/80">
+          <thead className="sticky top-0 z-20 bg-popovertext-foreground/80">
             <tr className="border-b border-slate-500/40">
               <th className="w-[210px] px-3 py-2 text-left">{renderSortLabel("Car", "carId")}</th>
               <th className="w-[120px] px-3 py-2 text-left">{renderSortLabel("Status", "status")}</th>
@@ -3204,19 +3204,19 @@ function CustomerInspectionsTable({
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={6} className="px-3 py-8 text-center text-white/70">
+                <td colSpan={6} className="px-3 py-8 text-center text-foreground/70">
                   Loading inspections...
                 </td>
               </tr>
             ) : inspections.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-3 py-8 text-center text-white/70">
+                <td colSpan={6} className="px-3 py-8 text-center text-foreground/70">
                   {error ?? "No inspections found for this filter."}
                 </td>
               </tr>
             ) : (
               inspections.map((inspection) => (
-                <tr key={inspection.id} className="border-b border-slate-500/30 text-white/85 hover:bg-white/[0.03]">
+                <tr key={inspection.id} className="border-b border-slate-500/30 text-foreground/85 hover:bg-muted/30">
                   <td className="px-3 py-2">{carLabels.get(inspection.carId ?? "") ?? inspection.carId ?? "-"}</td>
                   <td className="px-3 py-2">
                     <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${inspectionStatusBadgeClass(inspection.status)}`}>
@@ -3227,12 +3227,12 @@ function CustomerInspectionsTable({
                     {inspection.leadId ? (
                       <Link
                         href={companyId ? `/company/${companyId}/leads/${inspection.leadId}` : "#"}
-                        className="rounded-md border border-white/20 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white/70 hover:bg-white/10"
+                        className="rounded-md border border-border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-foreground/70 hover:bg-muted"
                       >
                         View Lead
                       </Link>
                     ) : (
-                      <span className="text-white/60">-</span>
+                      <span className="text-muted-foreground">-</span>
                     )}
                   </td>
                   <td className="px-3 py-2">{formatDateTime(inspection.startAt ?? inspection.createdAt)}</td>
@@ -3244,12 +3244,12 @@ function CustomerInspectionsTable({
                         target="_blank"
                         rel="noreferrer"
                         download={`inspection-report-${inspection.id}.pdf`}
-                        className="rounded-md border border-white/20 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white/70 hover:bg-white/10"
+                        className="rounded-md border border-border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-foreground/70 hover:bg-muted"
                       >
                         PDF
                       </a>
                     ) : (
-                      <span className="text-white/60">-</span>
+                      <span className="text-muted-foreground">-</span>
                     )}
                   </td>
                 </tr>
@@ -3261,19 +3261,19 @@ function CustomerInspectionsTable({
 
       <div className="space-y-2 md:hidden">
         {loading ? (
-          <div className="rounded-md border border-slate-500/30 bg-slate-900/40 px-3 py-4 text-sm text-white/70">Loading inspections...</div>
+          <div className="rounded-md border border-slate-500/30 bg-card/40 px-3 py-4 text-sm text-foreground/70">Loading inspections...</div>
         ) : inspections.length === 0 ? (
-          <div className="rounded-md border border-slate-500/30 bg-slate-900/40 px-3 py-4 text-sm text-white/70">
+          <div className="rounded-md border border-slate-500/30 bg-card/40 px-3 py-4 text-sm text-foreground/70">
             {error ?? "No inspections found for this filter."}
           </div>
         ) : (
           inspections.map((inspection) => (
-            <div key={inspection.id} className="space-y-2 rounded-md border border-slate-500/35 bg-slate-900/45 px-3 py-3 text-xs">
+            <div key={inspection.id} className="space-y-2 rounded-md border border-slate-500/35 bg-card/45 px-3 py-3 text-xs">
               <div className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${inspectionStatusBadgeClass(inspection.status)}`}>
                 {titleize(inspection.status)}
               </div>
-              <div className="text-white/75">Car: {carLabels.get(inspection.carId ?? "") ?? inspection.carId ?? "-"}</div>
-              <div className="text-white/65">
+              <div className="text-foreground/75">Car: {carLabels.get(inspection.carId ?? "") ?? inspection.carId ?? "-"}</div>
+              <div className="text-muted-foreground">
                 Lead:{" "}
                 {inspection.leadId ? (
                   <Link
@@ -3286,8 +3286,8 @@ function CustomerInspectionsTable({
                   "-"
                 )}
               </div>
-              <div className="text-white/60">Started: {formatDateTime(inspection.startAt ?? inspection.createdAt)}</div>
-              <div className="text-white/60">Updated: {formatDateTime(inspection.updatedAt)}</div>
+              <div className="text-muted-foreground">Started: {formatDateTime(inspection.startAt ?? inspection.createdAt)}</div>
+              <div className="text-muted-foreground">Updated: {formatDateTime(inspection.updatedAt)}</div>
               <div>
                 {companyId ? (
                   <a
@@ -3295,12 +3295,12 @@ function CustomerInspectionsTable({
                     target="_blank"
                     rel="noreferrer"
                     download={`inspection-report-${inspection.id}.pdf`}
-                    className="rounded-md border border-white/20 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white/70 hover:bg-white/10"
+                    className="rounded-md border border-border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-foreground/70 hover:bg-muted"
                   >
                     PDF
                   </a>
                 ) : (
-                  <span className="text-white/60">-</span>
+                  <span className="text-muted-foreground">-</span>
                 )}
               </div>
             </div>
@@ -3312,7 +3312,7 @@ function CustomerInspectionsTable({
         <div className="flex flex-wrap items-center justify-end gap-1">
           <button
             type="button"
-            className="rounded-md border border-white/20 px-2 py-1 text-[11px] text-white/70 disabled:opacity-50"
+            className="rounded-md border border-border px-2 py-1 text-[11px] text-foreground/70 disabled:opacity-50"
             disabled={page <= 1}
             onClick={() => onPageChange(Math.max(1, page - 1))}
           >
@@ -3322,7 +3322,7 @@ function CustomerInspectionsTable({
             <button
               key={item}
               type="button"
-              className={`rounded-md px-2 py-1 text-[11px] ${item === page ? "bg-blue-600 text-white" : "border border-white/20 text-white/70"}`}
+              className={`rounded-md px-2 py-1 text-[11px] ${item === page ? "bg-blue-600 text-white" : "border border-border text-foreground/70"}`}
               onClick={() => onPageChange(item)}
             >
               {item}
@@ -3330,7 +3330,7 @@ function CustomerInspectionsTable({
           ))}
           <button
             type="button"
-            className="rounded-md border border-white/20 px-2 py-1 text-[11px] text-white/70 disabled:opacity-50"
+            className="rounded-md border border-border px-2 py-1 text-[11px] text-foreground/70 disabled:opacity-50"
             disabled={page >= totalPages}
             onClick={() => onPageChange(Math.min(totalPages, page + 1))}
           >
@@ -3404,11 +3404,11 @@ function CustomerEstimatesTable({
   const renderSortLabel = (label: string, value: EstimatesSortBy) => (
     <button
       type="button"
-      className="inline-flex items-center gap-1 font-semibold hover:text-white"
+      className="inline-flex items-center gap-1 font-semibold hover:text-foreground"
       onClick={() => onSortChange(value)}
     >
       {label}
-      <span className={sortBy === value ? "text-blue-300" : "text-white/40"}>
+      <span className={sortBy === value ? "text-blue-300" : "text-muted-foreground"}>
         {sortBy === value ? (sortDir === "asc" ? "^" : "v") : "<>"}
       </span>
     </button>
@@ -3453,7 +3453,7 @@ function CustomerEstimatesTable({
           ))}
         </select>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-white/70">Rows</span>
+          <span className="text-xs text-foreground/70">Rows</span>
           <select
             className={`${theme.input} h-8 w-[90px] py-0 text-xs`}
             value={pageSize}
@@ -3468,7 +3468,7 @@ function CustomerEstimatesTable({
         </div>
       </div>
 
-      <div className="text-xs text-white/70">
+      <div className="text-xs text-foreground/70">
         Showing {loading ? 0 : estimates.length} of {total} estimates
         {carFilter === "selected" ? (
           <span className="ml-2 text-blue-300">{selectedCarId ? "(selected car)" : "(no selected car)"}</span>
@@ -3477,7 +3477,7 @@ function CustomerEstimatesTable({
 
       <div className={`hidden overflow-auto rounded-md border md:block ${theme.cardBorder} ${theme.surfaceSubtle} max-h-[560px]`}>
         <table className="min-w-full table-fixed text-xs">
-          <thead className="sticky top-0 z-20 bg-slate-900 text-white/80">
+          <thead className="sticky top-0 z-20 bg-popovertext-foreground/80">
             <tr className="border-b border-slate-500/40">
               <th className="w-[220px] px-3 py-2 text-left">{renderSortLabel("Car", "carId")}</th>
               <th className="w-[120px] px-3 py-2 text-left">{renderSortLabel("Status", "status")}</th>
@@ -3490,19 +3490,19 @@ function CustomerEstimatesTable({
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={6} className="px-3 py-8 text-center text-white/70">
+                <td colSpan={6} className="px-3 py-8 text-center text-foreground/70">
                   Loading estimates...
                 </td>
               </tr>
             ) : estimates.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-3 py-8 text-center text-white/70">
+                <td colSpan={6} className="px-3 py-8 text-center text-foreground/70">
                   {error ?? "No estimates found for this filter."}
                 </td>
               </tr>
             ) : (
               estimates.map((estimate) => (
-                <tr key={estimate.id} className="border-b border-slate-500/30 text-white/85 hover:bg-white/[0.03]">
+                <tr key={estimate.id} className="border-b border-slate-500/30 text-foreground/85 hover:bg-muted/30">
                   <td className="px-3 py-2">{carLabels.get(estimate.carId ?? "") ?? estimate.carId ?? "-"}</td>
                   <td className="px-3 py-2">
                     <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${estimateStatusBadgeClass(estimate.status)}`}>
@@ -3513,12 +3513,12 @@ function CustomerEstimatesTable({
                     {estimate.leadId ? (
                       <Link
                         href={companyId ? `/company/${companyId}/leads/${estimate.leadId}` : "#"}
-                        className="rounded-md border border-white/20 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white/70 hover:bg-white/10"
+                        className="rounded-md border border-border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-foreground/70 hover:bg-muted"
                       >
                         View Lead
                       </Link>
                     ) : (
-                      <span className="text-white/60">-</span>
+                      <span className="text-muted-foreground">-</span>
                     )}
                   </td>
                   <td className="px-3 py-2">{formatMoney(estimate)}</td>
@@ -3526,7 +3526,7 @@ function CustomerEstimatesTable({
                   <td className="px-3 py-2">
                     <Link
                       href={companyId ? `/company/${companyId}/estimates/${estimate.id}` : "#"}
-                      className="rounded-md border border-white/20 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white/70 hover:bg-white/10"
+                      className="rounded-md border border-border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-foreground/70 hover:bg-muted"
                     >
                       View
                     </Link>
@@ -3540,19 +3540,19 @@ function CustomerEstimatesTable({
 
       <div className="space-y-2 md:hidden">
         {loading ? (
-          <div className="rounded-md border border-slate-500/30 bg-slate-900/40 px-3 py-4 text-sm text-white/70">Loading estimates...</div>
+          <div className="rounded-md border border-slate-500/30 bg-card/40 px-3 py-4 text-sm text-foreground/70">Loading estimates...</div>
         ) : estimates.length === 0 ? (
-          <div className="rounded-md border border-slate-500/30 bg-slate-900/40 px-3 py-4 text-sm text-white/70">
+          <div className="rounded-md border border-slate-500/30 bg-card/40 px-3 py-4 text-sm text-foreground/70">
             {error ?? "No estimates found for this filter."}
           </div>
         ) : (
           estimates.map((estimate) => (
-            <div key={estimate.id} className="space-y-2 rounded-md border border-slate-500/35 bg-slate-900/45 px-3 py-3 text-xs">
+            <div key={estimate.id} className="space-y-2 rounded-md border border-slate-500/35 bg-card/45 px-3 py-3 text-xs">
               <div className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${estimateStatusBadgeClass(estimate.status)}`}>
                 {titleize(estimate.status)}
               </div>
-              <div className="text-white/75">Car: {carLabels.get(estimate.carId ?? "") ?? estimate.carId ?? "-"}</div>
-              <div className="text-white/65">
+              <div className="text-foreground/75">Car: {carLabels.get(estimate.carId ?? "") ?? estimate.carId ?? "-"}</div>
+              <div className="text-muted-foreground">
                 Lead:{" "}
                 {estimate.leadId ? (
                   <Link
@@ -3565,12 +3565,12 @@ function CustomerEstimatesTable({
                   "-"
                 )}
               </div>
-              <div className="text-white/60">Total: {formatMoney(estimate)}</div>
-              <div className="text-white/60">Updated: {formatDateTime(estimate.updatedAt)}</div>
+              <div className="text-muted-foreground">Total: {formatMoney(estimate)}</div>
+              <div className="text-muted-foreground">Updated: {formatDateTime(estimate.updatedAt)}</div>
               <div>
                 <Link
                   href={companyId ? `/company/${companyId}/estimates/${estimate.id}` : "#"}
-                  className="rounded-md border border-white/20 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white/70 hover:bg-white/10"
+                  className="rounded-md border border-border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-foreground/70 hover:bg-muted"
                 >
                   View
                 </Link>
@@ -3584,7 +3584,7 @@ function CustomerEstimatesTable({
         <div className="flex flex-wrap items-center justify-end gap-1">
           <button
             type="button"
-            className="rounded-md border border-white/20 px-2 py-1 text-[11px] text-white/70 disabled:opacity-50"
+            className="rounded-md border border-border px-2 py-1 text-[11px] text-foreground/70 disabled:opacity-50"
             disabled={page <= 1}
             onClick={() => onPageChange(Math.max(1, page - 1))}
           >
@@ -3594,7 +3594,7 @@ function CustomerEstimatesTable({
             <button
               key={item}
               type="button"
-              className={`rounded-md px-2 py-1 text-[11px] ${item === page ? "bg-blue-600 text-white" : "border border-white/20 text-white/70"}`}
+              className={`rounded-md px-2 py-1 text-[11px] ${item === page ? "bg-blue-600 text-white" : "border border-border text-foreground/70"}`}
               onClick={() => onPageChange(item)}
             >
               {item}
@@ -3602,7 +3602,7 @@ function CustomerEstimatesTable({
           ))}
           <button
             type="button"
-            className="rounded-md border border-white/20 px-2 py-1 text-[11px] text-white/70 disabled:opacity-50"
+            className="rounded-md border border-border px-2 py-1 text-[11px] text-foreground/70 disabled:opacity-50"
             disabled={page >= totalPages}
             onClick={() => onPageChange(Math.min(totalPages, page + 1))}
           >

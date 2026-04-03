@@ -489,7 +489,7 @@ export default function CustomerCreatePage({ params }: Params) {
         </form>
         {duplicateModalVisible && duplicateTitle && duplicateDescription && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-6">
-            <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-slate-950 p-6 shadow-2xl">
+            <div className="w-full max-w-sm rounded-2xl border border-border bg-background p-6 shadow-2xl">
               <div className="text-lg font-semibold">{duplicateTitle}</div>
               <p className="mt-2 text-sm text-muted-foreground">{duplicateDescription}</p>
               <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-between">

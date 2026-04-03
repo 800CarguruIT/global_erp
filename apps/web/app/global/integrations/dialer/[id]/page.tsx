@@ -74,7 +74,7 @@ export default function GlobalDialerEditPage() {
         {/* Back Button */}
         <div className="flex justify-start">
           <button
-            className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs sm:text-sm transition"
+            className="px-3 py-1.5 rounded-lg bg-muted hover:bg-muted/80 text-xs sm:text-sm transition"
             onClick={() =>
               (window.location.href = "/global/integrations/dialer")
             }

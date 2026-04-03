@@ -80,6 +80,77 @@ export async function GET(req: NextRequest, { params }: Params) {
   }
 
   const vin17Config = await getVin17ConfigForCompany(companyId);
+
+  // --- AI-based VIN decode (when 17vin is not configured, or as fallback) ---
+  if (!wantsCatalog && !wantsParts) {
+    try {
+      const { client } = await getOpenAIClientForCompany(companyId);
+      if (client) {
+        const vinDecodeModel = process.env.VIN_DECODE_MODEL?.trim() || process.env.OPENAI_MODEL?.trim() || "gpt-4o";
+        const completion = await client.chat.completions.create({
+          model: vinDecodeModel,
+          temperature: 0,
+          response_format: { type: "json_object" },
+          messages: [
+            {
+              role: "system",
+              content: `You are an expert automotive VIN decoder with deep knowledge of manufacturer VIN encoding patterns. Decode the VIN precisely using the standard 17-digit structure:
+- Positions 1-3 (WMI): World Manufacturer Identifier
+- Positions 4-8: Vehicle attributes (model, body, engine, restraint)
+- Position 9: Check digit
+- Position 10: Model year
+- Positions 11-17: Plant and serial number
+
+IMPORTANT: Use the exact model code from positions 4-8 to determine the specific model. Do NOT guess — if the VIN attributes point to Pathfinder, do not return Rogue or any other model.
+
+Return JSON with keys: make (string), model (string), year (number), body_type (string), engine (string), trim (string), country_of_origin (string). Set unknown fields to null.`,
+            },
+            { role: "user", content: `Decode this VIN precisely: ${vin}\n\nWMI (pos 1-3): ${vin.slice(0, 3)}\nAttributes (pos 4-8): ${vin.slice(3, 8)}\nYear code (pos 10): ${vin.charAt(9)}` },
+          ],
+        });
+        const raw = completion.choices?.[0]?.message?.content ?? "{}";
+        const decoded = JSON.parse(raw) as Record<string, unknown>;
+        const aiMake = String(decoded.make ?? "").trim();
+        const aiModel = String(decoded.model ?? "").trim();
+        const aiYear = decoded.year ? String(decoded.year) : "";
+        const aiBodyType = String(decoded.body_type ?? "").trim();
+        const aiEngine = String(decoded.engine ?? "").trim();
+        const aiTrim = String(decoded.trim ?? "").trim();
+        const aiCountry = String(decoded.country_of_origin ?? "").trim();
+
+        const carId = `ai-${vin}`;
+        const title = [aiMake, aiModel, aiYear].filter(Boolean).join(" ");
+        const description = [aiBodyType, aiEngine, aiTrim, aiCountry].filter(Boolean).join(" · ");
+
+        const car = { id: carId, make: aiMake, model: aiModel, year: aiYear, title, description };
+
+        // Cache in vin_catalog_cars for future lookups
+        if (aiMake) {
+          await upsertVinCatalogCars({ vin, cars: [car] }).catch(() => {});
+        }
+
+        return NextResponse.json({
+          data: {
+            vin,
+            epc: null,
+            cars: [car],
+            car,
+            partsBrand: null,
+            parts: [],
+            partsCount: 0,
+            requiresCarSelection: false,
+            partsCatalogPaused: true,
+            source: "ai",
+            decoded: { make: aiMake, model: aiModel, year: aiYear, bodyType: aiBodyType, engine: aiEngine, trim: aiTrim, country: aiCountry },
+          },
+        });
+      }
+    } catch (aiErr: any) {
+      console.error("[vin-lookup] AI decode failed:", aiErr?.message);
+      // Fall through to 17vin or error
+    }
+  }
+
   try {
     if (wantsCatalog) {
       const resolvedEpc =

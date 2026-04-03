@@ -87,7 +87,7 @@ export default async function CompanyHomePage({ params }: Props) {
           <div className="mt-3 flex flex-wrap gap-2">
             <Link
               href={`/company/${companyId}/operations-dashboard`}
-              className="inline-flex items-center rounded-md border border-white/30 bg-primary px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary-foreground shadow-sm transition hover:opacity-90"
+              className="inline-flex items-center rounded-md border border-border bg-primary px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary-foreground shadow-sm transition hover:opacity-90"
             >
               Operations Dashboard
             </Link>

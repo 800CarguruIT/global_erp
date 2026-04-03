@@ -8,7 +8,7 @@ import {
   deleteLead,
 } from "@repo/ai-core/crm/leads/repository";
 import type { LeadStatus, LeadType } from "@repo/ai-core/crm/leads/types";
-import { createCustomer, createCar, linkCustomerToCar } from "@repo/ai-core/crm/service";
+import { createCustomer, createCar, findOrCreateCar, linkCustomerToCar } from "@repo/ai-core/crm/service";
 import { createInspection } from "@repo/ai-core/workshop/inspections/repository";
 import { createEstimateForLead } from "@repo/ai-core/workshop/estimates/repository";
 import { createWorkOrderFromEstimate, createWorkOrderForInspection } from "@repo/ai-core/workshop/workorders/repository";
@@ -27,11 +27,15 @@ export async function GET(req: NextRequest, { params }: Params) {
   const { searchParams } = new URL(req.url);
   const q = searchParams.get("q")?.toLowerCase() ?? null;
   const status = searchParams.get("status");
+  const assignedUserId = searchParams.get("assignedUserId") ?? null;
+  const leadType = searchParams.get("leadType") ?? null;
 
   // 1. Fetch leads with pagination (was unbounded)
   const leads = await listLeadsForCompany(companyId, { limit: 200 });
   const filtered = leads.filter((l) => {
     if (status && l.leadStatus !== status) return false;
+    if (leadType && l.leadType !== leadType) return false;
+    if (assignedUserId && l.assignedUserId !== assignedUserId) return false;
     if (!q) return true;
     const hay = `${l.customerName ?? ""} ${l.customerPhone ?? ""} ${l.customerEmail ?? ""} ${l.source ?? ""}`.toLowerCase();
     return hay.includes(q);
@@ -237,7 +241,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       carPayload.modelYear ||
       carPayload.plateCode);
   if (!carId && hasCarDetails) {
-    const createdCar = await createCar({
+    const { car: resolvedCar } = await findOrCreateCar({
       companyId,
       plateCode: carPayload.plateCode ?? null,
       plateNumber: carPayload.plateNumber ?? null,
@@ -256,7 +260,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       registrationCardFileId: carPayload.registrationCardFileId ?? null,
       vinPhotoFileId: carPayload.vinPhotoFileId ?? null,
     });
-    carId = createdCar.id;
+    carId = resolvedCar.id;
   }
   if (carId && customer_id) {
     try {

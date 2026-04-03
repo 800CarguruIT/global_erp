@@ -18,22 +18,22 @@ export default function PisAdvisorsPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold text-white">Advisor Scores — V4 Composite Formula</h2>
+        <h2 className="text-lg font-bold text-foreground">Advisor Scores — V4 Composite Formula</h2>
         <button onClick={() => { fetch(`/api/company/${companyId}/pis/advisors`, { method: "POST" }).then(r => r.json()).then(d => setAdvisors(d.advisors ?? [])); }}
           className="rounded-lg bg-gradient-to-r from-amber-500 to-orange-600 px-4 py-2 text-xs font-semibold text-white hover:opacity-90">Refresh Scores</button>
       </div>
-      <div className="rounded-xl border border-white/10 bg-gradient-to-br from-slate-900/80 to-black/90 overflow-hidden">
+      <div className="rounded-xl border border-border bg-gradient-to-br from-slate-900/80 to-black/90 overflow-hidden">
         <table className="w-full text-xs">
-          <thead><tr className="border-b border-white/10 text-left">
+          <thead><tr className="border-b border-border text-left">
             {["#","Advisor","Composite","Conv %","GP %","Revenue","Paid %","FOC %","SLA","Call Q","Tier"].map(h => (
               <th key={h} className="px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{h}</th>
             ))}
           </tr></thead>
           <tbody>
             {advisors.map((adv, i) => (
-              <tr key={adv.advisorUserId} className="border-b border-white/5 hover:bg-white/5">
+              <tr key={adv.advisorUserId} className="border-b border-border/40 hover:bg-muted/40">
                 <td className="px-4 py-3 font-bold text-slate-400">{i + 1}</td>
-                <td className="px-4 py-3 font-medium text-white">{adv.advisorName}</td>
+                <td className="px-4 py-3 font-medium text-foreground">{adv.advisorName}</td>
                 <td className="px-4 py-3 font-bold text-amber-400">{adv.compositeScore.toFixed(1)}</td>
                 <td className="px-4 py-3 text-slate-300">{adv.conversionRate.toFixed(1)}%</td>
                 <td className="px-4 py-3 text-slate-300">{adv.gpPct.toFixed(1)}%</td>

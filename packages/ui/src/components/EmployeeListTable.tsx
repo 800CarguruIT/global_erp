@@ -53,12 +53,12 @@ export function EmployeeListTable({ items, onEdit, onDelete }: Props) {
           </thead>
           <tbody>
             {items.map((item) => (
-              <tr key={item.id} className="border-b border-white/5">
+              <tr key={item.id} className="border-b border-border/40">
                 <td className={cell}>{item.auto_code}</td>
                 <td className={cell}>
                   <div className="flex items-center gap-2">
                     {item.image_file_id && (
-                      <div className="h-8 w-8 overflow-hidden rounded-full bg-white/10">
+                      <div className="h-8 w-8 overflow-hidden rounded-full bg-muted">
                         <img
                           src={item.image_file_id}
                           alt={item.full_name}
@@ -84,7 +84,7 @@ export function EmployeeListTable({ items, onEdit, onDelete }: Props) {
                   <div className="flex gap-2">
                     {onEdit && (
                       <button
-                        className="rounded-md bg-white/10 px-2 py-1 text-xs hover:bg-white/20"
+                        className="rounded-md bg-muted px-2 py-1 text-xs hover:bg-muted/80"
                         onClick={() => onEdit(item.id)}
                       >
                         {t("hr.employees.table.edit")}

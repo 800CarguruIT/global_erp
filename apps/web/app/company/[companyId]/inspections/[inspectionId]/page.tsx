@@ -3583,7 +3583,7 @@ export function InspectionDetailPageClient({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <div className="hidden rounded-md border border-white/20 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-white/80 sm:block">
+            <div className="hidden rounded-md border border-border px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-foreground/80 sm:block">
               Status: {String(inspection?.status ?? "pending")}
             </div>
             {(startedAt || completedAt || cancelledAt) && (
@@ -3606,7 +3606,7 @@ export function InspectionDetailPageClient({
             )}
             <Link
               href={backHref}
-              className="inline-flex items-center rounded-md border border-white/25 bg-transparent px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-white shadow-sm transition hover:bg-white/10"
+              className="inline-flex items-center rounded-md border border-border bg-transparent px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-foreground shadow-sm transition hover:bg-muted"
             >
               Back
             </Link>
@@ -3625,7 +3625,7 @@ export function InspectionDetailPageClient({
               <span
                 key={stage.key}
                 className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${
-                  stage.done ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-300" : "border-white/15 text-white/70"
+                  stage.done ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-300" : "border-border text-foreground/70"
                 }`}
               >
                 {stage.label}
@@ -3636,7 +3636,7 @@ export function InspectionDetailPageClient({
                 <span
                   key={stage.key}
                   className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${
-                    stage.done ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-300" : "border-white/15 text-white/70"
+                    stage.done ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-300" : "border-border text-foreground/70"
                   }`}
                 >
                   {stage.label}
@@ -3656,14 +3656,14 @@ export function InspectionDetailPageClient({
                     ? "border-cyan-400 bg-cyan-500/20 text-cyan-200"
                     : step.done
                     ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-300"
-                    : "border-white/15 text-white/70"
+                    : "border-border text-foreground/70"
                 } disabled:cursor-not-allowed disabled:opacity-40`}
               >
                 Step {step.id}: {step.label}
               </button>
             ))}
           </div>
-          <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-white/70">
+          <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-foreground/70">
             <span className={hasUnsavedChanges ? "text-amber-300" : "text-emerald-300"}>
               {hasUnsavedChanges ? "Unsaved changes" : "All changes saved"}
             </span>
@@ -3709,15 +3709,15 @@ export function InspectionDetailPageClient({
 
         <div className={`grid gap-4 ${isWorkshopView ? "" : "lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]"}`}>
           <Card className={`p-4 ${theme.cardBg} ${theme.cardBorder}`}>
-            <div className="flex items-center justify-between border-b border-white/10 pb-2">
+            <div className="flex items-center justify-between border-b border-border pb-2">
               <div className="text-sm font-semibold">Inspection Details</div>
-              {loading && <div className="text-xs text-white/60">Loading...</div>}
+              {loading && <div className="text-xs text-muted-foreground">Loading...</div>}
             </div>
             <div className="pt-4">
               {inspectionStep === 1 && (
-              <div className="mt-3 rounded-md border border-white/10 bg-white/[0.02] p-3">
+              <div className="mt-3 rounded-md border border-border bg-card/30 p-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-white/70">Collect Car</div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-foreground/70">Collect Car</div>
                   <span
                     className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${
                       collectCarCompleted ? "bg-emerald-500/15 text-emerald-300" : "bg-amber-500/15 text-amber-300"
@@ -3726,9 +3726,9 @@ export function InspectionDetailPageClient({
                     {collectCarCompleted ? "Completed" : "Pending"}
                   </span>
                 </div>
-                <div className="mt-1 text-[11px] text-white/60">
+                <div className="mt-1 text-[11px] text-muted-foreground">
                   Source:{" "}
-                  <span className="font-semibold text-white/80">
+                  <span className="font-semibold text-foreground/80">
                     {collectCarSourceType === "recovery"
                       ? "Recovery Pickup"
                       : collectCarSourceType === "walkin"
@@ -3737,33 +3737,33 @@ export function InspectionDetailPageClient({
                   </span>
                 </div>
                 {collectCarLatestReview?.reviewedAt && (
-                  <div className="mt-1 text-[11px] text-white/60">
+                  <div className="mt-1 text-[11px] text-muted-foreground">
                     Reviewed at: {new Date(String(collectCarLatestReview.reviewedAt)).toLocaleString()}
                     {collectCarLatestReview?.reviewedBy ? ` by ${collectCarLatestReview.reviewedBy}` : ""}
                   </div>
                 )}
                 <div className="mt-3 grid gap-2 lg:grid-cols-2">
                   {Object.entries(collectCarSourceMedia).filter(([, fileId]) => Boolean(fileId)).length === 0 ? (
-                    <div className="rounded border border-dashed border-white/20 p-2 text-xs text-white/60 lg:col-span-2">
+                    <div className="rounded border border-dashed border-border p-2 text-xs text-muted-foreground lg:col-span-2">
                       No source media found.
                     </div>
                   ) : (
                     Object.entries(collectCarSourceMedia)
                       .filter(([, fileId]) => Boolean(fileId))
                       .map(([key, fileId]) => (
-                        <div key={key} className="rounded border border-white/10 bg-black/20 p-2">
-                          <div className="text-[11px] text-white/70">{collectMediaLabel(key)}</div>
+                        <div key={key} className="rounded border border-border bg-black/20 p-2">
+                          <div className="text-[11px] text-foreground/70">{collectMediaLabel(key)}</div>
                           <div className="mt-2">
                             {isVideoMediaKey(key) ? (
                               <video
-                                className="h-28 w-full rounded border border-white/10 object-cover"
+                                className="h-28 w-full rounded border border-border object-cover"
                                 controls
                                 preload="metadata"
                                 src={`/api/files/${fileId}`}
                               />
                             ) : (
                               <img
-                                className="h-28 w-full rounded border border-white/10 object-cover"
+                                className="h-28 w-full rounded border border-border object-cover"
                                 src={`/api/files/${fileId}`}
                                 alt={collectMediaLabel(key)}
                               />
@@ -3817,9 +3817,9 @@ export function InspectionDetailPageClient({
                 {!isReadOnly && (
                   <>
                     <div className="mt-3">
-                      <div className="text-[11px] text-white/70">Any difference between source media and received car?</div>
+                      <div className="text-[11px] text-foreground/70">Any difference between source media and received car?</div>
                       <div className="mt-1 flex items-center gap-3 text-xs">
-                        <label className="flex items-center gap-1 text-white/80">
+                        <label className="flex items-center gap-1 text-foreground/80">
                           <input
                             type="radio"
                             name="collect-car-difference"
@@ -3829,7 +3829,7 @@ export function InspectionDetailPageClient({
                           />
                           No difference
                         </label>
-                        <label className="flex items-center gap-1 text-white/80">
+                        <label className="flex items-center gap-1 text-foreground/80">
                           <input
                             type="radio"
                             name="collect-car-difference"
@@ -3842,7 +3842,7 @@ export function InspectionDetailPageClient({
                       </div>
                     </div>
                     <div className="mt-3">
-                      <label className="text-[11px] font-semibold text-white/70">Notes</label>
+                      <label className="text-[11px] font-semibold text-foreground/70">Notes</label>
                       <textarea
                         className={theme.input}
                         rows={2}
@@ -3866,7 +3866,7 @@ export function InspectionDetailPageClient({
                 {collectCarLogs.length > 0 && (
                   <div className="mt-3 space-y-1">
                     {collectCarLogs.slice(0, 3).map((log, idx) => (
-                      <div key={String(log?.id ?? idx)} className="rounded bg-white/5 px-2 py-1 text-[10px] text-white/75">
+                      <div key={String(log?.id ?? idx)} className="rounded bg-muted/40 px-2 py-1 text-[10px] text-foreground/75">
                         Review: {log?.hasDifference ? "Difference found" : "No difference"} at{" "}
                         {log?.reviewedAt ? new Date(String(log.reviewedAt)).toLocaleString() : "-"}
                         {log?.reviewedBy ? ` by ${log.reviewedBy}` : ""}
@@ -3877,13 +3877,13 @@ export function InspectionDetailPageClient({
               </div>
               )}
               {inspectionStep >= 3 && (
-              <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
+              <div className="rounded-md border border-border bg-card/30 p-3">
                 <div className="flex items-center justify-between gap-2">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-white/70">Pre-Inspection Form</div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-foreground/70">Pre-Inspection Form</div>
                   <span
                     className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${
                       !preInspection
-                        ? "bg-slate-500/15 text-slate-300"
+                        ? "bg-muted text-slate-300"
                         : preInspection?.status === "submitted"
                         ? "bg-emerald-500/15 text-emerald-300"
                         : "bg-amber-500/15 text-amber-300"
@@ -3893,7 +3893,7 @@ export function InspectionDetailPageClient({
                   </span>
                 </div>
                 {preInspection?.submittedAt && (
-                  <div className="mt-1 text-[11px] text-white/60">
+                  <div className="mt-1 text-[11px] text-muted-foreground">
                     Submitted at: {new Date(preInspection.submittedAt).toLocaleString()}
                   </div>
                 )}
@@ -3917,18 +3917,18 @@ export function InspectionDetailPageClient({
                         : toDisplayText(answer) || "-";
                       const details = collectPreInspectionDetails(answer);
                       return (
-                        <div key={key} className="rounded border border-white/10 bg-black/20 p-2">
-                          <div className="text-[11px] text-white/70">
+                        <div key={key} className="rounded border border-border bg-black/20 p-2">
+                          <div className="text-[11px] text-foreground/70">
                             {preInspectionQuestionLabels[key] ?? formatQuestionKeyLabel(key)}
                           </div>
-                          <div className="mt-1 text-xs font-semibold text-white">
+                          <div className="mt-1 text-xs font-semibold text-foreground">
                             {summary}
                           </div>
                           {details.length > 0 && (
                             <div className="mt-1 space-y-1">
                               {details.map((item, idx) => (
-                                <div key={`${key}-${item.key}-${idx}`} className="text-[11px] text-white/70">
-                                  <span className="text-white/50">{formatDetailKey(item.key)}:</span> {item.value}
+                                <div key={`${key}-${item.key}-${idx}`} className="text-[11px] text-foreground/70">
+                                  <span className="text-muted-foreground">{formatDetailKey(item.key)}:</span> {item.value}
                                 </div>
                               ))}
                             </div>
@@ -3953,11 +3953,11 @@ export function InspectionDetailPageClient({
             )}
             <div className="hidden">
               <div className="lg:col-span-2 flex items-center justify-between">
-                <div className="text-xs font-semibold uppercase tracking-wide text-white/70">Checklist</div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-foreground/70">Checklist</div>
                 {!isReadOnly && (
                   <button
                     type="button"
-                    className="rounded-md border border-white/20 px-2.5 py-1 text-[11px] font-semibold text-white/80 hover:bg-white/10"
+                    className="rounded-md border border-border px-2.5 py-1 text-[11px] font-semibold text-foreground/80 hover:bg-muted"
                     onClick={() => {
                       const next: Record<string, CheckValue> = {};
                       checkItems.forEach((item) => {
@@ -4010,7 +4010,7 @@ export function InspectionDetailPageClient({
 
             <div className="hidden">
               <div>
-                <label className="text-xs font-semibold text-white/70">Lead Branch</label>
+                <label className="text-xs font-semibold text-foreground/70">Lead Branch</label>
                 <input
                   type="text"
                   className={theme.input}
@@ -4020,7 +4020,7 @@ export function InspectionDetailPageClient({
                 />
               </div>
               <div>
-                <label className="text-xs font-semibold text-white/70">Inspector Name</label>
+                <label className="text-xs font-semibold text-foreground/70">Inspector Name</label>
                 <input
                   type="text"
                   className={theme.input}
@@ -4030,7 +4030,7 @@ export function InspectionDetailPageClient({
                 />
               </div>
               <div>
-                <label className="text-xs font-semibold text-white/70">Car-In Mileage</label>
+                <label className="text-xs font-semibold text-foreground/70">Car-In Mileage</label>
                 <input
                   type="text"
                   className={theme.input}
@@ -4044,7 +4044,7 @@ export function InspectionDetailPageClient({
 
             <div className="hidden">
               <div>
-                <label className="text-xs font-semibold text-white/70">Customer Complain</label>
+                <label className="text-xs font-semibold text-foreground/70">Customer Complain</label>
                 <textarea
                   className={theme.input}
                   rows={4}
@@ -4053,7 +4053,7 @@ export function InspectionDetailPageClient({
                 />
               </div>
               <div>
-                <label className="text-xs font-semibold text-white/70">Inspector Remarks</label>
+                <label className="text-xs font-semibold text-foreground/70">Inspector Remarks</label>
                 <textarea
                   className={theme.input}
                   rows={4}
@@ -4069,11 +4069,11 @@ export function InspectionDetailPageClient({
               <div className={`mt-2 rounded-md ${theme.cardBorder} ${theme.surfaceSubtle} p-3`}>
                 <div className="grid gap-3 lg:grid-cols-2">
                   <div className="space-y-2">
-                    <div className="text-xs font-semibold text-white/70">Car In Video</div>
+                    <div className="text-xs font-semibold text-foreground/70">Car In Video</div>
                     <div
                       {...carInDropzone.getRootProps()}
                       className={`cursor-pointer rounded-md border border-dashed px-4 py-5 text-center text-xs transition ${
-                        carInDropzone.isDragActive ? "border-cyan-400 bg-cyan-500/10 text-cyan-200" : "border-white/20 text-white/70 hover:bg-white/5"
+                        carInDropzone.isDragActive ? "border-cyan-400 bg-cyan-500/10 text-cyan-200" : "border-border text-foreground/70 hover:bg-muted/40"
                       }`}
                     >
                       <input {...carInDropzone.getInputProps()} />
@@ -4083,19 +4083,19 @@ export function InspectionDetailPageClient({
                     </div>
                     {videoUploading === "in" && (
                       <div className="space-y-1">
-                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
                           <div
                             className="h-full rounded-full bg-cyan-400 transition-all duration-150"
                             style={{ width: `${videoUploadProgress.in}%` }}
                           />
                         </div>
-                        <div className="text-[10px] text-white/60">{videoUploadProgress.in}% uploaded</div>
+                        <div className="text-[10px] text-muted-foreground">{videoUploadProgress.in}% uploaded</div>
                       </div>
                     )}
                     {carInVideoId && (
                       <div className="space-y-2">
                         <video
-                          className="h-[200px] w-[200px] rounded-md border border-white/10 object-cover"
+                          className="h-[200px] w-[200px] rounded-md border border-border object-cover"
                           controls
                           preload="metadata"
                           src={`/api/files/${carInVideoId}`}
@@ -4112,11 +4112,11 @@ export function InspectionDetailPageClient({
                     )}
                   </div>
                   <div className="space-y-2">
-                    <div className="text-xs font-semibold text-white/70">Car Out Video</div>
+                    <div className="text-xs font-semibold text-foreground/70">Car Out Video</div>
                     <div
                       {...carOutDropzone.getRootProps()}
                       className={`cursor-pointer rounded-md border border-dashed px-4 py-5 text-center text-xs transition ${
-                        carOutDropzone.isDragActive ? "border-cyan-400 bg-cyan-500/10 text-cyan-200" : "border-white/20 text-white/70 hover:bg-white/5"
+                        carOutDropzone.isDragActive ? "border-cyan-400 bg-cyan-500/10 text-cyan-200" : "border-border text-foreground/70 hover:bg-muted/40"
                       }`}
                     >
                       <input {...carOutDropzone.getInputProps()} />
@@ -4126,19 +4126,19 @@ export function InspectionDetailPageClient({
                     </div>
                     {videoUploading === "out" && (
                       <div className="space-y-1">
-                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
                           <div
                             className="h-full rounded-full bg-cyan-400 transition-all duration-150"
                             style={{ width: `${videoUploadProgress.out}%` }}
                           />
                         </div>
-                        <div className="text-[10px] text-white/60">{videoUploadProgress.out}% uploaded</div>
+                        <div className="text-[10px] text-muted-foreground">{videoUploadProgress.out}% uploaded</div>
                       </div>
                     )}
                     {carOutVideoId && (
                       <div className="space-y-2">
                         <video
-                          className="h-[200px] w-[200px] rounded-md border border-white/10 object-cover"
+                          className="h-[200px] w-[200px] rounded-md border border-border object-cover"
                           controls
                           preload="metadata"
                           src={`/api/files/${carOutVideoId}`}
@@ -4159,13 +4159,13 @@ export function InspectionDetailPageClient({
             </div>
 
             <div className={`mt-6 ${inspectionStep === 3 ? "" : "hidden"}`}>
-              <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
+              <div className="rounded-md border border-border bg-card/30 p-3">
                 <div className="text-sm font-semibold">Issues and Mandatory Checks</div>
-                <div className="mt-4 rounded-md border border-white/10 bg-black/20 p-3">
+                <div className="mt-4 rounded-md border border-border bg-black/20 p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="text-xs font-semibold text-white/80">Car Media Verification (Front/Rear/Right/Left + 360 Video)</div>
+                    <div className="text-xs font-semibold text-foreground/80">Car Media Verification (Front/Rear/Right/Left + 360 Video)</div>
                     <div className="flex flex-wrap items-center gap-2 text-[11px]">
-                      <span className="rounded-full border border-white/15 px-2 py-0.5 text-white/70">
+                      <span className="rounded-full border border-border px-2 py-0.5 text-foreground/70">
                         {carMediaCounts.verified}/{carMediaCounts.total} verified
                       </span>
                       <span className="rounded-full border border-amber-500/40 px-2 py-0.5 text-amber-300">
@@ -4191,11 +4191,11 @@ export function InspectionDetailPageClient({
                               ? "border-emerald-500/30 bg-emerald-500/5"
                               : reviewStatus === "rejected"
                               ? "border-rose-500/30 bg-rose-500/5"
-                              : "border-white/10"
+                              : "border-border"
                           }`}
                         >
                           <div className="flex items-center justify-between gap-2">
-                            <div className="text-[11px] text-white/70">{label}</div>
+                            <div className="text-[11px] text-foreground/70">{label}</div>
                             <span
                               className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${
                                 reviewStatus === "verified"
@@ -4212,14 +4212,14 @@ export function InspectionDetailPageClient({
                             <>
                               {key === "video" ? (
                                 <video
-                                  className="mt-2 h-32 w-full rounded border border-white/10 object-cover"
+                                  className="mt-2 h-32 w-full rounded border border-border object-cover"
                                   controls
                                   preload="metadata"
                                   src={`/api/files/${fileId}`}
                                 />
                               ) : (
                                 <img
-                                  className="mt-2 h-32 w-full rounded border border-white/10 object-cover"
+                                  className="mt-2 h-32 w-full rounded border border-border object-cover"
                                   src={`/api/files/${fileId}`}
                                   alt={label}
                                 />
@@ -4287,7 +4287,7 @@ export function InspectionDetailPageClient({
                                   ) : (
                                     <button
                                       type="button"
-                                      className="rounded-md border border-white/20 px-2.5 py-1 text-[11px] font-semibold text-white/80 hover:bg-white/10"
+                                      className="rounded-md border border-border px-2.5 py-1 text-[11px] font-semibold text-foreground/80 hover:bg-muted"
                                       disabled={isReadOnly || isCollectCarPending}
                                       onClick={async () => {
                                         const nextReview = { ...carMediaReview, [key]: "pending" as CarMediaReviewStatus };
@@ -4341,18 +4341,18 @@ export function InspectionDetailPageClient({
                                   </div>
                                   {replacementId && (
                                     <div className="mt-2 grid gap-2 lg:grid-cols-2">
-                                      <div className="rounded border border-white/10 bg-black/20 p-2">
-                                        <div className="text-[10px] text-white/60">Original</div>
+                                      <div className="rounded border border-border bg-black/20 p-2">
+                                        <div className="text-[10px] text-muted-foreground">Original</div>
                                         {key === "video" ? (
                                           <video
-                                            className="mt-1 h-24 w-full rounded border border-white/10 object-cover"
+                                            className="mt-1 h-24 w-full rounded border border-border object-cover"
                                             controls
                                             preload="metadata"
                                             src={`/api/files/${fileId}`}
                                           />
                                         ) : (
                                           <img
-                                            className="mt-1 h-24 w-full rounded border border-white/10 object-cover"
+                                            className="mt-1 h-24 w-full rounded border border-border object-cover"
                                             src={`/api/files/${fileId}`}
                                             alt={`Original ${label}`}
                                           />
@@ -4447,9 +4447,9 @@ export function InspectionDetailPageClient({
                     </div>
                   )}
                 </div>
-                <div className="mt-3 rounded-md border border-white/10 bg-black/20 p-3">
+                <div className="mt-3 rounded-md border border-border bg-black/20 p-3">
                   <div className="flex items-center justify-between gap-2">
-                    <label className="text-xs font-semibold text-white/70">Issues / Damages Notes</label>
+                    <label className="text-xs font-semibold text-foreground/70">Issues / Damages Notes</label>
                     {!isReadOnly && !isCollectCarPending && (
                       <button
                         type="button"
@@ -4464,7 +4464,7 @@ export function InspectionDetailPageClient({
                   {isAddingIssueNote && (
                     <div className="mt-2 rounded-md border border-cyan-500/30 bg-cyan-500/5 p-2">
                       <div>
-                        <label className="text-[11px] text-white/70">Description</label>
+                        <label className="text-[11px] text-foreground/70">Description</label>
                         <textarea
                           className={theme.input}
                           rows={2}
@@ -4494,7 +4494,7 @@ export function InspectionDetailPageClient({
                         </button>
                         <button
                           type="button"
-                          className="rounded-md border border-white/20 px-2.5 py-1 text-[11px] font-semibold text-white/80"
+                          className="rounded-md border border-border px-2.5 py-1 text-[11px] font-semibold text-foreground/80"
                           onClick={resetIssueNoteComposer}
                         >
                           Cancel
@@ -4503,14 +4503,14 @@ export function InspectionDetailPageClient({
                     </div>
                   )}
                   {inspectionIssueEntries.length === 0 ? (
-                    <div className="mt-2 text-[11px] text-white/60">
-                      No issue notes added. Click <span className="font-semibold text-white/80">Add Note</span> to attach image and description.
+                    <div className="mt-2 text-[11px] text-muted-foreground">
+                      No issue notes added. Click <span className="font-semibold text-foreground/80">Add Note</span> to attach image and description.
                     </div>
                   ) : (
                     <div className="mt-2 space-y-2">
                       {inspectionIssueEntries.map((entry, index) => (
-                        <div key={entry.id} className="rounded-md border border-white/10 bg-black/30 p-2">
-                          <div className="mb-2 flex items-center justify-between gap-2 text-[11px] text-white/70">
+                        <div key={entry.id} className="rounded-md border border-border bg-black/30 p-2">
+                          <div className="mb-2 flex items-center justify-between gap-2 text-[11px] text-foreground/70">
                             <span>Note #{index + 1}</span>
                             {!isReadOnly && !isCollectCarPending && (
                               <button
@@ -4527,7 +4527,7 @@ export function InspectionDetailPageClient({
                             )}
                           </div>
                           <div>
-                            <label className="text-[11px] text-white/70">Description</label>
+                            <label className="text-[11px] text-foreground/70">Description</label>
                             <textarea
                               className={theme.input}
                               rows={2}
@@ -4575,11 +4575,11 @@ export function InspectionDetailPageClient({
             </div>
 
             <div className={`mt-6 ${inspectionStep === 4 ? "" : "hidden"}`}>
-              <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
+              <div className="rounded-md border border-border bg-card/30 p-3">
                 <div className="text-sm font-semibold">Vehicle Data and VIN</div>
                 <div className="mt-3 grid gap-3 lg:grid-cols-2">
                   <div>
-                    <label className="text-xs font-semibold text-white/70">VIN</label>
+                    <label className="text-xs font-semibold text-foreground/70">VIN</label>
                     <div className="mt-1 flex flex-col gap-2 sm:flex-row">
                       <input
                         type="text"
@@ -4627,7 +4627,7 @@ export function InspectionDetailPageClient({
                     </div>
                     {vinLookupCars.length > 1 && (
                       <div className="mt-2">
-                        <label className="text-[11px] text-white/70">Select matched car</label>
+                        <label className="text-[11px] text-foreground/70">Select matched car</label>
                         <select
                           className={`${theme.input} mt-1`}
                           value={vinLookupSelectedCarId}
@@ -4661,7 +4661,7 @@ export function InspectionDetailPageClient({
                     )}
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-white/70">Car Plate</label>
+                    <label className="text-xs font-semibold text-foreground/70">Car Plate</label>
                     <input
                       type="text"
                       className={theme.input}
@@ -4672,7 +4672,7 @@ export function InspectionDetailPageClient({
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-white/70">Car Make <span className="text-red-400">*</span></label>
+                    <label className="text-xs font-semibold text-foreground/70">Car Make <span className="text-red-400">*</span></label>
                     <input
                       type="text"
                       className={`${theme.input} ${!inspectionMake.trim() && !isReadOnly ? "border-red-500/40" : ""}`}
@@ -4683,7 +4683,7 @@ export function InspectionDetailPageClient({
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-white/70">Car Model <span className="text-red-400">*</span></label>
+                    <label className="text-xs font-semibold text-foreground/70">Car Model <span className="text-red-400">*</span></label>
                     <input
                       type="text"
                       className={`${theme.input} ${!inspectionModel.trim() && !isReadOnly ? "border-red-500/40" : ""}`}
@@ -4694,7 +4694,7 @@ export function InspectionDetailPageClient({
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-white/70">Car Year <span className="text-red-400">*</span></label>
+                    <label className="text-xs font-semibold text-foreground/70">Car Year <span className="text-red-400">*</span></label>
                     <input
                       type="text"
                       className={`${theme.input} ${!inspectionYear.trim() && !isReadOnly ? "border-red-500/40" : ""}`}
@@ -4705,7 +4705,7 @@ export function InspectionDetailPageClient({
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-white/70">Tyre Size (Front)</label>
+                    <label className="text-xs font-semibold text-foreground/70">Tyre Size (Front)</label>
                     <select
                       className={theme.input}
                       value={tyreSizeFront}
@@ -4724,7 +4724,7 @@ export function InspectionDetailPageClient({
                     </select>
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-white/70">Tyre Size (Rear)</label>
+                    <label className="text-xs font-semibold text-foreground/70">Tyre Size (Rear)</label>
                     <select
                       className={theme.input}
                       value={tyreSizeRear}
@@ -4743,7 +4743,7 @@ export function InspectionDetailPageClient({
                     </select>
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-white/70">Car Mileage</label>
+                    <label className="text-xs font-semibold text-foreground/70">Car Mileage</label>
                     <input
                       type="text"
                       className={theme.input}
@@ -4774,12 +4774,12 @@ export function InspectionDetailPageClient({
                         .filter(([, v]) => v)
                         .map(([label, value]) => (
                           <div key={label}>
-                            <span className="text-white/40">{label}: </span>
-                            <span className="text-white/90">{value}</span>
+                            <span className="text-muted-foreground">{label}: </span>
+                            <span className="text-foreground/90">{value}</span>
                           </div>
                         ))}
                     </div>
-                    <div className="mt-1 text-[10px] text-white/30">Source: {aiVinDecodeResult.source}</div>
+                    <div className="mt-1 text-[10px] text-muted-foreground/50">Source: {aiVinDecodeResult.source}</div>
                     <div className="mt-3 flex gap-2">
                       <button
                         type="button"
@@ -4814,7 +4814,7 @@ export function InspectionDetailPageClient({
                       </button>
                       <button
                         type="button"
-                        className="rounded-md border border-white/20 px-4 py-1.5 text-xs font-medium text-white/70 hover:bg-white/5"
+                        className="rounded-md border border-border px-4 py-1.5 text-xs font-medium text-foreground/70 hover:bg-muted/40"
                         onClick={() => {
                           setAiVinDecodeResult(null);
                           setVinLookupNote("Decode dismissed. Car details unchanged.");
@@ -4833,15 +4833,15 @@ export function InspectionDetailPageClient({
             <div className={`mt-6 ${inspectionStep === 5 ? "" : "hidden"}`}>
 
               {/* Inspection Checks (Oil/Battery/Tyre/OBD) */}
-              <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
+              <div className="rounded-md border border-border bg-card/30 p-3">
                 <div className="text-sm font-semibold">Quick Checks</div>
                 <div className="mt-3 grid gap-3 lg:grid-cols-2">
                   {processCheckItems.map((item) => (
-                    <div key={item.key} className="rounded-md border border-white/10 bg-black/20 p-3">
-                      <div className="text-xs font-semibold text-white/80">{item.label}</div>
+                    <div key={item.key} className="rounded-md border border-border bg-black/20 p-3">
+                      <div className="text-xs font-semibold text-foreground/80">{item.label}</div>
                       <div className="mt-2 flex items-center gap-3 text-xs">
                         {(["ok", "issue", "na"] as ProcessCheckValue[]).map((value) => (
-                          <label key={value} className="flex items-center gap-1 text-white/80">
+                          <label key={value} className="flex items-center gap-1 text-foreground/80">
                             <input
                               type="radio"
                               name={`check-${item.key}`}
@@ -4854,7 +4854,7 @@ export function InspectionDetailPageClient({
                         ))}
                       </div>
                       <div className="mt-2">
-                        <div className="text-[10px] text-white/50">{item.label} images</div>
+                        <div className="text-[10px] text-muted-foreground">{item.label} images</div>
                         <input
                           type="file"
                           multiple
@@ -4863,7 +4863,7 @@ export function InspectionDetailPageClient({
                           onChange={(e) => {
                             void uploadProcessCheckFiles(item.key, e.target.files);
                           }}
-                          className="mt-1 text-xs text-white/70"
+                          className="mt-1 text-xs text-foreground/70"
                         />
                       </div>
                     </div>
@@ -4876,13 +4876,13 @@ export function InspectionDetailPageClient({
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="text-sm font-semibold text-violet-100">Select Parts by Category</div>
-                    <div className="text-[11px] text-white/50">Tap a category, then sub-category, then the specific part to add it.</div>
+                    <div className="text-[11px] text-muted-foreground">Tap a category, then sub-category, then the specific part to add it.</div>
                   </div>
                 </div>
 
                 <div className="mt-3">
                   {!quickCatLoaded && (
-                    <div className="text-xs text-white/50">Loading categories...</div>
+                    <div className="text-xs text-muted-foreground">Loading categories...</div>
                   )}
 
                   {/* Level 1: Category Grid */}
@@ -4894,11 +4894,11 @@ export function InspectionDetailPageClient({
                           type="button"
                           disabled={isReadOnly}
                           onClick={() => { setQuickCatSelectedCat(cat); setQuickCatLevel("sub"); }}
-                          className="flex flex-col items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.03] p-3 text-center transition hover:border-violet-400 hover:bg-violet-500/10 disabled:opacity-50"
+                          className="flex flex-col items-center gap-1.5 rounded-xl border border-border bg-card/40 p-3 text-center transition hover:border-violet-400 hover:bg-violet-500/10 disabled:opacity-50"
                         >
                           <span className="text-xl">{({"engine":"🔧","transmission":"⚙️","brakes":"🛑","suspension":"🔩","steering":"🎯","electrical":"⚡","ac":"❄️","body":"🚗","interior":"💺","exhaust":"💨","fuel":"⛽","tyres":"🛞"} as any)[cat.icon] ?? "🔧"}</span>
-                          <span className="text-[11px] font-semibold leading-tight text-white/90">{cat.name}</span>
-                          <span className="text-[10px] text-white/40">{cat.subcategories?.length ?? 0} groups</span>
+                          <span className="text-[11px] font-semibold leading-tight text-foreground/90">{cat.name}</span>
+                          <span className="text-[10px] text-muted-foreground">{cat.subcategories?.length ?? 0} groups</span>
                         </button>
                       ))}
                     </div>
@@ -4910,7 +4910,7 @@ export function InspectionDetailPageClient({
                       <button type="button" onClick={() => { setQuickCatLevel("cat"); setQuickCatSelectedCat(null); }} className="text-xs text-violet-300 hover:underline">
                         ← Back to all categories
                       </button>
-                      <div className="text-xs font-semibold text-white/90">{quickCatSelectedCat.name}</div>
+                      <div className="text-xs font-semibold text-foreground/90">{quickCatSelectedCat.name}</div>
                       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
                         {(quickCatSelectedCat.subcategories ?? []).map((sub: any) => (
                           <button
@@ -4918,10 +4918,10 @@ export function InspectionDetailPageClient({
                             type="button"
                             disabled={isReadOnly}
                             onClick={() => { setQuickCatSelectedSub(sub); setQuickCatLevel("part"); }}
-                            className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5 text-left transition hover:border-violet-400 hover:bg-violet-500/10 disabled:opacity-50"
+                            className="rounded-lg border border-border bg-card/40 px-3 py-2.5 text-left transition hover:border-violet-400 hover:bg-violet-500/10 disabled:opacity-50"
                           >
-                            <div className="text-xs font-medium text-white/90">{sub.name}</div>
-                            <div className="text-[10px] text-white/40">{sub.parts?.length ?? 0} parts</div>
+                            <div className="text-xs font-medium text-foreground/90">{sub.name}</div>
+                            <div className="text-[10px] text-muted-foreground">{sub.parts?.length ?? 0} parts</div>
                           </button>
                         ))}
                       </div>
@@ -4934,7 +4934,7 @@ export function InspectionDetailPageClient({
                       <button type="button" onClick={() => { setQuickCatLevel("sub"); setQuickCatSelectedSub(null); }} className="text-xs text-violet-300 hover:underline">
                         ← Back to {quickCatSelectedCat?.name}
                       </button>
-                      <div className="text-xs font-semibold text-white/90">{quickCatSelectedSub.name}</div>
+                      <div className="text-xs font-semibold text-foreground/90">{quickCatSelectedSub.name}</div>
                       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                         {(quickCatSelectedSub.parts ?? []).map((part: any) => {
                           const alreadyAdded = parts.some((p) => p.productName === part.name);
@@ -4973,10 +4973,10 @@ export function InspectionDetailPageClient({
                               className={`rounded-lg border px-3 py-2.5 text-left transition ${
                                 alreadyAdded
                                   ? "border-emerald-500/30 bg-emerald-500/10 opacity-60"
-                                  : "border-white/10 bg-white/[0.03] hover:border-violet-400 hover:bg-violet-500/10"
+                                  : "border-border bg-card/40 hover:border-violet-400 hover:bg-violet-500/10"
                               }`}
                             >
-                              <span className="text-xs text-white/90">{alreadyAdded ? "✓ " : "＋ "}{part.name}</span>
+                              <span className="text-xs text-foreground/90">{alreadyAdded ? "✓ " : "＋ "}{part.name}</span>
                             </button>
                           );
                         })}
@@ -4991,7 +4991,7 @@ export function InspectionDetailPageClient({
                 <div className="flex items-center justify-between gap-2">
                   <div className="text-sm font-semibold">Findings / Parts Needed</div>
                   <div className="flex flex-wrap items-center gap-2 text-[10px]">
-                    <span className="rounded-full border border-white/15 px-2 py-0.5 text-white/70">Total: {parts.length}</span>
+                    <span className="rounded-full border border-border px-2 py-0.5 text-foreground/70">Total: {parts.length}</span>
                     <span className="rounded-full border border-emerald-500/40 px-2 py-0.5 text-emerald-300">
                       Received: {parts.filter((p) => (p.orderStatus ?? "").toLowerCase() === "received").length}
                     </span>
@@ -5001,7 +5001,7 @@ export function InspectionDetailPageClient({
                     {!isReadOnly && (
                       <button
                         type="button"
-                        className={`rounded-md px-2.5 py-1 text-[11px] font-semibold text-white disabled:opacity-50 ${isCollectCarPending ? "bg-slate-600 cursor-not-allowed" : "bg-emerald-600"}`}
+                        className={`rounded-md px-2.5 py-1 text-[11px] font-semibold text-white disabled:opacity-50 ${isCollectCarPending ? "bg-muted-foreground cursor-not-allowed" : "bg-emerald-600"}`}
                         onClick={() => {
                           if (isCollectCarPending) {
                             toast.error("Complete Collect Car stage (Step 1) before saving parts.");
@@ -5019,22 +5019,22 @@ export function InspectionDetailPageClient({
                 </div>
 
                 {parts.length === 0 ? (
-                  <div className="mt-3 rounded-md border border-white/10 bg-white/[0.02] p-6 text-center">
-                    <div className="text-xs text-white/50">No parts added yet. Select from the categories above.</div>
+                  <div className="mt-3 rounded-md border border-border bg-card/30 p-6 text-center">
+                    <div className="text-xs text-muted-foreground">No parts added yet. Select from the categories above.</div>
                   </div>
                 ) : (
                   <div className="mt-3 space-y-3">
                     {parts.map((part, idx) => (
-                      <div key={part.id ?? idx} className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
+                      <div key={part.id ?? idx} className="rounded-lg border border-border bg-card/30 p-3">
                         {/* Row 1: Part name + remove */}
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0 flex-1">
-                            <div className="text-sm font-semibold text-white/90">{(part as any).productName || part.part || "Unnamed part"}</div>
-                            {part.description && <div className="text-[10px] text-white/40">{part.description}</div>}
+                            <div className="text-sm font-semibold text-foreground/90">{(part as any).productName || part.part || "Unnamed part"}</div>
+                            {part.description && <div className="text-[10px] text-muted-foreground">{part.description}</div>}
                             {!part.isSaved && <span className="text-[10px] text-amber-400">● Draft</span>}
                           </div>
                           {!isReadOnly && (
-                            <button type="button" onClick={() => setParts((prev) => prev.filter((_, i) => i !== idx))} className="rounded p-1 text-white/30 hover:text-rose-400">✕</button>
+                            <button type="button" onClick={() => setParts((prev) => prev.filter((_, i) => i !== idx))} className="rounded p-1 text-muted-foreground/50 hover:text-rose-400">✕</button>
                           )}
                         </div>
 
@@ -5042,7 +5042,7 @@ export function InspectionDetailPageClient({
                         <div className="mt-2 flex flex-wrap gap-4">
                           {/* Action Type: Replace / Service / Repair */}
                           <div className="space-y-1">
-                            <div className="text-[10px] font-semibold uppercase tracking-wide text-white/40">Action</div>
+                            <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Action</div>
                             <div className="flex gap-1">
                               {([
                                 { key: "replace", label: "Replace", icon: "🔄" },
@@ -5057,7 +5057,7 @@ export function InspectionDetailPageClient({
                                   className={`rounded-lg px-2.5 py-1 text-[11px] font-medium transition ${
                                     (part as any).actionType === key
                                       ? "bg-violet-500/25 text-violet-200 ring-1 ring-violet-500/50"
-                                      : "bg-white/5 text-white/50 hover:bg-white/10"
+                                      : "bg-muted/40 text-muted-foreground hover:bg-muted"
                                   }`}
                                 >
                                   {icon} {label}
@@ -5068,7 +5068,7 @@ export function InspectionDetailPageClient({
 
                           {/* Priority: Safety Risk / Mandatory / Recommended */}
                           <div className="space-y-1">
-                            <div className="text-[10px] font-semibold uppercase tracking-wide text-white/40">Priority</div>
+                            <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Priority</div>
                             <div className="flex gap-1">
                               {([
                                 { key: "safety_risk", label: "Safety Risk", color: "rose" },
@@ -5085,7 +5085,7 @@ export function InspectionDetailPageClient({
                                       ? color === "rose" ? "bg-rose-500/25 text-rose-200 ring-1 ring-rose-500/50"
                                         : color === "amber" ? "bg-amber-500/25 text-amber-200 ring-1 ring-amber-500/50"
                                         : "bg-cyan-500/25 text-cyan-200 ring-1 ring-cyan-500/50"
-                                      : "bg-white/5 text-white/50 hover:bg-white/10"
+                                      : "bg-muted/40 text-muted-foreground hover:bg-muted"
                                   }`}
                                 >
                                   {label}
@@ -5097,14 +5097,14 @@ export function InspectionDetailPageClient({
 
                         {/* Row 2b: Quantity */}
                         <div className="mt-2 flex items-center gap-2">
-                          <div className="text-[10px] font-semibold uppercase tracking-wide text-white/40">Qty</div>
+                          <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Qty</div>
                           <input
                             type="number"
                             min={1}
                             value={part.qty}
                             readOnly={isReadOnly}
                             onChange={(e) => updatePartField(idx, "qty", e.target.value)}
-                            className="w-16 rounded border border-white/20 bg-white/5 px-2 py-1 text-xs text-white text-center"
+                            className="w-16 rounded border border-border bg-muted/40 px-2 py-1 text-xs text-foreground text-center"
                           />
                         </div>
 
@@ -5112,12 +5112,12 @@ export function InspectionDetailPageClient({
                         {(part as any).aiDescription ? (
                           <div className="mt-2 rounded-md border border-cyan-500/20 bg-cyan-500/[0.03] px-3 py-2">
                             <div className="text-[10px] font-semibold text-cyan-300">AI Assessment</div>
-                            <div className="mt-0.5 text-[11px] leading-relaxed text-white/70">{(part as any).aiDescription}</div>
+                            <div className="mt-0.5 text-[11px] leading-relaxed text-foreground/70">{(part as any).aiDescription}</div>
                           </div>
                         ) : (part as any).actionType && (part as any).priority ? (
                           <div className="mt-2 text-[10px] text-cyan-300 animate-pulse">Generating AI description...</div>
                         ) : (
-                          <div className="mt-2 text-[10px] text-white/30">Select action &amp; priority to generate AI description.</div>
+                          <div className="mt-2 text-[10px] text-muted-foreground/50">Select action &amp; priority to generate AI description.</div>
                         )}
 
                         {/* Row 4: Photo / Video Evidence */}
@@ -5133,14 +5133,14 @@ export function InspectionDetailPageClient({
                                     const files = ((p as any).mediaFiles ?? []).filter((_: any, fi: number) => fi !== mfIdx);
                                     return { ...p, mediaFiles: files, mediaFileId: files[0]?.id ?? null, isSaved: false };
                                   }));
-                                }} className="text-[10px] text-white/40 hover:text-rose-400">✕</button>
+                                }} className="text-[10px] text-muted-foreground hover:text-rose-400">✕</button>
                               )}
                             </div>
                           ))}
                           {/* Always show upload buttons unless read-only */}
                           {!isReadOnly && (
                             <>
-                              <label className="flex cursor-pointer items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-1.5 text-[11px] text-white/60 transition hover:border-violet-400 hover:bg-violet-500/10 hover:text-white/90">
+                              <label className="flex cursor-pointer items-center gap-1.5 rounded-md border border-border bg-card/40 px-2.5 py-1.5 text-[11px] text-muted-foreground transition hover:border-violet-400 hover:bg-violet-500/10 hover:text-foreground/90">
                                 📷 Photo
                                 <input
                                   type="file"
@@ -5170,7 +5170,7 @@ export function InspectionDetailPageClient({
                                   }}
                                 />
                               </label>
-                              <label className="flex cursor-pointer items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-1.5 text-[11px] text-white/60 transition hover:border-violet-400 hover:bg-violet-500/10 hover:text-white/90">
+                              <label className="flex cursor-pointer items-center gap-1.5 rounded-md border border-border bg-card/40 px-2.5 py-1.5 text-[11px] text-muted-foreground transition hover:border-violet-400 hover:bg-violet-500/10 hover:text-foreground/90">
                                 🎥 Video
                                 <input
                                   type="file"
@@ -5216,15 +5216,15 @@ export function InspectionDetailPageClient({
                     <div className="text-sm font-semibold text-cyan-100">AI Suggestions</div>
                     {aiSuggestionsLoading && <span className="text-[11px] text-cyan-300 animate-pulse">analyzing...</span>}
                   </div>
-                  <div className="text-[11px] text-white/50">Related parts that may also need inspection — add or dismiss.</div>
+                  <div className="text-[11px] text-muted-foreground">Related parts that may also need inspection — add or dismiss.</div>
 
                   {aiSuggestions.length > 0 && (
                     <div className="mt-3 space-y-2">
                       {aiSuggestions.map((suggestion, idx) => (
-                        <div key={idx} className="flex items-center gap-3 rounded-lg border border-cyan-500/20 bg-white/[0.02] p-3">
+                        <div key={idx} className="flex items-center gap-3 rounded-lg border border-cyan-500/20 bg-card/30 p-3">
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2">
-                              <span className="text-xs font-semibold text-white/90">{suggestion.name}</span>
+                              <span className="text-xs font-semibold text-foreground/90">{suggestion.name}</span>
                               <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold ${
                                 suggestion.likelihood === "high"
                                   ? "bg-rose-500/20 text-rose-300"
@@ -5233,8 +5233,8 @@ export function InspectionDetailPageClient({
                                 {suggestion.likelihood === "high" ? "LIKELY" : "POSSIBLE"}
                               </span>
                             </div>
-                            <div className="text-[11px] text-white/50">{suggestion.reason}</div>
-                            <div className="text-[10px] text-white/30">{suggestion.category}</div>
+                            <div className="text-[11px] text-muted-foreground">{suggestion.reason}</div>
+                            <div className="text-[10px] text-muted-foreground/50">{suggestion.category}</div>
                           </div>
                           <button
                             type="button"
@@ -5272,7 +5272,7 @@ export function InspectionDetailPageClient({
                           <button
                             type="button"
                             onClick={() => setAiSuggestions((prev) => prev.filter((_, i) => i !== idx))}
-                            className="rounded p-1 text-white/30 hover:text-white/60"
+                            className="rounded p-1 text-muted-foreground/50 hover:text-muted-foreground"
                           >
                             ✕
                           </button>
@@ -5282,7 +5282,7 @@ export function InspectionDetailPageClient({
                   )}
 
                   {!aiSuggestionsLoading && aiSuggestions.length === 0 && aiSuggestionsLastKey && (
-                    <div className="mt-2 text-[11px] text-white/40">No additional suggestions. All related parts covered.</div>
+                    <div className="mt-2 text-[11px] text-muted-foreground">No additional suggestions. All related parts covered.</div>
                   )}
                 </div>
               )}
@@ -5291,7 +5291,7 @@ export function InspectionDetailPageClient({
 
             <div className={`mt-6 ${inspectionStep === 6 ? "" : "hidden"}`}>
               <div className="flex items-center justify-between gap-2">
-                <label className="text-xs font-semibold text-white/70">Inspector Remarks</label>
+                <label className="text-xs font-semibold text-foreground/70">Inspector Remarks</label>
                 <button
                   type="button"
                   className="rounded-md bg-violet-600 px-3 py-1.5 text-[11px] font-semibold text-white disabled:opacity-50"
@@ -5331,7 +5331,7 @@ export function InspectionDetailPageClient({
               {aiSummaryResult?.customer && (
                 <div className="mt-2 rounded-md border border-violet-500/20 bg-violet-500/5 p-3">
                   <div className="text-[11px] font-semibold text-violet-200">Customer-Friendly Summary (AI)</div>
-                  <div className="mt-1 whitespace-pre-wrap text-xs text-white/80">{aiSummaryResult.customer}</div>
+                  <div className="mt-1 whitespace-pre-wrap text-xs text-foreground/80">{aiSummaryResult.customer}</div>
                 </div>
               )}
             </div>
@@ -5346,34 +5346,34 @@ export function InspectionDetailPageClient({
                 </button>
               </div>
               <div id="inspection-report-print" className="report-print-root rounded-md border border-cyan-500/25 bg-cyan-500/5 p-4">
-                <div className="report-section rounded-md border border-white/10 bg-black/10 p-3">
+                <div className="report-section rounded-md border border-border bg-black/10 p-3">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
                       {reportWorkshopBranding.logoUrl ? (
                         <img
                           src={reportWorkshopBranding.logoUrl}
                           alt="Workshop logo"
-                          className="h-12 w-12 rounded border border-white/20 object-cover"
+                          className="h-12 w-12 rounded border border-border object-cover"
                         />
                       ) : (
-                        <div className="flex h-12 w-12 items-center justify-center rounded border border-white/20 text-[10px] text-white/70">
+                        <div className="flex h-12 w-12 items-center justify-center rounded border border-border text-[10px] text-foreground/70">
                           LOGO
                         </div>
                       )}
                       <div>
-                        <div className="text-base font-semibold text-white">{reportWorkshopBranding.workshopName}</div>
-                        <div className="text-xs text-white/70">{reportWorkshopBranding.contact}</div>
+                        <div className="text-base font-semibold text-foreground">{reportWorkshopBranding.workshopName}</div>
+                        <div className="text-xs text-foreground/70">{reportWorkshopBranding.contact}</div>
                       </div>
                     </div>
                     <div className="text-right">
                       <div className="text-lg font-semibold text-cyan-100">Vehicle Inspection Report</div>
-                      <div className="text-xs text-white/70">
+                      <div className="text-xs text-foreground/70">
                         Inspection Date: {new Date().toLocaleDateString()}
                       </div>
                     </div>
                   </div>
                   <div className="mt-3 grid gap-2 text-xs lg:grid-cols-2">
-                    <div className="space-y-1 text-white/85">
+                    <div className="space-y-1 text-foreground/85">
                       <div>Customer Name: {customer?.name ?? customer?.fullName ?? "N/A"}</div>
                       <div>
                         Vehicle: {[inspectionMake, inspectionModel, inspectionYear].filter(Boolean).join(" ") || "N/A"}
@@ -5381,7 +5381,7 @@ export function InspectionDetailPageClient({
                       <div>VIN: {inspectionVin || "N/A"}</div>
                       <div>License Plate: {plateLabel || "N/A"}</div>
                     </div>
-                    <div className="space-y-1 text-white/85">
+                    <div className="space-y-1 text-foreground/85">
                       <div>Mileage: {form.carInMileage || "N/A"}</div>
                       <div>Inspector / Technician: {form.inspectorName || "N/A"}</div>
                       <div>Workshop Branch: {form.advisorName || "N/A"}</div>
@@ -5390,19 +5390,19 @@ export function InspectionDetailPageClient({
                   </div>
                 </div>
 
-                <div className="report-section mt-3 rounded-md border border-white/10 bg-black/10 p-3">
+                <div className="report-section mt-3 rounded-md border border-border bg-black/10 p-3">
                   <div className="text-sm font-semibold text-cyan-100">Vehicle Overview Photos</div>
                   {reportMediaGallery.length === 0 ? (
-                    <div className="mt-2 text-xs text-white/60">No check-in photos available.</div>
+                    <div className="mt-2 text-xs text-muted-foreground">No check-in photos available.</div>
                   ) : (
                     <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                       {reportMediaGallery.map((media) => (
-                        <div key={`gallery-${media.key}`} className="rounded border border-white/10 bg-white/[0.02] p-2">
-                          <div className="mb-1 text-[10px] uppercase tracking-wide text-white/60">{media.label}</div>
+                        <div key={`gallery-${media.key}`} className="rounded border border-border bg-card/30 p-2">
+                          <div className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">{media.label}</div>
                           <img
                             src={`/api/files/${media.fileId}`}
                             alt={media.label}
-                            className="h-32 w-full rounded border border-white/10 object-cover"
+                            className="h-32 w-full rounded border border-border object-cover"
                           />
                         </div>
                       ))}
@@ -5410,12 +5410,12 @@ export function InspectionDetailPageClient({
                   )}
                 </div>
 
-                <div className="report-section mt-3 rounded-md border border-white/10 bg-black/10 p-3">
+                <div className="report-section mt-3 rounded-md border border-border bg-black/10 p-3">
                   <div className="grid gap-3 lg:grid-cols-[1fr_2fr]">
                     <div className="rounded border border-cyan-500/25 bg-cyan-500/5 p-3">
-                      <div className="text-[10px] uppercase tracking-wide text-white/60">Overall Vehicle Condition</div>
+                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Overall Vehicle Condition</div>
                       <div className="mt-1 text-3xl font-bold text-cyan-100">{overallHealthPercent}%</div>
-                      <div className="text-xs text-white/80">
+                      <div className="text-xs text-foreground/80">
                         {overallHealthPercent >= 85
                           ? "Excellent"
                           : overallHealthPercent >= 70
@@ -5426,15 +5426,15 @@ export function InspectionDetailPageClient({
                       </div>
                     </div>
                     <div>
-                      <div className="text-[10px] uppercase tracking-wide text-white/60">Category Health Scores</div>
+                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Category Health Scores</div>
                       <div className="mt-2 space-y-2">
                         {reportCategoryHealth.map((entry) => (
                           <div key={`cat-health-${entry.category}`}>
-                            <div className="flex items-center justify-between text-xs text-white/85">
+                            <div className="flex items-center justify-between text-xs text-foreground/85">
                               <span>{entry.category}</span>
                               <span>{entry.healthPercent}%</span>
                             </div>
-                            <div className="mt-1 h-1.5 w-full rounded bg-white/10">
+                            <div className="mt-1 h-1.5 w-full rounded bg-muted">
                               <div
                                 className={`h-1.5 rounded ${
                                   entry.healthPercent < 50
@@ -5455,24 +5455,24 @@ export function InspectionDetailPageClient({
                   </div>
                 </div>
 
-                <div className="report-section mt-3 rounded-md border border-white/10 bg-black/10 p-3">
+                <div className="report-section mt-3 rounded-md border border-border bg-black/10 p-3">
                   <div className="text-sm font-semibold text-cyan-100">Priority Issues Summary</div>
                   <div className="mt-2 grid gap-2 lg:grid-cols-2">
                     {(["Safety Risk", "Mandatory", "Recommended", "Optional"] as const).map((severity) => (
-                      <div key={`priority-${severity}`} className="rounded border border-white/10 bg-white/[0.02] p-2">
-                        <div className="text-xs font-semibold text-white">{severity}</div>
-                        <div className="mt-1 space-y-1 text-xs text-white/85">
+                      <div key={`priority-${severity}`} className="rounded border border-border bg-card/30 p-2">
+                        <div className="text-xs font-semibold text-foreground">{severity}</div>
+                        <div className="mt-1 space-y-1 text-xs text-foreground/85">
                           {reportPriorityFindings[severity].length === 0 ? (
-                            <div className="text-white/50">No items.</div>
+                            <div className="text-muted-foreground">No items.</div>
                           ) : (
                             reportPriorityFindings[severity].map((item, idx) => (
-                              <div key={`priority-item-${severity}-${idx}`} className="rounded border border-white/10 px-2 py-1">
+                              <div key={`priority-item-${severity}-${idx}`} className="rounded border border-border px-2 py-1">
                                 <div className="font-semibold">
                                   {item.partName}
                                   {item.partNumber ? ` (${item.partNumber})` : ""}
                                 </div>
-                                <div className="text-white/70">{item.observedCondition}</div>
-                                <div className="text-white/60">Part Group: {item.partGroup}</div>
+                                <div className="text-foreground/70">{item.observedCondition}</div>
+                                <div className="text-muted-foreground">Part Group: {item.partGroup}</div>
                               </div>
                             ))
                           )}
@@ -5482,24 +5482,24 @@ export function InspectionDetailPageClient({
                   </div>
                 </div>
 
-                <div className="report-section mt-3 rounded-md border border-white/10 bg-black/10 p-3">
+                <div className="report-section mt-3 rounded-md border border-border bg-black/10 p-3">
                   <div className="text-sm font-semibold text-cyan-100">Group Summary</div>
                   {selectedPartsByGroup.length === 0 ? (
-                    <div className="mt-2 text-xs text-white/60">No grouped inspection findings yet.</div>
+                    <div className="mt-2 text-xs text-muted-foreground">No grouped inspection findings yet.</div>
                   ) : (
                     <div className="mt-2 space-y-2">
                       {selectedPartsByGroup.map((group) => (
-                        <div key={`group-summary-${group.key}`} className="rounded border border-white/10 bg-white/[0.02] p-2 text-xs">
+                        <div key={`group-summary-${group.key}`} className="rounded border border-border bg-card/30 p-2 text-xs">
                           <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div className="font-semibold text-white">{group.label}</div>
+                            <div className="font-semibold text-foreground">{group.label}</div>
                             <div className="text-cyan-100">Health: {group.healthPercent}%</div>
                           </div>
-                          <div className="mt-1 text-white/75">{group.parts.length} selected part(s): {group.parts.join(", ")}</div>
+                          <div className="mt-1 text-foreground/75">{group.parts.length} selected part(s): {group.parts.join(", ")}</div>
                           <div className="mt-1 flex flex-wrap gap-1 text-[10px]">
                             <span className="rounded-full border border-rose-500/40 px-2 py-0.5 text-rose-300">Safety {group.severityCounts["Safety Risk"]}</span>
                             <span className="rounded-full border border-amber-500/40 px-2 py-0.5 text-amber-300">Mandatory {group.severityCounts.Mandatory}</span>
                             <span className="rounded-full border border-cyan-500/40 px-2 py-0.5 text-cyan-200">Recommended {group.severityCounts.Recommended}</span>
-                            <span className="rounded-full border border-white/20 px-2 py-0.5 text-white/80">Optional {group.severityCounts.Optional}</span>
+                            <span className="rounded-full border border-border px-2 py-0.5 text-foreground/80">Optional {group.severityCounts.Optional}</span>
                           </div>
                         </div>
                       ))}
@@ -5507,14 +5507,14 @@ export function InspectionDetailPageClient({
                   )}
                 </div>
 
-                <div className="report-section mt-3 rounded-md border border-white/10 bg-black/10 p-3">
+                <div className="report-section mt-3 rounded-md border border-border bg-black/10 p-3">
                   <div className="text-sm font-semibold text-cyan-100">Detailed Inspection Findings</div>
                   <div className="mt-2 space-y-2">
                     {reportFindings.length === 0 ? (
-                      <div className="text-xs text-white/60">No findings selected yet.</div>
+                      <div className="text-xs text-muted-foreground">No findings selected yet.</div>
                     ) : (
                       reportFindings.map((finding, idx) => (
-                        <div key={`finding-${idx}`} className="rounded border border-white/10 bg-white/[0.02] p-2 text-xs text-white/85">
+                        <div key={`finding-${idx}`} className="rounded border border-border bg-card/30 p-2 text-xs text-foreground/85">
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <div className="font-semibold">
                               {finding.partName}
@@ -5522,20 +5522,20 @@ export function InspectionDetailPageClient({
                             </div>
                             <span className="rounded-full border border-cyan-500/40 px-2 py-0.5 text-[10px] text-cyan-100">{finding.severity}</span>
                           </div>
-                          <div className="mt-1 text-white/70">Part Group: {finding.partGroup}</div>
+                          <div className="mt-1 text-foreground/70">Part Group: {finding.partGroup}</div>
                           <div className="mt-1"><span className="font-semibold">Observed Condition:</span> {finding.observedCondition}</div>
                           <div className="mt-1"><span className="font-semibold">Why This Matters:</span> {finding.whyItMatters}</div>
                           <div className="mt-1"><span className="font-semibold">Recommended Action:</span> {finding.recommendedAction}</div>
                           <div className="mt-2">
-                            <div className="text-[10px] uppercase tracking-wide text-white/60">Evidence Photos</div>
+                            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Evidence Photos</div>
                             {finding.mediaFileId ? (
                               <img
                                 src={`/api/files/${finding.mediaFileId}`}
                                 alt={`${finding.partName} evidence`}
-                                className="mt-1 h-32 w-full max-w-sm rounded border border-white/10 object-cover"
+                                className="mt-1 h-32 w-full max-w-sm rounded border border-border object-cover"
                               />
                             ) : (
-                              <div className="mt-1 text-white/50">No evidence attached.</div>
+                              <div className="mt-1 text-muted-foreground">No evidence attached.</div>
                             )}
                           </div>
                         </div>
@@ -5544,25 +5544,25 @@ export function InspectionDetailPageClient({
                   </div>
                 </div>
 
-                <div className="report-section mt-3 rounded-md border border-white/10 bg-black/10 p-3">
+                <div className="report-section mt-3 rounded-md border border-border bg-black/10 p-3">
                   <div className="text-sm font-semibold text-cyan-100">Inspection Summary</div>
-                  <div className="mt-2 text-xs leading-relaxed text-white/85">{reportFinalSummaryText}</div>
+                  <div className="mt-2 text-xs leading-relaxed text-foreground/85">{reportFinalSummaryText}</div>
                 </div>
 
-                <div className="report-section mt-3 rounded-md border border-white/10 bg-black/10 p-3">
+                <div className="report-section mt-3 rounded-md border border-border bg-black/10 p-3">
                   <div className="text-sm font-semibold text-cyan-100">Repair Approval Summary</div>
                   <div className="mt-2 grid gap-2 lg:grid-cols-2">
                     {(["Safety Risk", "Mandatory", "Recommended", "Optional"] as const).map((severity) => (
-                      <div key={`approval-${severity}`} className="rounded border border-white/10 bg-white/[0.02] p-2 text-xs">
-                        <div className="font-semibold text-white">{severity}</div>
+                      <div key={`approval-${severity}`} className="rounded border border-border bg-card/30 p-2 text-xs">
+                        <div className="font-semibold text-foreground">{severity}</div>
                         {reportPriorityFindings[severity].length === 0 ? (
-                          <div className="mt-1 text-white/50">No items.</div>
+                          <div className="mt-1 text-muted-foreground">No items.</div>
                         ) : (
                           <div className="mt-1 space-y-1">
                             {reportPriorityFindings[severity].map((item, idx) => (
-                              <div key={`approval-item-${severity}-${idx}`} className="rounded border border-white/10 px-2 py-1">
+                              <div key={`approval-item-${severity}-${idx}`} className="rounded border border-border px-2 py-1">
                                 <div className="font-semibold">{item.partName}</div>
-                                <div className="text-white/70">{item.recommendedAction}</div>
+                                <div className="text-foreground/70">{item.recommendedAction}</div>
                               </div>
                             ))}
                           </div>
@@ -5579,7 +5579,7 @@ export function InspectionDetailPageClient({
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  className="rounded-md border border-white/20 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-white/80 hover:bg-white/10"
+                  className="rounded-md border border-border px-3 py-2 text-xs font-semibold uppercase tracking-wide text-foreground/80 hover:bg-muted"
                   onClick={goPrevStep}
                   disabled={inspectionStep <= 1}
                 >
@@ -5612,7 +5612,7 @@ export function InspectionDetailPageClient({
               ) : !startedAt ? (
                 <button
                   type="button"
-                  className={`rounded-md px-6 py-2 text-xs font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+                  className={`rounded-md px-6 py-2 text-xs font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-muted`}
                   disabled={saving || isCollectCarPending || !companyId || !inspectionId}
                   onClick={async () => {
                     if (!companyId || !inspectionId) return;
@@ -5669,7 +5669,7 @@ export function InspectionDetailPageClient({
                 <>
                   <button
                     type="button"
-                    className={`rounded-md px-6 py-2 text-xs font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+                    className={`rounded-md px-6 py-2 text-xs font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-muted`}
                     disabled={saving || isCollectCarPending || !companyId || !inspectionId}
                     onClick={async () => {
                       if (!companyId || !inspectionId) return;
@@ -5882,9 +5882,9 @@ export function InspectionDetailPageClient({
               )}
             </div>
 
-            <div className={`mt-6 rounded-md bg-white/5 p-3 ${inspectionStep === 6 || isReadOnly ? "" : "hidden"}`}>
+            <div className={`mt-6 rounded-md bg-muted/40 p-3 ${inspectionStep === 6 || isReadOnly ? "" : "hidden"}`}>
               <div className="text-sm font-semibold">Inspection Log</div>
-              <div className="mt-2 space-y-1 text-xs text-white/80">
+              <div className="mt-2 space-y-1 text-xs text-foreground/80">
                 {startedAt && (
                   <div>
                     Start Time: <span className="font-semibold">{new Date(startedAt).toLocaleString()}</span>
@@ -5919,21 +5919,21 @@ export function InspectionDetailPageClient({
                     {cancelledBy ? ` by ${cancelledBy}` : ""}
                   </div>
                 )}
-                {!startedAt && !completedAt && <div className="text-white/60">No start/end time recorded.</div>}
+                {!startedAt && !completedAt && <div className="text-muted-foreground">No start/end time recorded.</div>}
               </div>
               <div className="mt-4">
                 {inspectionLogs.length === 0 ? (
-                  <div className="text-xs text-white/60">No activity yet.</div>
+                  <div className="text-xs text-muted-foreground">No activity yet.</div>
                 ) : (
                   <div className="space-y-1.5">
                     {inspectionLogs.map((log) => (
-                      <div key={log.id} className="rounded-md bg-white/5 px-2 py-1.5 text-[10px] text-white/85">
+                      <div key={log.id} className="rounded-md bg-muted/40 px-2 py-1.5 text-[10px] text-foreground/85">
                         <div>
                           <span className="font-semibold capitalize">{log.action}</span>
                           {log.message ? ` - ${log.message}` : ""}
                         </div>
-                        <div className="mt-0.5 text-[9px] text-white/70">
-                          by <span className="font-semibold text-white">{log.by || "System"}</span> at{" "}
+                        <div className="mt-0.5 text-[9px] text-foreground/70">
+                          by <span className="font-semibold text-foreground">{log.by || "System"}</span> at{" "}
                           {new Date(log.at).toLocaleString()}
                         </div>
                       </div>
@@ -5953,13 +5953,13 @@ export function InspectionDetailPageClient({
               </div>
               <div className="p-3 text-xs">
                 <div className="grid grid-cols-2 gap-2">
-                  <div className="text-white/70">Customer ID</div>
+                  <div className="text-foreground/70">Customer ID</div>
                   <div className="font-semibold">{customer?.code ?? customer?.id ?? "N/A"}</div>
-                  <div className="text-white/70">Customer Name</div>
+                  <div className="text-foreground/70">Customer Name</div>
                   <div className="font-semibold">{customer?.name ?? "N/A"}</div>
-                  <div className="text-white/70">Customer Phone</div>
+                  <div className="text-foreground/70">Customer Phone</div>
                   <div className="font-semibold">{customer?.phone ?? "N/A"}</div>
-                  <div className="text-white/70">Customer Type</div>
+                  <div className="text-foreground/70">Customer Type</div>
                   <div className="font-semibold">{customer?.customer_type ?? "Regular"}</div>
                 </div>
               </div>
@@ -5971,15 +5971,15 @@ export function InspectionDetailPageClient({
               </div>
               <div className="p-3 text-xs">
                 <div className="grid grid-cols-2 gap-2">
-                  <div className="text-white/70">Plate #</div>
+                  <div className="text-foreground/70">Plate #</div>
                   <div className="font-semibold">{plateLabel}</div>
-                  <div className="text-white/70">Car</div>
+                  <div className="text-foreground/70">Car</div>
                   <div className="font-semibold">
                     {[car?.make, car?.model].filter(Boolean).join(" ") || "N/A"}
                   </div>
-                  <div className="text-white/70">Type</div>
+                  <div className="text-foreground/70">Type</div>
                   <div className="font-semibold">{car?.body_type ?? car?.bodyType ?? "Regular"}</div>
-                  <div className="text-white/70">Free Battery</div>
+                  <div className="text-foreground/70">Free Battery</div>
                   <div className="font-semibold">Not Eligible</div>
                 </div>
               </div>
@@ -5991,7 +5991,7 @@ export function InspectionDetailPageClient({
               </div>
               <div className="p-3 text-xs">
                 <div className="flex items-center justify-between">
-                  <div className="text-white/70">Show entries</div>
+                  <div className="text-foreground/70">Show entries</div>
                   <input type="text" className={theme.input} placeholder="Search" />
                 </div>
               </div>
@@ -6003,16 +6003,16 @@ export function InspectionDetailPageClient({
       {/* ── Parts Catalog Modal ─────────────────────────────────────── */}
       {catalogModalOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-background/55 backdrop-blur-sm"
           onClick={(e) => { if (e.target === e.currentTarget) setCatalogModalOpen(false); }}
         >
-          <div className="relative mx-4 w-full max-w-lg rounded-xl border border-emerald-500/30 bg-slate-900 p-5 shadow-2xl">
+          <div className="relative mx-4 w-full max-w-lg rounded-xl border border-emerald-500/30 bg-popover p-5 shadow-2xl">
             {/* Header */}
             <div className="mb-4 flex items-center justify-between">
               <div className="text-sm font-semibold text-emerald-200 uppercase tracking-wide">Parts Catalog</div>
               <button
                 type="button"
-                className="rounded-md px-2 py-1 text-xs text-white/60 hover:bg-white/10 hover:text-white"
+                className="rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
                 onClick={() => setCatalogModalOpen(false)}
               >
                 ✕ Close
@@ -6144,7 +6144,7 @@ export function InspectionDetailPageClient({
                   </button>
                   <button
                     type="button"
-                    className="h-9 rounded-md border border-white/20 px-3 text-xs font-semibold text-white/80"
+                    className="h-9 rounded-md border border-border px-3 text-xs font-semibold text-foreground/80"
                     onClick={() => setBulkAddPartCodes([])}
                   >
                     Clear
@@ -6161,7 +6161,7 @@ export function InspectionDetailPageClient({
                       return (
                         <label
                           key={`cat-pick-m-${part.code}-${part.name}`}
-                          className="flex cursor-pointer items-center gap-2 rounded-md border border-white/10 px-2 py-1.5 text-xs hover:bg-white/5"
+                          className="flex cursor-pointer items-center gap-2 rounded-md border border-border px-2 py-1.5 text-xs hover:bg-muted/40"
                         >
                           <input
                             type="checkbox"
@@ -6174,8 +6174,8 @@ export function InspectionDetailPageClient({
                               );
                             }}
                           />
-                          <span className="text-white/85">{part.name || "Unnamed part"}</span>
-                          {part.code ? <span className="text-white/50">({part.code})</span> : null}
+                          <span className="text-foreground/85">{part.name || "Unnamed part"}</span>
+                          {part.code ? <span className="text-muted-foreground">({part.code})</span> : null}
                         </label>
                       );
                     })}

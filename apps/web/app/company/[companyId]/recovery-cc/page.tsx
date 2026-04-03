@@ -140,28 +140,28 @@ export default function RecoveryCcPage({ params }: Params) {
           <button
             type="button"
             onClick={() => setTab("pre_pickup")}
-            className={`rounded-xl border px-4 py-2 text-sm ${tab === "pre_pickup" ? "border-primary bg-primary/10" : "border-white/20"}`}
+            className={`rounded-xl border px-4 py-2 text-sm ${tab === "pre_pickup" ? "border-primary bg-primary/10" : "border-border"}`}
           >
             Pre Pickup ({counts.pre_pickup})
           </button>
           <button
             type="button"
             onClick={() => setTab("work_progress")}
-            className={`rounded-xl border px-4 py-2 text-sm ${tab === "work_progress" ? "border-primary bg-primary/10" : "border-white/20"}`}
+            className={`rounded-xl border px-4 py-2 text-sm ${tab === "work_progress" ? "border-primary bg-primary/10" : "border-border"}`}
           >
             Work Progress ({counts.work_progress})
           </button>
           <button
             type="button"
             onClick={() => setTab("happiness_check")}
-            className={`rounded-xl border px-4 py-2 text-sm ${tab === "happiness_check" ? "border-primary bg-primary/10" : "border-white/20"}`}
+            className={`rounded-xl border px-4 py-2 text-sm ${tab === "happiness_check" ? "border-primary bg-primary/10" : "border-border"}`}
           >
             Happiness Check ({counts.happiness_check})
           </button>
           <button
             type="button"
             onClick={() => void load()}
-            className="ml-auto rounded-xl border border-white/20 px-4 py-2 text-sm"
+            className="ml-auto rounded-xl border border-border px-4 py-2 text-sm"
           >
             Refresh
           </button>
@@ -171,9 +171,9 @@ export default function RecoveryCcPage({ params }: Params) {
         {error ? <div className="text-sm text-red-300">{error}</div> : null}
 
         {!loading && !error ? (
-          <div className="overflow-x-auto rounded-2xl border border-white/10">
+          <div className="overflow-x-auto rounded-2xl border border-border">
             <table className="w-full text-sm">
-              <thead className="bg-white/5 text-left">
+              <thead className="bg-muted/40 text-left">
                 <tr>
                   <th className="px-3 py-2">Lead ID</th>
                   <th className="px-3 py-2">Related Lead ID</th>
@@ -196,7 +196,7 @@ export default function RecoveryCcPage({ params }: Params) {
                   </tr>
                 ) : (
                   visibleRows.map((row) => (
-                    <tr key={row.id} className="border-t border-white/10">
+                    <tr key={row.id} className="border-t border-border">
                       <td className="px-3 py-2">
                         {row.leadId ? (
                           <a
@@ -232,13 +232,13 @@ export default function RecoveryCcPage({ params }: Params) {
                         <div className="flex flex-wrap gap-1">
                           <a
                             href={`/company/${companyId}/recovery-requests/${row.id}`}
-                            className="rounded-md border border-white/20 px-2 py-1 text-xs"
+                            className="rounded-md border border-border px-2 py-1 text-xs"
                           >
                             Open
                           </a>
                           <button
                             type="button"
-                            className="rounded-md border border-white/20 px-2 py-1 text-xs"
+                            className="rounded-md border border-border px-2 py-1 text-xs"
                             onClick={() => void copyFormUrl(row)}
                           >
                             Copy Form URL
@@ -255,7 +255,7 @@ export default function RecoveryCcPage({ params }: Params) {
                           ) : null}
                           <button
                             type="button"
-                            className="rounded-md border border-white/20 px-2 py-1 text-xs"
+                            className="rounded-md border border-border px-2 py-1 text-xs"
                             onClick={() => void shareForm(row)}
                             disabled={busy[row.id]}
                           >

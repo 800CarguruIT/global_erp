@@ -83,7 +83,7 @@ export default function BranchWorkshopJobDetailPage({ params }: Props) {
         <div className="flex items-center justify-between">
           <h1 className="text-xl sm:text-2xl font-semibold">Workshop Job</h1>
           <button
-            className="rounded-md border px-3 py-1.5 text-sm hover:bg-white/10"
+            className="rounded-md border px-3 py-1.5 text-sm hover:bg-muted"
             onClick={() => (window.location.href = `/company/${companyId}/branches/${branchId}/jobs/workshop`)}
           >
             Back

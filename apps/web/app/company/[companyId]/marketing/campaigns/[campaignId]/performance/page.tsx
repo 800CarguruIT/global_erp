@@ -221,14 +221,14 @@ export default async function CampaignPerformancePage({ params }: PageProps) {
                 <span>Open rate</span>
                 <span className="font-medium text-foreground">{openRate}</span>
               </div>
-              <div className="h-2 w-full rounded-full bg-white/10">
+              <div className="h-2 w-full rounded-full bg-muted">
                 <div className="h-2 rounded-full bg-emerald-400/80" style={{ width: openRate === "n/a" ? "0%" : openRate }} />
               </div>
               <div className="flex items-center justify-between">
                 <span>Click rate</span>
                 <span className="font-medium text-foreground">{clickRate}</span>
               </div>
-              <div className="h-2 w-full rounded-full bg-white/10">
+              <div className="h-2 w-full rounded-full bg-muted">
                 <div className="h-2 rounded-full bg-sky-400/80" style={{ width: clickRate === "n/a" ? "0%" : clickRate }} />
               </div>
             </div>
@@ -246,7 +246,7 @@ export default async function CampaignPerformancePage({ params }: PageProps) {
                       <span>{row.label}</span>
                       <span>{percent}%</span>
                     </div>
-                    <div className="h-2 w-full rounded-full bg-white/10">
+                    <div className="h-2 w-full rounded-full bg-muted">
                       <div
                         className="h-2 rounded-full bg-indigo-400/80"
                         style={{ width: `${percent}%` }}
@@ -279,7 +279,7 @@ export default async function CampaignPerformancePage({ params }: PageProps) {
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
                 <thead>
-                  <tr className="border-b border-white/10 text-left text-xs text-muted-foreground">
+                  <tr className="border-b border-border text-left text-xs text-muted-foreground">
                     <th className="px-3 py-2">Channel</th>
                     <th className="px-3 py-2">Sent</th>
                     <th className="px-3 py-2">Delivered</th>
@@ -296,7 +296,7 @@ export default async function CampaignPerformancePage({ params }: PageProps) {
                   {channelRows.map((row) => {
                     const counts = channels[row.key];
                     return (
-                      <tr key={row.key} className="border-b border-white/5">
+                      <tr key={row.key} className="border-b border-border/40">
                         <td className="px-3 py-2 font-medium">{row.label}</td>
                         <td className="px-3 py-2 text-muted-foreground">{counts.sent}</td>
                         <td className="px-3 py-2 text-muted-foreground">{counts.delivered}</td>
@@ -322,7 +322,7 @@ export default async function CampaignPerformancePage({ params }: PageProps) {
                 <div className="text-xs text-muted-foreground">No activity recorded yet.</div>
               )}
               {recentEvents.map((event, index) => (
-                <div key={`${event.channel}-${event.occurredAt}-${index}`} className="rounded-md border border-white/5 p-2">
+                <div key={`${event.channel}-${event.occurredAt}-${index}`} className="rounded-md border border-border/40 p-2">
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
                     <span>{CHANNEL_LABELS[event.channel]}</span>
                     <span>{formatDate(event.occurredAt)}</span>

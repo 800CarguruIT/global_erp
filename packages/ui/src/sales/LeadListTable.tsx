@@ -26,7 +26,7 @@ export function LeadListTable({ leads, onCreate, onRowClick }: LeadListTableProp
           <button
             type="button"
             onClick={onCreate}
-            className="rounded-md border px-3 py-1 text-sm font-medium hover:bg-white/10"
+            className="rounded-md border px-3 py-1 text-sm font-medium hover:bg-muted"
           >
             New Lead
           </button>

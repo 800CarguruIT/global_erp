@@ -1024,13 +1024,13 @@ export function EstimateQuotesMain({
       {state.status === "error" && <p className="text-sm text-destructive">{state.error}</p>}
       {state.status === "loaded" && (
         <>
-          <div className="overflow-x-auto px-4 py-3 [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/20">
+          <div className="overflow-x-auto px-4 py-3 [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted/80">
             <div className="flex min-w-max flex-nowrap gap-2 text-xs">
             {tabs.map((tab, index) => (
               <React.Fragment key={tab.id}>
                 {index > 0 && tabs[index - 1]?.group !== tab.group ? (
                   <span
-                    className="my-1 h-6 w-px shrink-0 bg-white/20"
+                    className="my-1 h-6 w-px shrink-0 bg-muted/80"
                     aria-hidden="true"
                   />
                 ) : null}
@@ -1040,7 +1040,7 @@ export function EstimateQuotesMain({
                   className={`min-w-[96px] shrink-0 rounded-full px-4 py-1.5 text-[11px] font-medium transition ${
                     activeTab === tab.id
                       ? "bg-gradient-to-b from-emerald-500/30 to-emerald-500/10 text-emerald-100 shadow-[0_0_8px_rgba(16,185,129,0.35)] border border-emerald-400/40"
-                      : "bg-white/5 text-white/70 border border-white/10 hover:text-white hover:border-white/30"
+                      : "bg-muted/40 text-foreground/70 border border-border hover:text-foreground hover:border-border"
                   }`}
                 >
                   {tab.label}
@@ -1878,7 +1878,7 @@ export function EstimateQuotesMain({
       {jobVerifyOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <Card className={`w-full max-w-4xl rounded-xl shadow-xl ${theme.cardBg} ${theme.cardBorder}`}>
-            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+            <div className="flex items-center justify-between border-b border-border px-4 py-3">
               <div>
                 <div className="text-sm font-semibold">Verify Job Card</div>
                 <div className="text-xs text-muted-foreground">Review job details before final verification.</div>
@@ -1886,7 +1886,7 @@ export function EstimateQuotesMain({
               <button
                 type="button"
                 onClick={closeJobVerifyModal}
-                className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+                className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-muted`}
               >
                 Close
               </button>
@@ -1898,7 +1898,7 @@ export function EstimateQuotesMain({
                 </div>
               ) : null}
               {jobVerifyDetailsLoading ? (
-                <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-muted-foreground">
+                <div className="rounded-lg border border-border bg-card/40 px-3 py-2 text-xs text-muted-foreground">
                   Loading job details...
                 </div>
               ) : null}
@@ -1931,17 +1931,17 @@ export function EstimateQuotesMain({
                     const netAmount = Number((quoteAmount + vatAmount).toFixed(2));
                     return (
                       <div className="grid gap-2 text-xs md:grid-cols-4">
-                        <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
+                        <div className="rounded-lg border border-border bg-card/40 px-3 py-2">
                           <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Quote Amount</div>
                           <div className="mt-1 font-semibold">
                             {jobVerifyCurrency} {quoteAmount.toFixed(2)}
                           </div>
                         </div>
-                        <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
+                        <div className="rounded-lg border border-border bg-card/40 px-3 py-2">
                           <div className="text-[10px] uppercase tracking-wide text-muted-foreground">VAT Rate</div>
                           <div className="mt-1 font-semibold">{jobVerifyVatRate.toFixed(2)}%</div>
                         </div>
-                        <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
+                        <div className="rounded-lg border border-border bg-card/40 px-3 py-2">
                           <div className="text-[10px] uppercase tracking-wide text-muted-foreground">VAT Amount</div>
                           <div className="mt-1 font-semibold">
                             {jobVerifyCurrency} {vatAmount.toFixed(2)}
@@ -1957,43 +1957,43 @@ export function EstimateQuotesMain({
                     );
                   })()}
                   <div className="grid gap-2 text-xs md:grid-cols-4">
-                    <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
+                    <div className="rounded-lg border border-border bg-card/40 px-3 py-2">
                       <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Job Card</div>
                       <div className="mt-1 font-semibold">{jobVerifyRow.id.slice(0, 8)}...</div>
                     </div>
-                    <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
+                    <div className="rounded-lg border border-border bg-card/40 px-3 py-2">
                       <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Status</div>
                       <div className="mt-1 font-semibold uppercase">{jobVerifyRow.status ?? "-"}</div>
                     </div>
-                    <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
+                    <div className="rounded-lg border border-border bg-card/40 px-3 py-2">
                       <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Start</div>
                       <div className="mt-1">{formatDate(jobVerifyRow.start_at)}</div>
                     </div>
-                    <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
+                    <div className="rounded-lg border border-border bg-card/40 px-3 py-2">
                       <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Completed</div>
                       <div className="mt-1">{formatDate(jobVerifyRow.complete_at)}</div>
                     </div>
-                    <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 md:col-span-2">
+                    <div className="rounded-lg border border-border bg-card/40 px-3 py-2 md:col-span-2">
                       <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Car</div>
                       <div className="mt-1 font-semibold">{jobVerifyRow.plate_number ?? "N/A"}</div>
                       <div className="text-[10px] text-muted-foreground">{[jobVerifyRow.make, jobVerifyRow.model].filter(Boolean).join(" ")}</div>
                     </div>
-                    <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
+                    <div className="rounded-lg border border-border bg-card/40 px-3 py-2">
                       <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Workshop</div>
                       <div className="mt-1">{jobVerifyRow.branch_name ?? "Unassigned"}</div>
                     </div>
-                    <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
+                    <div className="rounded-lg border border-border bg-card/40 px-3 py-2">
                       <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Quote Status</div>
                       <div className="mt-1 uppercase">{jobVerifyRow.workshop_quote_status ?? "-"}</div>
                     </div>
                   </div>
-                  <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
+                  <div className="rounded-lg border border-border bg-card/30 p-3">
                     <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Line Items</div>
                     {verifyItems.length ? (
-                      <div className="overflow-auto rounded-md border border-white/10">
+                      <div className="overflow-auto rounded-md border border-border">
                         <table className="min-w-full text-xs">
                           <thead>
-                            <tr className="bg-white/[0.04] text-muted-foreground">
+                            <tr className="bg-card/50 text-muted-foreground">
                               <th className="px-2 py-2 text-left">Part</th>
                               <th className="px-2 py-2 text-left">Qty</th>
                               <th className="px-2 py-2 text-left">Order Status</th>
@@ -2006,7 +2006,7 @@ export function EstimateQuotesMain({
                               const partPic = String(item.part_pic ?? "").trim();
                               const scrapPic = String(item.scrap_pic ?? "").trim();
                               return (
-                              <tr key={item.id} className="border-t border-white/10">
+                              <tr key={item.id} className="border-t border-border">
                                 <td className="px-2 py-2">{item.product_name ?? item.productName ?? "-"}</td>
                                 <td className="px-2 py-2">{item.quantity ?? "-"}</td>
                                 <td className="px-2 py-2 uppercase">{item.po_status ?? item.order_status ?? "-"}</td>
@@ -2016,7 +2016,7 @@ export function EstimateQuotesMain({
                                       href={`/api/files/${partPic}`}
                                       target="_blank"
                                       rel="noreferrer"
-                                      className="inline-flex items-center gap-2 rounded-md border border-white/15 bg-white/[0.04] px-2 py-1 hover:bg-white/[0.08]"
+                                      className="inline-flex items-center gap-2 rounded-md border border-border bg-card/50 px-2 py-1 hover:bg-muted"
                                     >
                                       <img
                                         src={`/api/files/${partPic}`}
@@ -2035,7 +2035,7 @@ export function EstimateQuotesMain({
                                       href={`/api/files/${scrapPic}`}
                                       target="_blank"
                                       rel="noreferrer"
-                                      className="inline-flex items-center gap-2 rounded-md border border-white/15 bg-white/[0.04] px-2 py-1 hover:bg-white/[0.08]"
+                                      className="inline-flex items-center gap-2 rounded-md border border-border bg-card/50 px-2 py-1 hover:bg-muted"
                                     >
                                       <img
                                         src={`/api/files/${scrapPic}`}
@@ -2058,12 +2058,12 @@ export function EstimateQuotesMain({
                       <div className="text-xs text-muted-foreground">No line items found.</div>
                     )}
                   </div>
-                  <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
+                  <div className="rounded-lg border border-border bg-card/30 p-3">
                     <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                       Job Media
                     </div>
                     {collectCarMileageImageId ? (
-                      <div className="mb-3 rounded-md border border-white/10 bg-white/[0.03] p-2">
+                      <div className="mb-3 rounded-md border border-border bg-card/40 p-2">
                         <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                           Collect Mileage Image
                         </div>
@@ -2071,7 +2071,7 @@ export function EstimateQuotesMain({
                           href={`/api/files/${collectCarMileageImageId}`}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex rounded-md border border-white/15 bg-white/[0.04] p-1 hover:bg-white/[0.08]"
+                          className="inline-flex rounded-md border border-border bg-card/50 p-1 hover:bg-muted"
                         >
                           <img
                             src={`/api/files/${collectCarMileageImageId}`}
@@ -2090,7 +2090,7 @@ export function EstimateQuotesMain({
                           {videoIds.map((fileId) => (
                             <video
                               key={fileId}
-                              className="h-36 w-full rounded-md border border-white/10 bg-black/30"
+                              className="h-36 w-full rounded-md border border-border bg-black/30"
                               controls
                               preload="metadata"
                               src={`/api/files/${fileId}`}
@@ -2108,11 +2108,11 @@ export function EstimateQuotesMain({
                 </>
               ) : null}
             </div>
-            <div className="flex items-center justify-end gap-2 border-t border-white/10 px-4 py-3">
+            <div className="flex items-center justify-end gap-2 border-t border-border px-4 py-3">
               <button
                 type="button"
                 onClick={closeJobVerifyModal}
-                className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+                className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-muted`}
               >
                 Cancel
               </button>
@@ -2136,7 +2136,7 @@ export function EstimateQuotesMain({
       {activeQuotesModalGroup && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <Card className={`w-full max-w-4xl rounded-xl shadow-xl ${theme.cardBg} ${theme.cardBorder}`}>
-            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+            <div className="flex items-center justify-between border-b border-border px-4 py-3">
               <div>
                 <div className="text-sm font-semibold">Quotes for {activeQuotesModalGroup.jobCardId ? `JC-${activeQuotesModalGroup.jobCardId.slice(0, 8)}...` : "Job"}</div>
                 <div className="text-xs text-muted-foreground">
@@ -2146,7 +2146,7 @@ export function EstimateQuotesMain({
               <button
                 type="button"
                 onClick={() => setQuotesModalGroupKey(null)}
-                className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+                className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-muted`}
               >
                 Close
               </button>
@@ -2223,7 +2223,7 @@ export function EstimateQuotesMain({
       {verifyOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 backdrop-blur-[2px] p-3 sm:p-5">
           <Card className={`w-full max-w-4xl rounded-2xl shadow-2xl ${theme.cardBg} ${theme.cardBorder}`}>
-            <div className="flex items-start justify-between gap-3 border-b border-white/10 px-5 py-4">
+            <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
               <div>
                 <div className="text-base font-semibold">Inspection Verification</div>
                 <div className="mt-0.5 text-xs text-muted-foreground">Review inspection report and finalize verification.</div>
@@ -2231,32 +2231,32 @@ export function EstimateQuotesMain({
               <button
                 type="button"
                 onClick={closeVerifyModal}
-                className={`rounded-lg px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+                className={`rounded-lg px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-muted`}
               >
                 Close
               </button>
             </div>
             <div className="max-h-[78vh] space-y-4 overflow-y-auto p-5 text-sm">
               {verifyError && <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-300">{verifyError}</div>}
-              {verifyLoading ? <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-muted-foreground">Loading inspection report...</div> : null}
+              {verifyLoading ? <div className="rounded-lg border border-border bg-card/40 px-3 py-2 text-sm text-muted-foreground">Loading inspection report...</div> : null}
               {!verifyLoading && verifyInspection ? (
                 <>
                   <div className="grid gap-2 text-xs sm:grid-cols-2 lg:grid-cols-4">
-                    <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
+                    <div className="rounded-xl border border-border bg-card/40 px-3 py-2">
                       <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Inspection</div>
                       <div className="mt-1 font-semibold">{verifyInspection.id?.slice(0, 8)}...</div>
                     </div>
-                    <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
+                    <div className="rounded-xl border border-border bg-card/40 px-3 py-2">
                       <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Status</div>
                       <div className="mt-1 font-semibold uppercase">{verifyInspection.status ?? "pending"}</div>
                     </div>
-                    <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
+                    <div className="rounded-xl border border-border bg-card/40 px-3 py-2">
                       <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Advisor Approval</div>
                       <div className={`mt-1 font-semibold ${verifyInspection?.draftPayload?.advisorApproved ? "text-emerald-300" : "text-amber-300"}`}>
                         {verifyInspection?.draftPayload?.advisorApproved ? "Approved" : "Pending"}
                       </div>
                     </div>
-                    <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
+                    <div className="rounded-xl border border-border bg-card/40 px-3 py-2">
                       <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Customer Approval</div>
                       <div className={`mt-1 font-semibold ${verifyInspection?.draftPayload?.customerApproved ? "text-emerald-300" : "text-amber-300"}`}>
                         {verifyInspection?.draftPayload?.customerApproved ? "Approved" : "Pending"}
@@ -2264,15 +2264,15 @@ export function EstimateQuotesMain({
                     </div>
                   </div>
 
-                  <div className="space-y-2 rounded-xl border border-white/10 bg-white/[0.02] p-3">
+                  <div className="space-y-2 rounded-xl border border-border bg-card/30 p-3">
                     <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Line Items</div>
                     {verifyLineItems.length === 0 ? (
                       <div className="text-xs text-muted-foreground">No line items found.</div>
                     ) : (
-                      <div className="max-h-52 overflow-auto rounded-lg border border-white/10">
+                      <div className="max-h-52 overflow-auto rounded-lg border border-border">
                         <table className="min-w-full text-xs">
                           <thead>
-                            <tr className="bg-white/[0.04] text-muted-foreground">
+                            <tr className="bg-card/50 text-muted-foreground">
                               <th className="px-2 py-2 text-left">Part</th>
                               <th className="px-2 py-2 text-left">Qty</th>
                               <th className="px-2 py-2 text-left">Reason</th>
@@ -2281,7 +2281,7 @@ export function EstimateQuotesMain({
                           </thead>
                           <tbody>
                             {verifyLineItems.map((item) => (
-                              <tr key={item.id} className="border-t border-white/10">
+                              <tr key={item.id} className="border-t border-border">
                                 <td className="px-2 py-2">{item.productName ?? item.product_name ?? "-"}</td>
                                 <td className="px-2 py-2">{item.quantity ?? 1}</td>
                                 <td className="px-2 py-2">{item.reason ?? "-"}</td>
@@ -2307,41 +2307,41 @@ export function EstimateQuotesMain({
                     )}
                   </div>
 
-                  <div className="space-y-2 rounded-xl border border-white/10 bg-white/[0.02] p-3">
+                  <div className="space-y-2 rounded-xl border border-border bg-card/30 p-3">
                     <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Videos</div>
                     {verifyVideos.length === 0 ? (
                       <div className="text-xs text-muted-foreground">No videos attached.</div>
                     ) : (
                       <div className="grid gap-3 md:grid-cols-2">
                         {verifyVideos.map((fileId) => (
-                          <video key={fileId} className="h-32 w-full rounded-lg border border-white/10 bg-black/20" controls src={`/api/files/${fileId}`} />
+                          <video key={fileId} className="h-32 w-full rounded-lg border border-border bg-black/20" controls src={`/api/files/${fileId}`} />
                         ))}
                       </div>
                     )}
                   </div>
 
-                  <div className="space-y-3 rounded-xl border border-white/10 bg-white/[0.02] p-3">
+                  <div className="space-y-3 rounded-xl border border-border bg-card/30 p-3">
                     <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Earnings Preview</div>
                     <div className="grid gap-2 text-xs sm:grid-cols-2 lg:grid-cols-3">
-                      <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
+                      <div className="rounded-lg border border-border bg-card/40 px-3 py-2">
                         <div className="text-muted-foreground">Fixed Fee</div>
                         <div className="font-semibold mt-0.5">
                           {costSettings.currency} {Number(costSettings.inspectionFixedAmount || 0).toFixed(2)}
                         </div>
                       </div>
-                      <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
+                      <div className="rounded-lg border border-border bg-card/40 px-3 py-2">
                         <div className="text-muted-foreground">Fine Total</div>
                         <div className="font-semibold text-rose-300 mt-0.5">
                           {costSettings.currency} {fineTotal.toFixed(2)}
                         </div>
                       </div>
-                      <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
+                      <div className="rounded-lg border border-border bg-card/40 px-3 py-2">
                         <div className="text-muted-foreground">Net Before VAT</div>
                         <div className="font-semibold mt-0.5">
                           {costSettings.currency} {netBeforeVat.toFixed(2)}
                         </div>
                       </div>
-                      <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
+                      <div className="rounded-lg border border-border bg-card/40 px-3 py-2">
                         <div className="text-muted-foreground">VAT ({Number(costSettings.vatRate || 0).toFixed(2)}%)</div>
                         <div className="font-semibold mt-0.5">
                           {costSettings.currency} {vatAmount.toFixed(2)}
@@ -2415,7 +2415,7 @@ export function EstimateQuotesMain({
                     </div>
                   </div>
 
-                  <div className="space-y-2 rounded-xl border border-white/10 bg-white/[0.02] p-3">
+                  <div className="space-y-2 rounded-xl border border-border bg-card/30 p-3">
                     <label className={`text-xs font-semibold ${theme.mutedText}`}>Cancel remarks (optional)</label>
                     <textarea
                       className={`${theme.input} min-h-24`}
@@ -2428,10 +2428,10 @@ export function EstimateQuotesMain({
                 </>
               ) : null}
             </div>
-            <div className="sticky bottom-0 flex flex-wrap items-center justify-end gap-2 border-t border-white/10 bg-black/20 px-5 py-4 backdrop-blur">
+            <div className="sticky bottom-0 flex flex-wrap items-center justify-end gap-2 border-t border-border bg-black/20 px-5 py-4 backdrop-blur">
                 <button
                   type="button"
-                  className={`rounded-lg px-4 py-2 text-xs font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+                  className={`rounded-lg px-4 py-2 text-xs font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-muted`}
                   onClick={closeVerifyModal}
                 >
                   Close
@@ -2470,12 +2470,12 @@ export function EstimateQuotesMain({
       {assignOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <Card className={`w-full max-w-lg rounded-xl shadow-xl ${theme.cardBg} ${theme.cardBorder}`}>
-            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+            <div className="flex items-center justify-between border-b border-border px-4 py-3">
               <div className="text-sm font-semibold">Assign Workshop Branch</div>
               <button
                 type="button"
                 onClick={closeAssignModal}
-                className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+                className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-muted`}
               >
                 Close
               </button>
@@ -2500,7 +2500,7 @@ export function EstimateQuotesMain({
               <div className="flex items-center justify-end gap-2">
                 <button
                   type="button"
-                  className={`rounded-md px-4 py-2 text-xs font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-white/10`}
+                  className={`rounded-md px-4 py-2 text-xs font-semibold uppercase tracking-wide ${theme.cardBorder} ${theme.surfaceSubtle} ${theme.mutedText} hover:bg-muted`}
                   onClick={closeAssignModal}
                 >
                   Cancel

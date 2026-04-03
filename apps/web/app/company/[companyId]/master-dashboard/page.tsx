@@ -78,7 +78,7 @@ function SparkLine({ data, color }: { data: number[]; color: string }) {
   const allZero = data.every((v) => v === 0);
   if (data.length < 2 || allZero) {
     return (
-      <div className="h-10 w-full flex items-center justify-center rounded bg-slate-800/40">
+      <div className="h-10 w-full flex items-center justify-center rounded bg-card/40">
         <span className="text-[10px] text-slate-600">No data for period</span>
       </div>
     );
@@ -119,12 +119,12 @@ function SectionHeader({ icon, title, subtitle, rightLabel }: { icon: string; ti
       <div className="flex items-center gap-2">
         <span className="text-lg">{icon}</span>
         <div>
-          <span className="text-sm font-bold text-white uppercase tracking-wide">{title}</span>
+          <span className="text-sm font-bold text-foreground uppercase tracking-wide">{title}</span>
           <span className="text-xs text-slate-400 ml-2">· {subtitle}</span>
         </div>
       </div>
       {rightLabel && (
-        <span className="text-[10px] text-slate-400 border border-white/10 rounded px-2 py-0.5">{rightLabel}</span>
+        <span className="text-[10px] text-slate-400 border border-border rounded px-2 py-0.5">{rightLabel}</span>
       )}
     </div>
   );
@@ -189,19 +189,19 @@ export default function MasterDashboardPage({
           <div>
             <div className="flex items-center gap-2">
               <span className="text-2xl">🏆</span>
-              <h1 className="text-xl sm:text-2xl font-bold text-white uppercase tracking-wide">Master Performance Dashboard</h1>
+              <h1 className="text-xl sm:text-2xl font-bold text-foreground uppercase tracking-wide">Master Performance Dashboard</h1>
             </div>
             <p className="text-xs text-slate-400 mt-1 ml-9">All Teams · Daily / Weekly / Monthly · Real-Time Performance Overview</p>
           </div>
           <div className="flex items-center gap-2 self-start">
             <input
               type="date" value={from} onChange={(e) => setFrom(e.target.value)}
-              className="rounded-lg border border-white/10 bg-slate-800 text-xs text-slate-300 px-2 py-1.5 focus:outline-none focus:border-blue-500"
+              className="rounded-lg border border-border bg-card text-xs text-slate-300 px-2 py-1.5 focus:outline-none focus:border-blue-500"
             />
             <span className="text-slate-500 text-xs">→</span>
             <input
               type="date" value={to} onChange={(e) => setTo(e.target.value)}
-              className="rounded-lg border border-white/10 bg-slate-800 text-xs text-slate-300 px-2 py-1.5 focus:outline-none focus:border-blue-500"
+              className="rounded-lg border border-border bg-card text-xs text-slate-300 px-2 py-1.5 focus:outline-none focus:border-blue-500"
             />
             <button
               onClick={() => companyId && fetchData(companyId)}
@@ -213,7 +213,7 @@ export default function MasterDashboardPage({
             <button
               onClick={() => setShowAI(!showAI)}
               className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition flex items-center gap-1.5 ${
-                showAI ? "border-purple-500/50 bg-purple-500/10 text-purple-400" : "border-white/10 bg-slate-800 text-slate-400 hover:text-purple-400"
+                showAI ? "border-purple-500/50 bg-purple-500/10 text-purple-400" : "border-border bg-card text-slate-400 hover:text-purple-400"
               }`}
             >
               <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
@@ -270,7 +270,7 @@ export default function MasterDashboardPage({
                   <span className="text-[10px] uppercase tracking-widest text-slate-400">{k.label}</span>
                   <span className="text-lg">{k.icon}</span>
                 </div>
-                <div className="text-xl font-bold text-white">{k.value}</div>
+                <div className="text-xl font-bold text-foreground">{k.value}</div>
                 {k.change && (
                   <div className={`text-[11px] mt-1 ${k.change.up ? "text-green-400" : "text-red-400"}`}>
                     {k.change.value}
@@ -285,9 +285,9 @@ export default function MasterDashboardPage({
         {d && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             {/* Team Table */}
-            <div className="lg:col-span-2 rounded-xl border border-white/10 bg-slate-900/60 p-4">
+            <div className="lg:col-span-2 rounded-xl border border-border bg-popover/60 p-4">
               <div className="flex items-center gap-4 mb-4">
-                <span className="text-xs font-bold text-white uppercase tracking-widest">Team Performance Summary</span>
+                <span className="text-xs font-bold text-foreground uppercase tracking-widest">Team Performance Summary</span>
                 <div className="flex gap-4 ml-auto text-center">
                   {[
                     { icon: "📞", label: "INBOUND" },
@@ -303,7 +303,7 @@ export default function MasterDashboardPage({
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="text-[10px] text-slate-500 uppercase border-b border-white/5">
+                    <tr className="text-[10px] text-slate-500 uppercase border-b border-border/40">
                       <th className="text-left py-2">Team</th>
                       <th className="text-right py-2">Total Calls</th>
                       <th className="text-right py-2">Answer Rate</th>
@@ -318,7 +318,7 @@ export default function MasterDashboardPage({
                       { name: "Remote Team", desc: `${rm?.agentCount ?? 0} agents · Remote work`, stats: rm?.teamStats, gradeColor: "text-yellow-400 bg-yellow-500/10" },
                       { name: "Portfolio Team", desc: "Account Mgmt · Upsell · Retention", stats: pf?.teamStats, gradeColor: "text-green-400 bg-green-500/10" },
                     ].map((row) => (
-                      <tr key={row.name} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                      <tr key={row.name} className="border-b border-border/40 hover:bg-muted/40 transition-colors">
                         <td className="py-3">
                           <div className="font-medium text-slate-200">{row.name}</div>
                           <div className="text-[10px] text-slate-500">{row.desc}</div>
@@ -341,7 +341,7 @@ export default function MasterDashboardPage({
                         </td>
                       </tr>
                     ))}
-                    <tr className="border-t-2 border-white/10 font-semibold text-slate-200">
+                    <tr className="border-t-2 border-border font-semibold text-slate-200">
                       <td className="py-2 text-xs">TOTAL</td>
                       <td className="text-right text-xs">{(kpis?.totalCallsHandled ?? 0).toLocaleString()}</td>
                       <td className="text-right text-xs">
@@ -360,8 +360,8 @@ export default function MasterDashboardPage({
 
             {/* Conversion Funnel */}
             {fn && (
-              <div className="rounded-xl border border-white/10 bg-slate-900/60 p-4">
-                <div className="text-[10px] font-bold text-white uppercase tracking-widest mb-4">
+              <div className="rounded-xl border border-border bg-popover/60 p-4">
+                <div className="text-[10px] font-bold text-foreground uppercase tracking-widest mb-4">
                   Conversion Funnel <span className="text-slate-500 font-normal">(All Teams)</span>
                 </div>
                 <div className="space-y-2">
@@ -378,7 +378,7 @@ export default function MasterDashboardPage({
                       <div key={step.label} className="flex items-center gap-2">
                         <div style={{ width: `${widths[i]}%` }} className="flex-shrink-0">
                           <div className="h-7 rounded bg-blue-600/80 flex items-center px-2">
-                            <span className="text-xs font-bold text-white">
+                            <span className="text-xs font-bold text-foreground">
                               {step.value !== null ? step.value.toLocaleString() : step.displayValue}
                             </span>
                           </div>
@@ -405,11 +405,11 @@ export default function MasterDashboardPage({
         {(ih || rm) && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Inhouse */}
-            <div className="rounded-xl border border-blue-500/20 bg-slate-900/60 p-4 space-y-4">
+            <div className="rounded-xl border border-blue-500/20 bg-popover/60 p-4 space-y-4">
               <div className="flex items-center gap-2">
                 <span className="text-lg">🏢</span>
                 <div>
-                  <div className="text-sm font-bold text-white">Inhouse Team</div>
+                  <div className="text-sm font-bold text-foreground">Inhouse Team</div>
                   <div className="text-[10px] text-slate-500">{ih?.agentCount ?? 0} agents</div>
                 </div>
               </div>
@@ -422,12 +422,12 @@ export default function MasterDashboardPage({
                 ].map((m) => (
                   <div key={m.label} className="rounded-lg border border-blue-500/10 bg-blue-500/5 p-2.5">
                     <div className="text-[9px] uppercase tracking-widest text-slate-500">{m.label}</div>
-                    <div className="text-base font-bold text-white mt-0.5">{m.value}</div>
+                    <div className="text-base font-bold text-foreground mt-0.5">{m.value}</div>
                   </div>
                 ))}
               </div>
               {ih && ih.trend.length > 0 && (
-                <div className="rounded-lg border border-white/5 bg-slate-800/40 p-2.5">
+                <div className="rounded-lg border border-border/40 bg-card/40 p-2.5">
                   <div className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Call Trend</div>
                   <SparkLine data={ih.trend.map((t) => t.calls)} color="#60a5fa" />
                   <div className="flex justify-between text-[8px] text-slate-600 mt-1">
@@ -443,7 +443,7 @@ export default function MasterDashboardPage({
                       { m: "Abandonment", v: ih.abandonmentRate, t: 10, h: false, c: "bg-orange-500" },
                       { m: "Score", v: ih.teamStats.score, t: 70, h: true, c: "bg-green-500" },
                     ].map((k) => (
-                      <tr key={k.m} className="border-b border-white/5">
+                      <tr key={k.m} className="border-b border-border/40">
                         <td className="py-1.5"><div className="flex items-center gap-2"><KpiBar pct={Math.min(k.v, 100)} color={k.c} /><span className="text-slate-400">{k.m}</span></div></td>
                         <td className="text-right text-slate-300">{k.v.toFixed(1)}%</td>
                         <td className="text-right"><StatusBadge status={kpiStatus(k.v, k.t, k.h)} /></td>
@@ -455,11 +455,11 @@ export default function MasterDashboardPage({
             </div>
 
             {/* Remote */}
-            <div className="rounded-xl border border-green-500/20 bg-slate-900/60 p-4 space-y-4">
+            <div className="rounded-xl border border-green-500/20 bg-popover/60 p-4 space-y-4">
               <div className="flex items-center gap-2">
                 <span className="text-lg">🏠</span>
                 <div>
-                  <div className="text-sm font-bold text-white">Remote Team</div>
+                  <div className="text-sm font-bold text-foreground">Remote Team</div>
                   <div className="text-[10px] text-slate-500">{rm?.agentCount ?? 0} agents</div>
                 </div>
               </div>
@@ -477,12 +477,12 @@ export default function MasterDashboardPage({
                 ].map((m) => (
                   <div key={m.label} className="rounded-lg border border-green-500/10 bg-green-500/5 p-2.5">
                     <div className="text-[9px] uppercase tracking-widest text-slate-500">{m.label}</div>
-                    <div className="text-base font-bold text-white mt-0.5">{m.value}</div>
+                    <div className="text-base font-bold text-foreground mt-0.5">{m.value}</div>
                   </div>
                 ))}
               </div>
               {rm && rm.trend.length > 0 && (
-                <div className="rounded-lg border border-white/5 bg-slate-800/40 p-2.5">
+                <div className="rounded-lg border border-border/40 bg-card/40 p-2.5">
                   <div className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Call Trend</div>
                   <SparkLine data={rm.trend.map((t) => t.calls)} color="#34d399" />
                   <div className="flex justify-between text-[8px] text-slate-600 mt-1">
@@ -498,7 +498,7 @@ export default function MasterDashboardPage({
                       { m: "Abandonment", v: rm.abandonmentRate, t: 10, h: false, c: "bg-orange-500" },
                       { m: "Score", v: rm.teamStats.score, t: 70, h: true, c: "bg-green-500" },
                     ].map((k) => (
-                      <tr key={k.m} className="border-b border-white/5">
+                      <tr key={k.m} className="border-b border-border/40">
                         <td className="py-1.5"><div className="flex items-center gap-2"><KpiBar pct={Math.min(k.v, 100)} color={k.c} /><span className="text-slate-400">{k.m}</span></div></td>
                         <td className="text-right text-slate-300">{k.v.toFixed(1)}%</td>
                         <td className="text-right"><StatusBadge status={kpiStatus(k.v, k.t, k.h)} /></td>
@@ -513,7 +513,7 @@ export default function MasterDashboardPage({
 
         {/* ── Portfolio Team ── */}
         {pf && (
-          <div className="rounded-xl border border-purple-500/20 bg-slate-900/60 p-4">
+          <div className="rounded-xl border border-purple-500/20 bg-popover/60 p-4">
             <SectionHeader icon="👥" title="Portfolio Team" subtitle="Account Management | Upsell | Retention" rightLabel="Period" />
             {pf.customersManaged === 0 && (
               <div className="mb-4 rounded-lg bg-purple-500/10 border border-purple-500/20 px-3 py-2 text-xs text-purple-300 flex items-center gap-2">
@@ -533,7 +533,7 @@ export default function MasterDashboardPage({
               ].map((m) => (
                 <div key={m.label} className={`rounded-xl border p-3 ${m.color}`}>
                   <div className="text-[10px] uppercase tracking-widest text-slate-400 mb-1">{m.label}</div>
-                  <div className="text-lg font-bold text-white">{m.value}</div>
+                  <div className="text-lg font-bold text-foreground">{m.value}</div>
                 </div>
               ))}
             </div>
@@ -544,7 +544,7 @@ export default function MasterDashboardPage({
                 <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Portfolio KPIs</div>
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="text-[10px] text-slate-500 border-b border-white/5">
+                    <tr className="text-[10px] text-slate-500 border-b border-border/40">
                       <th className="text-left py-1">Metric</th>
                       <th className="text-right py-1">Value</th>
                       <th className="text-right py-1">Target</th>
@@ -558,7 +558,7 @@ export default function MasterDashboardPage({
                       { metric: "Upsell Rate", val: pf.upsellRate, target: 30, higherBetter: true, barColor: "bg-orange-500" },
                       { metric: "Revenue per Customer", val: pf.revenuePerCustomer, target: 150, higherBetter: true, barColor: "bg-purple-500", isAed: true },
                     ].map((kpi) => (
-                      <tr key={kpi.metric} className="border-b border-white/5">
+                      <tr key={kpi.metric} className="border-b border-border/40">
                         <td className="py-2">
                           <div className="flex items-center gap-2">
                             <KpiBar pct={Math.min((kpi.val / (kpi.target * 1.5)) * 100, 100)} color={kpi.barColor} />
@@ -581,7 +581,7 @@ export default function MasterDashboardPage({
               </div>
 
               {/* Revenue Breakdown */}
-              <div className="rounded-xl border border-white/5 bg-slate-800/40 p-3">
+              <div className="rounded-xl border border-border/40 bg-card/40 p-3">
                 <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Revenue Breakdown</div>
                 {pf.revenueBreakdown.length > 0 && pf.totalSales > 0 ? (
                   <>
@@ -605,7 +605,7 @@ export default function MasterDashboardPage({
                           })()}
                         </svg>
                         <div className="absolute inset-0 flex flex-col items-center justify-center">
-                          <div className="text-xs font-bold text-white">{fmtCurrency(pf.totalSales)}</div>
+                          <div className="text-xs font-bold text-foreground">{fmtCurrency(pf.totalSales)}</div>
                           <div className="text-[9px] text-slate-500">Total Rev</div>
                         </div>
                       </div>
@@ -636,7 +636,7 @@ export default function MasterDashboardPage({
               </div>
 
               {/* Top Performers + Needs Attention */}
-              <div className="rounded-xl border border-white/5 bg-slate-800/40 p-3">
+              <div className="rounded-xl border border-border/40 bg-card/40 p-3">
                 <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Top Performers (MTD)</div>
                 {pf.topPerformers.length === 0 && (
                   <p className="text-[10px] text-slate-500">No agent data for this period.</p>
@@ -661,7 +661,7 @@ export default function MasterDashboardPage({
                 </div>
                 {pf.needsAttention.length > 0 && (
                   <>
-                    <div className="border-t border-white/10 pt-3">
+                    <div className="border-t border-border pt-3">
                       <div className="text-[10px] font-bold text-red-400 uppercase mb-2">⚠ Needs Attention</div>
                       {pf.needsAttention.map((a) => (
                         <div key={a.agentId} className="flex items-start gap-2 mb-1">

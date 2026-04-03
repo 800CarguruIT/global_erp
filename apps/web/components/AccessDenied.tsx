@@ -10,7 +10,7 @@ export function AccessDenied({
   description?: string;
 }) {
   return (
-    <div className="rounded-2xl border border-white/15 bg-red-500/10 p-6 text-sm text-white">
+    <div className="rounded-2xl border border-border bg-red-500/10 p-6 text-sm text-foreground">
       <p className="text-lg font-semibold">{title}</p>
       <p className="mt-1 text-xs uppercase tracking-[0.3em] text-red-200">Unauthorized</p>
       <p className="mt-3 text-sm text-red-100">{description}</p>

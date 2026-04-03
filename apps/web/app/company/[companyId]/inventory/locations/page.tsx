@@ -257,11 +257,11 @@ function InventoryLocationsPanel({ companyId }: { companyId: string }) {
       title="Inventory Locations"
       subtitle="Every stock movement must originate and land at a valid location."
       scopeLabel={`Company ${companyId}`}
-      contentClassName="space-y-6 rounded-2xl border-none bg-slate-950/70 p-0"
+      contentClassName="space-y-6 rounded-2xl border-none bg-background/70 p-0"
     >
       <div className="space-y-6">
         <section className="grid gap-4 lg:grid-cols-[1.5fr,1fr]">
-          <article className="rounded-2xl bg-slate-950/80 p-4 shadow-xl">
+          <article className="rounded-2xl bg-background/80 p-4 shadow-xl">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-semibold">Active locations</h2>
@@ -399,7 +399,7 @@ function InventoryLocationsPanel({ companyId }: { companyId: string }) {
             </div>
           </article>
 
-          <article className="rounded-2xl bg-slate-950/80 p-4 shadow-xl">
+          <article className="rounded-2xl bg-background/80 p-4 shadow-xl">
             <h2 className="text-lg font-semibold">Create location</h2>
             <p className="text-xs text-muted-foreground">
               Follow the hierarchy (warehouse → rack → shelf) so every SKU stays traceable.
@@ -418,7 +418,7 @@ function InventoryLocationsPanel({ companyId }: { companyId: string }) {
                 <input
                   value={form.name}
                   onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
-                  className="w-full rounded-2xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm text-white placeholder:text-slate-400 focus:border-primary focus:ring-2 focus:ring-primary/40"
+                  className="w-full rounded-2xl border border-border bg-popover/60 px-3 py-2 text-sm text-white placeholder:text-slate-400 focus:border-primary focus:ring-2 focus:ring-primary/40"
                   placeholder="Central Warehouse"
                 />
               </label>
@@ -429,7 +429,7 @@ function InventoryLocationsPanel({ companyId }: { companyId: string }) {
                   onChange={(e) =>
                     setForm((prev) => ({ ...prev, locationType: e.target.value as LocationForm["locationType"] }))
                   }
-                  className="w-full rounded-2xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm text-white placeholder:text-slate-400 focus:border-primary focus:ring-2 focus:ring-primary/40"
+                  className="w-full rounded-2xl border border-border bg-popover/60 px-3 py-2 text-sm text-white placeholder:text-slate-400 focus:border-primary focus:ring-2 focus:ring-primary/40"
                   disabled={isCentralCreationPhase}
                 >
                   <option value="warehouse">Warehouse</option>
@@ -443,7 +443,7 @@ function InventoryLocationsPanel({ companyId }: { companyId: string }) {
                 <select
                   value={form.branchId}
                   onChange={(e) => setForm((prev) => ({ ...prev, branchId: e.target.value }))}
-                  className="w-full rounded-2xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm text-white focus:border-primary focus:ring-2 focus:ring-primary/40"
+                  className="w-full rounded-2xl border border-border bg-popover/60 px-3 py-2 text-sm text-white focus:border-primary focus:ring-2 focus:ring-primary/40"
                   disabled={isCentralCreationPhase}
                 >
                   <option value="">Company / Central</option>
@@ -466,7 +466,7 @@ function InventoryLocationsPanel({ companyId }: { companyId: string }) {
           </article>
         </section>
 
-        <section className="rounded-2xl bg-slate-950/80 p-4 shadow-xl text-sm">
+        <section className="rounded-2xl bg-background/80 p-4 shadow-xl text-sm">
           <h2 className="text-lg font-semibold">Location strategy</h2>
           <p className="text-xs text-muted-foreground">
             Stock never lives at the company level—inventory is always attached to a physical location. Use

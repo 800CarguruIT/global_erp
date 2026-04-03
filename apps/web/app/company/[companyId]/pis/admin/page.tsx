@@ -37,19 +37,19 @@ export default function PisAdminPage() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-lg font-bold text-white">PIS Admin Configuration</h2>
+      <h2 className="text-lg font-bold text-foreground">PIS Admin Configuration</h2>
       <div className="space-y-4">
         {SECTIONS.map(s => (
-          <div key={s.key} className="rounded-xl border border-white/10 bg-gradient-to-br from-slate-900/80 to-black/90 p-5">
+          <div key={s.key} className="rounded-xl border border-border bg-gradient-to-br from-slate-900/80 to-black/90 p-5">
             <div className="flex items-center justify-between mb-3">
-              <div><h3 className="text-sm font-bold text-white">{s.label}</h3><p className="text-[11px] text-slate-500">{s.desc}</p></div>
+              <div><h3 className="text-sm font-bold text-foreground">{s.label}</h3><p className="text-[11px] text-slate-500">{s.desc}</p></div>
               <button onClick={() => { setEditKey(editKey === s.key ? null : s.key); setEditValue(JSON.stringify(config[s.key] ?? {}, null, 2)); }}
                 className="text-xs text-amber-400 hover:text-amber-300">{editKey === s.key ? "Cancel" : "Edit"}</button>
             </div>
             {editKey === s.key ? (
               <div className="space-y-2">
                 <textarea value={editValue} onChange={e => setEditValue(e.target.value)}
-                  className="w-full h-40 rounded-lg bg-slate-900 border border-white/20 p-3 text-xs font-mono text-slate-200" />
+                  className="w-full h-40 rounded-lg bg-popover border border-border p-3 text-xs font-mono text-slate-200" />
                 <button onClick={() => saveConfig(s.key)} disabled={saving === s.key}
                   className="rounded-lg bg-gradient-to-r from-amber-500 to-orange-600 px-4 py-2 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50">
                   {saving === s.key ? "Saving..." : "Save"}</button>
@@ -59,7 +59,7 @@ export default function PisAdminPage() {
                 {Object.entries(config[s.key] ?? {}).map(([k, v]) => (
                   <div key={k} className="rounded-lg bg-slate-800/50 p-2">
                     <div className="text-[10px] text-slate-500">{k.replace(/_/g, " ")}</div>
-                    <div className="text-sm font-semibold text-white">{String(v)}</div>
+                    <div className="text-sm font-semibold text-foreground">{String(v)}</div>
                   </div>
                 ))}
               </div>

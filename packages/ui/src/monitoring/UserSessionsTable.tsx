@@ -44,7 +44,7 @@ export function UserSessionsTable({ sessions }: Props) {
               ? "bg-emerald-500/20 text-emerald-100"
               : "bg-slate-500/20 text-slate-200";
             return (
-              <tr key={s.id} className="border-b border-white/5">
+              <tr key={s.id} className="border-b border-border/40">
                 <td className="px-3 py-2">
                   <span className={`px-2 py-1 rounded-full text-xs ${statusCls}`}>
                     {active ? "Active" : "Inactive"}

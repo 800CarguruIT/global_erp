@@ -53,14 +53,16 @@ type VinLookupCarOption = {
   description: string;
 };
 
-const TYRE_SIZE_OPTIONS = [
-  "195/65R15",
-  "205/55R16",
-  "215/55R17",
-  "225/45R17",
-  "225/55R18",
-  "235/55R19",
-  "245/45R19",
+const DEFAULT_TYRE_SIZE_OPTIONS = [
+  "155/65R14", "165/70R14", "175/65R14", "175/70R14",
+  "185/60R15", "185/65R15", "195/55R15", "195/60R15", "195/65R15",
+  "205/50R16", "205/55R16", "205/60R16", "215/55R16", "215/60R16", "215/65R16",
+  "215/45R17", "215/50R17", "215/55R17", "225/45R17", "225/50R17", "225/55R17", "225/65R17",
+  "225/40R18", "225/45R18", "225/55R18", "235/45R18", "235/55R18", "245/45R18",
+  "235/50R19", "235/55R19", "245/40R19", "245/45R19", "255/40R19", "255/45R19",
+  "255/35R20", "255/40R20", "265/35R20", "265/40R20", "275/35R20", "275/40R20",
+  "275/35R21", "285/35R21", "285/40R21",
+  "285/35R22", "295/30R22", "305/30R22",
 ];
 
 const INSPECTION_IMAGE_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
@@ -271,33 +273,46 @@ function decodeVinDetails(vinRaw: string): { make: string; year: string } {
   if (vin.length < 10) return { make: "", year: "" };
   const wmi = vin.slice(0, 3);
   const makeMap: Record<string, string> = {
-    WBA: "BMW",
-    WBS: "BMW",
-    WAU: "Audi",
-    WVG: "Volkswagen",
-    JHM: "Honda",
-    JTD: "Toyota",
-    JTE: "Toyota",
-    JN1: "Nissan",
-    KMH: "Hyundai",
-    KNA: "Kia",
-    KNM: "Renault Samsung",
-    SAL: "Land Rover",
-    SAJ: "Jaguar",
-    "1HG": "Honda",
-    "1FA": "Ford",
-    "1FT": "Ford",
-    "1C4": "Jeep",
-    "2HG": "Honda",
-    "2T3": "Toyota",
-    "3FA": "Ford",
-    "3VW": "Volkswagen",
-    "4T1": "Toyota",
-    "5NPE": "Hyundai",
-    "5XY": "Kia",
-    VF1: "Renault",
-    YV1: "Volvo",
-    ZFA: "Fiat",
+    // German
+    WBA: "BMW", WBS: "BMW", WBY: "BMW", WAU: "Audi", WUA: "Audi",
+    WVW: "Volkswagen", WVG: "Volkswagen", "3VW": "Volkswagen",
+    WDB: "Mercedes-Benz", WDC: "Mercedes-Benz", WDD: "Mercedes-Benz", "4JG": "Mercedes-Benz",
+    WP0: "Porsche", WP1: "Porsche",
+    // Japanese
+    JHM: "Honda", "1HG": "Honda", "2HG": "Honda", "5J6": "Honda",
+    JTD: "Toyota", JTE: "Toyota", JTN: "Toyota", "1NX": "Toyota", "2T1": "Toyota", "2T3": "Toyota",
+    "4T1": "Toyota", "4T3": "Toyota", "4T4": "Toyota", "5TD": "Toyota", "5TF": "Toyota",
+    "6T1": "Toyota",
+    JN1: "Nissan", JN8: "Nissan", "1N4": "Nissan", "1N6": "Nissan", "5N1": "Nissan",
+    JMZ: "Mazda", JM1: "Mazda", JM3: "Mazda",
+    JF1: "Subaru", JF2: "Subaru", "4S3": "Subaru", "4S4": "Subaru",
+    JS1: "Suzuki", JS2: "Suzuki",
+    MNT: "Nissan",
+    MHR: "Honda",
+    // Korean
+    KMH: "Hyundai", "5NP": "Hyundai", "5XY": "Kia",
+    KNA: "Kia", KND: "Kia", KNM: "Renault Samsung",
+    // British
+    SAL: "Land Rover", SAJ: "Jaguar", SCA: "Rolls-Royce", SCB: "Bentley",
+    // American
+    "1FA": "Ford", "1FT": "Ford", "1FM": "Ford", "2FM": "Ford", "3FA": "Ford",
+    "1C4": "Jeep", "1J4": "Jeep", "1J8": "Jeep",
+    "1G1": "Chevrolet", "1GC": "Chevrolet", "2G1": "Chevrolet", "3GN": "Chevrolet",
+    "1GT": "GMC", "1GK": "GMC",
+    "2LN": "Lincoln", "5LM": "Lincoln",
+    "1GY": "Cadillac",
+    "1D7": "Dodge", "2D7": "Dodge", "3D7": "Dodge",
+    // Other
+    VF1: "Renault", VF7: "Citroen", VF3: "Peugeot",
+    YV1: "Volvo", YV4: "Volvo",
+    ZFA: "Fiat", ZFF: "Ferrari", ZAR: "Alfa Romeo",
+    TRU: "Audi", TMB: "Skoda",
+    MBH: "Suzuki", MA1: "Mahindra",
+    // Middle East / India / China
+    MA3: "Suzuki India", MAJ: "Ford India",
+    LFV: "Volkswagen China", LVS: "Ford China", LSG: "GM China",
+    // GCC common
+    MNB: "Hyundai", "6F4": "Ford",
   };
 
   const yearCode = vin.charAt(9);
@@ -311,12 +326,12 @@ function decodeVinDetails(vinRaw: string): { make: string; year: string } {
 function ratingChipClass(value: string, activeValue: string): string {
   const active = value === activeValue;
   if (activeValue === "good" || activeValue === "normal" || activeValue === "clear") {
-    return active ? "border-emerald-400/60 bg-emerald-500/20 text-emerald-200" : "border-white/20";
+    return active ? "border-emerald-400/60 bg-emerald-500/20 text-emerald-200" : "border-border";
   }
   if (activeValue === "weak" || activeValue === "slow" || activeValue === "minor") {
-    return active ? "border-amber-400/60 bg-amber-500/20 text-amber-200" : "border-white/20";
+    return active ? "border-amber-400/60 bg-amber-500/20 text-amber-200" : "border-border";
   }
-  return active ? "border-rose-400/60 bg-rose-500/20 text-rose-200" : "border-white/20";
+  return active ? "border-rose-400/60 bg-rose-500/20 text-rose-200" : "border-border";
 }
 
 const chipButtonBaseClass = "rounded-md border px-2 py-1 text-xs uppercase tracking-wide transition-colors hover:border-sky-300/40";
@@ -480,6 +495,10 @@ export function LeadDetailMain({
   const [inspectionTyreSizeFront, setInspectionTyreSizeFront] = useState("");
   const [inspectionTyreSizeRear, setInspectionTyreSizeRear] = useState("");
   const [inspectionMileage, setInspectionMileage] = useState("");
+  const [aiTyreSizes, setAiTyreSizes] = useState<string[]>([]);
+  const [aiTyreSizesLoading, setAiTyreSizesLoading] = useState(false);
+  const [aiBatterySizes, setAiBatterySizes] = useState<string[]>([]);
+  const [aiBatterySizesLoading, setAiBatterySizesLoading] = useState(false);
   const [inspectionFieldErrors, setInspectionFieldErrors] = useState<InspectionFieldErrors>({});
   const [inspectionAutoFillNote, setInspectionAutoFillNote] = useState<string | null>(null);
   const [vinCarOptions, setVinCarOptions] = useState<VinLookupCarOption[]>([]);
@@ -1348,6 +1367,12 @@ export function LeadDetailMain({
     }
   }
 
+  const isLeadClosed = useMemo(() => {
+    const status = String(lead?.leadStatus ?? "").trim().toLowerCase();
+    const stage = String(lead?.leadStage ?? "").trim().toLowerCase();
+    return ["closed", "closed_won", "done", "completed", "lost"].includes(status) || stage === "closed";
+  }, [lead?.leadStatus, lead?.leadStage]);
+
   const derivedWorkflowStep = useMemo(() => {
     const stage = String(lead?.leadStage ?? "").trim().toLowerCase();
     const statusVal = String(lead?.leadStatus ?? "").trim().toLowerCase();
@@ -1524,6 +1549,24 @@ export function LeadDetailMain({
     return changed;
   };
 
+  const fetchAiTyreSizes = async (make: string, model: string, year: string) => {
+    if (!make || !companyId) return;
+    setAiTyreSizesLoading(true);
+    setAiBatterySizesLoading(true);
+    try {
+      const res = await fetch(`/api/company/${companyId}/sales/leads/${leadId}/tyre-sizes?make=${encodeURIComponent(make)}&model=${encodeURIComponent(model)}&year=${encodeURIComponent(year)}&includeBattery=1`, { cache: "no-store" });
+      if (res.ok) {
+        const json = await res.json();
+        const sizes: string[] = Array.isArray(json?.sizes) ? json.sizes : [];
+        const batteries: string[] = Array.isArray(json?.batterySizes) ? json.batterySizes : [];
+        if (sizes.length > 0) setAiTyreSizes(sizes);
+        if (batteries.length > 0) setAiBatterySizes(batteries);
+      }
+    } catch { /* ignore */ }
+    setAiTyreSizesLoading(false);
+    setAiBatterySizesLoading(false);
+  };
+
   const autoFillVehicleFromVin = async () => {
     const vin = inspectionVin.trim().toUpperCase();
     if (!vin) {
@@ -1533,6 +1576,7 @@ export function LeadDetailMain({
 
     let changed = 0;
     let partsCount: number | null = null;
+    let partsCatalogPaused = false;
     let canFallbackToLocalDecode = true;
     setIsVinLookupLoading(true);
     try {
@@ -1546,7 +1590,7 @@ export function LeadDetailMain({
       }
       const json = await res.json().catch(() => ({}));
       const data = json?.data ?? {};
-      const partsCatalogPaused = Boolean(data?.partsCatalogPaused);
+      partsCatalogPaused = Boolean(data?.partsCatalogPaused);
       const cars = Array.isArray(data?.cars) ? (data.cars as VinLookupCarOption[]) : [];
       const car = (data?.car as VinLookupCarOption | null) ?? null;
       if (Boolean(data?.requiresCarSelection) && cars.length > 1) {
@@ -1599,6 +1643,14 @@ export function LeadDetailMain({
     } else {
       setInspectionAutoFillNote(`VIN auto-fill updated ${changed} field${changed > 1 ? "s" : ""}.`);
     }
+
+    // Fetch AI tyre sizes based on decoded car info
+    const finalMake = inspectionMake.trim();
+    const finalModel = inspectionModel.trim();
+    const finalYear = inspectionYear.trim();
+    if (finalMake) {
+      void fetchAiTyreSizes(finalMake, finalModel, finalYear);
+    }
   };
 
   const fetchPartsCatalogueFromSelectedVinCar = async () => {
@@ -1612,6 +1664,7 @@ export function LeadDetailMain({
       return;
     }
 
+    let partsCatalogPaused = false;
     setIsVinLookupLoading(true);
     try {
       const res = await fetch(
@@ -1624,7 +1677,7 @@ export function LeadDetailMain({
       }
       const json = await res.json().catch(() => ({}));
       const data = json?.data ?? {};
-      const partsCatalogPaused = Boolean(data?.partsCatalogPaused);
+      partsCatalogPaused = Boolean(data?.partsCatalogPaused);
       const cars = Array.isArray(data?.cars) ? (data.cars as VinLookupCarOption[]) : [];
       const car = (data?.car as VinLookupCarOption | null) ?? null;
       const partsCount =
@@ -2046,53 +2099,47 @@ export function LeadDetailMain({
       >
         <div className="grid gap-4 lg:grid-cols-3">
           <div className="space-y-4 lg:col-span-2">
-            <Card className="p-4">
+            <Card className="p-3 sm:p-4">
+              {isLeadClosed ? (
+                <div className="space-y-4 py-4">
+                  <div className="flex flex-col items-center gap-3 text-center">
+                    <span className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/15 text-3xl">✅</span>
+                    <h2 className="text-lg font-bold text-emerald-400">Lead Closed</h2>
+                    <p className="text-sm text-muted-foreground">This lead has been completed and closed.</p>
+                  </div>
+                </div>
+              ) : (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-sm font-semibold">Lead Workflow (Multi-Step)</h2>
-                  <div className="text-xs text-muted-foreground">Call ID: {lead.id.slice(0, 12)}</div>
+                  <h2 className="text-sm font-semibold">Lead Workflow</h2>
+                  <div className="text-[10px] text-muted-foreground sm:text-xs">ID: {lead.id.slice(0, 8)}</div>
                 </div>
-                <div className="overflow-x-auto pb-1">
-                  <div className="flex min-w-max items-center gap-2">
-                    {workflowSteps.map((step, idx) => (
-                      <React.Fragment key={step.stage}>
-                        <div
-                          className={`rounded-full border px-3 py-1 text-[11px] font-semibold whitespace-nowrap transition ${
-                            idx < workflowStep
-                              ? "border-emerald-400/60 bg-emerald-500/15 text-emerald-300"
-                              : idx === activeWorkflowStep
-                              ? "border-sky-400/60 bg-sky-500/15 text-sky-300"
-                              : "border-white/15 bg-white/5 text-slate-300"
-                          }`}
-                        >
-                          <button
-                            type="button"
-                            disabled={idx > workflowStep}
-                            onClick={() => setWorkflowTabStep(idx)}
-                            className="disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            {idx + 1}. {step.title}
-                          </button>
-                        </div>
-                        {idx < workflowSteps.length - 1 ? (
-                          <span
-                            className={`text-[10px] ${
-                              idx < workflowStep ? "text-emerald-300/80" : "text-slate-500"
-                            }`}
-                          >
-                            ?
-                          </span>
-                        ) : null}
-                      </React.Fragment>
-                    ))}
-                  </div>
+                {/* Stepper — wraps on mobile */}
+                <div className="flex flex-wrap gap-1.5 sm:gap-2">
+                  {workflowSteps.map((step, idx) => (
+                    <button
+                      key={step.stage}
+                      type="button"
+                      disabled={idx > workflowStep}
+                      onClick={() => setWorkflowTabStep(idx)}
+                      className={`rounded-full border px-2.5 py-1.5 text-[10px] font-semibold whitespace-nowrap transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 sm:px-3 sm:py-1 sm:text-[11px] ${
+                        idx < workflowStep
+                          ? "border-emerald-400/60 bg-emerald-500/15 text-emerald-300"
+                          : idx === activeWorkflowStep
+                          ? "border-sky-400/60 bg-sky-500/15 text-sky-300"
+                          : "border-border bg-muted/40 text-muted-foreground"
+                      }`}
+                    >
+                      {idx + 1}. {step.title}
+                    </button>
+                  ))}
                 </div>
 
-                <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-                  <div className="text-sm font-medium">
+                <div className="rounded-xl border border-border bg-muted/40 p-3 sm:p-4">
+                  <div className="text-base font-semibold sm:text-sm">
                     Step {activeWorkflowStep + 1}: {workflowSteps[activeWorkflowStep]?.title}
                   </div>
-                  <div className="mt-1 text-xs text-muted-foreground">
+                  <div className="mt-1 text-sm text-muted-foreground sm:text-xs">
                     Complete this step, then continue to the next one.
                   </div>
                   {viewingPreviousWorkflowStep ? (
@@ -2101,7 +2148,7 @@ export function LeadDetailMain({
 
                   {activeWorkflowStep === 0 ? (
                     <div className="mt-3 space-y-2">
-                      <label className="flex items-center gap-2 text-xs">
+                      <label className="flex items-center gap-3 rounded-lg bg-card/30 px-3 py-3 text-sm sm:gap-2 sm:bg-transparent sm:px-0 sm:py-0 sm:text-xs">
                         <input
                           type="checkbox"
                           checked={acceptLeadConfirmed}
@@ -2114,7 +2161,7 @@ export function LeadDetailMain({
 
                   {activeWorkflowStep === 1 ? (
                     <div className="mt-3 space-y-2">
-                      <label className="flex items-center gap-2 text-xs">
+                      <label className="flex items-center gap-3 rounded-lg bg-card/30 px-3 py-3 text-sm sm:gap-2 sm:bg-transparent sm:px-0 sm:py-0 sm:text-xs">
                         <input
                           type="checkbox"
                           checked={startStepConfirmed}
@@ -2127,7 +2174,7 @@ export function LeadDetailMain({
 
                   {activeWorkflowStep === 2 ? (
                     <div className="mt-3 space-y-2">
-                      <label className="flex items-center gap-2 text-xs">
+                      <label className="flex items-center gap-3 rounded-lg bg-card/30 px-3 py-3 text-sm sm:gap-2 sm:bg-transparent sm:px-0 sm:py-0 sm:text-xs">
                         <input
                           type="checkbox"
                           checked={reachedStepConfirmed}
@@ -2135,7 +2182,7 @@ export function LeadDetailMain({
                         />
                         I confirm technician has reached customer location
                       </label>
-                      <div className="mt-2 rounded-md border border-dashed border-white/20 bg-white/5 p-3">
+                      <div className="mt-2 rounded-md border border-dashed border-border bg-muted/40 p-3">
                         <div className="flex items-center justify-between gap-2">
                           <div className="text-xs font-medium text-foreground">Caller Location</div>
                           {callerNavigationUrl ? (
@@ -2143,7 +2190,7 @@ export function LeadDetailMain({
                               href={callerNavigationUrl}
                               target="_blank"
                               rel="noreferrer"
-                              className="rounded border border-white/20 bg-white/10 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-white hover:bg-white/20"
+                              className="rounded border border-border bg-muted px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-foreground hover:bg-muted/80"
                             >
                               Open Navigation
                             </a>
@@ -2152,8 +2199,8 @@ export function LeadDetailMain({
                         <div className="mt-1 text-[11px] text-muted-foreground">
                           Use this to navigate to customer location.
                         </div>
-                        <div className="mt-2 rounded-md border border-white/10 bg-slate-900/40 px-3 py-2 text-[12px] text-slate-200">
-                          <div className="text-[11px] uppercase tracking-wide text-slate-400">Location Details</div>
+                        <div className="mt-2 rounded-md border border-border bg-card/40 px-3 py-2 text-[12px] text-foreground/80">
+                          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Location Details</div>
                           <div className="mt-1 break-all">{callerLocationLabel || callerMapRawLocation || "-"}</div>
                         </div>
                       </div>
@@ -2162,7 +2209,7 @@ export function LeadDetailMain({
 
                   {activeWorkflowStep === 3 ? (
                     <div className="mt-3 space-y-2">
-                      <label className="flex items-center gap-2 text-xs">
+                      <label className="flex items-center gap-3 rounded-lg bg-card/30 px-3 py-3 text-sm sm:gap-2 sm:bg-transparent sm:px-0 sm:py-0 sm:text-xs">
                         <input
                           type="checkbox"
                           checked={preServiceTermsAccepted}
@@ -2170,9 +2217,9 @@ export function LeadDetailMain({
                         />
                         I accept the pre-service terms and conditions
                       </label>
-                      <div className="rounded-md border border-dashed border-slate-400/70 bg-slate-900/30 p-2">
-                        <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-100">Terms & Conditions</div>
-                        <p className="mt-1 text-xs text-slate-200">
+                      <div className="rounded-md border border-dashed border-border bg-card/30 p-2">
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-foreground">Terms & Conditions</div>
+                        <p className="mt-1 text-xs text-foreground/80">
                           I authorize inspection/initial pre-service checks and approve recording findings before service starts.
                         </p>
                       </div>
@@ -2183,7 +2230,7 @@ export function LeadDetailMain({
                           <button
                             type="button"
                             onClick={() => setPreServiceSignature("")}
-                            className="rounded-md border border-slate-300 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-slate-100 hover:bg-white/10"
+                            className="rounded-md border border-border px-2 py-1 text-xs font-semibold uppercase tracking-wide text-foreground hover:bg-muted"
                           >
                             Clear Signature
                           </button>
@@ -2193,7 +2240,7 @@ export function LeadDetailMain({
                         value={preServiceNotes}
                         onChange={(e) => setPreServiceNotes(e.target.value)}
                         placeholder="Pre-service notes (optional)"
-                        className="h-20 w-full rounded-md border border-white/20 bg-slate-950/60 p-2 text-xs text-slate-100 placeholder:text-slate-500"
+                        className="h-20 w-full rounded-md border border-border bg-background/60 p-2 text-xs text-foreground placeholder:text-muted-foreground"
                       />
                       <button
                         type="button"
@@ -2211,9 +2258,9 @@ export function LeadDetailMain({
 
                   {activeWorkflowStep === 4 ? (
                     <div className="mt-3 space-y-3">
-                      <div className="rounded-md border border-slate-400/70 bg-slate-900/30 p-3">
+                      <div className="rounded-md border border-border bg-card/30 p-3">
                         <div className="flex items-center justify-between gap-2">
-                          <div className="text-xs font-semibold text-slate-100">
+                          <div className="text-xs font-semibold text-foreground">
                             Completed {inspectionCompletedCount}/{inspectionChecks.length} required fields
                           </div>
                           <div className="text-[11px] text-muted-foreground">
@@ -2254,8 +2301,8 @@ export function LeadDetailMain({
                         )}
                       </div>
 
-                      <div className="rounded-md border border-slate-400/70 bg-slate-900/30 p-3">
-                        <div className="text-xs font-semibold text-slate-100">Inspection Checklist</div>
+                      <div className="rounded-md border border-border bg-card/30 p-3">
+                        <div className="text-xs font-semibold text-foreground">Inspection Checklist</div>
                         <div className="mt-2 grid gap-3 md:grid-cols-2">
                           <div id="inspection-photo-front">
                             <FileUploader label={`1. Front Picture ${inspectionPhotoFront ? "?" : ""}`} kind="image" value={inspectionPhotoFront || null} onChange={(v) => { setInspectionPhotoFront(v ?? ""); clearInspectionFieldError("photoFront"); }} showPreview showFileIdField={false} capture="environment" maxSizeBytes={INSPECTION_IMAGE_MAX_SIZE_BYTES} acceptMimeTypes={INSPECTION_IMAGE_MIME_TYPES} helperText="Allowed: JPEG/PNG/WEBP/HEIC (max 10MB)" externalError={inspectionFieldErrors.photoFront ?? null} />
@@ -2291,7 +2338,7 @@ export function LeadDetailMain({
                               setSelectedVinCarId("");
                             }}
                             placeholder="4. Enter Car VIN"
-                            className="h-10 w-full rounded-md border border-white/20 bg-slate-950/60 px-3 text-xs text-slate-100 placeholder:text-slate-500"
+                            className="h-10 w-full rounded-md border border-border bg-background/60 px-3 text-xs text-foreground placeholder:text-muted-foreground"
                           />
                           {inspectionFieldErrors.vin ? <p className="text-xs text-destructive">{inspectionFieldErrors.vin}</p> : null}
                         </div>
@@ -2300,18 +2347,18 @@ export function LeadDetailMain({
                             type="button"
                             onClick={autoFillVehicleFromVin}
                             disabled={isVinLookupLoading}
-                            className="rounded-md border px-3 py-2 text-xs font-semibold uppercase tracking-wide hover:bg-white/10"
+                            className="rounded-md border px-3 py-2 text-xs font-semibold uppercase tracking-wide hover:bg-muted"
                           >
                             {isVinLookupLoading ? "Fetching VIN..." : "Auto-fill from VIN"}
                           </button>
-                          {inspectionAutoFillNote ? <span className="text-xs text-muted-foreground">{inspectionAutoFillNote}</span> : null}
+                          {/* auto-fill note hidden */}
                         </div>
                         {vinCarOptions.length > 1 ? (
                           <>
                             <select
                               value={selectedVinCarId}
                               onChange={(e) => setSelectedVinCarId(e.target.value)}
-                              className="h-10 w-full rounded-md border border-white/20 bg-slate-950/60 px-3 text-xs text-slate-100 md:col-span-1"
+                              className="h-10 w-full rounded-md border border-border bg-background/60 px-3 text-xs text-foreground md:col-span-1"
                             >
                               <option value="">Select matched car</option>
                               {vinCarOptions.map((car) => (
@@ -2325,7 +2372,7 @@ export function LeadDetailMain({
                                 type="button"
                                 onClick={fetchPartsCatalogueFromSelectedVinCar}
                                 disabled={isVinLookupLoading || !selectedVinCarId}
-                                className="rounded-md border px-3 py-2 text-xs font-semibold uppercase tracking-wide hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+                                className="rounded-md border px-3 py-2 text-xs font-semibold uppercase tracking-wide hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
                               >
                                 {isVinLookupLoading ? "Fetching..." : "Fetch Parts Catalogue"}
                               </button>
@@ -2340,7 +2387,7 @@ export function LeadDetailMain({
                             clearInspectionFieldError("make");
                           }}
                           placeholder="5a. Car Make"
-                          className="h-10 w-full rounded-md border border-white/20 bg-slate-950/60 px-3 text-xs text-slate-100 placeholder:text-slate-500"
+                          className="h-10 w-full rounded-md border border-border bg-background/60 px-3 text-xs text-foreground placeholder:text-muted-foreground"
                         />
                         {inspectionFieldErrors.make ? <p className="-mt-1 text-xs text-destructive">{inspectionFieldErrors.make}</p> : null}
                         <input
@@ -2351,7 +2398,7 @@ export function LeadDetailMain({
                             clearInspectionFieldError("model");
                           }}
                           placeholder="5b. Car Model"
-                          className="h-10 w-full rounded-md border border-white/20 bg-slate-950/60 px-3 text-xs text-slate-100 placeholder:text-slate-500"
+                          className="h-10 w-full rounded-md border border-border bg-background/60 px-3 text-xs text-foreground placeholder:text-muted-foreground"
                         />
                         {inspectionFieldErrors.model ? <p className="-mt-1 text-xs text-destructive">{inspectionFieldErrors.model}</p> : null}
                         <input
@@ -2362,7 +2409,7 @@ export function LeadDetailMain({
                             clearInspectionFieldError("year");
                           }}
                           placeholder="5c. Car Year"
-                          className="h-10 w-full rounded-md border border-white/20 bg-slate-950/60 px-3 text-xs text-slate-100 placeholder:text-slate-500"
+                          className="h-10 w-full rounded-md border border-border bg-background/60 px-3 text-xs text-foreground placeholder:text-muted-foreground"
                         />
                         {inspectionFieldErrors.year ? <p className="-mt-1 text-xs text-destructive">{inspectionFieldErrors.year}</p> : null}
                         <input
@@ -2373,7 +2420,7 @@ export function LeadDetailMain({
                             clearInspectionFieldError("plate");
                           }}
                           placeholder="5d. Car Plate"
-                          className="h-10 w-full rounded-md border border-white/20 bg-slate-950/60 px-3 text-xs text-slate-100 placeholder:text-slate-500"
+                          className="h-10 w-full rounded-md border border-border bg-background/60 px-3 text-xs text-foreground placeholder:text-muted-foreground"
                         />
                         {inspectionFieldErrors.plate ? <p className="-mt-1 text-xs text-destructive">{inspectionFieldErrors.plate}</p> : null}
                         <select
@@ -2383,10 +2430,10 @@ export function LeadDetailMain({
                             setInspectionTyreSizeFront(e.target.value);
                             clearInspectionFieldError("tyreSizeFront");
                           }}
-                          className="h-10 w-full rounded-md border border-white/20 bg-slate-950/60 px-3 text-xs text-slate-100"
+                          className="h-10 w-full rounded-md border border-border bg-background/60 px-3 text-xs text-foreground"
                         >
-                          <option value="">6a. Front Tyre Size</option>
-                          {TYRE_SIZE_OPTIONS.map((size) => (
+                          <option value="">{aiTyreSizesLoading ? "Loading tyre sizes..." : "6a. Front Tyre Size"}</option>
+                          {(aiTyreSizes.length > 0 ? aiTyreSizes : DEFAULT_TYRE_SIZE_OPTIONS).map((size) => (
                             <option key={size} value={size}>{size}</option>
                           ))}
                         </select>
@@ -2397,10 +2444,10 @@ export function LeadDetailMain({
                             setInspectionTyreSizeRear(e.target.value);
                             clearInspectionFieldError("tyreSizeRear");
                           }}
-                          className="h-10 w-full rounded-md border border-white/20 bg-slate-950/60 px-3 text-xs text-slate-100"
+                          className="h-10 w-full rounded-md border border-border bg-background/60 px-3 text-xs text-foreground"
                         >
-                          <option value="">6b. Rear Tyre Size</option>
-                          {TYRE_SIZE_OPTIONS.map((size) => (
+                          <option value="">{aiTyreSizesLoading ? "Loading tyre sizes..." : "6b. Rear Tyre Size"}</option>
+                          {(aiTyreSizes.length > 0 ? aiTyreSizes : DEFAULT_TYRE_SIZE_OPTIONS).map((size) => (
                             <option key={size} value={size}>{size}</option>
                           ))}
                         </select>
@@ -2412,23 +2459,23 @@ export function LeadDetailMain({
                             clearInspectionFieldError("mileage");
                           }}
                           placeholder="7. Enter Car Mileage"
-                          className="h-10 w-full rounded-md border border-white/20 bg-slate-950/60 px-3 text-xs text-slate-100 placeholder:text-slate-500"
+                          className="h-10 w-full rounded-md border border-border bg-background/60 px-3 text-xs text-foreground placeholder:text-muted-foreground"
                         />
                         {inspectionFieldErrors.tyreSizeFront ? <p className="-mt-1 text-xs text-destructive">{inspectionFieldErrors.tyreSizeFront}</p> : null}
                         {inspectionFieldErrors.tyreSizeRear ? <p className="-mt-1 text-xs text-destructive">{inspectionFieldErrors.tyreSizeRear}</p> : null}
                         {inspectionFieldErrors.mileage ? <p className="-mt-1 text-xs text-destructive">{inspectionFieldErrors.mileage}</p> : null}
                       </div>
 
-                      <div className="rounded-md border border-slate-400/70 bg-slate-900/30 p-3">
+                      <div className="rounded-md border border-border bg-card/30 p-3">
                         <div className="flex items-center justify-between gap-2">
-                          <div className="text-xs font-semibold text-slate-100">8. Car Health Check</div>
+                          <div className="text-xs font-semibold text-foreground">8. Car Health Check</div>
                           <div className="rounded border border-sky-300/40 bg-sky-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-200">
                             {healthSelectionCount}/5 checks
                           </div>
                         </div>
                         <div className="mt-2 grid gap-3 md:grid-cols-2">
                           <div id="inspection-health-battery">
-                            <div className="mb-1 text-xs text-slate-200">Battery Condition</div>
+                            <div className="mb-1 text-xs text-foreground/80">Battery Condition</div>
                             <div className="flex flex-wrap gap-2">
                               {["good", "weak", "replace"].map((value) => (
                                 <button
@@ -2447,7 +2494,7 @@ export function LeadDetailMain({
                             {inspectionFieldErrors.healthBattery ? <p className="mt-1 text-xs text-destructive">{inspectionFieldErrors.healthBattery}</p> : null}
                           </div>
                           <div id="inspection-health-starter">
-                            <div className="mb-1 text-xs text-slate-200">Starter</div>
+                            <div className="mb-1 text-xs text-foreground/80">Starter</div>
                             <div className="flex flex-wrap gap-2">
                               {["normal", "slow", "faulty"].map((value) => (
                                 <button
@@ -2467,22 +2514,48 @@ export function LeadDetailMain({
                           </div>
                         </div>
                         <div className="mt-2 grid gap-2 md:grid-cols-2">
-                          <input
+                          <select
                             id="inspection-health-battery-size"
                             value={healthBatterySize}
                             onChange={(e) => {
-                              setHealthBatterySize(e.target.value.toUpperCase());
+                              setHealthBatterySize(e.target.value);
                               clearInspectionFieldError("healthBatterySize");
                             }}
-                            placeholder="Battery size (required, e.g. 55D23L)"
-                            className="h-10 w-full rounded-md border border-white/20 bg-slate-950/60 px-3 text-xs text-slate-100 placeholder:text-slate-500"
-                          />
-                          <input
+                            className="h-10 w-full rounded-md border border-border bg-background/60 px-3 text-xs text-foreground"
+                          >
+                            <option value="">{aiBatterySizesLoading ? "Loading battery sizes..." : "Select Battery Size"}</option>
+                            {aiBatterySizes.map((s) => <option key={s} value={s}>{s}</option>)}
+                            {aiBatterySizes.length === 0 && !aiBatterySizesLoading ? (
+                              <>
+                                <option value="55D23L">55D23L</option>
+                                <option value="80D26L">80D26L</option>
+                                <option value="55B24L">55B24L</option>
+                                <option value="DIN55">DIN55</option>
+                                <option value="DIN66">DIN66</option>
+                                <option value="DIN75">DIN75</option>
+                                <option value="MF75D23L">MF75D23L</option>
+                                <option value="35">Group 35</option>
+                                <option value="24F">Group 24F</option>
+                                <option value="27F">Group 27F</option>
+                              </>
+                            ) : null}
+                          </select>
+
+                          <select
                             value={healthBatteryVoltage}
                             onChange={(e) => setHealthBatteryVoltage(e.target.value)}
-                            placeholder="Battery voltage (optional, e.g. 12.4V)"
-                            className="h-10 w-full rounded-md border border-white/20 bg-slate-950/60 px-3 text-xs text-slate-100 placeholder:text-slate-500"
-                          />
+                            className="h-10 w-full rounded-md border border-border bg-background/60 px-3 text-xs text-foreground"
+                          >
+                            <option value="">Battery Voltage (optional)</option>
+                            <option value="12.0V">12.0V - Low</option>
+                            <option value="12.2V">12.2V - Weak</option>
+                            <option value="12.4V">12.4V - Fair</option>
+                            <option value="12.6V">12.6V - Good</option>
+                            <option value="12.8V">12.8V - Excellent</option>
+                            <option value="13.0V">13.0V+</option>
+                            <option value="11.8V">11.8V - Very Low</option>
+                            <option value="11.5V">11.5V - Dead</option>
+                          </select>
                         </div>
                         {inspectionFieldErrors.healthBatterySize ? <p className="mt-1 text-xs text-destructive">{inspectionFieldErrors.healthBatterySize}</p> : null}
                         <div className="mt-3 grid gap-3 md:grid-cols-2">
@@ -2527,7 +2600,7 @@ export function LeadDetailMain({
                           value={healthNotes}
                           onChange={(e) => setHealthNotes(e.target.value)}
                           placeholder="Additional health notes (optional)"
-                          className="mt-2 h-16 w-full rounded-md border border-white/20 bg-slate-950/60 p-2 text-xs text-slate-100 placeholder:text-slate-500"
+                          className="mt-2 h-16 w-full rounded-md border border-border bg-background/60 p-2 text-xs text-foreground placeholder:text-muted-foreground"
                         />
                       </div>
                     </div>
@@ -2535,7 +2608,7 @@ export function LeadDetailMain({
 
                   {activeWorkflowStep === 5 ? (
                     <div className="mt-3 space-y-2">
-                      <label className="flex items-center gap-2 text-xs">
+                      <label className="flex items-center gap-3 rounded-lg bg-card/30 px-3 py-3 text-sm sm:gap-2 sm:bg-transparent sm:px-0 sm:py-0 sm:text-xs">
                         <input
                           type="checkbox"
                           checked={startJobStepConfirmed}
@@ -2553,7 +2626,7 @@ export function LeadDetailMain({
                         <button
                           type="button"
                           onClick={addProcessJobLineItem}
-                          className="rounded-md border px-2 py-1 text-[11px] font-semibold uppercase tracking-wide hover:bg-white/10"
+                          className="rounded-md border px-2 py-1 text-[11px] font-semibold uppercase tracking-wide hover:bg-muted"
                         >
                           Add Item
                         </button>
@@ -2563,7 +2636,7 @@ export function LeadDetailMain({
                       ) : (
                         <div className="space-y-3">
                           {processJobLineItems.map((item, idx) => (
-                            <div key={item.id} className="rounded-md border border-white/15 bg-white/5 p-2">
+                            <div key={item.id} className="rounded-md border border-border bg-muted/40 p-2">
                               <div className="mb-2 flex items-center justify-between">
                                 <div className="text-[11px] font-semibold">Item {idx + 1}</div>
                                 <button
@@ -2579,19 +2652,19 @@ export function LeadDetailMain({
                                   value={item.name}
                                   onChange={(e) => updateProcessJobLineItem(item.id, { name: e.target.value })}
                                   placeholder="Item name"
-                                  className="h-9 w-full rounded-md border border-white/20 bg-slate-950/60 px-2 text-xs text-slate-100 placeholder:text-slate-500"
+                                  className="h-9 w-full rounded-md border border-border bg-background/60 px-2 text-xs text-foreground placeholder:text-muted-foreground"
                                 />
                                 <input
                                   value={item.quantity}
                                   onChange={(e) => updateProcessJobLineItem(item.id, { quantity: e.target.value.replace(/[^\d.]/g, "") })}
                                   placeholder="Quantity"
-                                  className="h-9 w-full rounded-md border border-white/20 bg-slate-950/60 px-2 text-xs text-slate-100 placeholder:text-slate-500"
+                                  className="h-9 w-full rounded-md border border-border bg-background/60 px-2 text-xs text-foreground placeholder:text-muted-foreground"
                                 />
                                 <input
                                   value={item.price}
                                   onChange={(e) => updateProcessJobLineItem(item.id, { price: e.target.value.replace(/[^\d.]/g, "") })}
                                   placeholder="Unit price"
-                                  className="h-9 w-full rounded-md border border-white/20 bg-slate-950/60 px-2 text-xs text-slate-100 placeholder:text-slate-500"
+                                  className="h-9 w-full rounded-md border border-border bg-background/60 px-2 text-xs text-foreground placeholder:text-muted-foreground"
                                 />
                                 <FileUploader
                                   label={`Item Picture ${item.pictureFileId ? "?" : ""}`}
@@ -2605,8 +2678,8 @@ export function LeadDetailMain({
                                   acceptMimeTypes={INSPECTION_IMAGE_MIME_TYPES}
                                   helperText="Required evidence picture"
                                 />
-                                <div className="md:col-span-2 rounded-md border border-white/15 bg-slate-950/40 p-2">
-                                  <label className="flex items-center gap-2 text-xs text-slate-200">
+                                <div className="md:col-span-2 rounded-md border border-border bg-background/40 p-2">
+                                  <label className="flex items-center gap-2 text-xs text-foreground/80">
                                     <input
                                       type="checkbox"
                                       checked={item.scrapEnabled}
@@ -2638,7 +2711,7 @@ export function LeadDetailMain({
                                         value={item.scrapNotes}
                                         onChange={(e) => updateProcessJobLineItem(item.id, { scrapNotes: e.target.value })}
                                         placeholder="Scrap notes (optional)"
-                                        className="h-20 w-full rounded-md border border-white/20 bg-slate-950/60 p-2 text-xs text-slate-100 placeholder:text-slate-500"
+                                        className="h-20 w-full rounded-md border border-border bg-background/60 p-2 text-xs text-foreground placeholder:text-muted-foreground"
                                       />
                                     </div>
                                   ) : null}
@@ -2649,20 +2722,20 @@ export function LeadDetailMain({
                         </div>
                       )}
 
-                      <div className="rounded-md border border-white/15 bg-white/5 p-2">
+                      <div className="rounded-md border border-border bg-muted/40 p-2">
                         <div className="mb-2 text-xs font-semibold">Collect Payment</div>
                         <div className="grid gap-2 md:grid-cols-2">
                           <select
                             value={processJobPaymentMethod}
                             onChange={(e) => setProcessJobPaymentMethod(e.target.value)}
-                            className="h-9 w-full rounded-md border border-white/20 bg-slate-950/60 px-2 text-xs text-slate-100"
+                            className="h-9 w-full rounded-md border border-border bg-background/60 px-2 text-xs text-foreground"
                           >
                             <option value="cash">Cash</option>
                             <option value="card">Card</option>
                             <option value="bank_transfer">Bank Transfer</option>
                             <option value="online">Online</option>
                           </select>
-                          <label className="flex h-9 items-center gap-2 rounded-md border border-white/15 bg-slate-950/40 px-2 text-xs text-slate-200">
+                          <label className="flex h-9 items-center gap-2 rounded-md border border-border bg-background/40 px-2 text-xs text-foreground/80">
                             <input
                               type="checkbox"
                               checked={processJobWithVat}
@@ -2670,7 +2743,7 @@ export function LeadDetailMain({
                             />
                             With VAT (5%)
                           </label>
-                          <div className="md:col-span-2 rounded-md border border-white/15 bg-slate-950/40 p-2 text-xs text-slate-200">
+                          <div className="md:col-span-2 rounded-md border border-border bg-background/40 p-2 text-xs text-foreground/80">
                             <div className="flex items-center justify-between">
                               <span>Subtotal</span>
                               <span>{processJobSubTotal.toFixed(2)}</span>
@@ -2679,7 +2752,7 @@ export function LeadDetailMain({
                               <span>VAT ({(PROCESS_JOB_VAT_RATE * 100).toFixed(0)}%)</span>
                               <span>{processJobVatAmount.toFixed(2)}</span>
                             </div>
-                            <div className="mt-1 flex items-center justify-between font-semibold text-slate-100">
+                            <div className="mt-1 flex items-center justify-between font-semibold text-foreground">
                               <span>Total {processJobWithVat ? "(With VAT)" : "(Without VAT)"}</span>
                               <span>{processJobGrandTotal.toFixed(2)}</span>
                             </div>
@@ -2702,7 +2775,7 @@ export function LeadDetailMain({
                             value={processJobNotes}
                             onChange={(e) => setProcessJobNotes(e.target.value)}
                             placeholder="Payment notes (optional)"
-                            className="md:col-span-2 h-16 w-full rounded-md border border-white/20 bg-slate-950/60 p-2 text-xs text-slate-100 placeholder:text-slate-500"
+                            className="md:col-span-2 h-16 w-full rounded-md border border-border bg-background/60 p-2 text-xs text-foreground placeholder:text-muted-foreground"
                           />
                         </div>
                       </div>
@@ -2711,7 +2784,7 @@ export function LeadDetailMain({
 
                   {activeWorkflowStep === 7 ? (
                     <div className="mt-3 space-y-2">
-                      <label className="flex items-center gap-2 text-xs">
+                      <label className="flex items-center gap-3 rounded-lg bg-card/30 px-3 py-3 text-sm sm:gap-2 sm:bg-transparent sm:px-0 sm:py-0 sm:text-xs">
                         <input
                           type="checkbox"
                           checked={postServiceTermsAccepted}
@@ -2719,16 +2792,16 @@ export function LeadDetailMain({
                         />
                         I (customer) accept the post-service terms and conditions
                       </label>
-                      <div className="rounded-md border border-dashed border-slate-400/70 bg-slate-900/30 p-2">
-                        <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-100">Terms & Conditions</div>
-                        <p className="mt-1 text-xs text-slate-200">
+                      <div className="rounded-md border border-dashed border-border bg-card/30 p-2">
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-foreground">Terms & Conditions</div>
+                        <p className="mt-1 text-xs text-foreground/80">
                           I (customer) confirm the service checklist and car condition have been reviewed and accepted.
                         </p>
                       </div>
-                      <div className="rounded-md border border-white/15 bg-white/5 p-2">
+                      <div className="rounded-md border border-border bg-muted/40 p-2">
                         <div className="text-xs font-semibold">Customer Post-Service Checklist</div>
                         <div className="mt-2 grid gap-2 md:grid-cols-2">
-                          <label className="flex items-center gap-2 text-xs">
+                          <label className="flex items-center gap-3 rounded-lg bg-card/30 px-3 py-3 text-sm sm:gap-2 sm:bg-transparent sm:px-0 sm:py-0 sm:text-xs">
                             <input
                               type="checkbox"
                               checked={postServiceChecklistServiceDone}
@@ -2736,7 +2809,7 @@ export function LeadDetailMain({
                             />
                             I confirm service completed
                           </label>
-                          <label className="flex items-center gap-2 text-xs">
+                          <label className="flex items-center gap-3 rounded-lg bg-card/30 px-3 py-3 text-sm sm:gap-2 sm:bg-transparent sm:px-0 sm:py-0 sm:text-xs">
                             <input
                               type="checkbox"
                               checked={postServiceChecklistCleaned}
@@ -2744,7 +2817,7 @@ export function LeadDetailMain({
                             />
                             I confirm car cleaned
                           </label>
-                          <label className="flex items-center gap-2 text-xs">
+                          <label className="flex items-center gap-3 rounded-lg bg-card/30 px-3 py-3 text-sm sm:gap-2 sm:bg-transparent sm:px-0 sm:py-0 sm:text-xs">
                             <input
                               type="checkbox"
                               checked={postServiceChecklistExplained}
@@ -2752,7 +2825,7 @@ export function LeadDetailMain({
                             />
                             I confirm work explained to me
                           </label>
-                          <label className="flex items-center gap-2 text-xs">
+                          <label className="flex items-center gap-3 rounded-lg bg-card/30 px-3 py-3 text-sm sm:gap-2 sm:bg-transparent sm:px-0 sm:py-0 sm:text-xs">
                             <input
                               type="checkbox"
                               checked={postServiceChecklistRoadTested}
@@ -2769,7 +2842,7 @@ export function LeadDetailMain({
                           <button
                             type="button"
                             onClick={() => setPostServiceSignature("")}
-                            className="rounded-md border border-slate-300 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-slate-100 hover:bg-white/10"
+                            className="rounded-md border border-border px-2 py-1 text-xs font-semibold uppercase tracking-wide text-foreground hover:bg-muted"
                           >
                             Clear Signature
                           </button>
@@ -2779,7 +2852,7 @@ export function LeadDetailMain({
                         value={postServiceNotes}
                         onChange={(e) => setPostServiceNotes(e.target.value)}
                         placeholder="Post-service notes (optional)"
-                        className="h-20 w-full rounded-md border border-white/20 bg-slate-950/60 p-2 text-xs text-slate-100 placeholder:text-slate-500"
+                        className="h-20 w-full rounded-md border border-border bg-background/60 p-2 text-xs text-foreground placeholder:text-muted-foreground"
                       />
                       <button
                         type="button"
@@ -2799,12 +2872,12 @@ export function LeadDetailMain({
                     </div>
                   ) : null}
 
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <div className="mt-4 flex gap-2 sm:mt-3">
                     <button
                       type="button"
                       disabled={workflowBusy || activeWorkflowStep <= 0}
                       onClick={() => setWorkflowTabStep((prev) => Math.max(0, prev - 1))}
-                      className="rounded-md border px-3 py-2 text-xs font-semibold uppercase tracking-wide hover:bg-white/10 disabled:opacity-50"
+                      className="flex-1 rounded-xl border px-3 py-3 text-sm font-semibold uppercase tracking-wide active:bg-muted disabled:opacity-40 sm:flex-none sm:rounded-md sm:py-2 sm:text-xs"
                     >
                       Back
                     </button>
@@ -2812,7 +2885,7 @@ export function LeadDetailMain({
                       type="button"
                       disabled={workflowBusy || viewingPreviousWorkflowStep}
                       onClick={() => void submitCurrentWorkflowStep()}
-                      className="rounded-md border border-primary/40 bg-primary/10 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-primary hover:bg-primary/20 disabled:opacity-50"
+                      className="flex-[2] rounded-xl border border-primary/40 bg-primary/10 px-3 py-3 text-sm font-semibold uppercase tracking-wide text-primary active:bg-primary/20 disabled:opacity-40 sm:flex-none sm:rounded-md sm:py-2 sm:text-xs"
                     >
                       {workflowBusy
                         ? "Processing..."
@@ -2823,29 +2896,19 @@ export function LeadDetailMain({
                     {inspectionId ? (
                       <a
                         href={`/company/${companyId}/inspections/${inspectionId}`}
-                        className="rounded-md border px-3 py-2 text-xs font-semibold uppercase tracking-wide hover:bg-white/10"
+                        className="flex-1 rounded-xl border px-3 py-3 text-center text-sm font-semibold uppercase tracking-wide active:bg-muted sm:flex-none sm:rounded-md sm:py-2 sm:text-xs"
                       >
-                        Open Inspection
+                        Inspection
                       </a>
                     ) : null}
                   </div>
                 </div>
               </div>
+              )}
             </Card>
           </div>
 
-          <Card className="p-4">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <h2 className="text-sm font-semibold">Timeline</h2>
-              </div>
-              {isReloadingTimeline ? (
-                <p className="text-xs text-muted-foreground">Refreshing timeline...</p>
-              ) : (
-                <LeadTimeline events={events} variant={timelineVariant} />
-              )}
-            </div>
-          </Card>
+          {/* Timeline hidden */}
         </div>
       </MainPageShell>
     );
@@ -2879,7 +2942,7 @@ export function LeadDetailMain({
               type="button"
               onClick={handleAccept}
               disabled={isSaving}
-              className="rounded-md border px-2 py-1 text-xs font-semibold uppercase tracking-wide hover:bg-white/10 disabled:opacity-50"
+              className="rounded-md border px-2 py-1 text-xs font-semibold uppercase tracking-wide hover:bg-muted disabled:opacity-50"
             >
               Accept lead
             </button>
@@ -2889,7 +2952,7 @@ export function LeadDetailMain({
               type="button"
               onClick={handleCheckin}
               disabled={isSaving}
-              className="rounded-md border px-2 py-1 text-xs font-semibold uppercase tracking-wide hover:bg-white/10 disabled:opacity-50"
+              className="rounded-md border px-2 py-1 text-xs font-semibold uppercase tracking-wide hover:bg-muted disabled:opacity-50"
             >
               Car check-in
             </button>
@@ -2900,7 +2963,7 @@ export function LeadDetailMain({
                 type="button"
                 onClick={() => handleDelete(true)}
                 disabled={deleting}
-                className="rounded-md border px-2 py-1 text-xs hover:bg-white/10 disabled:opacity-50"
+                className="rounded-md border px-2 py-1 text-xs hover:bg-muted disabled:opacity-50"
               >
                 {deleting ? "Archiving..." : "Archive"}
               </button>
@@ -2936,7 +2999,7 @@ export function LeadDetailMain({
                               ? "border-emerald-400/60 bg-emerald-500/15 text-emerald-300"
                               : idx === activeWorkflowStep
                               ? "border-sky-400/60 bg-sky-500/15 text-sky-300"
-                              : "border-white/15 bg-white/5 text-slate-300"
+                              : "border-border bg-muted/40 text-muted-foreground"
                           }`}
                         >
                           <button
@@ -2951,7 +3014,7 @@ export function LeadDetailMain({
                         {idx < workflowSteps.length - 1 ? (
                           <span
                             className={`text-[10px] ${
-                              idx < workflowStep ? "text-emerald-300/80" : "text-slate-500"
+                              idx < workflowStep ? "text-emerald-300/80" : "text-muted-foreground"
                             }`}
                           >
                             ?
@@ -2962,11 +3025,11 @@ export function LeadDetailMain({
                   </div>
                 </div>
 
-                <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-                  <div className="text-sm font-medium">
+                <div className="rounded-xl border border-border bg-muted/40 p-3 sm:p-4">
+                  <div className="text-base font-semibold sm:text-sm">
                     Step {activeWorkflowStep + 1}: {workflowSteps[activeWorkflowStep]?.title}
                   </div>
-                  <div className="mt-1 text-xs text-muted-foreground">
+                  <div className="mt-1 text-sm text-muted-foreground sm:text-xs">
                     Complete this step, then continue to the next one.
                   </div>
                   {viewingPreviousWorkflowStep ? (
@@ -2975,7 +3038,7 @@ export function LeadDetailMain({
 
                   {activeWorkflowStep === 3 ? (
                     <div className="mt-3 space-y-2">
-                      <label className="flex items-center gap-2 text-xs">
+                      <label className="flex items-center gap-3 rounded-lg bg-card/30 px-3 py-3 text-sm sm:gap-2 sm:bg-transparent sm:px-0 sm:py-0 sm:text-xs">
                         <input
                           type="checkbox"
                           checked={preServiceTermsAccepted}
@@ -2983,9 +3046,9 @@ export function LeadDetailMain({
                         />
                         I accept the pre-service terms and conditions
                       </label>
-                      <div className="rounded-md border border-dashed border-slate-400/70 bg-slate-900/30 p-2">
-                        <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-100">Terms & Conditions</div>
-                        <p className="mt-1 text-xs text-slate-200">
+                      <div className="rounded-md border border-dashed border-border bg-card/30 p-2">
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-foreground">Terms & Conditions</div>
+                        <p className="mt-1 text-xs text-foreground/80">
                           I authorize inspection/initial pre-service checks and approve recording findings before service starts.
                         </p>
                       </div>
@@ -2996,7 +3059,7 @@ export function LeadDetailMain({
                           <button
                             type="button"
                             onClick={() => setPreServiceSignature("")}
-                            className="rounded-md border border-slate-300 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-slate-100 hover:bg-white/10"
+                            className="rounded-md border border-border px-2 py-1 text-xs font-semibold uppercase tracking-wide text-foreground hover:bg-muted"
                           >
                             Clear Signature
                           </button>
@@ -3006,7 +3069,7 @@ export function LeadDetailMain({
                         value={preServiceNotes}
                         onChange={(e) => setPreServiceNotes(e.target.value)}
                         placeholder="Pre-service notes (optional)"
-                        className="h-20 w-full rounded-md border border-white/20 bg-slate-950/60 p-2 text-xs text-slate-100 placeholder:text-slate-500"
+                        className="h-20 w-full rounded-md border border-border bg-background/60 p-2 text-xs text-foreground placeholder:text-muted-foreground"
                       />
                       <button
                         type="button"
@@ -3024,9 +3087,9 @@ export function LeadDetailMain({
 
                   {activeWorkflowStep === 4 ? (
                     <div className="mt-3 space-y-3">
-                      <div className="rounded-md border border-slate-400/70 bg-slate-900/30 p-3">
+                      <div className="rounded-md border border-border bg-card/30 p-3">
                         <div className="flex items-center justify-between gap-2">
-                          <div className="text-xs font-semibold text-slate-100">
+                          <div className="text-xs font-semibold text-foreground">
                             Completed {inspectionCompletedCount}/{inspectionChecks.length} required fields
                           </div>
                           <div className="text-[11px] text-muted-foreground">
@@ -3067,8 +3130,8 @@ export function LeadDetailMain({
                         )}
                       </div>
 
-                      <div className="rounded-md border border-slate-400/70 bg-slate-900/30 p-3">
-                        <div className="text-xs font-semibold text-slate-100">Inspection Checklist</div>
+                      <div className="rounded-md border border-border bg-card/30 p-3">
+                        <div className="text-xs font-semibold text-foreground">Inspection Checklist</div>
                         <div className="mt-2 grid gap-3 md:grid-cols-2">
                           <div id="inspection-photo-front">
                             <FileUploader label={`1. Front Picture ${inspectionPhotoFront ? "?" : ""}`} kind="image" value={inspectionPhotoFront || null} onChange={(v) => { setInspectionPhotoFront(v ?? ""); clearInspectionFieldError("photoFront"); }} showPreview showFileIdField={false} capture="environment" maxSizeBytes={INSPECTION_IMAGE_MAX_SIZE_BYTES} acceptMimeTypes={INSPECTION_IMAGE_MIME_TYPES} helperText="Allowed: JPEG/PNG/WEBP/HEIC (max 10MB)" externalError={inspectionFieldErrors.photoFront ?? null} />
@@ -3103,7 +3166,7 @@ export function LeadDetailMain({
                               setSelectedVinCarId("");
                             }}
                             placeholder="4. Enter Car VIN"
-                            className="h-10 w-full rounded-md border border-white/20 bg-slate-950/60 px-3 text-xs text-slate-100 placeholder:text-slate-500"
+                            className="h-10 w-full rounded-md border border-border bg-background/60 px-3 text-xs text-foreground placeholder:text-muted-foreground"
                           />
                           {inspectionFieldErrors.vin ? <p className="text-xs text-destructive">{inspectionFieldErrors.vin}</p> : null}
                         </div>
@@ -3112,18 +3175,18 @@ export function LeadDetailMain({
                             type="button"
                             onClick={autoFillVehicleFromVin}
                             disabled={isVinLookupLoading}
-                            className="rounded-md border px-3 py-2 text-xs font-semibold uppercase tracking-wide hover:bg-white/10"
+                            className="rounded-md border px-3 py-2 text-xs font-semibold uppercase tracking-wide hover:bg-muted"
                           >
                             {isVinLookupLoading ? "Fetching VIN..." : "Auto-fill from VIN"}
                           </button>
-                          {inspectionAutoFillNote ? <span className="text-xs text-muted-foreground">{inspectionAutoFillNote}</span> : null}
+                          {/* auto-fill note hidden */}
                         </div>
                         {vinCarOptions.length > 1 ? (
                           <>
                             <select
                               value={selectedVinCarId}
                               onChange={(e) => setSelectedVinCarId(e.target.value)}
-                              className="h-10 w-full rounded-md border border-white/20 bg-slate-950/60 px-3 text-xs text-slate-100 md:col-span-1"
+                              className="h-10 w-full rounded-md border border-border bg-background/60 px-3 text-xs text-foreground md:col-span-1"
                             >
                               <option value="">Select matched car</option>
                               {vinCarOptions.map((car) => (
@@ -3137,7 +3200,7 @@ export function LeadDetailMain({
                                 type="button"
                                 onClick={fetchPartsCatalogueFromSelectedVinCar}
                                 disabled={isVinLookupLoading || !selectedVinCarId}
-                                className="rounded-md border px-3 py-2 text-xs font-semibold uppercase tracking-wide hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+                                className="rounded-md border px-3 py-2 text-xs font-semibold uppercase tracking-wide hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
                               >
                                 {isVinLookupLoading ? "Fetching..." : "Fetch Parts Catalogue"}
                               </button>
@@ -3151,7 +3214,7 @@ export function LeadDetailMain({
                             clearInspectionFieldError("make");
                           }}
                           placeholder="5a. Car Make"
-                          className="h-10 w-full rounded-md border border-white/20 bg-slate-950/60 px-3 text-xs text-slate-100 placeholder:text-slate-500"
+                          className="h-10 w-full rounded-md border border-border bg-background/60 px-3 text-xs text-foreground placeholder:text-muted-foreground"
                         />
                         {inspectionFieldErrors.make ? <p className="-mt-1 text-xs text-destructive">{inspectionFieldErrors.make}</p> : null}
                         <input
@@ -3161,7 +3224,7 @@ export function LeadDetailMain({
                             clearInspectionFieldError("model");
                           }}
                           placeholder="5b. Car Model"
-                          className="h-10 w-full rounded-md border border-white/20 bg-slate-950/60 px-3 text-xs text-slate-100 placeholder:text-slate-500"
+                          className="h-10 w-full rounded-md border border-border bg-background/60 px-3 text-xs text-foreground placeholder:text-muted-foreground"
                         />
                         {inspectionFieldErrors.model ? <p className="-mt-1 text-xs text-destructive">{inspectionFieldErrors.model}</p> : null}
                         <input
@@ -3171,7 +3234,7 @@ export function LeadDetailMain({
                             clearInspectionFieldError("year");
                           }}
                           placeholder="5c. Car Year"
-                          className="h-10 w-full rounded-md border border-white/20 bg-slate-950/60 px-3 text-xs text-slate-100 placeholder:text-slate-500"
+                          className="h-10 w-full rounded-md border border-border bg-background/60 px-3 text-xs text-foreground placeholder:text-muted-foreground"
                         />
                         {inspectionFieldErrors.year ? <p className="-mt-1 text-xs text-destructive">{inspectionFieldErrors.year}</p> : null}
                         <input
@@ -3181,7 +3244,7 @@ export function LeadDetailMain({
                             clearInspectionFieldError("plate");
                           }}
                           placeholder="5d. Car Plate"
-                          className="h-10 w-full rounded-md border border-white/20 bg-slate-950/60 px-3 text-xs text-slate-100 placeholder:text-slate-500"
+                          className="h-10 w-full rounded-md border border-border bg-background/60 px-3 text-xs text-foreground placeholder:text-muted-foreground"
                         />
                         {inspectionFieldErrors.plate ? <p className="-mt-1 text-xs text-destructive">{inspectionFieldErrors.plate}</p> : null}
                         <select
@@ -3190,10 +3253,10 @@ export function LeadDetailMain({
                             setInspectionTyreSizeFront(e.target.value);
                             clearInspectionFieldError("tyreSizeFront");
                           }}
-                          className="h-10 w-full rounded-md border border-white/20 bg-slate-950/60 px-3 text-xs text-slate-100"
+                          className="h-10 w-full rounded-md border border-border bg-background/60 px-3 text-xs text-foreground"
                         >
-                          <option value="">6a. Front Tyre Size</option>
-                          {TYRE_SIZE_OPTIONS.map((size) => (
+                          <option value="">{aiTyreSizesLoading ? "Loading tyre sizes..." : "6a. Front Tyre Size"}</option>
+                          {(aiTyreSizes.length > 0 ? aiTyreSizes : DEFAULT_TYRE_SIZE_OPTIONS).map((size) => (
                             <option key={size} value={size}>{size}</option>
                           ))}
                         </select>
@@ -3203,10 +3266,10 @@ export function LeadDetailMain({
                             setInspectionTyreSizeRear(e.target.value);
                             clearInspectionFieldError("tyreSizeRear");
                           }}
-                          className="h-10 w-full rounded-md border border-white/20 bg-slate-950/60 px-3 text-xs text-slate-100"
+                          className="h-10 w-full rounded-md border border-border bg-background/60 px-3 text-xs text-foreground"
                         >
-                          <option value="">6b. Rear Tyre Size</option>
-                          {TYRE_SIZE_OPTIONS.map((size) => (
+                          <option value="">{aiTyreSizesLoading ? "Loading tyre sizes..." : "6b. Rear Tyre Size"}</option>
+                          {(aiTyreSizes.length > 0 ? aiTyreSizes : DEFAULT_TYRE_SIZE_OPTIONS).map((size) => (
                             <option key={size} value={size}>{size}</option>
                           ))}
                         </select>
@@ -3217,23 +3280,23 @@ export function LeadDetailMain({
                             clearInspectionFieldError("mileage");
                           }}
                           placeholder="7. Enter Car Mileage"
-                          className="h-10 w-full rounded-md border border-white/20 bg-slate-950/60 px-3 text-xs text-slate-100 placeholder:text-slate-500"
+                          className="h-10 w-full rounded-md border border-border bg-background/60 px-3 text-xs text-foreground placeholder:text-muted-foreground"
                         />
                         {inspectionFieldErrors.tyreSizeFront ? <p className="-mt-1 text-xs text-destructive">{inspectionFieldErrors.tyreSizeFront}</p> : null}
                         {inspectionFieldErrors.tyreSizeRear ? <p className="-mt-1 text-xs text-destructive">{inspectionFieldErrors.tyreSizeRear}</p> : null}
                         {inspectionFieldErrors.mileage ? <p className="-mt-1 text-xs text-destructive">{inspectionFieldErrors.mileage}</p> : null}
                       </div>
 
-                      <div className="rounded-md border border-slate-400/70 bg-slate-900/30 p-3">
+                      <div className="rounded-md border border-border bg-card/30 p-3">
                         <div className="flex items-center justify-between gap-2">
-                          <div className="text-xs font-semibold text-slate-100">8. Car Health Check</div>
+                          <div className="text-xs font-semibold text-foreground">8. Car Health Check</div>
                           <div className="rounded border border-sky-300/40 bg-sky-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-200">
                             {healthSelectionCount}/5 checks
                           </div>
                         </div>
                         <div className="mt-2 grid gap-3 md:grid-cols-2">
                           <div id="inspection-health-battery">
-                            <div className="mb-1 text-xs text-slate-200">Battery Condition</div>
+                            <div className="mb-1 text-xs text-foreground/80">Battery Condition</div>
                             <div className="flex flex-wrap gap-2">
                               {["good", "weak", "replace"].map((value) => (
                                 <button
@@ -3252,7 +3315,7 @@ export function LeadDetailMain({
                             {inspectionFieldErrors.healthBattery ? <p className="mt-1 text-xs text-destructive">{inspectionFieldErrors.healthBattery}</p> : null}
                           </div>
                           <div id="inspection-health-starter">
-                            <div className="mb-1 text-xs text-slate-200">Starter</div>
+                            <div className="mb-1 text-xs text-foreground/80">Starter</div>
                             <div className="flex flex-wrap gap-2">
                               {["normal", "slow", "faulty"].map((value) => (
                                 <button
@@ -3272,22 +3335,48 @@ export function LeadDetailMain({
                           </div>
                         </div>
                         <div className="mt-2 grid gap-2 md:grid-cols-2">
-                          <input
+                          <select
                             id="inspection-health-battery-size"
                             value={healthBatterySize}
                             onChange={(e) => {
-                              setHealthBatterySize(e.target.value.toUpperCase());
+                              setHealthBatterySize(e.target.value);
                               clearInspectionFieldError("healthBatterySize");
                             }}
-                            placeholder="Battery size (required, e.g. 55D23L)"
-                            className="h-10 w-full rounded-md border border-white/20 bg-slate-950/60 px-3 text-xs text-slate-100 placeholder:text-slate-500"
-                          />
-                          <input
+                            className="h-10 w-full rounded-md border border-border bg-background/60 px-3 text-xs text-foreground"
+                          >
+                            <option value="">{aiBatterySizesLoading ? "Loading battery sizes..." : "Select Battery Size"}</option>
+                            {aiBatterySizes.map((s) => <option key={s} value={s}>{s}</option>)}
+                            {aiBatterySizes.length === 0 && !aiBatterySizesLoading ? (
+                              <>
+                                <option value="55D23L">55D23L</option>
+                                <option value="80D26L">80D26L</option>
+                                <option value="55B24L">55B24L</option>
+                                <option value="DIN55">DIN55</option>
+                                <option value="DIN66">DIN66</option>
+                                <option value="DIN75">DIN75</option>
+                                <option value="MF75D23L">MF75D23L</option>
+                                <option value="35">Group 35</option>
+                                <option value="24F">Group 24F</option>
+                                <option value="27F">Group 27F</option>
+                              </>
+                            ) : null}
+                          </select>
+
+                          <select
                             value={healthBatteryVoltage}
                             onChange={(e) => setHealthBatteryVoltage(e.target.value)}
-                            placeholder="Battery voltage (optional, e.g. 12.4V)"
-                            className="h-10 w-full rounded-md border border-white/20 bg-slate-950/60 px-3 text-xs text-slate-100 placeholder:text-slate-500"
-                          />
+                            className="h-10 w-full rounded-md border border-border bg-background/60 px-3 text-xs text-foreground"
+                          >
+                            <option value="">Battery Voltage (optional)</option>
+                            <option value="12.0V">12.0V - Low</option>
+                            <option value="12.2V">12.2V - Weak</option>
+                            <option value="12.4V">12.4V - Fair</option>
+                            <option value="12.6V">12.6V - Good</option>
+                            <option value="12.8V">12.8V - Excellent</option>
+                            <option value="13.0V">13.0V+</option>
+                            <option value="11.8V">11.8V - Very Low</option>
+                            <option value="11.5V">11.5V - Dead</option>
+                          </select>
                         </div>
                         {inspectionFieldErrors.healthBatterySize ? <p className="mt-1 text-xs text-destructive">{inspectionFieldErrors.healthBatterySize}</p> : null}
                         <div className="mt-3 grid gap-3 md:grid-cols-2">
@@ -3332,7 +3421,7 @@ export function LeadDetailMain({
                           value={healthNotes}
                           onChange={(e) => setHealthNotes(e.target.value)}
                           placeholder="Additional health notes (optional)"
-                          className="mt-2 h-16 w-full rounded-md border border-white/20 bg-slate-950/60 p-2 text-xs text-slate-100 placeholder:text-slate-500"
+                          className="mt-2 h-16 w-full rounded-md border border-border bg-background/60 p-2 text-xs text-foreground placeholder:text-muted-foreground"
                         />
                       </div>
                     </div>
@@ -3340,7 +3429,7 @@ export function LeadDetailMain({
 
                   {activeWorkflowStep === 7 ? (
                     <div className="mt-3 space-y-2">
-                      <label className="flex items-center gap-2 text-xs">
+                      <label className="flex items-center gap-3 rounded-lg bg-card/30 px-3 py-3 text-sm sm:gap-2 sm:bg-transparent sm:px-0 sm:py-0 sm:text-xs">
                         <input
                           type="checkbox"
                           checked={postServiceTermsAccepted}
@@ -3348,16 +3437,16 @@ export function LeadDetailMain({
                         />
                         I (customer) accept the post-service terms and conditions
                       </label>
-                      <div className="rounded-md border border-dashed border-slate-400/70 bg-slate-900/30 p-2">
-                        <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-100">Terms & Conditions</div>
-                        <p className="mt-1 text-xs text-slate-200">
+                      <div className="rounded-md border border-dashed border-border bg-card/30 p-2">
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-foreground">Terms & Conditions</div>
+                        <p className="mt-1 text-xs text-foreground/80">
                           I (customer) confirm the service checklist and car condition have been reviewed and accepted.
                         </p>
                       </div>
-                      <div className="rounded-md border border-white/15 bg-white/5 p-2">
+                      <div className="rounded-md border border-border bg-muted/40 p-2">
                         <div className="text-xs font-semibold">Customer Post-Service Checklist</div>
                         <div className="mt-2 grid gap-2 md:grid-cols-2">
-                          <label className="flex items-center gap-2 text-xs">
+                          <label className="flex items-center gap-3 rounded-lg bg-card/30 px-3 py-3 text-sm sm:gap-2 sm:bg-transparent sm:px-0 sm:py-0 sm:text-xs">
                             <input
                               type="checkbox"
                               checked={postServiceChecklistServiceDone}
@@ -3365,7 +3454,7 @@ export function LeadDetailMain({
                             />
                             I confirm service completed
                           </label>
-                          <label className="flex items-center gap-2 text-xs">
+                          <label className="flex items-center gap-3 rounded-lg bg-card/30 px-3 py-3 text-sm sm:gap-2 sm:bg-transparent sm:px-0 sm:py-0 sm:text-xs">
                             <input
                               type="checkbox"
                               checked={postServiceChecklistCleaned}
@@ -3373,7 +3462,7 @@ export function LeadDetailMain({
                             />
                             I confirm car cleaned
                           </label>
-                          <label className="flex items-center gap-2 text-xs">
+                          <label className="flex items-center gap-3 rounded-lg bg-card/30 px-3 py-3 text-sm sm:gap-2 sm:bg-transparent sm:px-0 sm:py-0 sm:text-xs">
                             <input
                               type="checkbox"
                               checked={postServiceChecklistExplained}
@@ -3381,7 +3470,7 @@ export function LeadDetailMain({
                             />
                             I confirm work explained to me
                           </label>
-                          <label className="flex items-center gap-2 text-xs">
+                          <label className="flex items-center gap-3 rounded-lg bg-card/30 px-3 py-3 text-sm sm:gap-2 sm:bg-transparent sm:px-0 sm:py-0 sm:text-xs">
                             <input
                               type="checkbox"
                               checked={postServiceChecklistRoadTested}
@@ -3398,7 +3487,7 @@ export function LeadDetailMain({
                           <button
                             type="button"
                             onClick={() => setPostServiceSignature("")}
-                            className="rounded-md border border-slate-300 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-slate-100 hover:bg-white/10"
+                            className="rounded-md border border-border px-2 py-1 text-xs font-semibold uppercase tracking-wide text-foreground hover:bg-muted"
                           >
                             Clear Signature
                           </button>
@@ -3408,7 +3497,7 @@ export function LeadDetailMain({
                         value={postServiceNotes}
                         onChange={(e) => setPostServiceNotes(e.target.value)}
                         placeholder="Post-service notes (optional)"
-                        className="h-20 w-full rounded-md border border-white/20 bg-slate-950/60 p-2 text-xs text-slate-100 placeholder:text-slate-500"
+                        className="h-20 w-full rounded-md border border-border bg-background/60 p-2 text-xs text-foreground placeholder:text-muted-foreground"
                       />
                       <button
                         type="button"
@@ -3428,12 +3517,12 @@ export function LeadDetailMain({
                     </div>
                   ) : null}
 
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <div className="mt-4 flex gap-2 sm:mt-3">
                     <button
                       type="button"
                       disabled={workflowBusy || activeWorkflowStep <= 0}
                       onClick={() => setWorkflowTabStep((prev) => Math.max(0, prev - 1))}
-                      className="rounded-md border px-3 py-2 text-xs font-semibold uppercase tracking-wide hover:bg-white/10 disabled:opacity-50"
+                      className="flex-1 rounded-xl border px-3 py-3 text-sm font-semibold uppercase tracking-wide active:bg-muted disabled:opacity-40 sm:flex-none sm:rounded-md sm:py-2 sm:text-xs"
                     >
                       Back
                     </button>
@@ -3441,7 +3530,7 @@ export function LeadDetailMain({
                       type="button"
                       disabled={workflowBusy || viewingPreviousWorkflowStep}
                       onClick={() => void submitCurrentWorkflowStep()}
-                      className="rounded-md border border-primary/40 bg-primary/10 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-primary hover:bg-primary/20 disabled:opacity-50"
+                      className="flex-[2] rounded-xl border border-primary/40 bg-primary/10 px-3 py-3 text-sm font-semibold uppercase tracking-wide text-primary active:bg-primary/20 disabled:opacity-40 sm:flex-none sm:rounded-md sm:py-2 sm:text-xs"
                     >
                       {workflowBusy
                         ? "Processing..."
@@ -3452,9 +3541,9 @@ export function LeadDetailMain({
                     {inspectionId ? (
                       <a
                         href={`/company/${companyId}/inspections/${inspectionId}`}
-                        className="rounded-md border px-3 py-2 text-xs font-semibold uppercase tracking-wide hover:bg-white/10"
+                        className="flex-1 rounded-xl border px-3 py-3 text-center text-sm font-semibold uppercase tracking-wide active:bg-muted sm:flex-none sm:rounded-md sm:py-2 sm:text-xs"
                       >
-                        Open Inspection
+                        Inspection
                       </a>
                     ) : null}
                   </div>
@@ -3829,18 +3918,7 @@ export function LeadDetailMain({
         </div>
 
         {useSectionCards ? (
-          <Card className="p-4">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <h2 className="text-sm font-semibold">Timeline</h2>
-              </div>
-              {isReloadingTimeline ? (
-                <p className="text-xs text-muted-foreground">Refreshing timeline...</p>
-              ) : (
-                <LeadTimeline events={events} variant={timelineVariant} />
-              )}
-            </div>
-          </Card>
+          {/* Timeline hidden */}
         ) : (
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-2">

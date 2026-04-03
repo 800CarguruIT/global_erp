@@ -22,7 +22,7 @@ type Props = {
 
 export function UserMonitoringOverview({ user, risk }: Props) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/5 p-4 sm:p-5 space-y-2">
+    <div className="rounded-2xl border border-border bg-muted/40 p-4 sm:p-5 space-y-2">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
           <div className="text-lg font-semibold">{user.name ?? user.email}</div>
@@ -55,7 +55,7 @@ export function UserMonitoringOverview({ user, risk }: Props) {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex flex-col gap-1 bg-white/5 rounded-xl p-3 border border-white/5">
+    <div className="flex flex-col gap-1 bg-muted/40 rounded-xl p-3 border border-border/40">
       <span className="text-xs uppercase opacity-70">{label}</span>
       <span className="text-sm">{value}</span>
     </div>

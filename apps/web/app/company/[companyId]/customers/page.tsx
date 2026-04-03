@@ -315,7 +315,7 @@ export default function CompanyCustomersPage({ params }: Params) {
             </button>
             <Link
               href={companyId ? `/company/${companyId}/customers/new` : "#"}
-              className="inline-flex items-center rounded-md border border-white/30 bg-primary px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-primary-foreground shadow-md transition hover:opacity-90 hover:shadow-lg"
+              className="inline-flex items-center rounded-md border border-border bg-primary px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-primary-foreground shadow-md transition hover:opacity-90 hover:shadow-lg"
             >
               <svg viewBox="0 0 24 24" className="-ml-1 mr-2 h-4 w-4" aria-hidden="true">
                 <path
@@ -532,7 +532,7 @@ export default function CompanyCustomersPage({ params }: Params) {
                         </Link>
                         <Link
                           href={companyId ? `/company/${companyId}/customers/${c.id}/edit` : "#"}
-                          className="inline-flex items-center rounded-md border border-white/30 bg-primary px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary-foreground shadow-sm transition hover:opacity-90 hover:shadow-md"
+                          className="inline-flex items-center rounded-md border border-border bg-primary px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary-foreground shadow-sm transition hover:opacity-90 hover:shadow-md"
                         >
                           Edit
                         </Link>
@@ -580,8 +580,8 @@ export default function CompanyCustomersPage({ params }: Params) {
               >
                 <table className="min-w-full text-sm border-separate border-spacing-0">
                   <thead>
-                    <tr className="text-left bg-slate-950">
-                      <th className="px-4 py-3.5 sticky left-0 top-0 z-30 bg-slate-950 border-b border-slate-700/60 text-[11px] font-semibold uppercase tracking-wide text-slate-300 shadow-[inset_-1px_0_0_rgba(148,163,184,0.22)]">
+                    <tr className="text-left bg-background">
+                      <th className="px-4 py-3.5 sticky left-0 top-0 z-30 bg-background border-b border-slate-700/60 text-[11px] font-semibold uppercase tracking-wide text-slate-300 shadow-[inset_-1px_0_0_rgba(148,163,184,0.22)]">
                         <input
                           type="checkbox"
                           checked={filtered.length > 0 && filtered.every((c) => selected[c.id])}
@@ -594,69 +594,69 @@ export default function CompanyCustomersPage({ params }: Params) {
                           }}
                         />
                       </th>
-                      <th className="px-4 py-3.5 sticky top-0 z-20 bg-slate-950 border-b border-slate-700/60 text-[11px] font-semibold uppercase tracking-wide text-slate-300">
+                      <th className="px-4 py-3.5 sticky top-0 z-20 bg-background border-b border-slate-700/60 text-[11px] font-semibold uppercase tracking-wide text-slate-300">
                         <button
                           type="button"
                           onClick={() => applyColumnSort("name")}
-                          className="inline-flex items-center gap-1.5 hover:text-white"
+                          className="inline-flex items-center gap-1.5 hover:text-foreground"
                         >
                           Name
                           {sortLabel("name") ? (
-                            <span className="rounded bg-white/10 px-1.5 py-0.5 text-[9px] font-bold tracking-normal text-slate-200">
+                            <span className="rounded bg-muted px-1.5 py-0.5 text-[9px] font-bold tracking-normal text-slate-200">
                               {sortLabel("name")}
                             </span>
                           ) : null}
                         </button>
                       </th>
-                      <th className="px-4 py-3.5 sticky top-0 z-20 bg-slate-950 border-b border-slate-700/60 text-[11px] font-semibold uppercase tracking-wide text-slate-300">
+                      <th className="px-4 py-3.5 sticky top-0 z-20 bg-background border-b border-slate-700/60 text-[11px] font-semibold uppercase tracking-wide text-slate-300">
                         <button
                           type="button"
                           onClick={() => applyColumnSort("phone")}
-                          className="inline-flex items-center gap-1.5 hover:text-white"
+                          className="inline-flex items-center gap-1.5 hover:text-foreground"
                         >
                           Phone
                           {sortLabel("phone") ? (
-                            <span className="rounded bg-white/10 px-1.5 py-0.5 text-[9px] font-bold tracking-normal text-slate-200">
+                            <span className="rounded bg-muted px-1.5 py-0.5 text-[9px] font-bold tracking-normal text-slate-200">
                               {sortLabel("phone")}
                             </span>
                           ) : null}
                         </button>
                       </th>
-                      <th className="px-4 py-3.5 sticky top-0 z-20 bg-slate-950 border-b border-slate-700/60 text-[11px] font-semibold uppercase tracking-wide text-slate-300">
+                      <th className="px-4 py-3.5 sticky top-0 z-20 bg-background border-b border-slate-700/60 text-[11px] font-semibold uppercase tracking-wide text-slate-300">
                         <button
                           type="button"
                           onClick={() => applyColumnSort("email")}
-                          className="inline-flex items-center gap-1.5 hover:text-white"
+                          className="inline-flex items-center gap-1.5 hover:text-foreground"
                         >
                           Email
                           {sortLabel("email") ? (
-                            <span className="rounded bg-white/10 px-1.5 py-0.5 text-[9px] font-bold tracking-normal text-slate-200">
+                            <span className="rounded bg-muted px-1.5 py-0.5 text-[9px] font-bold tracking-normal text-slate-200">
                               {sortLabel("email")}
                             </span>
                           ) : null}
                         </button>
                       </th>
-                      <th className="px-4 py-3.5 sticky top-0 z-20 bg-slate-950 border-b border-slate-700/60 text-[11px] font-semibold uppercase tracking-wide text-slate-300">
+                      <th className="px-4 py-3.5 sticky top-0 z-20 bg-background border-b border-slate-700/60 text-[11px] font-semibold uppercase tracking-wide text-slate-300">
                         Cars
                       </th>
-                      <th className="px-4 py-3.5 sticky top-0 z-20 bg-slate-950 border-b border-slate-700/60 text-[11px] font-semibold uppercase tracking-wide text-slate-300">
+                      <th className="px-4 py-3.5 sticky top-0 z-20 bg-background border-b border-slate-700/60 text-[11px] font-semibold uppercase tracking-wide text-slate-300">
                         <button
                           type="button"
                           onClick={() => applyColumnSort("code")}
-                          className="inline-flex items-center gap-1.5 hover:text-white"
+                          className="inline-flex items-center gap-1.5 hover:text-foreground"
                         >
                           Code
                           {sortLabel("code") ? (
-                            <span className="rounded bg-white/10 px-1.5 py-0.5 text-[9px] font-bold tracking-normal text-slate-200">
+                            <span className="rounded bg-muted px-1.5 py-0.5 text-[9px] font-bold tracking-normal text-slate-200">
                               {sortLabel("code")}
                             </span>
                           ) : null}
                         </button>
                       </th>
-                      <th className="px-4 py-3.5 sticky top-0 z-20 bg-slate-950 border-b border-slate-700/60 text-[11px] font-semibold uppercase tracking-wide text-slate-300">
+                      <th className="px-4 py-3.5 sticky top-0 z-20 bg-background border-b border-slate-700/60 text-[11px] font-semibold uppercase tracking-wide text-slate-300">
                         Status
                       </th>
-                      <th className="px-4 py-3.5 text-right sticky right-0 top-0 z-30 bg-slate-950 border-b border-slate-700/60 text-[11px] font-semibold uppercase tracking-wide text-slate-300 shadow-[inset_1px_0_0_rgba(148,163,184,0.22)]">
+                      <th className="px-4 py-3.5 text-right sticky right-0 top-0 z-30 bg-background border-b border-slate-700/60 text-[11px] font-semibold uppercase tracking-wide text-slate-300 shadow-[inset_1px_0_0_rgba(148,163,184,0.22)]">
                         Actions
                       </th>
                     </tr>
@@ -682,7 +682,7 @@ export default function CompanyCustomersPage({ params }: Params) {
                           </tr>
                         ) : null}
                       {virtualRows.rows.map((c) => (
-                        <tr key={c.id} className="transition-colors odd:bg-transparent even:bg-slate-900/25 hover:bg-slate-800/35">
+                        <tr key={c.id} className="transition-colors odd:bg-transparent even:bg-popover/25 hover:bg-muted/35">
                           <td className="px-4 py-3.5 border-b border-slate-300/25 sticky left-0 z-10 bg-background shadow-[inset_-1px_0_0_rgba(148,163,184,0.18)]">
                             <input
                               type="checkbox"
@@ -738,7 +738,7 @@ export default function CompanyCustomersPage({ params }: Params) {
                             <div className="flex items-center justify-end gap-2 whitespace-nowrap">
                               <Link
                                 href={companyId ? `/company/${companyId}/customers/${c.id}/edit` : "#"}
-                                className="inline-flex items-center rounded-md border border-white/30 bg-primary px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary-foreground shadow-sm transition hover:opacity-90 hover:shadow-md"
+                                className="inline-flex items-center rounded-md border border-border bg-primary px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary-foreground shadow-sm transition hover:opacity-90 hover:shadow-md"
                               >
                                 Edit
                               </Link>

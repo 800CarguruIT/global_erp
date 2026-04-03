@@ -289,7 +289,7 @@ export function EmployeeForm({ mode = "create", initialValues, scope, onSaved }:
               />
               <button
                 type="button"
-                className="px-3 py-2 rounded-lg border border-white/20 text-xs hover:border-white/40"
+                className="px-3 py-2 rounded-lg border border-border text-xs hover:border-border"
                 onClick={() => fileInputRef.current?.click()}
               >
                 Upload
@@ -625,7 +625,7 @@ export function EmployeeForm({ mode = "create", initialValues, scope, onSaved }:
               />
               <button
                 type="button"
-                className="px-3 py-2 rounded-lg border border-white/20 text-xs hover:border-white/40"
+                className="px-3 py-2 rounded-lg border border-border text-xs hover:border-border"
                 onClick={() => idFileInputRef.current?.click()}
               >
                 Upload
@@ -678,7 +678,7 @@ export function EmployeeForm({ mode = "create", initialValues, scope, onSaved }:
               />
               <button
                 type="button"
-                className="px-3 py-2 rounded-lg border border-white/20 text-xs hover:border-white/40"
+                className="px-3 py-2 rounded-lg border border-border text-xs hover:border-border"
                 onClick={() => passportFileInputRef.current?.click()}
               >
                 Upload
@@ -784,7 +784,7 @@ export function EmployeeForm({ mode = "create", initialValues, scope, onSaved }:
           {(values.allowances ?? []).length < 5 && (
             <button
               type="button"
-              className="text-xs px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 transition"
+              className="text-xs px-3 py-2 rounded-lg bg-muted hover:bg-muted/80 transition"
               onClick={() =>
                 setValues((prev) => ({
                   ...prev,
